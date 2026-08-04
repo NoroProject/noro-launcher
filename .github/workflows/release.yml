@@ -56,6 +56,41 @@ jobs:
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp target/${{ matrix.target }}/release/noro-master.exe dist/noro-master-${{ matrix.target }}.exe
             cp target/${{ matrix.target }}/release/noro-launcher.exe dist/noro-launcher-${{ matrix.target }}.exe
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # Упаковываем master как обычный бинарник
+            cp target/${{ matrix.target }}/release/noro-master dist/noro-master-${{ matrix.target }}
+            
+            # Упаковываем launcher как .app
+            APP_NAME="NoroLauncher.app"
+            mkdir -p "$APP_NAME/Contents/MacOS"
+            mkdir -p "$APP_NAME/Contents/Resources"
+            cp target/${{ matrix.target }}/release/noro-launcher "$APP_NAME/Contents/MacOS/"
+            
+            cat > "$APP_NAME/Contents/Info.plist" <<EOF
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+                <key>CFBundleExecutable</key>
+                <string>noro-launcher</string>
+                <key>CFBundleIdentifier</key>
+                <string>com.nexbitstd.norolauncher</string>
+                <key>CFBundleName</key>
+                <string>NoroLauncher</string>
+                <key>CFBundlePackageType</key>
+                <string>APPL</string>
+                <key>CFBundleShortVersionString</key>
+                <string>1.0</string>
+                <key>CFBundleVersion</key>
+                <string>1</string>
+                <key>LSMinimumSystemVersion</key>
+                <string>10.13</string>
+            </dict>
+            </plist>
+            EOF
+            
+            # Архивируем .app в tar.gz чтобы сохранить права доступа
+            tar -czf dist/noro-launcher-${{ matrix.target }}.app.tar.gz "$APP_NAME"
           else
             cp target/${{ matrix.target }}/release/noro-master dist/noro-master-${{ matrix.target }}
             cp target/${{ matrix.target }}/release/noro-launcher dist/noro-launcher-${{ matrix.target }}
