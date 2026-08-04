@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: noro-postgres
+    environment:
+      POSTGRES_DB: noro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - noro-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d noro"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - internal
+
+  noro-master:
+    image: ghcr.io/nexbitstd/noro-master:latest
+    container_name: noro-master
+    environment:
+      NORO_BIND: 0.0.0.0:8080
+      NORO_PUBLIC_URL: https://api.${DOMAIN}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/noro
+      NORO_DATA_DIR: /app/data
+      NORO_GITHUB_REPO: ${NORO_GITHUB_REPO}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      NORO_LAUNCHER_REPO: /app/launcher-repo
+      CURSEFORGE_API_KEY: ${CURSEFORGE_API_KEY}
+      NORO_SIGNING_KEY: ${NORO_SIGNING_KEY}
+    volumes:
+      - noro-data:/app/data
+      - ./launcher-repo:/app/launcher-repo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.http.routers.noro-master.rule=Host(`api.${DOMAIN}`)
+      - traefik.http.routers.noro-master.entrypoints=websecure
+      - traefik.http.routers.noro-master.tls=true
+      - traefik.http.services.noro-master.loadbalancer.server.port=8080
+    restart: unless-stopped
+    networks:
+      - internal
+      - traefik-public
+
+  noro-web:
+    image: ghcr.io/nexbitstd/noro-web:latest
+    container_name: noro-web
+    environment:
+      NUXT_PUBLIC_MASTER_URL: https://api.${DOMAIN}
+      NUXT_PUBLIC_WEB_URL: https://${DOMAIN}
+    depends_on:
+      - noro-master
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.http.routers.noro-web.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.noro-web.entrypoints=websecure
+      - traefik.http.routers.noro-web.tls=true
+      - traefik.http.services.noro-web.loadbalancer.server.port=3000
+    restart: unless-stopped
+    networks:
+      - internal
+      - traefik-public
+
+volumes:
+  noro-postgres:
+  noro-data:
+
+networks:
+  internal:
+    name: noro-internal
+  traefik-public:
+    external: true

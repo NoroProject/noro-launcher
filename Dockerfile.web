@@ -1,0 +1,17 @@
+FROM oven/bun:1.2.21 AS builder
+WORKDIR /app/web
+
+COPY web/package.json web/bun.lock* ./
+RUN bun install --frozen-lockfile
+
+COPY web/ ./
+RUN bun run build
+
+FROM oven/bun:1.2.21
+WORKDIR /app/web
+
+ENV NODE_ENV=production
+COPY --from=builder /app/web/.output ./.output
+
+EXPOSE 3000
+CMD ["bun", ".output/server/index.mjs"]
