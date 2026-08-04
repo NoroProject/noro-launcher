@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: noro
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
@@ -15,6 +15,53 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+    networks:
+      - internal
+
+  noro-master:
+    image: ghcr.io/nexbitstd/noro-master:latest
+    container_name: noro-master
+    environment:
+      NORO_BIND: 0.0.0.0:8080
+      NORO_PUBLIC_URL: ${NORO_PUBLIC_URL:-http://localhost:8080}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/noro
+      NORO_DATA_DIR: /app/data
+      NORO_GITHUB_REPO: ${NORO_GITHUB_REPO}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      NORO_LAUNCHER_REPO: /app/launcher-repo
+      CURSEFORGE_API_KEY: ${CURSEFORGE_API_KEY}
+      NORO_SIGNING_KEY: ${NORO_SIGNING_KEY}
+    ports:
+      - "8080:8080"
+    volumes:
+      - noro-data:/app/data
+      - ./launcher-repo:/app/launcher-repo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - internal
+
+  noro-web:
+    image: ghcr.io/nexbitstd/noro-web:latest
+    container_name: noro-web
+    environment:
+      NUXT_PUBLIC_MASTER_URL: ${NORO_PUBLIC_URL:-http://localhost:8080}
+      NUXT_PUBLIC_WEB_URL: ${NUXT_PUBLIC_WEB_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - noro-master
+    restart: unless-stopped
+    networks:
+      - internal
 
 volumes:
   noro-postgres:
+  noro-data:
+
+networks:
+  internal:
+    name: noro-internal
