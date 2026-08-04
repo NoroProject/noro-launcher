@@ -9,6 +9,7 @@ members = [
     "crates/master",
     "crates/admin_cli",
     "crates/noro_launcher",
+    "crates/noro_core",
 ]
 
 [workspace.package]

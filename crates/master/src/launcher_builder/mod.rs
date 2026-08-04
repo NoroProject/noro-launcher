@@ -76,7 +76,7 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
 
     for asset in assets {
         let name = asset["name"].as_str().unwrap_or_default();
-        if !name.starts_with("noro-launcher-") {
+        if !name.starts_with("noro-launcher-core-") {
             continue;
         }
         

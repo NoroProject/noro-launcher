@@ -4219,7 +4219,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
-name = "noro_launcher"
+name = "noro_core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -4233,6 +4233,19 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "noro_launcher"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs 5.0.1",
+ "hex",
+ "reqwest",
+ "serde_json",
+ "sha2",
+ "tokio",
 ]
 
 [[package]]

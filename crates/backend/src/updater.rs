@@ -1,18 +1,35 @@
-//! Самообновление лаунчера: скачивание, проверка sha256 + ed25519, замена бинарника.
+//! Самообновление лаунчера: скачивание, проверка sha256 + ed25519, установка в AppData/bin/.
+//! Bootstrapper (.exe, который скачал пользователь) никогда не меняется — это даёт
+//! накопление SmartScreen-репутации на Windows.
 
 use crate::directories::LauncherDirectories;
 use crate::sync::integrity::sha256_hex;
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use schema::LauncherVersion;
+use std::path::PathBuf;
 
-/// Скачать и установить обновление. После успеха нужно вызвать [`restart`].
+/// Имя основного бинарника лаунчера в каталоге `bin/`.
+fn core_binary_name() -> &'static str {
+    if cfg!(windows) {
+        "noro-launcher-core.exe"
+    } else {
+        "noro-launcher-core"
+    }
+}
+
+/// Путь к основному бинарнику лаунчера.
+pub fn core_binary_path(dirs: &LauncherDirectories) -> PathBuf {
+    dirs.root().join(core_binary_name())
+}
+
+/// Скачать и установить обновление в `AppData/bin/`. Возвращает путь к бинарнику.
 pub async fn install_update(
     client: &reqwest::Client,
     dirs: &LauncherDirectories,
     version: &LauncherVersion,
     on_progress: impl Fn(u64, u64),
-) -> Result<std::path::PathBuf> {
-    tokio::fs::create_dir_all(dirs.updates()).await.ok();
+) -> Result<PathBuf> {
+    tokio::fs::create_dir_all(dirs.root()).await.ok();
 
     // Скачать.
     let resp = client.get(&version.url).send().await?.error_for_status()?;
@@ -38,51 +55,37 @@ pub async fn install_update(
         bail!("подпись бинарника недействительна");
     }
 
-    // Записать новый бинарник.
-    let new_path = dirs
-        .updates()
-        .join(format!("noro-launcher-{}", version.version));
-    tokio::fs::write(&new_path, &bytes).await?;
+    // Записать основной бинарник в bin/.
+    let dest = core_binary_path(dirs);
+
+    // На Windows нельзя перезаписать запущенный exe — переименуем старый.
+    #[cfg(windows)]
+    if dest.exists() {
+        let old = dest.with_extension("old");
+        let _ = tokio::fs::remove_file(&old).await;
+        let _ = tokio::fs::rename(&dest, &old).await;
+    }
+
+    tokio::fs::write(&dest, &bytes).await?;
+
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = tokio::fs::metadata(&new_path).await?.permissions();
+        let mut perms = tokio::fs::metadata(&dest).await?.permissions();
         perms.set_mode(0o755);
-        tokio::fs::set_permissions(&new_path, perms).await?;
+        tokio::fs::set_permissions(&dest, perms).await?;
     }
 
-    // Заменить текущий исполняемый файл.
-    let current = std::env::current_exe().context("определение текущего exe")?;
-    swap_executable(&current, &new_path).await?;
-    Ok(current)
+    // Сохранить текущую версию.
+    let version_file = dirs.root().join("version");
+    tokio::fs::write(&version_file, &version.version).await.ok();
+
+    Ok(dest)
 }
 
-/// Заменить `current` бинарник на `new`.
-async fn swap_executable(current: &std::path::Path, new: &std::path::Path) -> Result<()> {
-    #[cfg(unix)]
-    {
-        // На unix можно переименовать поверх запущенного бинарника.
-        tokio::fs::rename(new, current)
-            .await
-            .context("замена бинарника")?;
-    }
-    #[cfg(windows)]
-    {
-        // На Windows запущенный exe нельзя перезаписать: переименуем старый.
-        let old = current.with_extension("old");
-        let _ = tokio::fs::remove_file(&old).await;
-        tokio::fs::rename(current, &old)
-            .await
-            .context("переименование старого exe")?;
-        tokio::fs::rename(new, current)
-            .await
-            .context("установка нового exe")?;
-    }
-    Ok(())
-}
-
-/// Перезапустить лаунчер из обновлённого бинарника и завершить текущий процесс.
+/// Перезапустить лаунчер (запускает основной бинарник из bin/).
 pub fn restart(exe: &std::path::Path) -> ! {
     let _ = std::process::Command::new(exe).spawn();
     std::process::exit(0);
 }
+

@@ -45,9 +45,11 @@ jobs:
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
             cross build --release -p master --bin noro-master --target ${{ matrix.target }}
             cross build --release -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cross build --release -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
           else
             cargo build --release -p master --bin noro-master --target ${{ matrix.target }}
             cargo build --release -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cargo build --release -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
           fi
         shell: bash
         
@@ -58,11 +60,12 @@ jobs:
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp target/${{ matrix.target }}/release/noro-master.exe dist/noro-master-${{ matrix.target }}.exe
             cp target/${{ matrix.target }}/release/noro-launcher.exe dist/noro-launcher-${{ matrix.target }}.exe
+            cp target/${{ matrix.target }}/release/noro-launcher-core.exe dist/noro-launcher-core-${{ matrix.target }}.exe
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # Упаковываем master как обычный бинарник
             cp target/${{ matrix.target }}/release/noro-master dist/noro-master-${{ matrix.target }}
+            cp target/${{ matrix.target }}/release/noro-launcher-core dist/noro-launcher-core-${{ matrix.target }}
             
-            # Упаковываем launcher как .app
+            # Упаковываем bootstrapper как .app
             APP_NAME="NoroLauncher.app"
             mkdir -p "$APP_NAME/Contents/MacOS"
             mkdir -p "$APP_NAME/Contents/Resources"
@@ -91,11 +94,11 @@ jobs:
             </plist>
             EOF
             
-            # Архивируем .app в tar.gz чтобы сохранить права доступа
             tar -czf dist/noro-launcher-${{ matrix.target }}.app.tar.gz "$APP_NAME"
           else
             cp target/${{ matrix.target }}/release/noro-master dist/noro-master-${{ matrix.target }}
             cp target/${{ matrix.target }}/release/noro-launcher dist/noro-launcher-${{ matrix.target }}
+            cp target/${{ matrix.target }}/release/noro-launcher-core dist/noro-launcher-core-${{ matrix.target }}
           fi
 
       - name: Upload artifact

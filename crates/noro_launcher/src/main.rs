@@ -1,167 +1,137 @@
-//! Точка входа лаунчера: single-instance, мост frontend↔backend, запуск обоих.
+//! Bootstrapper лаунчера: проверка обновлений, скачивание core-бинарника, запуск.
+//!
+//! Этот файл НИКОГДА не обновляется после первой установки — это даёт
+//! накопление SmartScreen-репутации на Windows.
+//! Вся логика лаунчера живёт в core-бинарнике (`noro-launcher-core`),
+//! который обновляется автоматически в `AppData/noro-launcher/`.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use bridge::{MessageToBackend, MessageToFrontend, QuitCoordinator};
-use fs2::FileExt;
-use std::fs::OpenOptions;
 use std::path::PathBuf;
+use std::process::ExitCode;
 
-fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,backend=debug,frontend=debug,bridge=debug".into()),
-        )
-        .init();
-
+fn main() -> ExitCode {
     let app_dir = dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("noro-launcher");
     let _ = std::fs::create_dir_all(&app_dir);
 
-    let lockfile_path = app_dir.join("app.lock");
-    let socket_path = app_dir.join("app.sock");
+    let core_path = app_dir.join(core_binary_name());
 
-    let lockfile = match OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(&lockfile_path)
-    {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!("не удалось открыть app.lock: {e}");
-            return;
-        }
-    };
-
-    if lockfile.try_lock_exclusive().is_err() {
-        // Уже запущен — попросить существующий процесс показать окно.
-        focus_existing(&socket_path);
-        return;
+    // Если core-бинарник есть — просто запускаем.
+    // Обновление проверит сам core (backend::check_launcher_update).
+    if core_path.exists() {
+        return run_core(&core_path);
     }
 
-    run_primary(&app_dir, &socket_path, &lockfile_path);
-}
-
-/// Основной процесс.
-fn run_primary(
-    _app_dir: &std::path::Path,
-    socket_path: &std::path::Path,
-    lockfile_path: &std::path::Path,
-) {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(3)
-        .enable_all()
-        .build()
-        .expect("tokio runtime");
-
-    let _ = std::fs::remove_file(socket_path);
-
-    let (backend_recv, backend_handle, frontend_recv, frontend_handle) = bridge::create_pair();
-    let listen_cancel = tokio_util::sync::CancellationToken::new();
-
-    // Слушатель single-instance: на новое подключение — показать окно.
-    spawn_focus_listener(
-        &runtime,
-        socket_path.to_path_buf(),
-        frontend_handle.clone(),
-        listen_cancel.clone(),
-    );
-
-    // Координатор завершения: отменяет слушатель и шлёт Quit в backend.
-    let quit_coordinator = QuitCoordinator::new(Box::new({
-        let backend_handle = backend_handle.clone();
-        let listen_cancel = listen_cancel.clone();
-        move || {
-            listen_cancel.cancel();
-            backend_handle.send(MessageToBackend::Quit);
-        }
-    }));
-
-    backend::start(
-        &runtime,
-        frontend_handle,
-        backend_recv,
-        quit_coordinator.fork(),
-    );
-
-    // Блокирует главный поток до выхода (GPUI требует main thread).
-    frontend::start(backend_handle, frontend_recv);
-
-    tracing::info!("frontend завершён, останавливаем backend");
-    runtime.block_on(quit_coordinator.quit());
-    let _ = std::fs::remove_file(lockfile_path);
-    std::process::exit(0);
-}
-
-fn spawn_focus_listener(
-    runtime: &tokio::runtime::Runtime,
-    socket_path: PathBuf,
-    frontend: bridge::FrontendHandle,
-    cancel: tokio_util::sync::CancellationToken,
-) {
-    runtime.spawn(async move {
-        #[cfg(unix)]
-        {
-            let listener = match tokio::net::UnixListener::bind(&socket_path) {
-                Ok(l) => l,
-                Err(e) => {
-                    tracing::warn!("не удалось открыть сокет single-instance: {e}");
-                    return;
-                }
-            };
-            loop {
-                tokio::select! {
-                    accepted = listener.accept() => {
-                        if accepted.is_ok() {
-                            frontend.send(MessageToFrontend::OpenOrFocusMainWindow);
-                        }
-                    }
-                    _ = cancel.cancelled() => break,
-                }
-            }
-            let _ = std::fs::remove_file(&socket_path);
-        }
-        #[cfg(windows)]
-        {
-            use tokio::net::windows::named_pipe::ServerOptions;
-            let pipe_name = r"\\.\pipe\noro-launcher";
-            loop {
-                let server = match ServerOptions::new().create(pipe_name) {
-                    Ok(s) => s,
-                    Err(_) => break,
-                };
-                tokio::select! {
-                    res = server.connect() => {
-                        if res.is_ok() {
-                            frontend.send(MessageToFrontend::OpenOrFocusMainWindow);
-                        }
-                    }
-                    _ = cancel.cancelled() => break,
-                }
-            }
-        }
-    });
-}
-
-/// Вторичный процесс: достучаться до основного, чтобы показать окно.
-fn focus_existing(socket_path: &std::path::Path) {
-    println!("noro-launcher уже запущен — показываю окно");
+    // Первый запуск: скачиваем core с мастера.
+    eprintln!("первый запуск — скачивание лаунчера...");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .expect("tokio runtime");
-    rt.block_on(async {
-        #[cfg(unix)]
-        {
-            let _ = tokio::net::UnixStream::connect(socket_path).await;
+
+    match rt.block_on(download_core(&app_dir, &core_path)) {
+        Ok(()) => run_core(&core_path),
+        Err(e) => {
+            eprintln!("ошибка скачивания: {e:#}");
+            ExitCode::FAILURE
         }
-        #[cfg(windows)]
-        {
-            let _ = socket_path; // имя пайпа фиксировано
-            use tokio::net::windows::named_pipe::ClientOptions;
-            let _ = ClientOptions::new().open(r"\\.\pipe\noro-launcher");
+    }
+}
+
+fn core_binary_name() -> &'static str {
+    if cfg!(windows) {
+        "noro-launcher-core.exe"
+    } else {
+        "noro-launcher-core"
+    }
+}
+
+fn run_core(path: &std::path::Path) -> ExitCode {
+    let status = std::process::Command::new(path)
+        .args(std::env::args_os().skip(1))
+        .status();
+    match status {
+        Ok(s) => {
+            if s.success() {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
         }
-    });
+        Err(e) => {
+            eprintln!("не удалось запустить {}: {e}", path.display());
+            ExitCode::FAILURE
+        }
+    }
+}
+
+async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> {
+    let master_url = option_env!("NORO_MASTER_URL")
+        .unwrap_or("http://127.0.0.1:8080");
+    let platform = current_platform();
+    let url = format!(
+        "{}/api/launcher/version?platform={platform}",
+        master_url.trim_end_matches('/')
+    );
+
+    let client = reqwest::Client::new();
+    let resp = client.get(&url).send().await?.error_for_status()?;
+    let info: serde_json::Value = resp.json().await?;
+
+    if info.is_null() {
+        anyhow::bail!("нет доступной версии лаунчера для {platform}");
+    }
+
+    let download_url = info["url"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("нет url в ответе"))?;
+    let expected_sha = info["sha256"]
+        .as_str()
+        .unwrap_or_default();
+    let version = info["version"]
+        .as_str()
+        .unwrap_or("unknown");
+
+    eprintln!("скачивание версии {version}...");
+    let resp = client.get(download_url).send().await?.error_for_status()?;
+    let bytes = resp.bytes().await?;
+
+    // Проверка SHA256.
+    use sha2::Digest;
+    let hash = hex::encode(sha2::Sha256::digest(&bytes));
+    if !expected_sha.is_empty() && !hash.eq_ignore_ascii_case(expected_sha) {
+        anyhow::bail!("sha256 не совпал: ожидали {expected_sha}, получили {hash}");
+    }
+
+    // Записать файл.
+    std::fs::write(dest, &bytes)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(dest)?.permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(dest, perms)?;
+    }
+
+    // Сохранить версию.
+    let version_file = app_dir.join("version");
+    std::fs::write(version_file, version).ok();
+
+    eprintln!("готово!");
+    Ok(())
+}
+
+fn current_platform() -> &'static str {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => "linux-x86_64",
+        ("linux", "aarch64") => "linux-aarch64",
+        ("macos", "x86_64") => "macos-x86_64",
+        ("macos", "aarch64") => "macos-aarch64",
+        ("windows", "x86_64") => "windows-x86_64",
+        (os, arch) => {
+            Box::leak(format!("{os}-{arch}").into_boxed_str())
+        }
+    }
 }
