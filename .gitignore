@@ -2,7 +2,15 @@
 **/target
 Cargo.lock
 .env
+.env.*
+!.env.example
 *.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/
 
 # web
 web/node_modules
@@ -10,6 +18,10 @@ web/.nuxt
 web/.output
 web/dist
 web/bun.lockb
+web/.cache
+web/.vercel
+web/.turbo
+web/coverage
 
 # java-агенты
 agent/.gradle
@@ -17,14 +29,22 @@ agent/build
 agent/*/build
 agent/*/bin
 agent/**/run
+agent/**/.classpath
+agent/**/.project
+agent/**/.settings/
 
 # данные мастера
 /data
 master_data/
 *.sqlite
 *.db
+*.sqlite-shm
+*.sqlite-wal
 
 # ключи (не коммитим приватные ключи подписи)
 *.pem
 ed25519_private*
 secrets/
+*.p12
+*.jks
+*.keystore
