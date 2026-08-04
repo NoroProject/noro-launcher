@@ -16,3 +16,6 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
+
+[build-dependencies]
+winres = "0.1"

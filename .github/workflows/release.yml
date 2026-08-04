@@ -70,6 +70,7 @@ jobs:
             mkdir -p "$APP_NAME/Contents/MacOS"
             mkdir -p "$APP_NAME/Contents/Resources"
             cp target/${{ matrix.target }}/release/noro-launcher "$APP_NAME/Contents/MacOS/"
+            cp assets/icon.icns "$APP_NAME/Contents/Resources/AppIcon.icns"
             
             cat > "$APP_NAME/Contents/Info.plist" <<EOF
             <?xml version="1.0" encoding="UTF-8"?>
@@ -82,6 +83,8 @@ jobs:
                 <string>com.nexbitstd.norolauncher</string>
                 <key>CFBundleName</key>
                 <string>NoroLauncher</string>
+                <key>CFBundleIconFile</key>
+                <string>AppIcon</string>
                 <key>CFBundlePackageType</key>
                 <string>APPL</string>
                 <key>CFBundleShortVersionString</key>
