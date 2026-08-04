@@ -1,0 +1,135 @@
+/* Поверхности. Модель высот та же, что в лаунчере:
+   фон → панель → карточка → поле ввода. Каждый уровень чуть светлее и обведён
+   рамкой — без рамок панели сливались в один тёмный блин. */
+
+.noro-panel {
+  background: var(--noro-panel);
+  border: 1px solid var(--noro-border);
+  border-radius: var(--noro-r-sm);
+}
+
+.noro-card {
+  background: var(--noro-panel);
+  border: 1px solid var(--noro-border);
+  border-radius: var(--noro-r-sm);
+  padding: 20px;
+  transition: border-color 120ms linear, background-color 120ms linear;
+}
+
+.noro-card--cream {
+  background: color-mix(in srgb, var(--noro-cream) 6%, var(--noro-panel));
+  border-color: color-mix(in srgb, var(--noro-cream) 26%, var(--noro-border));
+}
+
+.noro-card--magenta {
+  background: color-mix(in srgb, var(--noro-magenta) 6%, var(--noro-panel));
+  border-color: color-mix(in srgb, var(--noro-magenta) 26%, var(--noro-border));
+}
+
+.noro-card--blue {
+  background: color-mix(in srgb, var(--noro-blue) 6%, var(--noro-panel));
+  border-color: color-mix(in srgb, var(--noro-blue) 26%, var(--noro-border));
+}
+
+/* Раньше это был просто жирный Outfit и «пиксельным» только назывался. */
+.noro-pixel {
+  font-family: var(--noro-font-display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
+/* Мелкая служебная подпись: секции, статусы, шапки таблиц. */
+.noro-label {
+  color: var(--noro-muted);
+  font-family: var(--noro-font);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.noro-cta {
+  background: var(--noro-cream);
+  border: 1px solid var(--noro-cream);
+  border-radius: var(--noro-r-sm);
+  color: var(--noro-on-cream);
+  display: inline-flex;
+  font-family: var(--noro-font);
+  font-weight: 700;
+  justify-content: center;
+  letter-spacing: 0.06em;
+  min-height: 44px;
+  text-transform: uppercase;
+  transition: background-color 120ms linear, border-color 120ms linear;
+}
+
+.noro-cta:hover {
+  background: var(--noro-cream-hover);
+  border-color: var(--noro-white);
+}
+
+.noro-cta:focus-visible {
+  outline: 2px solid var(--noro-magenta);
+  outline-offset: 2px;
+}
+
+.noro-chip {
+  background: var(--noro-input);
+  border: 1px solid var(--noro-border);
+  border-radius: var(--noro-r-sm);
+  font-family: var(--noro-font);
+}
+
+.noro-chip-on {
+  background: color-mix(in srgb, var(--noro-blue) 18%, var(--noro-input));
+  border-color: var(--noro-blue);
+  color: var(--noro-text);
+}
+
+.noro-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.noro-table th,
+.noro-table td {
+  border-bottom: 1px solid var(--noro-border);
+  padding: 12px 16px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.noro-table th {
+  background: var(--noro-input);
+  color: var(--noro-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.noro-table td {
+  color: var(--noro-text);
+  font-size: 0.85rem;
+}
+
+.noro-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--noro-white) 3%, transparent);
+}
+
+.noro-scroll {
+  scrollbar-color: var(--noro-border) transparent;
+  scrollbar-width: thin;
+}
+
+.noro-hero-panel {
+  background: var(--noro-panel-2);
+  border: 1px solid var(--noro-border);
+  border-radius: var(--noro-r-sm);
+  /* Свой контекст наложения: внутри z-10 поднимает контент над фоновой
+     картинкой, и без изоляции он доставал до липкой шапки страницы. */
+  isolation: isolate;
+  min-height: 144px;
+  position: relative;
+}

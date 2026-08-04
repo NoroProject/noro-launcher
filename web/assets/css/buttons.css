@@ -1,0 +1,160 @@
+.noro-btn {
+  align-items: center;
+  border-radius: var(--noro-r-sm);
+  border-style: solid;
+  /* Рамка есть всегда: без неё secondary-кнопка на фоне страницы исчезала —
+     её заливка (--noro-input) почти совпадает с --noro-bg. */
+  border-width: 1px;
+  border-color: transparent;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 8px;
+  min-height: 44px;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  transition: background-color 120ms linear, border-color 120ms linear, color 120ms linear;
+}
+
+/* Высота приходит только отсюда. Раньше её переопределял ещё и вариант
+   окраски: primary был 48px против 44px у поля ввода рядом — кнопка «Save»
+   торчала над полем на 4px. */
+
+/* Одинаковая ширина для кнопок-переключателей: без неё «ENGLISH» и «РУССКИЙ»
+   расходились по ширине и переключатель прыгал. */
+.noro-btn-equal {
+  min-width: 128px;
+}
+
+.noro-btn-sm.noro-btn-equal {
+  min-width: 104px;
+}
+
+/* Size variants (4pt grid friendly) */
+.noro-btn-sm {
+  font-size: 12px;
+  font-weight: 700;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+}
+.noro-btn-lg {
+  font-size: 15px;
+  font-weight: 700;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 20px;
+}
+
+.noro-btn:focus-visible {
+  outline: 2px solid var(--noro-blue);
+  outline-offset: 2px;
+}
+
+.noro-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.noro-btn-primary {
+  background: var(--noro-cream);
+  border-color: var(--noro-cream);
+  color: var(--noro-on-cream);
+}
+
+.noro-btn-primary:hover:not(:disabled) {
+  background: var(--noro-cream-hover);
+  border-color: var(--noro-white);
+}
+
+.noro-btn-secondary {
+  background: var(--noro-input);
+  border-color: var(--noro-border);
+  color: var(--noro-text);
+}
+
+.noro-btn-secondary:hover:not(:disabled) {
+  background: var(--noro-panel-2);
+  border-color: var(--noro-cream);
+}
+
+/* Третьестепенные и опасные действия: без заливки, чтобы не спорить с primary. */
+.noro-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--noro-muted);
+}
+
+.noro-btn-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--noro-white) 5%, transparent);
+  border-color: var(--noro-border);
+}
+
+.noro-btn-secondary:hover:not(:disabled) {
+  background: var(--noro-panel-2);
+  color: var(--noro-white);
+  
+}
+
+.noro-btn-dark {
+  background: var(--noro-bg-deep);
+  color: var(--noro-cream);
+}
+
+.noro-btn-dark:hover:not(:disabled) {
+  background: var(--noro-input);
+  color: var(--noro-cream);
+  
+}
+
+/* Warning (orange/amber) for rebuild etc. */
+.noro-btn-warning {
+  background: var(--noro-amber);
+  color: var(--noro-on-cream);
+}
+
+.noro-btn-warning:hover:not(:disabled) {
+  filter: brightness(0.9);
+  
+}
+
+/* Danger (red) for delete etc. */
+.noro-btn-danger {
+  background: var(--noro-danger);
+  color: var(--noro-white);
+}
+
+.noro-btn-danger:hover:not(:disabled) {
+  filter: brightness(0.9);
+  
+}
+
+/* Bold outline per flat design (thick border, fill on hover) */
+.noro-btn-outline {
+  background: transparent;
+  border: 1px solid var(--noro-cream);
+  color: var(--noro-cream);
+}
+
+.noro-btn-outline:hover:not(:disabled) {
+  background: var(--noro-cream);
+  color: var(--noro-on-cream);
+  border-color: var(--noro-cream);
+
+}
+
+.noro-btn-outline-blue {
+  background: transparent;
+  border: 1px solid var(--noro-blue);
+  color: var(--noro-blue);
+}
+
+.noro-btn-outline-blue:hover:not(:disabled) {
+  background: var(--noro-blue);
+  color: var(--noro-bg-deep);
+  border-color: var(--noro-blue);
+
+}

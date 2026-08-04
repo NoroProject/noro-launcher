@@ -1,0 +1,43 @@
+//! Общие serde-типы, разделяемые между лаунчером, мастером, CLI и (через JSON) web.
+//!
+//! Этот крейт не зависит от tokio/axum/sqlx — только сериализация и базовые типы,
+//! поэтому его одинаково тянут и frontend (GPUI), и backend, и master.
+
+pub mod build;
+pub mod launcher;
+pub mod news;
+pub mod permissions;
+pub mod server;
+pub mod user;
+pub mod ws_protocol;
+
+pub use build::*;
+pub use launcher::*;
+pub use news::*;
+pub use permissions::*;
+pub use server::*;
+pub use user::*;
+pub use ws_protocol::*;
+
+/// UUID игрока (Minecraft) детерминированно выводится из Discord ID
+/// через UUID v5 в фиксированном namespace. Так один и тот же Discord-аккаунт
+/// всегда получает один и тот же MC-UUID, без хранения маппинга.
+pub const MC_UUID_NAMESPACE: uuid::Uuid = uuid::Uuid::from_bytes([
+    0x4e, 0x6f, 0x72, 0x6f, 0x4d, 0x43, 0x55, 0x55, 0x49, 0x44, 0x4e, 0x53, 0x70, 0x61, 0x63, 0x65,
+]);
+
+/// Детерминированный offline-style MC UUID из Discord ID.
+pub fn mc_uuid_from_discord(discord_id: &str) -> uuid::Uuid {
+    uuid::Uuid::new_v5(
+        &MC_UUID_NAMESPACE,
+        format!("Discord:{discord_id}").as_bytes(),
+    )
+}
+
+/// DEV-ONLY seed для ed25519. В режиме разработки мастер выводит из него приватный
+/// ключ подписи манифестов, а лаунчер — публичный ключ для проверки. Так обе
+/// стороны согласованы из коробки. В production мастер задаёт реальный приватный
+/// ключ через env `NORO_SIGNING_KEY`, а лаунчер компилируется с реальным публичным
+/// ключом через env `NORO_SIGNING_PUBKEY`. Этот seed НИКОГДА не должен использоваться
+/// в проде — он публичен в исходниках.
+pub const DEV_SIGNING_SEED: [u8; 32] = *b"noro-launcher-dev-signing-seed!!";

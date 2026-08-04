@@ -1,0 +1,30 @@
+/target
+**/target
+Cargo.lock
+.env
+*.log
+
+# web
+web/node_modules
+web/.nuxt
+web/.output
+web/dist
+web/bun.lockb
+
+# java-агенты
+agent/.gradle
+agent/build
+agent/*/build
+agent/*/bin
+agent/**/run
+
+# данные мастера
+/data
+master_data/
+*.sqlite
+*.db
+
+# ключи (не коммитим приватные ключи подписи)
+*.pem
+ed25519_private*
+secrets/

@@ -1,0 +1,60 @@
+[package]
+name = "master"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "noro-master"
+path = "src/main.rs"
+
+[dependencies]
+schema = { workspace = true }
+i18n = { workspace = true }
+
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+futures-util = { workspace = true }
+
+axum = { workspace = true }
+axum-extra = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+sqlx = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+reqwest = { workspace = true }
+tokio-tungstenite = { workspace = true }
+
+ed25519-dalek = { workspace = true }
+rand = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+argon2 = { workspace = true }
+
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+once_cell = { workspace = true }
+bytes = { workspace = true }
+zip = { workspace = true }
+walkdir = { workspace = true }
+url = { workspace = true }
+urlencoding = { workspace = true }
+indexmap = { workspace = true }
+image = { workspace = true }
+clap = { workspace = true }

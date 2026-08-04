@@ -1,0 +1,43 @@
+[versions]
+# Minecraft 1.21.1 requires Java 21 — the toolchain pins it in build.gradle.kts.
+minecraft = "1.21.1"
+java = "21"
+
+paper = "1.21.1-R0.1-SNAPSHOT"
+luckperms = "5.5"
+
+fabricLoom = "1.17.14"
+fabricLoader = "0.19.3"
+fabricApi = "0.116.15+1.21.1"
+yarn = "1.21.1+build.3"
+
+neoforge = "21.1.248"
+moddev = "2.0.143"
+
+shadow = "9.0.2"
+# Компилируемся против той версии, что реально едет с 1.21.1, а не против
+# свежайшей: рантайм тут старше, чем Maven Central.
+gson = "2.10.1"
+slf4j = "2.0.9"
+junit = "5.11.3"
+
+[libraries]
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper" }
+luckperms-api = { module = "net.luckperms:api", version.ref = "luckperms" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.11.3" }
+
+minecraft = { module = "com.mojang:minecraft", version.ref = "minecraft" }
+fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabricLoader" }
+fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabricApi" }
+yarn = { module = "net.fabricmc:yarn", version.ref = "yarn" }
+
+neoforge = { module = "net.neoforged:neoforge", version.ref = "neoforge" }
+
+[plugins]
+fabric-loom = { id = "fabric-loom", version.ref = "fabricLoom" }
+neoforge-moddev = { id = "net.neoforged.moddev", version.ref = "moddev" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

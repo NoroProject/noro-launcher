@@ -1,0 +1,115 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/schema",
+    "crates/i18n",
+    "crates/bridge",
+    "crates/backend",
+    "crates/frontend",
+    "crates/master",
+    "crates/admin_cli",
+    "crates/noro_launcher",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["noro"]
+
+[workspace.dependencies]
+fluent-bundle = "0.16"
+unic-langid = "0.9"
+# Локальные крейты
+schema = { path = "crates/schema" }
+i18n = { path = "crates/i18n" }
+bridge = { path = "crates/bridge" }
+backend = { path = "crates/backend" }
+
+# Async
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+futures = "0.3"
+futures-util = "0.3"
+async-trait = "0.1"
+
+# Сериализация
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_with = "3"
+
+# Типы
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Ошибки/логи
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP сервер (master)
+axum = { version = "0.8", features = ["ws", "multipart", "macros"] }
+axum-extra = { version = "0.10", features = ["typed-header"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
+
+# БД
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
+    "migrate",
+] }
+
+# WS клиент (backend ↔ master)
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+
+# HTTP клиент
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "stream",
+    "rustls-tls",
+    "multipart",
+] }
+
+# Крипто/хеши
+ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8", "pem"] }
+rand = "0.8"
+sha1 = "0.10"
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+base64 = "0.22"
+argon2 = "0.5"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Утилиты
+parking_lot = "0.12"
+dashmap = "6"
+once_cell = "1"
+bytes = "1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
+zip = "2"
+# NBT: servers.dat игрового клиента
+fastnbt = "2"
+walkdir = "2"
+dirs = "5"
+keyring = { version = "3", features = ["apple-native"] }
+url = "2"
+urlencoding = "2"
+open = "5"
+indexmap = { version = "2", features = ["serde"] }
+memchr = "2"
+regex = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

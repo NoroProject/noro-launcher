@@ -1,0 +1,76 @@
+use super::common::progress_label;
+use crate::components::progress_bar;
+use crate::state::SyncUiState;
+use crate::theme::*;
+use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
+use i18n::t;
+use uuid::Uuid;
+
+pub fn sync_overlay(_server_id: Uuid, sync: &SyncUiState) -> AnyElement {
+    div()
+        .absolute()
+        .left(px(32.))
+        .right(px(32.))
+        .bottom(px(120.))
+        .rounded(px(R_SM))
+        .bg(rgba(0x0b1626f8)) // More opaque
+        .border_1()
+        .border_color(rgb(if sync.failed.is_some() { ERROR } else { BORDER }))
+        .p(px(20.))
+        .flex()
+        .flex_col()
+        .gap(px(12.))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .child(
+                    div()
+                        .font_family(FONT_PIXEL_ALT)
+                        .text_size(px(14.))
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(rgb(if sync.failed.is_some() {
+                            ERROR
+                        } else {
+                            TEXT_PRIMARY
+                        }))
+                        .child(if sync.failed.is_some() {
+                            t("sync-failed")
+                        } else if sync.stage.is_empty() {
+                            t("game-preparing")
+                        } else {
+                            sync.stage.to_uppercase()
+                        }),
+                )
+                .child(div().flex_1())
+                .child(
+                    div()
+                        .font_family(FONT_PIXEL_ALT)
+                        .text_size(px(12.))
+                        .text_color(rgb(TEXT_MUTED))
+                        .child(progress_label(sync)),
+                ),
+        )
+        .child(progress_bar(sync.fraction()))
+        .when(!sync.detail.is_empty(), |d| {
+            d.child(
+                div()
+                    .text_xs()
+                    .truncate()
+                    .font_family(FONT_PIXEL_ALT)
+                    .text_color(rgb(TEXT_MUTED))
+                    .child(sync.detail.clone()),
+            )
+        })
+        .when_some(sync.failed.clone(), |d, e| {
+            d.child(
+                div()
+                    .mt(px(4.))
+                    .text_sm()
+                    .font_family(FONT_PIXEL_ALT)
+                    .text_color(rgb(ERROR))
+                    .child(format!("Error: {e}")),
+            )
+        })
+        .into_any_element()
+}

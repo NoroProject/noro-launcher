@@ -1,0 +1,25 @@
+//! Общее состояние приложения, шарится между всеми хендлерами.
+
+use crate::config::Config;
+use crate::files::FileStore;
+use crate::signing::Signer25519;
+use crate::ws::WsHub;
+use sqlx::PgPool;
+use std::sync::Arc;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub db: PgPool,
+    pub ws: WsHub,
+    pub files: FileStore,
+    pub signer: Signer25519,
+    pub config: Arc<Config>,
+    pub http: reqwest::Client,
+    pub import_jobs: Arc<dashmap::DashMap<uuid::Uuid, crate::build_importer::ImportProgress>>,
+}
+
+impl AppState {
+    pub fn http(&self) -> &reqwest::Client {
+        &self.http
+    }
+}

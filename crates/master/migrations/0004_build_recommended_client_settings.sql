@@ -1,0 +1,5 @@
+ALTER TABLE builds
+    ADD COLUMN IF NOT EXISTS recommended_memory_min_mb INTEGER NOT NULL DEFAULT 2048,
+    ADD COLUMN IF NOT EXISTS recommended_memory_max_mb INTEGER NOT NULL DEFAULT 4096,
+    ADD COLUMN IF NOT EXISTS recommended_jvm_flags TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS recommended_show_console_on_launch BOOLEAN NOT NULL DEFAULT TRUE;

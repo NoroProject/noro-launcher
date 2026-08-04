@@ -1,0 +1,165 @@
+.noro-input {
+  background: var(--noro-input);
+  border: 1px solid var(--noro-border-soft);
+  border-radius: var(--noro-r-sm);
+  color: var(--noro-text);
+  display: block;
+  font-size: 0.94rem;
+  line-height: 1.5rem;
+  min-height: 44px;
+  outline: none;
+  padding: 0.625rem 0.75rem;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  width: 100%;
+}
+
+/* Нативный select не совпадает с input ни по высоте, ни по базовой линии:
+   у него своё внутреннее поле под стрелку и своя отрисовка от ОС. Убираем её
+   и рисуем стрелку фоном, чтобы поля в одной строке стояли ровно. */
+.noro-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%235a6b91' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 0.75rem;
+  padding-right: 2rem;
+}
+
+.noro-input:focus {
+  background: var(--noro-bg-deep);
+  border-color: var(--noro-blue);
+  box-shadow: 0 0 0 1px var(--noro-blue);
+}
+
+.noro-label {
+  color: var(--noro-muted);
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+/* Метка в одной строке с кнопкой: отступ .noro-label рассчитан на поле ввода
+   под ней и здесь сбивает вертикальное выравнивание. Утилитой mb-0 это не
+   лечится — файл вне слоёв и выигрывает у @layer utilities. */
+.noro-label-inline {
+  margin-bottom: 0;
+}
+
+.noro-tab {
+  align-items: center;
+  background: var(--noro-input);
+  border: 0;
+  border-radius: var(--noro-r-sm);
+  color: var(--noro-muted);
+  display: flex;
+  gap: 12px;
+  min-height: 76px;
+  padding: 16px;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.noro-tab:hover,
+.noro-tab-active {
+  background: var(--noro-panel-2);
+  color: var(--noro-text);
+  transform: scale(1.02);
+}
+
+.noro-tab-active {
+  outline: 2px solid var(--noro-blue);
+  outline-offset: -2px;
+}
+
+.noro-info,
+.noro-toggle-row {
+  align-items: flex-start;
+  background: var(--noro-input);
+  border: 0;
+  border-radius: var(--noro-r-sm);
+  color: var(--noro-muted);
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+}
+
+.noro-info > :first-child,
+.noro-toggle-row > :first-child {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.noro-dropzone {
+  align-items: center;
+  background: var(--noro-input);
+  border: 4px dashed var(--noro-border);
+  border-radius: var(--noro-r-sm);
+  color: var(--noro-muted);
+  display: grid;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 24px;
+  position: relative;
+  transition: border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.noro-dropzone:hover {
+  border-color: var(--noro-blue);
+  color: var(--noro-text);
+  transform: scale(1.01);
+}
+
+.noro-input-sm {
+  background: var(--noro-input) !important;
+  border: 1px solid var(--noro-border-soft) !important;
+  border-radius: var(--noro-r-sm) !important;
+  color: var(--noro-text) !important;
+}
+
+.noro-input-sm:focus {
+  border-color: var(--noro-blue) !important;
+  box-shadow: 0 0 0 1px var(--noro-blue) !important;
+  outline: none !important;
+}
+
+.bg-black\/10,
+.bg-black\/20,
+.bg-black\/25,
+.bg-black\/30,
+.bg-black\/35,
+.bg-black\/40 {
+  background-color: var(--noro-input) !important;
+}
+
+.bg-white\/10 {
+  background-color: var(--noro-panel-2) !important;
+}
+
+.shadow-lg,
+.shadow-2xl {
+  box-shadow: none !important;
+}
+
+.blur-sm {
+  filter: none !important;
+}
+
+.backdrop-blur,
+.backdrop-blur-sm {
+  backdrop-filter: none !important;
+}
+
+/* Catch remaining Nuxt UI buttons and pull them toward our flat noro cream system (no new colors) */
+:deep(.u-button-primary),
+:deep(button[style*="--ui-primary"]) {
+  background: var(--noro-cream) !important;
+  color: var(--noro-on-cream) !important;
+  border-radius: var(--noro-r-sm);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+:deep(.u-button-primary:hover) {
+  background: var(--noro-cream-hover) !important;
+  transform: scale(1.02);
+}

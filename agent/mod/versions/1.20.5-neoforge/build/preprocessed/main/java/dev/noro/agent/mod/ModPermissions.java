@@ -1,0 +1,98 @@
+package dev.noro.agent.mod;
+
+import dev.noro.agent.core.AccessGate;
+import dev.noro.agent.core.AgentConfig;
+import dev.noro.agent.core.MasterClient;
+import dev.noro.agent.core.PermissionSet;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Права игроков и каталог узлов на стороне мода.
+ *
+ * <p>Типов Minecraft здесь нет, поэтому нет и директив препроцессора: когда
+ * именно звать {@link #load}, решает точка входа своего лоадера.
+ *
+ * <p>Карты именно конкурентные: пишет в них поток логина, а читает игровой —
+ * на каждую проверку права.
+ */
+final class ModPermissions {
+
+    private final MasterClient client;
+    private final AgentConfig config;
+
+    private final Map<UUID, PermissionSet> byPlayer = new ConcurrentHashMap<>();
+
+    /**
+     * Решение мастера, снятое ещё на логине. Вход в мир его забирает вместо
+     * второго запроса за тем же самым.
+     */
+    private final Map<UUID, AccessGate.Decision> negotiated = new ConcurrentHashMap<>();
+
+    private volatile List<String> nodes = List.of();
+
+    ModPermissions(MasterClient client, AgentConfig config) {
+        this.client = client;
+        this.config = config;
+    }
+
+    /**
+     * Ходит к мастеру и раскладывает права игрока. Блокирующий по замыслу:
+     * звать его надо там, где логин обязан дождаться ответа, — иначе сервер
+     * успеет прочитать права раньше, чем они появятся.
+     */
+    void load(UUID uuid) {
+        AccessGate.Decision decision = AccessGate.check(client, config, uuid, AgentRuntime.LOG);
+        if (decision.profile() != null) {
+            byPlayer.put(uuid, PermissionSet.of(decision.profile().permissions()));
+        }
+        negotiated.put(uuid, decision);
+    }
+
+    /** @return {@code null}, если логин прошёл мимо {@link #load} — тогда решение спрашивают заново */
+    AccessGate.Decision takeDecision(UUID uuid) {
+        return negotiated.remove(uuid);
+    }
+
+    /** Пустой набор, а не {@code null}: у неизвестного игрока просто нет прав. */
+    PermissionSet of(UUID uuid) {
+        return byPlayer.getOrDefault(uuid, PermissionSet.empty());
+    }
+
+    /**
+     * Оборванный логин — единственный случай, когда запись остаётся: выхода не
+     * было, значит и события выхода не будет. Следующая попытка того же игрока
+     * её перезапишет, поэтому карта растёт не быстрее списка знакомых UUID.
+     */
+    void forget(UUID uuid) {
+        byPlayer.remove(uuid);
+        negotiated.remove(uuid);
+    }
+
+    void rememberNodes(Collection<String> names) {
+        nodes = List.copyOf(names);
+    }
+
+    /**
+     * Отправляет каталог мастеру. Зовётся один раз со старта сервера: узлы
+     * регистрируются до него и после уже не меняются.
+     */
+    void report() {
+        List<String> current = nodes;
+        if (current.isEmpty()) {
+            return;
+        }
+        try {
+            client.reportNodes(current);
+            AgentRuntime.LOG.info("Reported {} permission nodes to master", current.size());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            // Каталог — подсказка для админки, а не условие работы сервера.
+            AgentRuntime.LOG.warn("Cannot report permission nodes: {}", e.getMessage());
+        }
+    }
+}

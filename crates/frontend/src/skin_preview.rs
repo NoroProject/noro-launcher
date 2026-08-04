@@ -1,0 +1,92 @@
+//! Цикл превью скина: два независимых часа — покачивание конечностей идёт
+//! всегда с одной скоростью, поворот стоит на месте, пока фигуру тянут мышью.
+
+use crate::skin;
+use crate::state::{LauncherUI, Page};
+use gpui::Context;
+use std::time::{Duration, Instant};
+
+/// Шаг отрисовки. Кадр стоит ~3–8 мс, так что ~30 к/с укладывается с запасом.
+const FRAME: Duration = Duration::from_millis(33);
+/// Пока превью не на экране, рендерить незачем — только изредка просыпаться.
+const IDLE_TICK: Duration = Duration::from_millis(250);
+/// Полный цикл взмаха рук и ног.
+const SWAY_PERIOD_MS: f32 = 2400.0;
+/// Скорость автоповорота — полный оборот примерно за 6 секунд.
+const YAW_DEG_PER_SEC: f32 = 60.0;
+
+/// Всё, что нужно фоновому рендеру для одного кадра.
+pub(crate) struct FrameJob {
+    skin: Vec<u8>,
+    cape: Option<Vec<u8>>,
+    yaw: f64,
+    sway: f64,
+}
+
+impl LauncherUI {
+    /// Сдвинуть часы и собрать задание на кадр. `None` — рендерить нечего.
+    fn next_frame_job(&mut self, elapsed: Duration) -> Option<FrameJob> {
+        let skin = self.skin_bytes.clone()?;
+        if self.page != Page::Profile {
+            return None;
+        }
+        let dt = elapsed.as_secs_f32().min(0.25); // после долгой паузы не прыгаем
+        self.skin_sway = (self.skin_sway + dt * 1000.0 / SWAY_PERIOD_MS).fract();
+        if !self.skin_dragging {
+            self.skin_yaw = (self.skin_yaw + dt * YAW_DEG_PER_SEC).rem_euclid(360.0);
+        }
+        Some(FrameJob {
+            skin,
+            cape: self.cape_bytes.clone(),
+            yaw: self.skin_yaw as f64,
+            sway: self.skin_sway as f64,
+        })
+    }
+
+    /// Довернуть фигуру рукой. Кадр подхватит цикл — отдельно рисовать не нужно.
+    pub fn rotate_skin(&mut self, degrees: f32, cx: &mut Context<Self>) {
+        self.skin_yaw = (self.skin_yaw + degrees).rem_euclid(360.0);
+        cx.notify();
+    }
+
+    pub(crate) fn start_skin_animation(&mut self, cx: &mut Context<Self>) {
+        if self.skin_anim_running {
+            return;
+        }
+        self.skin_anim_running = true;
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| {
+            let mut last = Instant::now();
+            loop {
+                let elapsed = last.elapsed();
+                last = Instant::now();
+                let Ok(job) = this.update(cx, |state, _| state.next_frame_job(elapsed)) else {
+                    break; // окно закрылось
+                };
+                let Some(job) = job else {
+                    executor.timer(IDLE_TICK).await;
+                    continue;
+                };
+
+                let frame = executor
+                    .spawn(async move {
+                        skin::render_view(&job.skin, job.cape.as_deref(), job.yaw, job.sway)
+                    })
+                    .await;
+
+                let alive = this.update(cx, |state, cx| {
+                    // Кадр не отрисовался — оставляем предыдущий, иначе моргнёт.
+                    if let Some(frame) = frame {
+                        state.skin_preview = Some(frame);
+                        cx.notify();
+                    }
+                });
+                if alive.is_err() {
+                    break;
+                }
+                executor.timer(FRAME).await;
+            }
+        })
+        .detach();
+    }
+}

@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+@import "./buttons.css";
+@import "./surfaces.css";
+@import "./controls.css";
+@import "./file-manager.css";
+
+/* Те же шрифты, что и в лаунчере: сайт и приложение должны читаться как один
+   продукт. Monocraft — открытая реализация майнкрафтовского шрифта с полной
+   кириллицей. Press Start 2P — только логотип и hero. */
+@font-face {
+  font-family: "Monocraft";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/fonts/Monocraft.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Monocraft";
+  font-style: normal;
+  font-weight: 700;
+  src: url("/fonts/Monocraft-Bold.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Press Start 2P";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/fonts/PressStart2P-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  /* Значения сведены с theme.rs лаунчера — расхождение читалось бы как два
+     разных продукта. */
+  --noro-bg: #0d1b2e;
+  --noro-bg-deep: #07111f;
+  --noro-sidebar: #0b1626;
+  --noro-panel: #13233d;
+  --noro-panel-2: #172a47;
+  --noro-input: #0f2036;
+  --noro-border: #223a55;
+  --noro-border-soft: #1d3558;
+  --noro-text: #dbe6ff;
+  --noro-muted: #5a6b91;
+  --noro-cream: #f3e7b3;
+  --noro-cream-hover: #fbf0c4;
+  --noro-on-cream: #12233d;
+  --noro-magenta: #e85aa5;
+  --noro-blue: #7fb2ff;
+  --noro-green: #7ee0a4;
+  --noro-amber: #f3c969;
+  --noro-danger: #ff6b8b;
+  --noro-white: #ffffff;
+
+  /* Радиусы лаунчера. Пиксельная эстетика не терпит крупных скруглений. */
+  --noro-r-sm: 4px;
+  --noro-r-md: 8px;
+  --noro-r-lg: 12px;
+
+  --noro-font: "Monocraft", ui-monospace, "SF Mono", monospace;
+  --noro-font-display: "Press Start 2P", "Monocraft", monospace;
+}
+
+html,
+body,
+#__nuxt {
+  min-height: 100%;
+}
+
+body {
+  background: var(--noro-bg);
+  color: var(--noro-text);
+  font-family: var(--noro-font);
+  letter-spacing: 0;
+  margin: 0;
+}
+
+/* Атмосфера вместо декоративных диагоналей: пиксельная сетка 4×4 задаёт
+   масштаб вёрстки и не спорит с содержимым. Прежние цветные полосы резали
+   карточки пополам и читались как артефакт рендеринга. */
+body::before {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--noro-blue) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--noro-blue) 4%, transparent) 1px, transparent 1px);
+  background-size: 4px 4px, 4px 4px;
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: -2;
+}
+
+body::after {
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 0%,
+    color-mix(in srgb, var(--noro-blue) 8%, transparent),
+    transparent 70%
+  );
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--noro-magenta) 40%, transparent);
+  color: var(--noro-white);
+}
+
+::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--noro-bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--noro-border);
+  border-radius: var(--noro-r-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--noro-muted);
+}

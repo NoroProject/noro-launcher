@@ -1,0 +1,17 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mods]]
+modId = "noro_agent"
+version = "${version}"
+displayName = "Noro Agent"
+authors = "noro"
+description = '''Projects master roles, access and online count onto this server.'''
+
+[[dependencies.noro_agent]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21,)"
+ordering = "NONE"
+side = "SERVER"

@@ -1,0 +1,37 @@
+# ServerWrapper configuration. Copy next to the server and edit.
+#   java -jar noro-wrapper.jar [path/to/noro-wrapper.properties]
+
+master-url=http://127.0.0.1:8080
+
+# Issued in the build admin panel, section Game servers. Shown once.
+# This is the only place the secret lives: the wrapper passes it to the server
+# process through NORO_AGENT_SECRET, so it is never copied into plugins/ or mods/.
+secret=noroagent_0000000000000000000000000000000000000000000000000000000000000000
+
+# ed25519 public key of the master, hex. Printed by the master on startup.
+#
+# Leave empty and the wrapper fetches it from the master once, pins it to
+# noro/signing-key.pub, and treats any later change as a hard error. That keeps
+# every server on the same key without copying it by hand — at the cost of
+# trusting the very first connection.
+#
+# Set it explicitly for production: a pinned key here is a real trust anchor and
+# always wins. There is no default on purpose — one would silently trust the dev
+# key (735fcfcd88e76de41d49ab3b6e42ac506ddf213359425b047a05d4c4a77f0715).
+signing-public-key=
+
+server-dir=.
+
+# Paper/Fabric: the server jar. NeoForge starts from an args file instead —
+# pass it with a leading @ and the wrapper forwards it verbatim:
+#   server-jar=@libraries/net/neoforged/neoforge/21.1.248/unix_args.txt
+server-jar=paper-1.21.1.jar
+
+java=java
+jvm-args=-Xmx4G -Xms4G
+server-args=nogui
+
+# Optional. The wrapper detects both from the server directory; set these only
+# when detection fails or you want to pin them.
+#platform=paper
+#mc-version=1.21.1

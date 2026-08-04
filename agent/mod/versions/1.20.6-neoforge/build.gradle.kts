@@ -1,0 +1,13 @@
+plugins {
+    id("gg.essential.multi-version")
+}
+
+dependencies {
+    minecraft("com.mojang:minecraft:1.20.6")
+    mappings(loom.officialMojangMappings())
+
+    neoForge("net.neoforged:neoforge:20.6.139")
+
+    compileOnly("net.luckperms:api:5.5")
+    compileOnly(project(":core"))
+}

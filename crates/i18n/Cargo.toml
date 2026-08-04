@@ -1,0 +1,10 @@
+[package]
+name = "i18n"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fluent-bundle = { workspace = true }
+unic-langid = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }

@@ -1,0 +1,26 @@
+{
+  "name": "noro-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "TMPDIR=/tmp nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.64",
+    "@nuxt/ui": "^3.3.7",
+    "dompurify": "^3.4.13",
+    "marked": "^18.0.7",
+    "nuxt": "^3.17.0",
+    "skinview3d": "^3.4.2",
+    "vue": "^3.5.0",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
+  }
+}

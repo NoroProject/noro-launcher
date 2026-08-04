@@ -1,0 +1,2 @@
+ALTER TABLE server_cores
+    ADD COLUMN IF NOT EXISTS file_sha1 TEXT NOT NULL DEFAULT '';
