@@ -36,91 +36,108 @@ pub async fn start_build(state: &AppState, tag: &str) -> Result<Uuid> {
     Ok(job_id)
 }
 
-async fn run_build(state: &AppState, job_id: Uuid, repo: &PathBuf, tag: &str) -> Result<()> {
-    set_status(state, job_id, "building").await?;
-    append_log(state, job_id, &format!("сборка тега {tag}\n")).await?;
+async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &str) -> Result<()> {
+    set_status(state, job_id, "downloading").await?;
+    append_log(state, job_id, &format!("запрос релиза {tag} из GitHub...\n")).await?;
 
-    // git fetch + checkout.
-    run_logged(state, job_id, repo, "git", &["fetch", "--all", "--tags"]).await?;
-    run_logged(state, job_id, repo, "git", &["checkout", tag]).await?;
+    let repo_str = state.config.github_repo.as_deref().unwrap_or("NexBitstd/NoroLauncher");
+    let url = format!("https://api.github.com/repos/{repo_str}/releases/tags/{tag}");
+    
+    let mut req = state.http().get(&url).header("User-Agent", "noro-master");
+    if let Some(tok) = &state.config.github_token {
+        req = req.bearer_auth(tok);
+    }
+    
+    let resp = req.send().await.with_context(|| "ошибка запроса к GitHub API")?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return Err(anyhow::anyhow!("GitHub API вернул статус: {} ({})", status, text));
+    }
+    
+    let release: serde_json::Value = resp.json().await?;
+    let assets = release["assets"].as_array().ok_or_else(|| anyhow::anyhow!("В релизе нет ассетов"))?;
+    
+    if assets.is_empty() {
+        return Err(anyhow::anyhow!("Ассеты для релиза {} не найдены", tag));
+    }
 
-    // cargo build.
-    run_logged(
-        state,
-        job_id,
-        repo,
-        "cargo",
-        &["build", "--release", "--bin", "noro-launcher"],
-    )
-    .await?;
+    append_log(state, job_id, &format!("найдено {} ассетов\n", assets.len())).await?;
 
-    // Найти бинарник.
-    let bin_name = if cfg!(windows) {
-        "noro-launcher.exe"
-    } else {
-        "noro-launcher"
-    };
-    let bin_path = repo.join("target").join("release").join(bin_name);
-    let bytes = tokio::fs::read(&bin_path)
-        .await
-        .with_context(|| format!("чтение бинарника {}", bin_path.display()))?;
+    let target_platforms = [
+        ("x86_64-pc-windows-msvc", "windows-x86_64"),
+        ("x86_64-unknown-linux-gnu", "linux-x86_64"),
+        ("aarch64-unknown-linux-gnu", "linux-aarch64"),
+        ("x86_64-apple-darwin", "macos-x86_64"),
+        ("aarch64-apple-darwin", "macos-aarch64"),
+    ];
 
-    // Хеши и подпись.
-    let sha256 = sha256_bytes(&bytes);
-    let signature = base64::engine::general_purpose::STANDARD.encode(state.signer.sign(&bytes));
-    let stored = state.files.put_bytes(&bytes).await?;
+    let mut saved_count = 0;
 
-    let platform = schema::current_platform();
-    let id = crate::db::insert_launcher_version(
-        &state.db,
-        tag,
-        platform,
-        &sha256,
-        &stored.sha1,
-        bytes.len() as i64,
-        &signature,
-    )
-    .await?;
+    for asset in assets {
+        let name = asset["name"].as_str().unwrap_or_default();
+        if !name.starts_with("noro-launcher-") {
+            continue;
+        }
+        
+        let mut matched_platform = None;
+        for (target, plat) in &target_platforms {
+            if name.contains(target) {
+                matched_platform = Some(*plat);
+                break;
+            }
+        }
+        
+        let Some(platform) = matched_platform else { continue; };
+        let asset_url = asset["url"].as_str().unwrap_or_default();
+        
+        append_log(state, job_id, &format!("скачивание {}...\n", name)).await?;
+        
+        // Скачивание через API с токеном (чтобы работало с приватными репозиториями)
+        let mut dl_req = state.http().get(asset_url)
+            .header("User-Agent", "noro-master")
+            .header("Accept", "application/octet-stream");
+            
+        if let Some(tok) = &state.config.github_token {
+            dl_req = dl_req.bearer_auth(tok);
+        }
+        
+        let resp = dl_req.send().await?;
+        if !resp.status().is_success() {
+            append_log(state, job_id, &format!("ошибка скачивания {}: {}\n", name, resp.status())).await?;
+            continue;
+        }
+        
+        let bytes = resp.bytes().await?;
+        
+        let sha256 = sha256_bytes(&bytes);
+        let signature = base64::engine::general_purpose::STANDARD.encode(state.signer.sign(&bytes));
+        let stored = state.files.put_bytes(&bytes).await?;
 
-    append_log(
-        state,
-        job_id,
-        &format!(
-            "\nготово: версия {tag} ({platform}), id={id}, {} байт\n",
-            bytes.len()
-        ),
-    )
-    .await?;
+        let id = crate::db::insert_launcher_version(
+            &state.db,
+            tag,
+            platform,
+            &sha256,
+            &stored.sha1,
+            bytes.len() as i64,
+            &signature,
+        ).await?;
+        
+        saved_count += 1;
+        append_log(state, job_id, &format!("сохранено: {platform}, id={id}, {} байт\n", bytes.len())).await?;
+    }
+    
+    if saved_count == 0 {
+        return Err(anyhow::anyhow!("Не удалось скачать ни один бинарник noro-launcher для известных платформ"));
+    }
+
     set_status(state, job_id, "done").await?;
     Ok(())
 }
 
 /// Запустить процесс и записать его вывод в лог задачи.
-async fn run_logged(
-    state: &AppState,
-    job_id: Uuid,
-    cwd: &PathBuf,
-    cmd: &str,
-    args: &[&str],
-) -> Result<()> {
-    append_log(state, job_id, &format!("$ {cmd} {}\n", args.join(" "))).await?;
-    let output = tokio::process::Command::new(cmd)
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .await
-        .with_context(|| format!("запуск {cmd}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    append_log(state, job_id, &format!("{stdout}{stderr}")).await?;
-    if !output.status.success() {
-        return Err(anyhow!(
-            "{cmd} завершился с кодом {:?}",
-            output.status.code()
-        ));
-    }
-    Ok(())
-}
+
 
 async fn append_log(state: &AppState, job_id: Uuid, text: &str) -> Result<()> {
     sqlx::query("UPDATE launcher_build_jobs SET log = log || $2 WHERE id = $1")
