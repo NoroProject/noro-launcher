@@ -58,7 +58,9 @@ fn default_locale() -> String {
 }
 
 fn default_master_url() -> String {
-    std::env::var("NORO_MASTER_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string())
+    option_env!("NORO_MASTER_URL")
+        .unwrap_or("http://127.0.0.1:8080")
+        .to_string()
 }
 
 impl LauncherConfig {
