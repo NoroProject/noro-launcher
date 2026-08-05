@@ -85,15 +85,14 @@ function handleAddUrl() {
                     />
                 </label>
             </div>
-            <UButton
+            <AtomButton variant="primary"
                 :loading="busy === 'curseforge-add'"
                 icon="i-lucide-download-cloud"
-                color="primary"
                 block
                 @click="handleAddCurseForge"
             >
                 Add CurseForge Mod
-            </UButton>
+            </AtomButton>
         </div>
 
         <div v-if="activeTab === 'url'" class="grid gap-4">
@@ -105,15 +104,14 @@ function handleAddUrl() {
                     placeholder="https://example.com/mod.jar"
                 />
             </label>
-            <UButton
+            <AtomButton variant="primary"
                 :loading="busy === 'url'"
                 icon="i-lucide-link"
-                color="primary"
                 block
                 @click="handleAddUrl"
             >
                 Add from URL
-            </UButton>
+            </AtomButton>
         </div>
     </AtomModal>
 </template>

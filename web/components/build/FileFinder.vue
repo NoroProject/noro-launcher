@@ -5,6 +5,8 @@ const props = defineProps<{ buildId: string }>()
 const emit = defineEmits<{ refresh: [] }>()
 
 const auth = useAuth()
+
+const notify = useNotify()
 const files = ref<BuildFileRow[]>([])
 const pending = ref(false)
 const search = ref('')
@@ -26,6 +28,9 @@ const filtered = computed(() => {
   return q ? files.value.filter(f => f.path.toLowerCase().includes(q)) : files.value
 })
 
+/** Скрытый input вместо <label>: кнопка тогда одна и та же во всём проекте. */
+const filePicker = ref<HTMLInputElement | null>(null)
+
 async function uploadFiles(ev: Event) {
   const input = ev.target as HTMLInputElement
   if (!input.files?.length) return
@@ -36,6 +41,9 @@ async function uploadFiles(ev: Event) {
     }
     await load()
     emit('refresh')
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = null
     input.value = ''
@@ -49,6 +57,9 @@ async function deleteFile(id: string) {
     await auth.request(`/api/admin/builds/${props.buildId}/files/${id}`, { method: 'DELETE' })
     await load()
     emit('refresh')
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = null
   }
@@ -70,10 +81,10 @@ watch(() => props.buildId, load)
       </div>
       <div class="flex items-center gap-2">
         <input v-model="search" class="noro-input-sm w-48" placeholder="Search files..." />
-        <label class="noro-btn noro-btn-secondary cursor-pointer">
-          <UIcon name="i-lucide-upload" class="size-4" /> Upload
-          <input type="file" multiple class="hidden" @change="uploadFiles" />
-        </label>
+        <AtomButton variant="secondary" icon="i-lucide-upload" @click="filePicker?.click()">
+          Upload
+        </AtomButton>
+        <input ref="filePicker" type="file" multiple class="hidden" @change="uploadFiles" />
         <AtomButton variant="dark" :loading="pending" @click="load">Refresh</AtomButton>
       </div>
     </div>
@@ -94,8 +105,21 @@ watch(() => props.buildId, load)
         </div>
 
         <div class="w-32 flex justify-end gap-1 opacity-0 group-hover:opacity-100">
-          <a :href="`/files/${f.sha1}`" download class="noro-btn noro-btn-dark !min-h-7 !text-[10px] !px-2">↓</a>
-          <button class="noro-btn noro-btn-dark !min-h-7 !text-[10px] !px-2 text-[var(--noro-danger)]" @click.stop="deleteFile(f.id)">×</button>
+          <AtomButton
+            variant="dark"
+            :href="`/files/${f.sha1}`"
+            download
+            class="!min-h-7 !text-[10px] !px-2"
+          >
+            ↓
+          </AtomButton>
+          <AtomButton
+            variant="dark"
+            @click.stop="deleteFile(f.id)"
+            class="!min-h-7 !text-[10px] !px-2 text-[var(--noro-danger)]"
+          >
+            ×
+          </AtomButton>
         </div>
       </div>
 

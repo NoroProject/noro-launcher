@@ -42,12 +42,10 @@ function onContextChange(event: Event) {
       </select>
     </div>
 
-    <UButton
+    <AtomButton variant="danger"
       :loading="busy"
       icon="i-lucide-x"
-      size="xs"
-      color="error"
-      variant="ghost"
+      size="sm"
       @click="emit('remove')"
     />
   </div>

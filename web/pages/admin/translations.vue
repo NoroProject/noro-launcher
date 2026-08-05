@@ -115,16 +115,16 @@ await load(active.value)
     <div class="grid gap-4">
       <section class="noro-panel p-6">
         <div class="flex flex-wrap items-center gap-2">
-          <button
+          <AtomButton
             v-for="loc in LOCALES"
             :key="loc.code"
-            type="button"
-            class="noro-btn noro-btn-sm noro-btn-equal"
-            :class="active === loc.code ? 'noro-btn-primary' : 'noro-btn-secondary'"
+            :variant="active === loc.code ? 'primary' : 'secondary'"
+            size="sm"
+            equal
             @click="load(loc.code)"
           >
             {{ loc.label }}
-          </button>
+          </AtomButton>
           <span class="noro-label ml-auto">
             {{ changedCount }} of {{ builtin.size }} changed
           </span>
@@ -192,19 +192,25 @@ await load(active.value)
       </section>
 
       <section class="noro-panel flex flex-wrap items-center gap-3 p-4">
-        <button type="button" class="noro-btn noro-btn-primary" :disabled="busy || !dirty" @click="save">
-          <UIcon name="i-lucide-save" class="size-4" />{{ busy ? 'Saving…' : 'Save' }}
-        </button>
+        <AtomButton
+          variant="primary"
+          icon="i-lucide-save"
+          :disabled="busy || !dirty"
+          @click="save"
+        >
+          {{ busy ? 'Saving…' : 'Save' }}
+        </AtomButton>
         <span v-if="dirty" class="noro-label text-[var(--noro-amber)]">Unsaved changes</span>
-        <button
+        <AtomButton
           v-if="changedCount"
-          type="button"
-          class="noro-btn noro-btn-ghost ml-auto text-[var(--noro-danger)]"
+          variant="ghost"
+          icon="i-lucide-rotate-ccw"
           :disabled="busy"
           @click="resetAll"
+          class="ml-auto text-[var(--noro-danger)]"
         >
-          <UIcon name="i-lucide-rotate-ccw" class="size-4" />Reset all to built-in
-        </button>
+          Reset all to built-in
+        </AtomButton>
       </section>
 
       <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />

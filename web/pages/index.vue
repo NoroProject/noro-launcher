@@ -47,9 +47,7 @@ const steps = [
             <NuxtLink :to="target" class="noro-cta px-6 py-3">
               {{ auth.loggedIn.value ? 'OPEN CABINET' : 'START WITH DISCORD' }}
             </NuxtLink>
-            <NuxtLink to="/skin" class="noro-btn noro-btn-secondary">
-              <UIcon name="i-lucide-shirt" class="size-5" />Skin cabinet
-            </NuxtLink>
+            <AtomButton variant="secondary" icon="i-lucide-shirt" to="/skin">Skin cabinet</AtomButton>
           </div>
         </div>
 
@@ -68,6 +66,10 @@ const steps = [
             <div class="noro-label">Launcher preview</div>
           </div>
         </div>
+      </section>
+
+      <section class="mx-auto max-w-7xl px-5 pb-4">
+        <LauncherDownload />
       </section>
 
       <section class="bg-[var(--noro-panel)] px-5 py-16">
@@ -99,9 +101,12 @@ const steps = [
             <h2 class="text-3xl font-black">Ready for the next launch?</h2>
             <p class="mt-2 max-w-2xl text-base font-bold">Open the cabinet, connect Discord, and keep the project moving from one controlled surface.</p>
           </div>
-          <NuxtLink :to="target" class="noro-btn noro-btn-dark">
+          <AtomButton
+            variant="dark"
+            :to="target"
+          >
             {{ auth.loggedIn.value ? 'Open cabinet' : 'Sign in' }}
-          </NuxtLink>
+          </AtomButton>
         </div>
       </section>
     </main>

@@ -3,6 +3,7 @@ import type { NewsRow } from '~/types/api'
 
 const route = useRoute()
 const auth = useAuth()
+const notify = useNotify()
 await auth.loadMe()
 
 const id = computed(() => String(route.params.id))
@@ -31,6 +32,9 @@ async function save() {
       body: { ...form, preview_img_url: form.preview_img_url || null }
     })
     await refresh()
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = null
   }
@@ -41,6 +45,9 @@ async function removeNews() {
   try {
     await auth.request(`/api/admin/news/${id.value}`, { method: 'DELETE' })
     await navigateTo('/admin/news')
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = null
   }
@@ -50,10 +57,7 @@ async function removeNews() {
 <template>
   <NoroShell :title="item?.title || 'NEWS'" subtitle="Markdown editor">
     <template #actions>
-      <NuxtLink :to="'/admin/news'" class="noro-btn noro-btn-ghost">
-        <UIcon name="i-lucide-arrow-left" class="size-4" />
-        Back
-      </NuxtLink>
+      <AtomButton variant="ghost" icon="i-lucide-arrow-left" :to="'/admin/news'">Back</AtomButton>
     </template>
 
     <EmptyState v-if="!item" icon="i-lucide-search-x" title="News item not found" />
@@ -65,15 +69,15 @@ async function removeNews() {
         <div class="grid gap-2"><span class="noro-label">Body</span><AdminMarkdownEditor v-model="form.body" /></div>
         <UCheckbox v-model="form.pinned" label="Pinned" />
         <div class="flex gap-2">
-          <button type="submit" class="noro-btn noro-btn-primary" :disabled="busy === 'save'">
-            <UIcon
-              :name="busy === 'save' ? 'i-lucide-loader-circle' : 'i-lucide-save'"
-              class="size-4"
-              :class="busy === 'save' ? 'animate-spin' : ''"
-            />
+          <AtomButton
+            variant="primary"
+            icon="i-lucide-save"
+            type="submit"
+            :loading="busy === 'save'"
+          >
             Save
-          </button>
-          <UButton :loading="busy === 'delete'" icon="i-lucide-trash-2" color="error" variant="subtle" @click="removeNews">Delete</UButton>
+          </AtomButton>
+          <AtomButton variant="danger" :loading="busy === 'delete'" icon="i-lucide-trash-2" @click="removeNews">Delete</AtomButton>
         </div>
       </form>
 

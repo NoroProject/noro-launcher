@@ -116,13 +116,14 @@ function linkClass(path: string) {
                     <div class="truncate text-sm font-bold text-[var(--noro-text)]">{{ auth.user.value?.username || "Guest" }}</div>
                     <div class="truncate text-xs text-[var(--noro-muted)]">@{{ auth.user.value?.discord_username || "discord" }}</div>
                 </div>
-                <button
-                    class="shrink-0 rounded-lg p-2 text-[var(--noro-muted)] transition hover:bg-[var(--noro-panel)] hover:text-[var(--noro-text)]"
+                <AtomButton
+                    variant="ghost"
+                    size="sm"
+                    icon="i-lucide-log-out"
+                    class="shrink-0"
                     aria-label="Sign out"
                     @click="auth.signOut()"
-                >
-                    <UIcon name="i-lucide-log-out" class="size-3.5" />
-                </button>
+                />
             </div>
         </div>
     </aside>

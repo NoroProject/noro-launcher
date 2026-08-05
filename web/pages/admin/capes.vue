@@ -2,6 +2,8 @@
 import type { CapeRow } from '~/types/cape'
 
 const auth = useAuth()
+
+const notify = useNotify()
 await auth.loadMe()
 
 const name = ref('')
@@ -29,6 +31,9 @@ async function uploadCape() {
     file.value = null
     message.value = 'Cape uploaded'
     await refresh()
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = false
   }
@@ -39,6 +44,9 @@ async function deleteCape(cape: CapeRow) {
   try {
     await auth.request(`/api/admin/capes/${cape.id}`, { method: 'DELETE' })
     await refresh()
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = false
   }
@@ -72,9 +80,14 @@ async function deleteCape(cape: CapeRow) {
             <span class="block truncate text-lg font-black text-[var(--noro-cream)]">{{ fileLabel }}</span>
             <input class="mt-3 w-full text-sm text-[var(--noro-text)]" type="file" accept="image/png" @change="onFile">
           </label>
-          <button type="button" class="noro-btn noro-btn-primary" :disabled="busy || !file || !name.trim()" @click="uploadCape">
-            <UIcon name="i-lucide-upload" class="size-5" />Upload Cape
-          </button>
+          <AtomButton
+            variant="primary"
+            icon="i-lucide-upload"
+            :disabled="busy || !file || !name.trim()"
+            @click="uploadCape"
+          >
+            Upload Cape
+          </AtomButton>
         </div>
       </section>
 
@@ -85,7 +98,15 @@ async function deleteCape(cape: CapeRow) {
               <h3 class="truncate text-xl font-black text-[var(--noro-cream)]">{{ cape.name }}</h3>
               <p class="mt-1 text-xs font-bold uppercase tracking-wider text-[var(--noro-blue)]">{{ Math.ceil(cape.size / 1024) }} KB</p>
             </div>
-            <button class="noro-btn noro-btn-dark !min-h-8 !px-2" :disabled="busy" @click="deleteCape(cape)"><UIcon name="i-lucide-trash-2" class="size-4" /></button>
+            <AtomButton
+              variant="dark"
+              icon="i-lucide-trash-2"
+              :disabled="busy"
+              @click="deleteCape(cape)"
+              class="!min-h-8 !px-2"
+            >
+
+            </AtomButton>
           </div>
           <div class="mt-4 grid h-32 place-items-center rounded-lg bg-[var(--noro-input)] p-4">
             <img :src="cape.url" :alt="cape.name" class="max-h-full max-w-full object-contain">

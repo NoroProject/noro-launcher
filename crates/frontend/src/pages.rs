@@ -9,6 +9,7 @@ mod game_status;
 mod game_sync;
 mod mod_icon;
 mod news;
+mod news_detail;
 mod profile;
 mod profile_asset;
 mod profile_skin;

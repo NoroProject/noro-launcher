@@ -1,5 +1,6 @@
 //! Сборка лаунчера из git-тега: checkout → cargo build → ed25519-подпись → FileStore.
 
+pub mod dispatch;
 pub mod github_watcher;
 
 use crate::files::sha256_bytes;
@@ -37,6 +38,8 @@ pub async fn start_build(state: &AppState, tag: &str) -> Result<Uuid> {
 }
 
 async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &str) -> Result<()> {
+    trigger_and_wait(state, job_id, tag).await?;
+
     set_status(state, job_id, "downloading").await?;
     append_log(state, job_id, &format!("запрос релиза {tag} из GitHub...\n")).await?;
 
@@ -76,9 +79,15 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
 
     for asset in assets {
         let name = asset["name"].as_str().unwrap_or_default();
-        if !name.starts_with("noro-launcher-core-") {
+        // Порядок проверок важен: имя core тоже начинается с "noro-launcher-",
+        // и обратный порядок пометил бы core установщиком.
+        let kind = if name.starts_with("noro-launcher-core-") {
+            "core"
+        } else if name.starts_with("noro-launcher-") {
+            "bootstrapper"
+        } else {
             continue;
-        }
+        };
         
         let mut matched_platform = None;
         for (target, plat) in &target_platforms {
@@ -122,10 +131,11 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
             &stored.sha1,
             bytes.len() as i64,
             &signature,
+            kind,
         ).await?;
         
         saved_count += 1;
-        append_log(state, job_id, &format!("сохранено: {platform}, id={id}, {} байт\n", bytes.len())).await?;
+        append_log(state, job_id, &format!("сохранено: {kind} {platform}, id={id}, {} байт\n", bytes.len())).await?;
     }
     
     if saved_count == 0 {
@@ -136,8 +146,47 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
     Ok(())
 }
 
-/// Запустить процесс и записать его вывод в лог задачи.
+/// Просит GitHub собрать лаунчер и ждёт окончания сборки.
+///
+/// Без токена запускать нечем — тогда работаем по релизу, который собрали
+/// руками. Раньше это был единственный режим, и ломать его не за чем.
+async fn trigger_and_wait(state: &AppState, job_id: Uuid, tag: &str) -> Result<()> {
+    set_status(state, job_id, "building").await?;
 
+    if !dispatch::trigger(state, tag, job_id).await? {
+        append_log(
+            state,
+            job_id,
+            "GITHUB_TOKEN не задан — сборка не запускается, беру готовый релиз\n",
+        )
+        .await?;
+        return Ok(());
+    }
+
+    append_log(state, job_id, &format!("запущена сборка лаунчера {tag}\n")).await?;
+
+    // Лог пишется по ходу опроса, иначе полчаса ожидания выглядят как зависание.
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let pump = {
+        let state = state.clone();
+        tokio::spawn(async move {
+            while let Some(line) = rx.recv().await {
+                let _ = append_log(&state, job_id, &line).await;
+            }
+        })
+    };
+
+    let result = dispatch::wait(state, job_id, |line| {
+        let _ = tx.send(line);
+    })
+    .await;
+    drop(tx);
+    let _ = pump.await;
+
+    let url = result?;
+    append_log(state, job_id, &format!("сборка успешна: {url}\n")).await?;
+    Ok(())
+}
 
 async fn append_log(state: &AppState, job_id: Uuid, text: &str) -> Result<()> {
     sqlx::query("UPDATE launcher_build_jobs SET log = log || $2 WHERE id = $1")

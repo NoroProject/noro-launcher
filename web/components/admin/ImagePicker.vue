@@ -20,6 +20,13 @@ const error = ref<string | null>(null)
 const dragging = ref(false)
 const input = ref<HTMLInputElement | null>(null)
 
+/**
+ * `<label for>` вместо обёртки: input лежит рядом, а не внутри зоны, иначе
+ * `@drop` на label ловил бы и клик по самому input. Id обязан быть уникальным —
+ * на странице таких пикеров может оказаться несколько.
+ */
+const inputId = useId()
+
 const MAX_BYTES = 4 * 1024 * 1024
 
 async function send(file: File | null | undefined) {
@@ -58,21 +65,29 @@ async function send(file: File | null | undefined) {
     <div v-if="modelValue" class="grid gap-2">
       <img :src="modelValue" alt="" class="aspect-video w-full rounded-[var(--noro-r-sm)] border border-[var(--noro-border)] object-cover">
       <div class="flex flex-wrap gap-2">
-        <button type="button" class="noro-btn noro-btn-secondary noro-btn-sm" @click="input?.click()">
-          <UIcon name="i-lucide-refresh-cw" class="size-3.5" />Replace
-        </button>
-        <button
-          type="button"
-          class="noro-btn noro-btn-ghost noro-btn-sm text-[var(--noro-danger)]"
-          @click="emit('update:modelValue', '')"
+        <AtomButton
+          variant="secondary"
+          icon="i-lucide-refresh-cw"
+          size="sm"
+          @click="input?.click()"
         >
-          <UIcon name="i-lucide-x" class="size-3.5" />Remove
-        </button>
+          Replace
+        </AtomButton>
+        <AtomButton
+          variant="ghost"
+          icon="i-lucide-x"
+          size="sm"
+          @click="emit('update:modelValue', '')"
+          class="text-[var(--noro-danger)]"
+        >
+          Remove
+        </AtomButton>
       </div>
     </div>
 
     <label
       v-else
+      :for="inputId"
       class="grid cursor-pointer place-items-center gap-2 rounded-[var(--noro-r-sm)] border border-dashed px-4 py-8 text-center transition-colors duration-100"
       :class="dragging
         ? 'border-[var(--noro-cream)] bg-[color-mix(in_srgb,var(--noro-cream)_8%,var(--noro-input))]'
@@ -88,7 +103,7 @@ async function send(file: File | null | undefined) {
       <span class="text-xs text-[var(--noro-muted)]">PNG or JPEG, up to 4 MB</span>
     </label>
 
-    <input ref="input" class="hidden" type="file" accept="image/*" @change="send(($event.target as HTMLInputElement).files?.[0])">
+    <input :id="inputId" ref="input" class="hidden" type="file" accept="image/*" @change="send(($event.target as HTMLInputElement).files?.[0])">
 
     <p v-if="error" class="text-xs text-[var(--noro-danger)]">{{ error }}</p>
   </div>

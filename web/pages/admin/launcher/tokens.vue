@@ -2,6 +2,8 @@
 import type { AdminTokenRow } from '~/types/api'
 
 const auth = useAuth()
+
+const notify = useNotify()
 await auth.loadMe()
 
 const { data: tokens, refresh, pending } = await useAsyncData('admin-tokens', () =>
@@ -27,6 +29,9 @@ async function createToken() {
     Object.assign(form, { name: '', permissions: 'noro.admin.*' })
     await refresh()
     showCreate.value = false
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = null
   }
@@ -37,6 +42,9 @@ async function revoke(id: string) {
   try {
     await auth.request(`/api/admin/tokens/${id}`, { method: 'DELETE' })
     await refresh()
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = null
   }
@@ -54,9 +62,7 @@ async function revoke(id: string) {
       >
         Refresh
       </AtomButton>
-      <button type="button" class="noro-btn noro-btn-primary" @click="showCreate = true">
-        <UIcon name="i-lucide-plus" class="size-5" />New token
-      </button>
+      <AtomButton variant="primary" icon="i-lucide-plus" @click="showCreate = true">New token</AtomButton>
     </template>
 
     <UAlert
@@ -78,7 +84,15 @@ async function revoke(id: string) {
             <td>{{ token.permissions.join(', ') }}</td>
             <td>{{ token.last_used_at || 'never' }}</td>
             <td class="text-right">
-              <button class="noro-btn noro-btn-dark !min-h-8 !px-2" :disabled="busy === token.id" @click="revoke(token.id)"><UIcon name="i-lucide-trash-2" class="size-3.5" /></button>
+              <AtomButton
+                variant="dark"
+                icon="i-lucide-trash-2"
+                :disabled="busy === token.id"
+                @click="revoke(token.id)"
+                class="!min-h-8 !px-2"
+              >
+
+              </AtomButton>
             </td>
           </tr>
         </tbody>
@@ -91,10 +105,15 @@ async function revoke(id: string) {
         <label><span class="noro-label">Name</span><input v-model="form.name" class="noro-input" required></label>
         <label><span class="noro-label">Permissions, one per line</span><textarea v-model="form.permissions" class="noro-input min-h-28" /></label>
         <div class="flex justify-end gap-3 pt-2">
-          <button type="button" class="noro-btn noro-btn-secondary" @click="showCreate = false">Cancel</button>
-          <button :disabled="busy === 'create'" type="submit" class="noro-btn noro-btn-primary">
-            <UIcon name="i-lucide-plus" class="size-5" />Create
-          </button>
+          <AtomButton variant="secondary" @click="showCreate = false">Cancel</AtomButton>
+          <AtomButton
+            variant="primary"
+            icon="i-lucide-plus"
+            :disabled="busy === 'create'"
+            type="submit"
+          >
+            Create
+          </AtomButton>
         </div>
       </form>
     </AtomModal>

@@ -2,6 +2,8 @@
 import type { UserProfile } from '~/types/api'
 
 const auth = useAuth()
+
+const notify = useNotify()
 await auth.loadMe()
 
 const username = ref(auth.user.value?.username || '')
@@ -32,6 +34,9 @@ async function saveUsername() {
     })
     username.value = auth.user.value.username
     saved.value = true
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     saving.value = false
   }
@@ -79,13 +84,16 @@ async function saveUsername() {
               Shown to other players in game. Up to 16 characters.
             </span>
           </label>
-          <button
+          <AtomButton
+            variant="primary"
+            icon="i-lucide-save"
+            equal
             type="submit"
-            class="noro-btn noro-btn-primary self-start md:mt-[26px] noro-btn-equal"
             :disabled="saving || !hasChanges"
+            class="self-start md:mt-[26px]"
           >
-            <UIcon name="i-lucide-save" class="size-4" />Save
-          </button>
+            Save
+          </AtomButton>
         </form>
         <UAlert
           v-if="saved"
@@ -95,6 +103,11 @@ async function saveUsername() {
           icon="i-lucide-check"
           description="Profile updated"
         />
+      </section>
+
+      <section class="noro-panel p-6">
+        <h2 class="mb-4 font-bold text-[var(--noro-text)]">Launcher</h2>
+        <LauncherDownload compact />
       </section>
 
       <section class="grid gap-4 xl:grid-cols-2">

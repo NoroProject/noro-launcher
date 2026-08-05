@@ -5,6 +5,7 @@ import type { FmItem } from './List.vue'
 const props = defineProps<{ buildId: string }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth()
+const notify = useNotify()
 
 // ─── State ───
 const files = ref<BuildFileRow[]>([])
@@ -186,6 +187,9 @@ async function deleteSelected() {
     selected.value = new Set()
     await loadFiles()
     emit('changed')
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally { loading.value = false }
 }
 
@@ -259,6 +263,9 @@ async function doUpload(fileList: File[]) {
     }
     await loadFiles()
     emit('changed')
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally { loading.value = false }
 }
 

@@ -20,6 +20,8 @@ export function useAdminServerBuilds(
   loader: Ref<Record<string, string[]>>,
   loadLoader: (kind: string, mc: string) => Promise<void>,
 ) {
+  const notify = useNotify();
+
   const buildsData = useAsyncData(
     `admin-builds-${id.value}`,
     () => auth.request<BuildRow[]>(`/api/admin/builds?server_id=${id.value}`),
@@ -49,6 +51,9 @@ export function useAdminServerBuilds(
       buildForm.version = "";
       await buildsData.refresh();
       showCreateBuild.value = false;
+      notify.ok()
+    } catch (e) {
+      notify.fail(e)
     } finally {
       creatingBuild.value = false;
     }

@@ -97,11 +97,9 @@ function doAdd() {
                 class="noro-input-sm flex-1"
                 placeholder="Search Modrinth..."
                 />
-            <UButton
+            <AtomButton variant="secondary"
                 :loading="loadingSearch"
                 icon="i-lucide-search"
-                color="neutral"
-                variant="subtle"
                 @click="search"
             />
         </div>
@@ -223,16 +221,15 @@ function doAdd() {
                 </div>
             </div>
 
-            <UButton
+            <AtomButton variant="primary"
                 :loading="busy === 'modrinth-add'"
                 :disabled="!versionId"
                 icon="i-lucide-download"
-                color="primary"
                 block
                 @click="doAdd"
             >
                 {{ isOptional ? "Add as Optional Mod" : "Add Mod" }}
-            </UButton>
+            </AtomButton>
         </div>
 
         <div class="pt-2 border-t border-[var(--noro-border)]/30">
@@ -243,14 +240,13 @@ function doAdd() {
                     class="noro-input-sm flex-1 font-mono"
                     placeholder="Version ID (e.g. A4v...)"
                 />
-                <UButton
+                <AtomButton variant="primary"
                     :loading="busy === 'modrinth-add'"
                     icon="i-lucide-download"
-                    color="primary"
                     @click="emit('add', versionId, null)"
                 >
                     Add
-                </UButton>
+                </AtomButton>
             </div>
         </div>
     </div>

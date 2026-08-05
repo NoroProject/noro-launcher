@@ -8,12 +8,12 @@ defineProps<{
 </script>
 
 <template>
-  <NuxtLink
+  <AtomButton
+    :variant="primary ? 'primary' : 'secondary'"
+    :icon="icon"
     :to="to"
-    class="noro-btn flex gap-3"
-    :class="primary ? 'noro-btn-primary' : 'noro-btn-secondary'"
+    class="flex gap-3"
   >
-    <UIcon :name="icon" class="size-5" />
     <span>{{ label }}</span>
-  </NuxtLink>
+  </AtomButton>
 </template>

@@ -129,6 +129,8 @@ pub struct LauncherVersionRow {
     pub signature: String,
     pub is_current: bool,
     pub built_at: DateTime<Utc>,
+    /// `core` — то, что качает bootstrapper; `bootstrapper` — то, что качает игрок.
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]

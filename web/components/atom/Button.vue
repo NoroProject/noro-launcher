@@ -6,9 +6,16 @@ const props = withDefaults(defineProps<{
   iconRight?: string
   loading?: boolean
   disabled?: boolean
+  /** Внутренний роут — рендерится NuxtLink. */
   to?: string
+  /** Внешний адрес или скачивание — рендерится обычный `<a>`. */
+  href?: string
+  /** `true` — имя файла с сервера, строка — своё имя. Только вместе с `href`. */
+  download?: boolean | string
   type?: 'button' | 'submit'
   block?: boolean
+  /** Одинаковая ширина в ряду однотипных кнопок. */
+  equal?: boolean
 }>(), {
   variant: 'secondary',
   size: 'md',
@@ -17,8 +24,39 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ click: [event: MouseEvent] }>()
 
-const variantClass = computed(() => {
-  const map: Record<string, string> = {
+const slots = useSlots()
+
+/**
+ * Кнопка-иконка без подписи. Пустой `<span>` рядом с иконкой съедал бы gap и
+ * боковые отступы, из-за чего такие кнопки выходили заметно шире квадрата.
+ */
+const iconOnly = computed(() => !slots.default)
+
+const isDisabled = computed(() => props.disabled || props.loading)
+
+/**
+ * Один тег вместо трёх веток шаблона: копии разметки под button/a/NuxtLink
+ * разъезжались бы при каждой правке.
+ */
+const tag = computed(() => {
+  if (props.to) return resolveComponent('NuxtLink')
+  if (props.href) return 'a'
+  return 'button'
+})
+
+const tagAttrs = computed(() => {
+  if (props.to) return { to: props.to }
+  if (props.href) {
+    // `download="true"` браузер принял бы за имя файла — пустая строка значит
+    // «оставить имя, которое отдал сервер».
+    const name = props.download === true ? '' : props.download
+    return { href: props.href, download: name }
+  }
+  return { type: props.type, disabled: isDisabled.value }
+})
+
+const classes = computed(() => {
+  const variants: Record<string, string> = {
     primary: 'noro-btn-primary',
     secondary: 'noro-btn-secondary',
     dark: 'noro-btn-dark',
@@ -28,16 +66,18 @@ const variantClass = computed(() => {
     'outline-blue': 'noro-btn-outline-blue',
     ghost: 'noro-btn-dark !bg-transparent hover:!bg-white/5',
   }
-  return map[props.variant] || 'noro-btn-secondary'
+  const sizes: Record<string, string> = { sm: 'noro-btn-sm', lg: 'noro-btn-lg' }
+  return [
+    'noro-btn',
+    variants[props.variant] || variants.secondary,
+    sizes[props.size] || '',
+    {
+      'w-full': props.block,
+      'noro-btn-equal': props.equal,
+      '!px-0 aspect-square': iconOnly.value,
+    },
+  ]
 })
-
-const sizeClass = computed(() => {
-  if (props.size === 'sm') return 'noro-btn-sm'
-  if (props.size === 'lg') return 'noro-btn-lg'
-  return ''
-})
-
-const isDisabled = computed(() => props.disabled || props.loading)
 
 function handleClick(e: MouseEvent) {
   if (isDisabled.value) {
@@ -49,30 +89,16 @@ function handleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <NuxtLink
-    v-if="to"
-    :to="to"
-    :class="['noro-btn', variantClass, sizeClass, { 'w-full': block }]"
-    :aria-disabled="isDisabled"
+  <component
+    :is="tag"
+    v-bind="tagAttrs"
+    :class="classes"
+    :aria-disabled="isDisabled || undefined"
     @click="handleClick"
   >
     <UIcon v-if="loading" name="i-lucide-loader-circle" class="size-4 shrink-0 animate-spin" />
     <UIcon v-else-if="icon" :name="icon" class="size-4 shrink-0" />
-    <span class="truncate"><slot /></span>
+    <span v-if="!iconOnly" class="truncate"><slot /></span>
     <UIcon v-if="iconRight && !loading" :name="iconRight" class="size-4 shrink-0" />
-  </NuxtLink>
-
-  <button
-    v-else
-    :type="type"
-    :class="['noro-btn', variantClass, sizeClass, { 'w-full': block }]"
-    :disabled="isDisabled"
-    @click="handleClick"
-  >
-    <UIcon v-if="loading" name="i-lucide-loader-circle" class="size-4 shrink-0 animate-spin" />
-    <UIcon v-else-if="icon" :name="icon" class="size-4 shrink-0" />
-    <span class="truncate"><slot /></span>
-    <UIcon v-if="iconRight && !loading" :name="iconRight" class="size-4 shrink-0" />
-  </button>
+  </component>
 </template>
-

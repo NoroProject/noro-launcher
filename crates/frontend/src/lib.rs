@@ -38,6 +38,7 @@ impl gpui::Render for LauncherUI {
             | Page::ServerMods(_)
             | Page::ServerSettings(_)
             | Page::News
+            | Page::NewsDetail(_)
             | Page::Profile
             | Page::Settings => pages::launcher_shell(self, cx),
         };

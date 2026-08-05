@@ -2,6 +2,8 @@
 import type { NewsRow } from '~/types/api'
 
 const auth = useAuth()
+
+const notify = useNotify()
 await auth.loadMe()
 
 const { data: news, refresh, pending } = await useAsyncData('admin-news', () =>
@@ -22,6 +24,9 @@ async function createNews() {
     Object.assign(form, { title: '', body: '', preview_img_url: '', pinned: false })
     await refresh()
     showCreate.value = false
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     creating.value = false
   }
@@ -39,9 +44,7 @@ async function createNews() {
       >
         Refresh
       </AtomButton>
-      <button type="button" class="noro-btn noro-btn-primary" @click="showCreate = true">
-        <UIcon name="i-lucide-plus" class="size-5" />New post
-      </button>
+      <AtomButton variant="primary" icon="i-lucide-plus" @click="showCreate = true">New post</AtomButton>
     </template>
 
     <section class="grid gap-3">
@@ -69,10 +72,8 @@ async function createNews() {
         <div class="grid gap-2"><span class="noro-label">Body</span><AdminMarkdownEditor v-model="form.body" /></div>
         <UCheckbox v-model="form.pinned" label="Pinned" />
         <div class="flex justify-end gap-3 pt-2">
-          <button type="button" class="noro-btn noro-btn-secondary" @click="showCreate = false">Cancel</button>
-          <button :disabled="creating" type="submit" class="noro-btn noro-btn-primary">
-            <UIcon name="i-lucide-plus" class="size-5" />Create
-          </button>
+          <AtomButton variant="secondary" @click="showCreate = false">Cancel</AtomButton>
+          <AtomButton variant="primary" icon="i-lucide-plus" :disabled="creating" type="submit">Create</AtomButton>
         </div>
       </form>
     </AtomModal>

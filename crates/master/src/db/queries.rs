@@ -1017,7 +1017,8 @@ pub async fn current_launcher_version(
     platform: &str,
 ) -> Result<Option<LauncherVersionRow>> {
     Ok(sqlx::query_as::<_, LauncherVersionRow>(
-        "SELECT * FROM launcher_versions WHERE platform=$1 AND is_current=TRUE LIMIT 1",
+        "SELECT * FROM launcher_versions
+         WHERE platform=$1 AND kind='core' AND is_current=TRUE LIMIT 1",
     )
     .bind(platform)
     .fetch_optional(pool)
@@ -1033,11 +1034,13 @@ pub async fn insert_launcher_version(
     file_sha1: &str,
     size: i64,
     signature: &str,
+    kind: &str,
 ) -> Result<Uuid> {
     Ok(sqlx::query_scalar(
-        "INSERT INTO launcher_versions (version, platform, sha256, file_sha1, size, signature)
-         VALUES ($1,$2,$3,$4,$5,$6)
-         ON CONFLICT (version, platform) DO UPDATE SET sha256=$3, file_sha1=$4, size=$5, signature=$6
+        "INSERT INTO launcher_versions (version, platform, sha256, file_sha1, size, signature, kind)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (version, platform, kind)
+         DO UPDATE SET sha256=$3, file_sha1=$4, size=$5, signature=$6
          RETURNING id",
     )
     .bind(version)
@@ -1046,6 +1049,7 @@ pub async fn insert_launcher_version(
     .bind(file_sha1)
     .bind(size)
     .bind(signature)
+    .bind(kind)
     .fetch_one(pool)
     .await?)
 }
@@ -1244,4 +1248,15 @@ pub async fn user_by_mc_uuid(pool: &PgPool, mc_uuid: Uuid) -> Result<Option<User
         .fetch_optional(pool)
         .await?;
     Ok(row)
+}
+
+/// Актуальные установщики по платформам — то, что раздаётся с сайта.
+pub async fn current_bootstrappers(pool: &PgPool) -> Result<Vec<LauncherVersionRow>> {
+    Ok(sqlx::query_as::<_, LauncherVersionRow>(
+        "SELECT * FROM launcher_versions
+         WHERE kind='bootstrapper' AND is_current=TRUE
+         ORDER BY platform",
+    )
+    .fetch_all(pool)
+    .await?)
 }

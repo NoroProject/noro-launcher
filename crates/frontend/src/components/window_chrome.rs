@@ -3,7 +3,10 @@
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
-use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, Context, MouseButton};
+use gpui::{
+    div, prelude::*, px, rgb, rgba, AnyElement, Context, MouseButton, MouseDownEvent, Pixels,
+    Point, Size,
+};
 use i18n::Locale;
 
 /// Верхняя панель окна. `compact` — тонкий вариант для основного интерфейса.
@@ -18,14 +21,35 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
         .items_center()
         .px(px(16.))
         .gap(px(4.))
-        // Перетаскивание окна за рамку.
-        .on_mouse_down(MouseButton::Left, |_, window, _| window.start_window_move())
+        // Перетаскивание окна за рамку — но не за самый край.
+        //
+        // Панель занимает всю ширину и упирается в верхнюю кромку окна, а там
+        // проходит системная зона ресайза. Когда `start_window_move()` висел на
+        // всей площади, система успевала показать курсор ресайза, после чего
+        // нажатие уводило окно в move: курсор мигал, размер не менялся, а
+        // AppKit ругался «Window move completed without beginning».
+        .on_mouse_down(MouseButton::Left, |event: &MouseDownEvent, window, _| {
+            if !in_resize_edge(event.position, window.viewport_size()) {
+                window.start_window_move();
+            }
+        })
         .child(div().flex_1())
         .children(Locale::ALL.map(|l| lang_pill(l, l == active, cx)))
         .child(div().w(px(8.)))
         .child(control("win-min", "minus", false))
         .child(control("win-close", "x", true))
         .into_any_element()
+}
+
+/// Ширина системной зоны ресайза по краям окна.
+///
+/// macOS ловит ресайз в нескольких пикселях от кромки; берём с запасом, иначе
+/// попасть в неё мышью почти невозможно.
+const RESIZE_EDGE: f32 = 6.;
+
+fn in_resize_edge(position: Point<Pixels>, viewport: Size<Pixels>) -> bool {
+    let edge = px(RESIZE_EDGE);
+    position.y <= edge || position.x <= edge || position.x >= viewport.width - edge
 }
 
 fn lang_pill(locale: Locale, active: bool, cx: &mut Context<LauncherUI>) -> AnyElement {

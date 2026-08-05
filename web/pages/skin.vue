@@ -81,9 +81,7 @@ async function deleteSkin() {
   -->
   <NoroShell title="SKIN" subtitle="Your Minecraft appearance">
     <template #actions>
-      <NuxtLink to="/cabinet" class="noro-btn noro-btn-secondary">
-        <UIcon name="i-lucide-arrow-left" class="size-4" />Cabinet
-      </NuxtLink>
+      <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">Cabinet</AtomButton>
     </template>
 
     <div class="grid gap-4 xl:grid-cols-[360px_1fr]">
@@ -119,25 +117,25 @@ async function deleteSkin() {
         </label>
 
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            class="noro-btn noro-btn-primary"
+          <AtomButton
+            variant="primary"
+            icon="i-lucide-upload"
             :disabled="!file || uploading"
             @click="uploadSkin"
           >
-            <UIcon name="i-lucide-upload" class="size-4" />
             {{ uploading ? 'Uploading…' : 'Upload' }}
-          </button>
+          </AtomButton>
           <!-- Удаление отодвинуто от основной кнопки: соседство с Upload
                провоцировало промах по необратимому действию. -->
-          <button
+          <AtomButton
             v-if="hasSkin"
-            type="button"
-            class="noro-btn noro-btn-ghost ml-auto text-[var(--noro-danger)]"
+            variant="ghost"
+            icon="i-lucide-trash-2"
             @click="deleteSkin"
+            class="ml-auto text-[var(--noro-danger)]"
           >
-            <UIcon name="i-lucide-trash-2" class="size-4" />Remove current skin
-          </button>
+            Remove current skin
+          </AtomButton>
         </div>
 
         <UAlert

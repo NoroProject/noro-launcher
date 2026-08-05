@@ -120,6 +120,7 @@ fn router(state: AppState) -> Router {
     let launcher_api = Router::new()
         .route("/ws/launcher", get(launcher::ws_handler))
         .route("/api/launcher/version", get(launcher::current_version))
+        .route("/api/launcher/downloads", get(launcher::downloads))
         .route("/files/{sha1}", get(file_serve::serve_file))
         .route("/api/textures/default-skin", get(textures::default_skin))
         .route("/api/launcher/locales", get(translations::list))

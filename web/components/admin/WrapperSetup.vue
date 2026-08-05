@@ -26,15 +26,16 @@ const masterUrl = computed(() => `https://${props.host}`)
         <div>
           <h4 class="mb-2 font-bold text-[var(--noro-text)]">1. Download the wrapper</h4>
           <p class="mb-3 text-sm">Put it next to your server jar.</p>
-          <a
+          <AtomButton
             v-if="wrapper"
+            variant="primary"
+            icon="i-lucide-download"
             :href="wrapper.url"
             download="wrapper.jar"
-            class="noro-btn noro-btn-primary inline-flex w-auto"
+            class="inline-flex w-auto"
           >
-            <UIcon name="i-lucide-download" class="size-5" />
             Download wrapper.jar
-          </a>
+          </AtomButton>
           <p v-else class="text-sm text-[var(--noro-amber)]">
             Not built yet — run <code>./gradlew collectAgents</code> in <code>agent/</code> and copy
             <code>agent/build/agents/</code> into <code>{NORO_DATA_DIR}/agents/</code>.

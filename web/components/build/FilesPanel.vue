@@ -217,13 +217,15 @@ const sortIcon = (col: string) => {
                             </UTooltip>
                         </td>
                         <td class="text-right">
-                            <button
-                                class="noro-btn noro-btn-dark !min-h-8 !min-w-8 !px-1.5 opacity-0 transition-all group-hover:opacity-100"
-                                :disabled="busy === `delete-file-${file.id}`"
-                                @click="$emit('remove', file.id)"
+                            <AtomButton
+                              variant="dark"
+                              icon="i-lucide-trash-2"
+                              :disabled="busy === `delete-file-${file.id}`"
+                              @click="$emit('remove', file.id)"
+                              class="!min-h-8 !min-w-8 !px-1.5 opacity-0 transition-all group-hover:opacity-100"
                             >
-                                <UIcon name="i-lucide-trash-2" class="size-3.5" />
-                            </button>
+
+                            </AtomButton>
                         </td>
                     </tr>
                 </tbody>

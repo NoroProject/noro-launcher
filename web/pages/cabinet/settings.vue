@@ -17,9 +17,7 @@ const sessionRows = computed(() => [
   -->
   <NoroShell title="SETTINGS" subtitle="Your account">
     <template #actions>
-      <NuxtLink to="/cabinet" class="noro-btn noro-btn-secondary">
-        <UIcon name="i-lucide-arrow-left" class="size-4" />Cabinet
-      </NuxtLink>
+      <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">Cabinet</AtomButton>
     </template>
 
     <div class="mx-auto grid w-full max-w-2xl gap-4">
@@ -42,9 +40,7 @@ const sessionRows = computed(() => [
         <p class="mb-4 text-sm text-[var(--noro-muted)]">
           Signing out only affects this browser. The launcher keeps its own session.
         </p>
-        <button type="button" class="noro-btn noro-btn-secondary" @click="auth.signOut()">
-          <UIcon name="i-lucide-log-out" class="size-4" />Sign out
-        </button>
+        <AtomButton variant="secondary" icon="i-lucide-log-out" @click="auth.signOut()">Sign out</AtomButton>
       </section>
     </div>
   </NoroShell>

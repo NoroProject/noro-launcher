@@ -1,4 +1,4 @@
-use super::{game, news, profile, server_mods, server_settings, settings, sidebar};
+use super::{game, news, news_detail, profile, server_mods, server_settings, settings, sidebar};
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
 use gpui::{div, prelude::*, rgb, AnyElement};
@@ -25,6 +25,7 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
                 .relative()
                 .child(match ui.page.clone() {
                     Page::News => news::page(ui, cx),
+                    Page::NewsDetail(id) => news_detail::page(ui, id, cx),
                     Page::Profile => profile::page(ui, cx),
                     Page::Settings => settings::page(ui, cx),
                     Page::ServerMods(id) => server_mods::page(ui, id, cx),

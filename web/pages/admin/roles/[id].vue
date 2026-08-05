@@ -78,10 +78,7 @@ async function movePermission(entry: PermissionEntry, serverId: string | null) {
 <template>
   <NoroShell :title="role?.display_name || 'ROLE'" :subtitle="role?.name">
     <template #actions>
-      <NuxtLink :to="'/admin/roles'" class="noro-btn noro-btn-ghost">
-        <UIcon name="i-lucide-arrow-left" class="size-4" />
-        Back
-      </NuxtLink>
+      <AtomButton variant="ghost" icon="i-lucide-arrow-left" :to="'/admin/roles'">Back</AtomButton>
     </template>
 
     <EmptyState v-if="!role" icon="i-lucide-search-x" title="Role not found" />
@@ -109,15 +106,16 @@ async function movePermission(entry: PermissionEntry, serverId: string | null) {
         </label>
         <UCheckbox v-model="form.is_default" label="Default role" />
         <div class="flex gap-2">
-          <button type="submit" class="noro-btn noro-btn-primary" :disabled="busy === 'save'">
-            <UIcon
-              :name="busy === 'save' ? 'i-lucide-loader-circle' : 'i-lucide-save'"
-              class="size-4"
-              :class="busy === 'save' ? 'animate-spin' : ''"
-            />
+          <AtomButton
+            variant="primary"
+            icon="i-lucide-save"
+            :loading="busy === 'save'"
+            type="submit"
+            :disabled="busy === 'save'"
+          >
             Save
-          </button>
-          <UButton :loading="busy === 'delete'" icon="i-lucide-trash-2" color="error" variant="subtle" @click="removeRole">Delete</UButton>
+          </AtomButton>
+          <AtomButton variant="danger" :loading="busy === 'delete'" icon="i-lucide-trash-2" @click="removeRole">Delete</AtomButton>
         </div>
       </form>
 

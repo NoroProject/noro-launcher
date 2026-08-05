@@ -82,7 +82,7 @@ function reset() {
             <div class="noro-pixel text-lg uppercase text-[var(--noro-cream)]">Path Rules</div>
             <div class="text-[10px] uppercase tracking-widest text-[var(--noro-muted)]">File browser • pick sync mode</div>
           </div>
-          <UButton icon="i-lucide-x" variant="ghost" @click="open=false" />
+          <AtomButton variant="ghost" icon="i-lucide-x" @click="open=false" />
         </div>
 
         <div class="flex items-center gap-2 border-b border-[var(--noro-border)] bg-black/20 px-4 py-2">
@@ -111,7 +111,7 @@ function reset() {
                 :class="e.mode===m ? colors[m] : 'text-[var(--noro-muted)] hover:bg-white/10'"
                 @click="set(e.path, m)">{{ labels[m] }}</button>
             </div>
-            <button class="text-[var(--noro-muted)] hover:text-[var(--noro-danger)]" @click.stop="remove(e.path)"><UIcon name="i-lucide-x" class="size-3.5"/></button>
+            <AtomButton variant="ghost" size="sm" icon="i-lucide-x" class="!text-[var(--noro-muted)] hover:!text-[var(--noro-danger)]" @click.stop="remove(e.path)" />
           </div>
           <div v-if="!list.length" class="py-6 text-center text-xs text-[var(--noro-muted)]">No matches.</div>
         </div>

@@ -63,11 +63,9 @@ function setFiles(mod: OptionalMod, value: string) {
                 >
                     <!-- Floating Actions -->
                     <div class="absolute right-4 top-4 flex gap-2">
-                        <UButton
+                        <AtomButton variant="danger"
                             icon="i-lucide-trash-2"
-                            size="xs"
-                            color="error"
-                            variant="ghost"
+                            size="sm"
                             class="opacity-0 transition-opacity group-hover:opacity-100"
                             @click="$emit('delete', index)"
                         />
@@ -181,15 +179,14 @@ function setFiles(mod: OptionalMod, value: string) {
                     Remember to save your changes to apply them to the build
                     manifest.
                 </p>
-                <UButton
+                <AtomButton variant="primary"
                     :loading="busy === 'optional'"
                     icon="i-lucide-save"
-                    color="primary"
                     size="md"
                     @click="$emit('save')"
                 >
                     Save Optional Mods
-                </UButton>
+                </AtomButton>
             </div>
         </div>
     </section>

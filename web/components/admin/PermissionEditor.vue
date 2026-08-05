@@ -88,19 +88,16 @@ function add() {
               @submit="add"
             />
           </div>
-          <button
-            type="button"
-            class="noro-btn noro-btn-primary shrink-0"
+          <AtomButton
+            variant="primary"
+            icon="i-lucide-plus"
+            :loading="busy === 'perm'"
             :disabled="!node.trim() || !fresh.length || busy === 'perm'"
             @click="add"
+            class="shrink-0"
           >
-            <UIcon
-              :name="busy === 'perm' ? 'i-lucide-loader-circle' : 'i-lucide-plus'"
-              class="size-4"
-              :class="busy === 'perm' ? 'animate-spin' : ''"
-            />
             Add
-          </button>
+          </AtomButton>
         </div>
       </div>
     </div>

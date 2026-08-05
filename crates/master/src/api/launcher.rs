@@ -38,6 +38,36 @@ pub async fn current_version(
     }
 }
 
+/// Установщики под все платформы — для кнопки скачивания на сайте.
+///
+/// Отдаётся без авторизации: лаунчер качают до того, как заводят аккаунт.
+pub async fn downloads(State(state): State<AppState>) -> AppResult<Json<serde_json::Value>> {
+    let rows = crate::db::current_bootstrappers(&state.db).await?;
+    let items: Vec<_> = rows
+        .into_iter()
+        .map(|r| {
+            serde_json::json!({
+                "platform": r.platform,
+                "version": r.version,
+                "size": r.size,
+                "sha256": r.sha256,
+                "url": state.config.file_url(&r.file_sha1),
+                "filename": filename_for(&r.platform),
+            })
+        })
+        .collect();
+    Ok(Json(serde_json::json!(items)))
+}
+
+/// Имя файла для сохранения: стор адресуется по хешу и своего имени не знает.
+fn filename_for(platform: &str) -> String {
+    match platform {
+        p if p.starts_with("windows") => "NoroLauncher.exe".into(),
+        p if p.starts_with("macos") => "NoroLauncher.app.tar.gz".into(),
+        _ => "noro-launcher".into(),
+    }
+}
+
 /// WebSocket-апгрейд.
 pub async fn ws_handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(move |socket| handle_socket(socket, state))

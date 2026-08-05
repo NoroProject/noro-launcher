@@ -2,6 +2,8 @@
 import type { LauncherVersionRow } from '~/types/api'
 
 const auth = useAuth()
+
+const notify = useNotify()
 await auth.loadMe()
 
 const { data: versions, refresh, pending, error } = await useAsyncData('admin-launcher-versions', () =>
@@ -34,6 +36,9 @@ async function buildLauncher() {
     jobId.value = response.job_id
     showBuild.value = false
     showLog.value = true
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = null
   }
@@ -54,6 +59,9 @@ async function deploy(versionId: string) {
   try {
     await auth.request(`/api/admin/launcher/deploy/${versionId}`, { method: 'POST' })
     await refresh()
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     busy.value = null
   }
@@ -71,12 +79,8 @@ async function deploy(versionId: string) {
       >
         Refresh
       </AtomButton>
-      <button type="button" class="noro-btn noro-btn-primary" @click="showBuild = true">
-        <UIcon name="i-lucide-hammer" class="size-5" />Build tag
-      </button>
-      <button type="button" class="noro-btn noro-btn-secondary" @click="showLog = true">
-        <UIcon name="i-lucide-file-text" class="size-5" />Build log
-      </button>
+      <AtomButton variant="primary" icon="i-lucide-hammer" @click="showBuild = true">Build tag</AtomButton>
+      <AtomButton variant="secondary" icon="i-lucide-file-text" @click="showLog = true">Build log</AtomButton>
     </template>
 
     <UAlert v-if="error" class="mb-5" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="humanError(error)" />
@@ -91,7 +95,7 @@ async function deploy(versionId: string) {
             <td><code class="text-xs text-[var(--noro-muted)]">{{ version.sha256.slice(0, 16) }}...</code></td>
             <td><UBadge :color="version.is_current ? 'success' : 'neutral'" variant="subtle">{{ version.is_current ? 'current' : 'stored' }}</UBadge></td>
             <td class="text-right">
-              <UButton :loading="busy === `deploy-${version.id}`" icon="i-lucide-send" color="primary" size="sm" variant="subtle" @click="deploy(version.id)">Deploy</UButton>
+              <AtomButton variant="primary" :loading="busy === `deploy-${version.id}`" icon="i-lucide-send" size="sm" @click="deploy(version.id)">Deploy</AtomButton>
             </td>
           </tr>
         </tbody>
@@ -101,19 +105,19 @@ async function deploy(versionId: string) {
 
     <AtomModal v-model="showBuild" title="GITHUB BUILD" subtitle="Build a launcher release tag">
       <div class="grid gap-3">
-        <UButton :loading="busy === 'github'" icon="i-lucide-github" color="neutral" variant="subtle" @click="githubLatest">Check latest release</UButton>
+        <AtomButton variant="secondary" :loading="busy === 'github'" icon="i-lucide-github" @click="githubLatest">Check latest release</AtomButton>
         <pre v-if="latest" class="rounded-lg bg-[var(--noro-input)] p-3 text-xs text-[var(--noro-text)]">{{ JSON.stringify(latest, null, 2) }}</pre>
         <input v-model="tag" class="noro-input" placeholder="v1.2.3">
         <div class="flex justify-end gap-3 pt-2">
-          <button type="button" class="noro-btn noro-btn-secondary" @click="showBuild = false">Cancel</button>
-          <button
-            type="button"
-            class="noro-btn noro-btn-primary"
+          <AtomButton variant="secondary" @click="showBuild = false">Cancel</AtomButton>
+          <AtomButton
+            variant="primary"
+            icon="i-lucide-hammer"
             :disabled="busy === 'build' || !tag"
             @click="buildLauncher"
           >
-            <UIcon name="i-lucide-hammer" class="size-5" />Build tag
-          </button>
+            Build tag
+          </AtomButton>
         </div>
       </div>
     </AtomModal>
@@ -121,7 +125,7 @@ async function deploy(versionId: string) {
     <AtomModal v-model="showLog" title="BUILD LOG" subtitle="Inspect launcher builder output" wide>
       <div class="flex gap-2">
         <input v-model="jobId" class="noro-input" placeholder="job_id">
-        <UButton :loading="busy === 'log'" icon="i-lucide-file-text" color="neutral" variant="subtle" @click="loadLog" />
+        <AtomButton variant="secondary" :loading="busy === 'log'" icon="i-lucide-file-text" @click="loadLog" />
       </div>
       <pre v-if="jobLog" class="mt-3 max-h-80 overflow-auto rounded-lg bg-[var(--noro-input)] p-3 text-xs text-[var(--noro-text)]">{{ JSON.stringify(jobLog, null, 2) }}</pre>
     </AtomModal>

@@ -1,7 +1,7 @@
 use super::common::{page_title, panel, tabs, Cx};
 use crate::state::LauncherUI;
 use crate::theme::*;
-use gpui::{div, prelude::*, px, rgb, AnyElement, FontWeight};
+use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
 use i18n::t;
 use schema::NewsItem;
 
@@ -22,12 +22,12 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .flex_col()
                 .gap(px(16.))
                 .child(page_title(t("news-title")))
-                .children(cards(&ui.news)),
+                .children(cards(&ui.news, cx)),
         )
         .into_any_element()
 }
 
-fn cards(items: &[NewsItem]) -> Vec<AnyElement> {
+fn cards(items: &[NewsItem], cx: &mut Cx) -> Vec<AnyElement> {
     if items.is_empty() {
         return vec![panel()
             .p(px(20.))
@@ -37,12 +37,22 @@ fn cards(items: &[NewsItem]) -> Vec<AnyElement> {
             .child(t("news-empty"))
             .into_any_element()];
     }
-    items.iter().map(card).collect()
+    items.iter().map(|item| card(item, cx)).collect()
 }
 
-fn card(item: &NewsItem) -> AnyElement {
+fn card(item: &NewsItem, cx: &mut Cx) -> AnyElement {
+    let id = item.id;
     panel()
+        // Идентификатор обязан быть уникальным на кадр, иначе GPUI склеит
+        // обработчики разных карточек.
+        .id(gpui::ElementId::Name(id.to_string().into()))
         .p(px(20.))
+        .cursor_pointer()
+        .hover(|d| d.bg(rgba(0xffffff08)))
+        .on_click(cx.listener(move |this, _e, _w, cx| {
+            this.open_news(id, cx);
+            cx.notify();
+        }))
         .flex()
         .flex_col()
         .gap(px(12.))
@@ -66,6 +76,14 @@ fn card(item: &NewsItem) -> AnyElement {
                         .font_family(FONT_PIXEL_ALT)
                         .text_color(rgb(TEXT_MUTED))
                         .child(item.published_at.format("%Y-%m-%d").to_string()),
+                )
+                .child(
+                    div()
+                        .ml(px(12.))
+                        .text_xs()
+                        .font_family(FONT_PIXEL_ALT)
+                        .text_color(rgb(CTA))
+                        .child(t("news-read")),
                 ),
         )
         .child(

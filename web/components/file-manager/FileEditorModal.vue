@@ -73,18 +73,15 @@ onMounted(() => {
           <span class="text-xs font-normal text-[var(--noro-muted)]">{{ filePath }}</span>
         </h3>
         <div class="flex items-center gap-2">
-          <UButton
+          <AtomButton variant="primary"
             size="sm"
-            color="primary"
             :loading="saving"
             @click="save"
           >
             Save (Ctrl+S)
-          </UButton>
-          <UButton
+          </AtomButton>
+          <AtomButton variant="ghost"
             size="sm"
-            color="gray"
-            variant="ghost"
             icon="i-lucide-x"
             @click="emit('close')"
           />

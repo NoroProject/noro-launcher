@@ -101,6 +101,8 @@ sync-failed = ОШИБКА СИНХРОНИЗАЦИИ
 ## Новости
 news-title = НОВОСТИ
 news-empty = Новостей пока нет.
+news-back = Назад
+news-read = Читать
 
 ## Моды
 mods-optional = ОПЦИОНАЛЬНЫЕ МОДЫ

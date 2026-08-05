@@ -38,15 +38,15 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik-public
+      - traefik.docker.network=traefik
       - traefik.http.routers.noro-master.rule=Host(`api.${DOMAIN}`)
       - traefik.http.routers.noro-master.entrypoints=websecure
-      - traefik.http.routers.noro-master.tls=true
+      - traefik.http.routers.noro-master.tls.certresolver=le
       - traefik.http.services.noro-master.loadbalancer.server.port=8080
     restart: unless-stopped
     networks:
       - internal
-      - traefik-public
+      - traefik
 
   noro-web:
     image: ghcr.io/nexbitstd/noro-web:latest
@@ -58,15 +58,15 @@ services:
       - noro-master
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik-public
+      - traefik.docker.network=traefik
       - traefik.http.routers.noro-web.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.noro-web.entrypoints=websecure
-      - traefik.http.routers.noro-web.tls=true
+      - traefik.http.routers.noro-web.tls.certresolver=le
       - traefik.http.services.noro-web.loadbalancer.server.port=3000
     restart: unless-stopped
     networks:
       - internal
-      - traefik-public
+      - traefik
 
 volumes:
   noro-postgres:
@@ -75,5 +75,5 @@ volumes:
 networks:
   internal:
     name: noro-internal
-  traefik-public:
+  traefik:
     external: true

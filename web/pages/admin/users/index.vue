@@ -49,7 +49,14 @@ const { data: users, refresh, pending, error } = await useAsyncData('admin-users
             </td>
             <td><UBadge :color="user.banned ? 'error' : 'success'" variant="subtle">{{ user.banned ? 'banned' : 'active' }}</UBadge></td>
             <td class="text-right">
-              <NuxtLink :to="`/admin/users/${user.id}`" class="noro-btn noro-btn-dark !min-h-8 !min-w-8 !px-1.5"><UIcon name="i-lucide-settings" class="size-4" /></NuxtLink>
+              <AtomButton
+                variant="dark"
+                icon="i-lucide-settings"
+                :to="`/admin/users/${user.id}`"
+                class="!min-h-8 !min-w-8 !px-1.5"
+              >
+
+              </AtomButton>
             </td>
           </tr>
         </tbody>

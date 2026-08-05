@@ -27,6 +27,8 @@ pub struct Config {
     /// GitHub-репозиторий лаунчера для launcher_builder: "owner/repo".
     pub github_repo: Option<String>,
     pub github_token: Option<String>,
+    /// Ветка, из которой запускается workflow сборки лаунчера.
+    pub github_ref: Option<String>,
     /// Путь к локальному чекауту репозитория лаунчера для сборки.
     pub launcher_repo_path: Option<PathBuf>,
 
@@ -76,6 +78,7 @@ impl Config {
                 .filter(|s| !s.is_empty()),
             github_repo: std::env::var("NORO_GITHUB_REPO").ok(),
             github_token: std::env::var("GITHUB_TOKEN").ok(),
+            github_ref: std::env::var("NORO_GITHUB_REF").ok(),
             launcher_repo_path: std::env::var("NORO_LAUNCHER_REPO").ok().map(PathBuf::from),
             files_cdn_url: std::env::var("NORO_FILES_CDN_URL")
                 .ok()

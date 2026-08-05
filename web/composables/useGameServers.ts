@@ -8,6 +8,7 @@ import type { GameServer, GameServerForm } from "~/types/game-server";
  * неоткуда, остаётся только перевыпустить.
  */
 export function useGameServers(serverId: string) {
+  const notify = useNotify();
   const api = useApi();
   const base = `/api/admin/servers/${serverId}/game-servers`;
 
@@ -45,6 +46,9 @@ export function useGameServers(serverId: string) {
     try {
       await api.request(`${base}/${id}`, { method: "PUT", body: form });
       await load();
+      notify.ok()
+    } catch (e) {
+      notify.fail(e)
     } finally {
       busyId.value = null;
     }
@@ -57,6 +61,9 @@ export function useGameServers(serverId: string) {
         method: "POST",
       });
       secret.value = { name: item.name, value: res.secret };
+      notify.ok()
+    } catch (e) {
+      notify.fail(e)
     } finally {
       busyId.value = null;
     }
@@ -67,6 +74,9 @@ export function useGameServers(serverId: string) {
     try {
       await api.request(`${base}/${id}`, { method: "DELETE" });
       await load();
+      notify.ok('Deleted')
+    } catch (e) {
+      notify.fail(e)
     } finally {
       busyId.value = null;
     }

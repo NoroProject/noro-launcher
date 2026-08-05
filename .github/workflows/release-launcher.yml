@@ -1,0 +1,139 @@
+# Релиз лаунчера. Запускается мастером через workflow_dispatch и ждёт его же:
+# мастер потом забирает ассеты релиза, подписывает core и раскладывает по
+# платформам. Тег в `run-name` — единственный способ сопоставить запуск с
+# задачей: workflow_dispatch не возвращает id запуска.
+name: Release Launcher
+
+run-name: launcher ${{ inputs.tag || github.ref_name }} [${{ inputs.job_id || 'push' }}]
+
+on:
+  # Запасной путь: без GITHUB_TOKEN у мастера собрать лаунчер больше нечем.
+  push:
+    tags:
+      - 'launcher-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Тег релиза, например launcher-v1.4.0
+        required: true
+        type: string
+      job_id:
+        description: id задачи мастера, для сопоставления запуска
+        required: false
+        default: manual
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  # Оба обязательны: без них release-сборка bootstrapper'а не компилируется —
+  # см. crates/noro_launcher/src/verify.rs.
+  NORO_MASTER_URL: ${{ vars.NORO_MASTER_URL }}
+  NORO_SIGNING_PUBKEY: ${{ vars.NORO_SIGNING_PUBKEY }}
+  # На push тега inputs пустые — тег берётся из ссылки.
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  guard:
+    name: Check release vars
+    runs-on: ubuntu-latest
+    steps:
+      # Падать здесь, а не на пятой матрице через двадцать минут.
+      - name: Vars present
+        run: |
+          set -euo pipefail
+          [ -n "${NORO_MASTER_URL:-}" ] || { echo "::error::переменная NORO_MASTER_URL не задана в настройках репозитория"; exit 1; }
+          [ -n "${NORO_SIGNING_PUBKEY:-}" ] || { echo "::error::переменная NORO_SIGNING_PUBKEY не задана — иначе доверенным станет dev-ключ"; exit 1; }
+
+  build:
+    name: launcher ${{ matrix.target }}
+    needs: guard
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: launcher-${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            cross build --release -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cross build --release -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
+          else
+            cargo build --release -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cargo build --release -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          OUT=target/${{ matrix.target }}/release
+          case "${{ matrix.os }}" in
+            windows-latest)
+              cp "$OUT/noro-launcher.exe" dist/noro-launcher-${{ matrix.target }}.exe
+              cp "$OUT/noro-launcher-core.exe" dist/noro-launcher-core-${{ matrix.target }}.exe
+              ;;
+            macos-latest)
+              cp "$OUT/noro-launcher-core" dist/noro-launcher-core-${{ matrix.target }}
+              bash .github/scripts/make-app.sh "$OUT/noro-launcher" NoroLauncher.app
+              tar -czf dist/noro-launcher-${{ matrix.target }}.app.tar.gz NoroLauncher.app
+              ;;
+            *)
+              cp "$OUT/noro-launcher" dist/noro-launcher-${{ matrix.target }}
+              cp "$OUT/noro-launcher-core" dist/noro-launcher-core-${{ matrix.target }}
+              ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-${{ matrix.target }}
+          path: dist/*
+
+  release:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # Мастер ждёт именно релиз с этим тегом и читает из него ассеты
+      # noro-launcher-core-*.
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          tag_name: ${{ env.TAG }}

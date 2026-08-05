@@ -9,6 +9,7 @@ export function useAdminServerRoles(
   auth: AuthApi,
   id: ComputedRef<string>,
 ) {
+  const notify = useNotify();
   const rolesData = useAsyncData(
     "admin-roles-list",
     () => auth.request<Role[]>("/api/admin/roles"),
@@ -45,6 +46,9 @@ export function useAdminServerRoles(
         });
         role.permissions.push(perm);
       }
+      notify.ok()
+    } catch (e) {
+      notify.fail(e)
     } finally {
       togglingRole.value = null;
     }

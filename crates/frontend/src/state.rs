@@ -23,6 +23,7 @@ pub enum Page {
     ServerMods(Uuid),
     ServerSettings(Uuid),
     News,
+    NewsDetail(Uuid),
     Profile,
     Settings,
 }
@@ -135,6 +136,8 @@ pub struct LauncherUI {
     pub logs: HashMap<Uuid, Vec<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
     pub background_images: HashMap<Uuid, Arc<Image>>,
+    pub news_images: HashMap<Uuid, Arc<Image>>,
+    news_images_loading: HashSet<Uuid>,
     pub server_icons: HashMap<Uuid, Arc<Image>>,
     pub optional_mod_icons: HashMap<String, Arc<Image>>,
     background_image_urls: HashMap<Uuid, String>,
@@ -213,6 +216,8 @@ impl LauncherUI {
             logs: HashMap::new(),
             optional_mods: HashMap::new(),
             background_images: HashMap::new(),
+            news_images: HashMap::new(),
+            news_images_loading: HashSet::new(),
             server_icons: HashMap::new(),
             optional_mod_icons: HashMap::new(),
             background_image_urls: HashMap::new(),
@@ -464,7 +469,10 @@ impl LauncherUI {
                 self.page = Page::Login;
             }
             MessageToFrontend::ServerList { servers } => self.replace_servers(servers),
-            MessageToFrontend::NewsUpdated { items } => self.news = items,
+            MessageToFrontend::NewsUpdated { items } => {
+                self.news_images.retain(|id, _| items.iter().any(|n| n.id == *id));
+                self.news = items;
+            }
             MessageToFrontend::ConfigState {
                 memory_min_mb,
                 memory_max_mb,
@@ -668,6 +676,41 @@ impl LauncherUI {
         // здесь означало бы заблокировать загрузку только что залитого скина.
         self.skin_uploading = true;
         self.backend.send(MessageToBackend::UploadSkin { bytes });
+    }
+
+    pub fn open_news(&mut self, id: Uuid, cx: &mut Context<Self>) {
+        self.page = Page::NewsDetail(id);
+        self.load_news_image(id, cx);
+    }
+
+    /// Картинка новости тянется лениво — на списке она не нужна, а новостей
+    /// может быть много.
+    pub fn load_news_image(&mut self, id: Uuid, cx: &mut Context<Self>) {
+        if self.news_images.contains_key(&id) || self.news_images_loading.contains(&id) {
+            return;
+        }
+        let Some(url) = self
+            .news
+            .iter()
+            .find(|n| n.id == id)
+            .and_then(|n| n.preview_img_url.clone())
+            .filter(|u| !u.trim().is_empty())
+        else {
+            return;
+        };
+
+        self.news_images_loading.insert(id);
+        cx.spawn(async move |this, cx| {
+            let result = crate::image_loader::load_image_from_url(url).await;
+            let _ = this.update(cx, |state, cx| {
+                state.news_images_loading.remove(&id);
+                if let Ok(image) = result {
+                    state.news_images.insert(id, image);
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     pub fn open_server(&mut self, id: Uuid) {

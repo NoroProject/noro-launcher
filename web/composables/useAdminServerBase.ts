@@ -40,6 +40,7 @@ function hydrateForm(form: ServerEditForm, server: ServerRow) {
 export function useAdminServerBase() {
   const route = useRoute();
   const auth = useAuth();
+  const notify = useNotify()
 
   const id = computed(() => String(route.params.id));
   const activeTab = ref<ServerSettingsTab>("server");
@@ -74,6 +75,9 @@ export function useAdminServerBase() {
         body: form,
       });
       await refresh();
+      notify.ok()
+    } catch (e) {
+      notify.fail(e)
     } finally {
       saving.value = false;
     }
@@ -84,6 +88,9 @@ export function useAdminServerBase() {
     try {
       await auth.request(`/api/admin/servers/${id.value}`, { method: "DELETE" });
       await navigateTo("/admin/servers");
+      notify.ok()
+    } catch (e) {
+      notify.fail(e)
     } finally {
       deleting.value = false;
     }

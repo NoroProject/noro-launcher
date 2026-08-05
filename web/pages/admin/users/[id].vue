@@ -85,7 +85,7 @@ async function movePermission(entry: PermissionEntry, serverId: string | null) {
 <template>
   <NoroShell :title="user?.username || 'USER'" :subtitle="user?.discord_username">
     <template #actions>
-      <NuxtLink to="/admin/users" class="noro-btn noro-btn-dark"><UIcon name="i-lucide-arrow-left" class="size-4" /> Back</NuxtLink>
+      <AtomButton variant="dark" icon="i-lucide-arrow-left" to="/admin/users">Back</AtomButton>
     </template>
 
     <EmptyState v-if="!user" icon="i-lucide-search-x" title="User not found" />
@@ -119,7 +119,14 @@ async function movePermission(entry: PermissionEntry, serverId: string | null) {
             </select>
             <div class="mt-4 flex items-center justify-between gap-3 rounded-lg bg-[var(--noro-input)] p-3">
               <span class="truncate text-sm font-bold text-[var(--noro-muted)]">{{ currentCape?.name || 'No cape assigned' }}</span>
-              <button class="noro-btn noro-btn-primary" :disabled="busy === 'cape'" @click="assignCape"><UIcon name="i-lucide-save" class="size-4" /> Apply</button>
+              <AtomButton
+                variant="primary"
+                icon="i-lucide-save"
+                :disabled="busy === 'cape'"
+                @click="assignCape"
+              >
+                Apply
+              </AtomButton>
             </div>
           </div>
 
@@ -127,8 +134,8 @@ async function movePermission(entry: PermissionEntry, serverId: string | null) {
             <h2 class="mb-4 text-xl font-black text-[var(--noro-text)]">Moderation</h2>
             <input v-model="banReason" class="noro-input" placeholder="Ban reason">
             <div class="mt-4 flex flex-wrap gap-2">
-              <UButton :loading="busy === 'ban'" icon="i-lucide-ban" color="error" variant="subtle" @click="setBan(true)">Ban</UButton>
-              <UButton :loading="busy === 'ban'" icon="i-lucide-check" color="success" variant="subtle" @click="setBan(false)">Unban</UButton>
+              <AtomButton variant="danger" :loading="busy === 'ban'" icon="i-lucide-ban" @click="setBan(true)">Ban</AtomButton>
+              <AtomButton variant="secondary" :loading="busy === 'ban'" icon="i-lucide-check" @click="setBan(false)">Unban</AtomButton>
             </div>
           </div>
         </div>

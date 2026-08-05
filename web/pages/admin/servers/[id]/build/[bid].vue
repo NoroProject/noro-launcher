@@ -237,8 +237,8 @@ async function applyPackVersions() {
             title: "Versions Applied",
             description: "You need to rebuild the pack for changes to take effect.",
             icon: "i-lucide-check-circle",
-            color: "green",
-            timeout: 5000,
+            color: "success",
+            duration: 5000,
         });
     });
 }
@@ -297,12 +297,13 @@ function deleteOptional(index: number) {
         :subtitle="build?.published ? 'published' : 'draft'"
     >
         <template #actions>
-            <NuxtLink
-                :to="`/admin/servers/${serverId}`"
-                class="noro-btn noro-btn-dark"
+            <AtomButton
+              variant="dark"
+              icon="i-lucide-arrow-left"
+              :to="`/admin/servers/${serverId}`"
             >
-                <UIcon name="i-lucide-arrow-left" class="size-4" /> Back
-            </NuxtLink>
+              Back
+            </AtomButton>
         </template>
 
         <UAlert
@@ -348,7 +349,7 @@ function deleteOptional(index: number) {
                     {{ warn }}
                 </li>
             </ul>
-            <UButton size="xs" color="gray" variant="ghost" class="mt-3" @click="importProgress = null">Dismiss</UButton>
+            <AtomButton variant="ghost" size="sm" class="mt-3" @click="importProgress = null">Dismiss</AtomButton>
         </div>
 
         <!-- Version Suggestions -->
@@ -370,9 +371,9 @@ function deleteOptional(index: number) {
                     Would you like to apply these settings to your build?
                 </p>
             </div>
-            <UButton size="sm" color="primary" @click="applyPackVersions" :loading="pendingAction === 'apply-versions'">
+            <AtomButton variant="primary" size="sm" @click="applyPackVersions" :loading="pendingAction === 'apply-versions'">
                 Apply Versions
-            </UButton>
+            </AtomButton>
         </div>
 
         <div class="grid gap-5 xl:grid-cols-[1fr_390px] items-start">

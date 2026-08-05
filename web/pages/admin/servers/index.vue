@@ -2,6 +2,8 @@
 import type { ServerRow } from "~/types/api";
 
 const auth = useAuth();
+
+const notify = useNotify()
 const { minecraft, loader, loading, loadMinecraft, loadLoader } =
     useVersionOptions();
 await auth.loadMe();
@@ -62,6 +64,9 @@ async function createServer() {
         });
         await refresh();
         showCreate.value = false;
+      notify.ok()
+    } catch (e) {
+      notify.fail(e)
     } finally {
         creating.value = false;
     }
@@ -75,19 +80,19 @@ async function createServer() {
     >
         <template #actions>
             <AtomButton
-                icon="i-lucide-refresh-cw"
-                variant="dark"
-                :loading="pending"
-                @click="refresh()"
+              icon="i-lucide-refresh-cw"
+              variant="dark"
+              :loading="pending"
+              @click="refresh()"
             >
-                Refresh
+              Refresh
             </AtomButton>
             <AtomButton
-                icon="i-lucide-plus"
-                variant="primary"
-                @click="showCreate = true"
+              icon="i-lucide-plus"
+              variant="primary"
+              @click="showCreate = true"
             >
-                New server
+              New server
             </AtomButton>
         </template>
 
@@ -163,12 +168,14 @@ async function createServer() {
                             </div>
                         </td>
                         <td class="px-5 py-4 text-right">
-                            <NuxtLink
-                                :to="`/admin/servers/${server.id}`"
-                                class="noro-btn noro-btn-dark !min-h-9 !min-w-9 !px-2"
+                            <AtomButton
+                              variant="dark"
+                              icon="i-lucide-settings-2"
+                              :to="`/admin/servers/${server.id}`"
+                              class="!min-h-9 !min-w-9 !px-2"
                             >
-                                <UIcon name="i-lucide-settings-2" class="size-4" />
-                            </NuxtLink>
+
+                            </AtomButton>
                         </td>
                     </tr>
                 </tbody>
@@ -258,12 +265,12 @@ async function createServer() {
                         Cancel
                     </AtomButton>
                     <AtomButton
-                        :loading="creating"
-                        type="submit"
-                        variant="primary"
-                        icon="i-lucide-plus"
+                      :loading="creating"
+                      type="submit"
+                      variant="primary"
+                      icon="i-lucide-plus"
                     >
-                        Create Server
+                      Create Server
                     </AtomButton>
                 </div>
             </form>

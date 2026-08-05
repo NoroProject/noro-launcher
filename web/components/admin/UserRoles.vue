@@ -31,12 +31,12 @@ function addRole() {
         <option value="">Select role</option>
         <option v-for="role in freeRoles" :key="role.id" :value="role.id">{{ role.display_name }}</option>
       </select>
-      <UButton :loading="busy === 'role'" icon="i-lucide-plus" color="primary" @click="addRole" />
+      <AtomButton variant="primary" :loading="busy === 'role'" icon="i-lucide-plus" @click="addRole" />
     </div>
     <div class="grid gap-2">
       <div v-for="role in userRoles" :key="role.id" class="flex items-center justify-between rounded-lg bg-[var(--noro-input)] px-3 py-2">
         <span class="font-bold text-[var(--noro-text)]">{{ role.display_name }}</span>
-        <UButton :loading="busy === `role-${role.id}`" icon="i-lucide-x" size="xs" color="error" variant="ghost" @click="emit('remove', role.id)" />
+        <AtomButton variant="danger" :loading="busy === `role-${role.id}`" icon="i-lucide-x" size="sm" @click="emit('remove', role.id)" />
       </div>
     </div>
   </div>

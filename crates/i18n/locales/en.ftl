@@ -99,6 +99,8 @@ sync-failed = SYNC FAILED
 ## News
 news-title = NEWS
 news-empty = No news yet.
+news-back = Back
+news-read = Read
 
 ## Mods
 mods-optional = OPTIONAL MODS

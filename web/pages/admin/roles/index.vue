@@ -2,6 +2,8 @@
 import type { Role } from '~/types/api'
 
 const auth = useAuth()
+
+const notify = useNotify()
 await auth.loadMe()
 
 const { data: roles, refresh, pending } = await useAsyncData('admin-roles', () =>
@@ -19,6 +21,9 @@ async function createRole() {
     Object.assign(form, { name: '', display_name: '', color: '#e85aa5', is_default: false, sort_order: 0 })
     await refresh()
     showCreate.value = false
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
   } finally {
     creating.value = false
   }
@@ -36,9 +41,7 @@ async function createRole() {
       >
         Refresh
       </AtomButton>
-      <button type="button" class="noro-btn noro-btn-primary" @click="showCreate = true">
-        <UIcon name="i-lucide-plus" class="size-5" />New role
-      </button>
+      <AtomButton variant="primary" icon="i-lucide-plus" @click="showCreate = true">New role</AtomButton>
     </template>
 
     <section class="noro-panel overflow-hidden">
@@ -55,7 +58,7 @@ async function createRole() {
             </td>
             <td>{{ role.permissions.length }}</td>
             <td>{{ role.is_default ? 'yes' : 'no' }}</td>
-            <td class="text-right"><UButton :to="`/admin/roles/${role.id}`" icon="i-lucide-settings" size="sm" color="neutral" variant="ghost" /></td>
+            <td class="text-right"><AtomButton variant="ghost" :to="`/admin/roles/${role.id}`" icon="i-lucide-settings" size="sm" /></td>
           </tr>
         </tbody>
       </table>
@@ -70,10 +73,8 @@ async function createRole() {
         <label><span class="noro-label">Order</span><input v-model.number="form.sort_order" class="noro-input" type="number"></label>
         <UCheckbox v-model="form.is_default" label="Default role" />
         <div class="flex justify-end gap-3 pt-2">
-          <button type="button" class="noro-btn noro-btn-secondary" @click="showCreate = false">Cancel</button>
-          <button :disabled="creating" type="submit" class="noro-btn noro-btn-primary">
-            <UIcon name="i-lucide-plus" class="size-5" />Create
-          </button>
+          <AtomButton variant="secondary" @click="showCreate = false">Cancel</AtomButton>
+          <AtomButton variant="primary" icon="i-lucide-plus" :disabled="creating" type="submit">Create</AtomButton>
         </div>
       </form>
     </AtomModal>

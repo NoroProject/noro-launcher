@@ -6,6 +6,8 @@
 //! который обновляется автоматически в `AppData/noro-launcher/`.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod verify;
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -17,14 +19,21 @@ fn main() -> ExitCode {
 
     let core_path = app_dir.join(core_binary_name());
 
-    // Если core-бинарник есть — просто запускаем.
-    // Обновление проверит сам core (backend::check_launcher_update).
+    // Проверяем подпись на КАЖДОМ запуске, а не только при скачивании: иначе
+    // всё, что сумеет записать в AppData, исполнялось бы вечно.
     if core_path.exists() {
-        return run_core(&core_path);
+        match verify::verify_installed(&core_path) {
+            Ok(()) => return run_core(&core_path),
+            Err(e) => {
+                eprintln!("установленный лаунчер не прошёл проверку подписи: {e:#}");
+                eprintln!("он будет скачан заново");
+                verify::discard(&core_path);
+            }
+        }
     }
 
-    // Первый запуск: скачиваем core с мастера.
-    eprintln!("первый запуск — скачивание лаунчера...");
+    // Сюда попадаем и на первом запуске, и когда установленный core забракован.
+    eprintln!("скачивание лаунчера...");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -67,8 +76,7 @@ fn run_core(path: &std::path::Path) -> ExitCode {
 }
 
 async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> {
-    let master_url = option_env!("NORO_MASTER_URL")
-        .unwrap_or("http://127.0.0.1:8080");
+    let master_url = verify::master_url();
     let platform = current_platform();
     let url = format!(
         "{}/api/launcher/version?platform={platform}",
@@ -86,9 +94,13 @@ async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> 
     let download_url = info["url"]
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("нет url в ответе"))?;
-    let expected_sha = info["sha256"]
+    let expected_sha = info["sha256"].as_str().unwrap_or_default();
+    // Подпись обязательна: sha256 из этого же ответа ловит битую закачку, но не
+    // подмену — кто подменит канал, подставит и файл, и его хеш.
+    let signature = info["signature"]
         .as_str()
-        .unwrap_or_default();
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| anyhow::anyhow!("мастер не отдал подпись лаунчера"))?;
     let version = info["version"]
         .as_str()
         .unwrap_or("unknown");
@@ -104,8 +116,12 @@ async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> 
         anyhow::bail!("sha256 не совпал: ожидали {expected_sha}, получили {hash}");
     }
 
+    verify::verify_bytes(&bytes, signature)
+        .map_err(|e| anyhow::anyhow!("проверка подписи лаунчера не прошла: {e}"))?;
+
     // Записать файл.
     std::fs::write(dest, &bytes)?;
+    verify::store(dest, signature)?;
 
     #[cfg(unix)]
     {
