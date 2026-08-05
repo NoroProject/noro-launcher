@@ -13,6 +13,14 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
+    // Посмотреть на окно загрузки, не дожидаясь настоящей закачки: править вид
+    // иначе можно только вслепую, стирая скачанный core перед каждым запуском.
+    // Только в отладочной сборке — в релизе такого крючка нет.
+    #[cfg(debug_assertions)]
+    if std::env::var_os("NORO_SPLASH_PREVIEW").is_some() {
+        return splash_preview();
+    }
+
     let app_dir = dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(schema::launcher_dir_name());
@@ -42,16 +50,15 @@ fn main() -> ExitCode {
     // Сюда попадаем на первом запуске, при забракованном core и при обновлении.
     // Дальше — минуты закачки, поэтому показываем окно: GPUI забирает главный
     // поток себе, а скачивание уходит в фон и рапортует прогресс в общий слот.
-    let progress: splash::Shared = Default::default();
-    let work_progress = progress.clone();
+    let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
     let work_dir = app_dir.clone();
     let work_core = core_path.clone();
-    let outcome = splash::run_with(progress, move || {
+    let outcome = splash::run_with(rx, move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("tokio runtime");
-        rt.block_on(download_core(&work_dir, &work_core, &work_progress))
+        rt.block_on(download_core(&work_dir, &work_core, &reporter))
     });
 
     match outcome {
@@ -62,6 +69,31 @@ fn main() -> ExitCode {
         }
         None => ExitCode::FAILURE,
     }
+}
+
+/// Крутит полосу по кругу, пока окно не закроют.
+#[cfg(debug_assertions)]
+fn splash_preview() -> ExitCode {
+    let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
+    splash::run_with(rx, move || {
+        let stages = [
+            ("Проверка версии…", 0u64),
+            ("Загрузка launcher-v1.2.3", 15_358_608),
+        ];
+        loop {
+            for (label, total) in stages {
+                for step in 0..=100 {
+                    let _ = reporter.send(splash::Progress {
+                        label: label.to_string(),
+                        done: total / 100 * step,
+                        total,
+                    });
+                    std::thread::sleep(std::time::Duration::from_millis(60));
+                }
+            }
+        }
+    });
+    ExitCode::SUCCESS
 }
 
 fn core_binary_name() -> &'static str {
@@ -124,9 +156,16 @@ async fn update_pending(app_dir: &PathBuf) -> bool {
 async fn download_core(
     app_dir: &PathBuf,
     dest: &PathBuf,
-    progress: &splash::Shared,
+    report: &splash::Reporter,
 ) -> anyhow::Result<()> {
-    progress.lock().label = "Проверка версии…".into();
+    let say = |label: &str, done: u64, total: u64| {
+        let _ = report.send(splash::Progress {
+            label: label.to_string(),
+            done,
+            total,
+        });
+    };
+    say("Проверка версии…", 0, 0);
     let master_url = verify::master_url();
     let platform = current_platform();
     let url = format!(
@@ -154,17 +193,22 @@ async fn download_core(
         .ok_or_else(|| anyhow::anyhow!("мастер не отдал подпись лаунчера"))?;
     let version = info["version"].as_str().unwrap_or("unknown");
 
-    progress.lock().label = format!("Загрузка {version}");
+    say(&format!("Загрузка {version}"), 0, 0);
     let mut resp = client.get(download_url).send().await?.error_for_status()?;
 
     // Читаем по кускам ради прогресса: reqwest отдаёт их сам, без futures.
     let total = resp.content_length().unwrap_or(0);
     let mut bytes: Vec<u8> = Vec::with_capacity(total as usize);
+    // Отчитываемся раз в процент: кадр всё равно один, а сообщений было бы
+    // столько же, сколько кусков в ответе.
+    let mut reported = 0u64;
     while let Some(chunk) = resp.chunk().await? {
         bytes.extend_from_slice(&chunk);
-        let mut p = progress.lock();
-        p.done = bytes.len() as u64;
-        p.total = total;
+        let done = bytes.len() as u64;
+        if total > 0 && done * 100 / total > reported {
+            reported = done * 100 / total;
+            say(&format!("Загрузка {version}"), done, total);
+        }
     }
 
     // Проверка SHA256.
@@ -193,7 +237,7 @@ async fn download_core(
     let version_file = app_dir.join("version");
     std::fs::write(version_file, version).ok();
 
-    progress.lock().label = "Готово".into();
+    say("Готово", 1, 1);
     Ok(())
 }
 

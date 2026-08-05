@@ -27,6 +27,8 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .hover(|d| d.bg(rgba(0xffffff08)))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.page = Page::Profile;
+            // Цикл анимации гаснет, когда профиль закрыт, — заводим заново.
+            this.start_skin_animation(cx);
             cx.notify();
         }))
         .child(avatar(ui))

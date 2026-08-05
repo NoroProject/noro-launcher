@@ -10,6 +10,7 @@ use gpui::{
 use parking_lot::Mutex;
 use std::borrow::Cow;
 use std::sync::Arc;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 const BG: u32 = 0x0d1b2e;
 const PANEL: u32 = 0x13233d;
@@ -23,7 +24,7 @@ const WINDOW: (f32, f32) = (420., 320.);
 #[folder = "assets/"]
 struct SplashAssets;
 
-/// Что показывать в окне. Пишется из потока закачки, читается при отрисовке.
+/// Что показывать в окне. Присылается из потока закачки.
 #[derive(Default, Clone)]
 pub struct Progress {
     pub label: String,
@@ -31,18 +32,40 @@ pub struct Progress {
     pub total: u64,
 }
 
-pub type Shared = Arc<Mutex<Progress>>;
+/// Куда закачка шлёт свои отчёты.
+pub type Reporter = UnboundedSender<Progress>;
 
 struct Splash {
-    progress: Shared,
+    progress: Progress,
+}
+
+impl Splash {
+    fn new(mut rx: UnboundedReceiver<Progress>, cx: &mut Context<Self>) -> Self {
+        // Перерисовываем по событию, а не по таймеру: задача спит на recv, пока
+        // закачка не пришлёт новую цифру, и лишних кадров не возникает.
+        cx.spawn(async move |this, cx| {
+            while let Some(next) = rx.recv().await {
+                if this
+                    .update(cx, |splash, cx| {
+                        splash.progress = next;
+                        cx.notify();
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        })
+        .detach();
+        Self {
+            progress: Progress::default(),
+        }
+    }
 }
 
 impl Render for Splash {
-    fn render(&mut self, _w: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Пока идёт закачка, кадр нужно перерисовывать: прогресс приходит из
-        // другого потока и сам о себе сообщить не может.
-        cx.notify();
-        let p = self.progress.lock().clone();
+    fn render(&mut self, _w: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        let p = self.progress.clone();
         let ratio = if p.total > 0 {
             (p.done as f32 / p.total as f32).clamp(0., 1.)
         } else {
@@ -117,7 +140,7 @@ impl gpui::AssetSource for SplashAssetSource {
 
 /// Показать окно и держать его, пока `work` не закончит. Возвращает результат
 /// работы: сама закачка идёт в фоне, GPUI требует главный поток себе.
-pub fn run_with<T, F>(progress: Shared, work: F) -> Option<T>
+pub fn run_with<T, F>(rx: UnboundedReceiver<Progress>, work: F) -> Option<T>
 where
     T: Send + 'static,
     F: FnOnce() -> T + Send + 'static,
@@ -145,11 +168,7 @@ where
                     }),
                     ..Default::default()
                 },
-                |_window, cx| {
-                    cx.new(|_| Splash {
-                        progress: progress.clone(),
-                    })
-                },
+                |_window, cx| cx.new(|cx| Splash::new(rx, cx)),
             );
 
             // Работа идёт в отдельном потоке: главный занят отрисовкой.

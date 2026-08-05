@@ -8,8 +8,6 @@ use std::time::{Duration, Instant};
 
 /// Шаг отрисовки. Кадр стоит ~3–8 мс, так что ~30 к/с укладывается с запасом.
 const FRAME: Duration = Duration::from_millis(33);
-/// Пока превью не на экране, рендерить незачем — только изредка просыпаться.
-const IDLE_TICK: Duration = Duration::from_millis(250);
 /// Полный цикл взмаха рук и ног.
 const SWAY_PERIOD_MS: f32 = 2400.0;
 /// Скорость автоповорота — полный оборот примерно за 6 секунд.
@@ -64,8 +62,11 @@ impl LauncherUI {
                     break; // окно закрылось
                 };
                 let Some(job) = job else {
-                    executor.timer(IDLE_TICK).await;
-                    continue;
+                    // Профиль закрыт или скина нет — цикл гасим совсем. Раньше
+                    // он просыпался четырежды в секунду всё время работы
+                    // лаунчера, хотя рисовать было нечего.
+                    let _ = this.update(cx, |state, _| state.skin_anim_running = false);
+                    break;
                 };
 
                 let frame = executor
