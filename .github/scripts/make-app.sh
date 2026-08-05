@@ -56,6 +56,14 @@ fi
 # подпись ad-hoc — она не убирает предупреждение Gatekeeper о неизвестном
 # разработчике, но делает приложение запускаемым.
 IDENTITY="${MACOS_SIGN_IDENTITY:--}"
-codesign --force --deep --sign "$IDENTITY" --timestamp=none "$APP"
+
+if [ "$IDENTITY" = "-" ]; then
+  codesign --force --deep --sign - --timestamp=none "$APP"
+else
+  # Нотаризация принимает только сборки с hardened runtime и защищённой
+  # меткой времени; без --options runtime Apple отклонит пакет.
+  codesign --force --deep --sign "$IDENTITY" --options runtime --timestamp "$APP"
+fi
+
 codesign --verify --deep --strict "$APP"
 
