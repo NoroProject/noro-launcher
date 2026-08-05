@@ -243,18 +243,6 @@ async function applyPackVersions() {
     });
 }
 
-async function savePaths() {
-    await run("paths", async () => {
-        await auth.request(`/api/admin/builds/${buildId.value}/paths`, {
-            method: "PUT",
-            body: {
-                unmanaged_paths: lines(pathsForm.unmanaged),
-                user_managed_paths: lines(pathsForm.userManaged),
-            },
-        });
-        await buildPayload.refresh();
-    });
-}
 
 async function saveRecommended() {
     await run("recommended", async () => {
@@ -406,9 +394,7 @@ function deleteOptional(index: number) {
                 />
                 <BuildPathsPanel
                     :paths-form="pathsForm"
-                    :files="filesData.data.value"
-                    :busy="busy"
-                    @save="savePaths"
+                    @browse="showFileManager = true"
                 />
             </div>
 

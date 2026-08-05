@@ -2,6 +2,8 @@
 export interface FmItem {
   type: 'folder' | 'file'
   name: string
+  /** Полный путь от корня сборки; у папок — с косой чертой на конце. */
+  path: string
   id?: string
   /** Адрес в контент-адресуемом хранилище: по нему файл и скачивается. */
   sha1?: string
@@ -12,6 +14,8 @@ export interface FmItem {
 
 const props = defineProps<{
   items: FmItem[]
+  /** Режим синхронизации пути с учётом наследования от папок. */
+  rule: (path: string) => RuleState
   selected: Set<string>
   sortKey: string
   sortAsc: boolean
@@ -24,6 +28,7 @@ const emit = defineEmits<{
   open: [item: FmItem]
   context: [item: FmItem, ev: MouseEvent]
   sort: [key: string]
+  'toggle-rule': [path: string]
   'bg-context': [ev: MouseEvent]
   'update:renameValue': [v: string]
   'rename-commit': []
@@ -43,9 +48,22 @@ function fmtSize(b?: number) {
 
 const cols = [
   { key: 'name', label: 'Name', cls: '' },
+  { key: 'sync', label: 'Sync', cls: 'w-16 text-center' },
   { key: 'size', label: 'Size', cls: 'w-24 text-right' },
   { key: 'kind', label: 'Kind', cls: 'w-28' },
 ]
+
+const MODE_CLASS: Record<SyncMode, string> = {
+  sync: 'text-[var(--noro-cream)]',
+  ignored: 'text-[var(--noro-blue)]',
+  user: 'text-[var(--noro-magenta)]',
+}
+
+/** Подпись как у прав доступа: буква режима плюс откуда он взялся. */
+function ruleTitle(path: string) {
+  const r = props.rule(path)
+  return r.from ? `${MODE_HINT[r.mode]} (inherited from ${r.from})` : MODE_HINT[r.mode]
+}
 
 function sortIcon(key: string) {
   if (props.sortKey !== key) return ''

@@ -37,6 +37,20 @@ const editorFileId = ref('')
 const editorFileName = ref('')
 const editorFilePath = ref('')
 
+// ─── Правила синхронизации ───
+const rules = useSyncRules(props.buildId)
+
+/** Клик по метке меняет режим и сразу сохраняет — как chmod, без «применить». */
+async function toggleRule(path: string) {
+  rules.cycle(path)
+  try {
+    await rules.save()
+  } catch (e) {
+    notify.fail(e)
+    await rules.load()
+  }
+}
+
 // ─── API ───
 async function loadFiles() {
   loading.value = true
@@ -45,7 +59,7 @@ async function loadFiles() {
   } finally { loading.value = false }
 }
 
-onMounted(loadFiles)
+onMounted(() => Promise.all([loadFiles(), rules.load()]))
 
 // ─── Breadcrumb ───
 const breadcrumb = computed(() => {
@@ -85,14 +99,15 @@ const currentItems = computed<FmItem[]>(() => {
     } else {
       const ext = rel.split('.').pop()?.toUpperCase() || ''
       fileItems.push({
-        type: 'file', name: rel, id: f.id, sha1: f.sha1,
+        type: 'file', name: rel, path: f.path, id: f.id, sha1: f.sha1,
         size: f.size, kind: ext || 'File',
       })
     }
   }
 
+  // Путь папки — с косой чертой: так правило и наследуется вниз.
   const folderItems: FmItem[] = Array.from(folderMap, ([name, info]) => ({
-    type: 'folder', name, count: info.count,
+    type: 'folder', name, path: `${prefix}${name}/`, count: info.count,
   }))
 
   let all = [...folderItems, ...fileItems]
@@ -345,6 +360,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <FileManagerList
         v-if="viewMode === 'list'"
         :items="currentItems"
+        :rule="rules.ruleFor"
+        @toggle-rule="toggleRule"
         :selected="selected"
         :sort-key="sortKey"
         :sort-asc="sortAsc"

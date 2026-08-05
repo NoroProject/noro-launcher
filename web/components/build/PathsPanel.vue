@@ -1,20 +1,10 @@
 <script setup lang="ts">
-import type { BuildFileRow } from "~/types/api";
 
 const pathsForm = defineModel<{ unmanaged: string; userManaged: string }>("pathsForm", { required: true });
-const props = withDefaults(defineProps<{ files?: BuildFileRow[] | null; busy?: string | null }>(), {});
-defineEmits<{ save: [] }>();
-
-const showModal = ref(false);
+defineEmits<{ browse: [] }>();
 
 const ignoredCount = computed(() => pathsForm.value.unmanaged.split("\n").filter(l => l.trim()).length);
 const userCount = computed(() => pathsForm.value.userManaged.split("\n").filter(l => l.trim()).length);
-
-function openBrowser() { showModal.value = true; }
-function applyRules(unm: string, usr: string) {
-  pathsForm.value.unmanaged = unm;
-  pathsForm.value.userManaged = usr;
-}
 </script>
 
 <template>
@@ -52,32 +42,16 @@ function applyRules(unm: string, usr: string) {
         </div>
       </div>
 
+      <!-- Редактор переехал в файловый менеджер: правила ставятся на дереве,
+           где видно, что во что вложено, и наследуются вниз по папкам. -->
       <AtomButton
         icon="i-lucide-folder-open"
         variant="primary"
         block
-        @click="openBrowser"
+        @click="$emit('browse')"
       >
-        Browse &amp; Edit Rules
-      </AtomButton>
-
-      <AtomButton
-        icon="i-lucide-save"
-        variant="primary"
-        :loading="busy === 'paths'"
-        block
-        @click="$emit('save')"
-      >
-        Save Path Rules
+        Edit in file manager
       </AtomButton>
     </div>
   </section>
-
-  <PathRulesModal
-    v-model="showModal"
-    :unmanaged="pathsForm.unmanaged"
-    :user-managed="pathsForm.userManaged"
-    :files="props.files"
-    @apply="applyRules"
-  />
 </template>
