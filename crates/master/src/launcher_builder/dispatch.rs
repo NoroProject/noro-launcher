@@ -60,6 +60,29 @@ pub async fn trigger(state: &AppState, tag: &str, job_id: Uuid) -> Result<bool> 
     Ok(true)
 }
 
+/// Есть ли уже готовый релиз с таким тегом.
+///
+/// Тег, отправленный в git, собирает лаунчер сам. Без этой проверки нажатие
+/// «Build tag» в админке запускало бы вторую сборку тех же исходников и ждало
+/// её полчаса — при том, что забирать ассеты можно сразу.
+pub async fn release_exists(state: &AppState, tag: &str) -> Result<bool> {
+    let mut req = state
+        .http()
+        .get(api(state, &format!("releases/tags/{tag}")))
+        .header("User-Agent", "noro-master")
+        .header("Accept", "application/vnd.github+json");
+    if let Some(tok) = token(state) {
+        req = req.bearer_auth(tok);
+    }
+    let resp = req.send().await.context("не проверить наличие релиза")?;
+    if !resp.status().is_success() {
+        return Ok(false);
+    }
+    let body: serde_json::Value = resp.json().await?;
+    // Черновик без ассетов забирать нечего — считаем, что релиза ещё нет.
+    Ok(body["assets"].as_array().is_some_and(|a| !a.is_empty()))
+}
+
 /// Ждёт завершения запуска, помеченного `job_id`. Возвращает ссылку на run.
 pub async fn wait(state: &AppState, job_id: Uuid, mut log: impl FnMut(String)) -> Result<String> {
     let marker = format!("[{job_id}]");

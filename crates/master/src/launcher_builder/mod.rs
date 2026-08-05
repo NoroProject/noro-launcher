@@ -153,6 +153,11 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
 async fn trigger_and_wait(state: &AppState, job_id: Uuid, tag: &str) -> Result<()> {
     set_status(state, job_id, "building").await?;
 
+    if dispatch::release_exists(state, tag).await.unwrap_or(false) {
+        append_log(state, job_id, &format!("релиз {tag} уже собран — беру его ассеты\n")).await?;
+        return Ok(());
+    }
+
     if !dispatch::trigger(state, tag, job_id).await? {
         append_log(
             state,
