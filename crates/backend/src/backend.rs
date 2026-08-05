@@ -397,7 +397,10 @@ impl BackendState {
             if let Ok(v) = r.json::<serde_json::Value>().await {
                 if !v.is_null() {
                     if let Some(version) = v["version"].as_str() {
-                        if version != env!("CARGO_PKG_VERSION") {
+                        // Мастер отдаёт git-тег («launcher-v1.2.0»), а у нас на
+                        // руках версия крейта («1.2.0»): без снятия префикса они
+                        // не совпадали никогда, и плашка обновления висела всегда.
+                        if version.trim_start_matches("launcher-v") != env!("CARGO_PKG_VERSION") {
                             if let Ok(lv) = serde_json::from_value::<schema::LauncherVersion>(
                                 build_launcher_version(&v),
                             ) {

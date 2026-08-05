@@ -19,11 +19,17 @@ fn main() -> ExitCode {
 
     let core_path = app_dir.join(core_binary_name());
 
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+
     // Проверяем подпись на КАЖДОМ запуске, а не только при скачивании: иначе
     // всё, что сумеет записать в AppData, исполнялось бы вечно.
     if core_path.exists() {
         match verify::verify_installed(&core_path) {
-            Ok(()) => return run_core(&core_path),
+            Ok(()) if !rt.block_on(update_pending(&app_dir)) => return run_core(&core_path),
+            Ok(()) => eprintln!("на мастере лежит другая версия — обновляемся"),
             Err(e) => {
                 eprintln!("установленный лаунчер не прошёл проверку подписи: {e:#}");
                 eprintln!("он будет скачан заново");
@@ -32,13 +38,8 @@ fn main() -> ExitCode {
         }
     }
 
-    // Сюда попадаем и на первом запуске, и когда установленный core забракован.
+    // Сюда попадаем на первом запуске, при забракованном core и при обновлении.
     eprintln!("скачивание лаунчера...");
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("tokio runtime");
-
     match rt.block_on(download_core(&app_dir, &core_path)) {
         Ok(()) => run_core(&core_path),
         Err(e) => {
@@ -73,6 +74,34 @@ fn run_core(path: &std::path::Path) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Мастер раздаёт версию, отличную от установленной?
+///
+/// Обновлять core обязан именно bootstrapper. Сам core этого не сделает: он
+/// показывает кнопку обновления в настройках, а те лежат за экраном входа — и
+/// когда обновление нужно как раз для входа, круг не разрывается.
+///
+/// Сеть недоступна или мастер молчит — запускаем что есть: игру важнее открыть,
+/// чем упереться в обновление.
+async fn update_pending(app_dir: &PathBuf) -> bool {
+    let installed = std::fs::read_to_string(app_dir.join("version")).unwrap_or_default();
+    let installed = installed.trim();
+    if installed.is_empty() {
+        return false;
+    }
+    let url = format!(
+        "{}/api/launcher/version?platform={}",
+        verify::master_url().trim_end_matches('/'),
+        current_platform()
+    );
+    let Ok(resp) = reqwest::Client::new().get(&url).send().await else {
+        return false;
+    };
+    let Ok(info) = resp.json::<serde_json::Value>().await else {
+        return false;
+    };
+    info["version"].as_str().is_some_and(|remote| remote != installed)
 }
 
 async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> {
