@@ -1,6 +1,6 @@
 //! Новость целиком: картинка, полный текст, автор и дата.
 
-use super::common::{panel, tabs, Cx};
+use super::common::{page_header, panel, Cx};
 use crate::icons::ic;
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
@@ -16,11 +16,11 @@ pub fn page(ui: &LauncherUI, id: Uuid, cx: &mut Cx) -> AnyElement {
         .size_full()
         .relative()
         .bg(rgb(CONTENT_FALLBACK))
-        .child(tabs(ui, cx))
+        .child(page_header("newspaper", t("news-title")))
         .child(
             div()
                 .absolute()
-                .top(px(104.))
+                .top(px(96.))
                 .left(px(40.))
                 .right(px(40.))
                 .bottom(px(32.))
@@ -78,9 +78,12 @@ fn body(ui: &LauncherUI, item: &NewsItem) -> AnyElement {
 
     if let Some(image) = ui.news_images.get(&item.id) {
         root = root.child(
+            // Без flex_shrink_0 картинка в колонке растягивается и наползает
+            // на заголовок с текстом.
             img(image.clone())
                 .w_full()
                 .h(px(240.))
+                .flex_shrink_0()
                 .rounded(px(R_SM))
                 .object_fit(ObjectFit::Cover),
         );

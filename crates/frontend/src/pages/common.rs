@@ -25,6 +25,32 @@ pub fn panel() -> gpui::Div {
         .border_color(rgb(BORDER))
 }
 
+/// Шапка страницы: иконка и заголовок.
+///
+/// Новости и настройки лаунчера к серверу отношения не имеют, а вкладки
+/// «Игра / Моды / Настройки» переключают именно его — на этих экранах они сбивали
+/// с толку и вели в никуда.
+pub fn page_header(icon: &'static str, title: impl Into<gpui::SharedString>) -> AnyElement {
+    div()
+        .h(px(72.))
+        .px(px(32.))
+        .flex()
+        .items_center()
+        .gap(px(12.))
+        .border_b_1()
+        .border_color(rgb(BORDER))
+        .child(crate::icons::ic(icon, 18., TEXT_MUTED))
+        .child(
+            div()
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(18.))
+                .font_weight(gpui::FontWeight::BOLD)
+                .text_color(rgb(CTA))
+                .child(title.into()),
+        )
+        .into_any_element()
+}
+
 pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let sid = ui.selected_server_id();
     let page = ui.page.clone();

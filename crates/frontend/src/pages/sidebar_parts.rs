@@ -5,7 +5,7 @@ use crate::components::pixel_title;
 use crate::icons::ic;
 use crate::state::Page;
 use crate::theme::*;
-use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, App, ClickEvent, Window};
+use gpui::{div, img, prelude::*, px, rgb, rgba, AnyElement, App, ClickEvent, Window};
 use i18n::t;
 
 pub fn nav_icon(
@@ -38,7 +38,18 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
     div()
         .id("home-logo")
         .cursor_pointer()
+        .flex()
+        .items_center()
+        .gap(px(10.))
         .hover(|d| d.opacity(0.8))
+        // Иконка приложения рядом с названием: голая надпись в шапке смотрелась
+        // пустовато, а лаунчер уже имеет свой знак.
+        .child(
+            img("logo.png")
+                .size(px(28.))
+                .rounded(px(R_SM))
+                .flex_shrink_0(),
+        )
         .child(pixel_title("NORO", 24., CTA))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.page = this

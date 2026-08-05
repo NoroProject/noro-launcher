@@ -1,4 +1,4 @@
-use super::common::{page_title, panel, tabs, Cx};
+use super::common::{page_header, panel, Cx};
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
@@ -10,18 +10,17 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .size_full()
         .relative()
         .bg(rgb(CONTENT_FALLBACK))
-        .child(tabs(ui, cx))
+        .child(page_header("newspaper", t("news-title")))
         .child(
             div()
                 .absolute()
-                .top(px(104.))
+                .top(px(96.))
                 .left(px(40.))
                 .right(px(40.))
                 .bottom(px(32.))
                 .flex()
                 .flex_col()
                 .gap(px(16.))
-                .child(page_title(t("news-title")))
                 .children(cards(&ui.news, cx)),
         )
         .into_any_element()
@@ -88,11 +87,11 @@ fn card(item: &NewsItem, cx: &mut Cx) -> AnyElement {
         )
         .child(
             div()
-                .line_clamp(4)
+                .line_clamp(3)
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(16.))
                 .text_color(rgb(TEXT_SECONDARY))
-                .child(item.body.clone()),
+                .child(super::markdown::plain_excerpt(&item.body, 240)),
         )
         .into_any_element()
 }

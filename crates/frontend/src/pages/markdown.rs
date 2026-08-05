@@ -76,6 +76,31 @@ pub fn render(source: &str) -> Vec<AnyElement> {
     out
 }
 
+/// Короткий отрывок без разметки — для карточки в списке.
+///
+/// Раньше в карточку падало тело как есть, и читатель видел решётки, звёздочки
+/// и дефисы списков вместо текста.
+pub fn plain_excerpt(source: &str, limit: usize) -> String {
+    let mut out = String::new();
+    for event in Parser::new(source) {
+        match event {
+            Event::Text(text) | Event::Code(text) => out.push_str(&text),
+            Event::SoftBreak | Event::HardBreak | Event::End(TagEnd::Paragraph) => out.push(' '),
+            _ => {}
+        }
+        if out.chars().count() > limit {
+            break;
+        }
+    }
+    let trimmed: String = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    if trimmed.chars().count() > limit {
+        let cut: String = trimmed.chars().take(limit).collect();
+        format!("{}…", cut.trim_end())
+    } else {
+        trimmed
+    }
+}
+
 fn heading_size(level: HeadingLevel) -> u8 {
     match level {
         HeadingLevel::H1 => 22,
