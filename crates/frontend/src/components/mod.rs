@@ -11,6 +11,7 @@ mod icon_button;
 mod mod_toggle;
 mod pixel_title;
 mod progress;
+mod version_badge;
 mod window_chrome;
 
 pub use atom_art::{atom_art, tiny_atom_logo};
@@ -22,4 +23,5 @@ pub use icon_button::{icon_btn, stepper_btn};
 pub use mod_toggle::mod_toggle;
 pub use pixel_title::{pixel_label, pixel_title};
 pub use progress::progress_bar;
+pub use version_badge::version_badge;
 pub use window_chrome::window_chrome;

@@ -1,6 +1,6 @@
 //! ATOM-style login screen.
 
-use crate::components::{atom_art, cta_button, tiny_atom_logo};
+use crate::components::{atom_art, cta_button, tiny_atom_logo, version_badge};
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent, Context, FontWeight};
@@ -54,6 +54,7 @@ fn left_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(login_checks())
         .when_some(ui.login_error.clone(), |d, e| d.child(error_panel(e)))
         .child(div().flex_1())
+        .child(version_badge())
         .into_any_element()
 }
 

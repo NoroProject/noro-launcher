@@ -3,7 +3,7 @@
 use super::common::{panel, Cx};
 use super::settings_panel::settings_panel;
 use super::settings_rows::row;
-use crate::components::btn;
+use crate::components::{btn, version_badge};
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
@@ -40,7 +40,9 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                         .child(settings_panel(ui, cx))
                         .when_some(ui.update_available.clone(), |d, v| {
                             d.child(update_panel(v.version, cx))
-                        }),
+                        })
+                        // Своя версия — всегда, а не только когда есть обновление.
+                        .child(version_badge()),
                 ),
         )
         .into_any_element()
