@@ -28,7 +28,7 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         // Логотип
         .child(
             div()
-                .h(px(80.))
+                .h(px(72.))
                 .px(px(20.))
                 .flex()
                 .items_center()

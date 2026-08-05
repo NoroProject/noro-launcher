@@ -22,8 +22,8 @@ pub fn page(ui: &LauncherUI, id: Uuid, cx: &mut Cx) -> AnyElement {
             div()
                 .flex_1()
                 .min_h_0()
-                .px(px(24.))
-                .py(px(24.))
+                .px(px(16.))
+                .py(px(20.))
                 .flex()
                 .flex_col()
                 .items_center()
@@ -87,14 +87,16 @@ fn body(ui: &LauncherUI, item: &NewsItem) -> AnyElement {
 
     if let Some(image) = ui.news_images.get(&item.id) {
         root = root.child(
-            // Без flex_shrink_0 картинка в колонке растягивается и наползает
-            // на заголовок с текстом.
-            img(image.clone())
+            // Картинку держит контейнер с заданной высотой, а сама она внутри
+            // растягивается на него. Заданная высота у самого img в колонке не
+            // держалась: снимок расползался и наезжал на заголовок.
+            div()
                 .w_full()
                 .h(px(240.))
                 .flex_shrink_0()
+                .overflow_hidden()
                 .rounded(px(R_SM))
-                .object_fit(ObjectFit::Cover),
+                .child(img(image.clone()).size_full().object_fit(ObjectFit::Cover)),
         );
     }
 
