@@ -20,12 +20,15 @@ const showAll = ref(false)
     <div v-if="pending" class="text-sm text-[var(--noro-muted)]">Loading builds…</div>
 
     <!-- Пока релиза нет, кнопка вела бы в никуда. Честнее сказать прямо. -->
-    <div v-else-if="!primary" class="text-sm text-[var(--noro-muted)]">
+    <div v-else-if="!downloads.length" class="text-sm text-[var(--noro-muted)]">
       No launcher build published yet.
     </div>
 
     <template v-else>
-      <div class="flex flex-wrap items-center gap-3">
+      <!-- Платформы может не быть: при рендере на сервере она неизвестна. Тогда
+           вместо кнопки сразу раскрыт полный список, чтобы никому не досталась
+           сборка под чужую систему. -->
+      <div v-if="primary" class="flex flex-wrap items-center gap-3">
         <AtomButton
           variant="primary"
           size="lg"
@@ -40,8 +43,9 @@ const showAll = ref(false)
         </span>
       </div>
 
-      <div v-if="others.length" class="mt-4">
+      <div v-if="others.length" :class="primary ? 'mt-4' : ''">
         <AtomButton
+          v-if="primary"
           variant="ghost"
           size="sm"
           :icon="showAll ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
@@ -50,7 +54,7 @@ const showAll = ref(false)
           Other platforms
         </AtomButton>
 
-        <div v-if="showAll" class="mt-3 grid gap-2">
+        <div v-if="showAll || !primary" :class="primary ? 'mt-3 grid gap-2' : 'grid gap-2'">
           <a
             v-for="item in others"
             :key="item.platform"

@@ -43,8 +43,13 @@ export function useLauncherDownloads() {
     return null
   })
 
+  /**
+   * Только точное совпадение. Подставить сюда первую попавшуюся сборку нельзя:
+   * при рендере на сервере платформа неизвестна всегда, и кнопка уезжала бы в
+   * разметку со ссылкой на чужой бинарник — маководы качали Linux ELF.
+   */
   const primary = computed(() =>
-    data.value.find(d => d.platform === guessed.value) || data.value[0] || null
+    data.value.find(d => d.platform === guessed.value) || null
   )
 
   const others = computed(() => data.value.filter(d => d !== primary.value))
