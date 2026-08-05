@@ -43,3 +43,19 @@ PLIST
 if command -v plutil >/dev/null 2>&1; then
   plutil -lint "$APP/Contents/Info.plist"
 fi
+
+# Переподписать бандл целиком.
+#
+# Линковщик подписывает голый бинарник ad-hoc, и на arm64 без подписи macOS
+# приложение вообще не запускает. Но как только бинарник оборачивается в бандл с
+# Info.plist и иконкой, та подпись перестаёт соответствовать содержимому: она
+# утверждает, что ресурсов нет. Система считает такой бандл повреждённым и
+# предлагает выбросить его в корзину.
+#
+# MACOS_SIGN_IDENTITY позволяет подставить настоящий Developer ID; по умолчанию
+# подпись ad-hoc — она не убирает предупреждение Gatekeeper о неизвестном
+# разработчике, но делает приложение запускаемым.
+IDENTITY="${MACOS_SIGN_IDENTITY:--}"
+codesign --force --deep --sign "$IDENTITY" --timestamp=none "$APP"
+codesign --verify --deep --strict "$APP"
+
