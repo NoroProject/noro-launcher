@@ -4,6 +4,9 @@ const props = defineProps<{
     capeUrl?: string | null;
 }>();
 
+/** Тот же Стив, которого мастер отдаёт игре, — чтобы вьюер не пустовал. */
+const defaultSkinUrl = `${useRuntimeConfig().public.masterUrl}/api/textures/default-skin`;
+
 const canvas = ref<HTMLCanvasElement | null>(null);
 const frame = ref<HTMLElement | null>(null);
 const isReady = ref(false);
@@ -20,11 +23,7 @@ function resize() {
 async function loadTextures() {
     if (!viewer) return;
     try {
-        if (props.skinUrl) {
-            await viewer.loadSkin(props.skinUrl, { model: "auto-detect" });
-        } else {
-            viewer.loadSkin(null);
-        }
+        await viewer.loadSkin(props.skinUrl || defaultSkinUrl, { model: "auto-detect" });
         if (props.capeUrl) {
             await viewer.loadCape(props.capeUrl, { backEquipment: "cape" });
         } else {
