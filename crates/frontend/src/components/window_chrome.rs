@@ -5,7 +5,7 @@ use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{
     div, prelude::*, px, rgb, rgba, AnyElement, Context, MouseButton, MouseDownEvent, Pixels,
-    Point, Size,
+    Point, Size, WindowControlArea,
 };
 use i18n::Locale;
 
@@ -33,7 +33,16 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
                 window.start_window_move();
             }
         })
-        .child(div().flex_1())
+        // Windows двигает окно сам, по ответу на WM_NCHITTEST, — там
+        // `start_window_move()` не делает ничего, и шапка не таскалась вовсе.
+        // Метку вешаем на пустую часть: накрыть ею всю панель нельзя, система
+        // сочтёт кнопки частью заголовка и съест клики по ним.
+        .child(
+            div()
+                .flex_1()
+                .h_full()
+                .window_control_area(WindowControlArea::Drag),
+        )
         .children(Locale::ALL.map(|l| lang_pill(l, l == active, cx)))
         .child(div().w(px(8.)))
         .child(control("win-min", "minus", false))
