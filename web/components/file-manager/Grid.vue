@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { FmItem } from './List.vue'
 
-defineProps<{
+const props = defineProps<{
   items: FmItem[]
+  /** Режим синхронизации пути с учётом наследования от папок. */
+  rule: (path: string) => RuleState
   selected: Set<string>
   renamingId: string | null
   renameValue: string
@@ -13,10 +15,22 @@ const emit = defineEmits<{
   open: [item: FmItem]
   context: [item: FmItem, ev: MouseEvent]
   'bg-context': [ev: MouseEvent]
+  'toggle-rule': [path: string]
   'update:renameValue': [v: string]
   'rename-commit': []
   'rename-cancel': []
 }>()
+
+const MODE_CLASS: Record<SyncMode, string> = {
+  sync: 'text-[var(--noro-cream)]',
+  ignored: 'text-[var(--noro-blue)]',
+  user: 'text-[var(--noro-magenta)]',
+}
+
+function ruleTitle(path: string) {
+  const r = props.rule(path)
+  return r.from ? `${MODE_HINT[r.mode]} (inherited from ${r.from})` : MODE_HINT[r.mode]
+}
 
 function itemKey(it: FmItem) {
   return it.type === 'folder' ? `d:${it.name}` : `f:${it.id}`
@@ -59,12 +73,22 @@ function iconColor(it: FmItem) {
     <div
       v-for="it in items"
       :key="itemKey(it)"
-      class="fm-grid-card"
+      class="fm-grid-card relative"
       :class="{ 'fm-selected': selected.has(itemKey(it)) }"
       @click="emit('select', itemKey(it), $event)"
       @dblclick="emit('open', it)"
       @contextmenu.prevent.stop="emit('context', it, $event)"
     >
+      <!-- Режим синхронизации в углу плитки: буква та же, что в списке,
+           приглушённая — значит унаследована от папки. -->
+      <button
+        class="absolute right-1.5 top-1.5 font-mono text-xs font-bold"
+        :class="[MODE_CLASS[rule(it.path).mode], rule(it.path).from ? 'opacity-40' : '']"
+        :title="ruleTitle(it.path)"
+        @click.stop="emit('toggle-rule', it.path)"
+      >
+        {{ MODE_LABEL[rule(it.path).mode] }}
+      </button>
       <UIcon
         :name="iconForKind(it)"
         :class="['size-10', iconColor(it)]"

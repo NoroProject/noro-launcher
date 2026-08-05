@@ -93,7 +93,7 @@ fn update_panel(version: String, cx: &mut Cx) -> AnyElement {
                     .font_family(FONT_PIXEL_ALT)
                     .text_size(px(11.))
                     .text_color(rgb(TEXT_MUTED))
-                    .child(format!("v{version}")),
+                    .child(format!("v{}", version.trim_start_matches("launcher-v"))),
             ),
         )
         .into_any_element()

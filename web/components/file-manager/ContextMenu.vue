@@ -5,7 +5,12 @@ defineProps<{
   isFolder: boolean
   hasSelection: boolean
   isText?: boolean
+  /** Текущий режим синхронизации цели — чтобы отметить его в подменю. */
+  syncMode?: SyncMode
 }>()
+
+// Подменю раскрывается по наведению, как в проводнике.
+const syncOpen = ref(false)
 
 const emit = defineEmits<{
   open: []
@@ -16,6 +21,7 @@ const emit = defineEmits<{
   delete: []
   newFolder: []
   upload: []
+  'set-sync': [mode: SyncMode]
   close: []
 }>()
 
@@ -59,6 +65,35 @@ onUnmounted(() => {
       <button v-if="hasSelection" class="fm-ctx-item" @click="emit('copy')">
         <UIcon name="i-lucide-copy" class="size-4" /> Copy Path
       </button>
+      <template v-if="hasSelection">
+        <div class="fm-ctx-sep" />
+        <!-- Режим ставится и отсюда: на плитках метки нет, да и списком
+             попадать в одну букву неудобно. -->
+        <div class="relative" @mouseenter="syncOpen = true" @mouseleave="syncOpen = false">
+          <button class="fm-ctx-item w-full justify-between">
+            <span class="flex items-center gap-2">
+              <UIcon name="i-lucide-refresh-cw" class="size-4" /> Sync mode
+            </span>
+            <UIcon name="i-lucide-chevron-right" class="size-3.5" />
+          </button>
+          <div v-if="syncOpen" class="fm-ctx absolute left-full top-0 ml-0.5">
+            <button
+              v-for="mode in MODE_ORDER"
+              :key="mode"
+              class="fm-ctx-item"
+              @click="emit('set-sync', mode)"
+            >
+              <UIcon
+                :name="syncMode === mode ? 'i-lucide-check' : 'i-lucide-minus'"
+                class="size-4"
+                :class="syncMode === mode ? 'text-[var(--noro-cream)]' : 'opacity-30'"
+              />
+              {{ MODE_HINT[mode] }}
+            </button>
+          </div>
+        </div>
+      </template>
+
       <div class="fm-ctx-sep" />
       <button class="fm-ctx-item" @click="emit('newFolder')">
         <UIcon name="i-lucide-folder-plus" class="size-4" /> New Folder

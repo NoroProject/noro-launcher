@@ -49,6 +49,23 @@ fn main() -> ExitCode {
     }
 }
 
+/// Показать окно консоли, если его нет.
+///
+/// Релизный bootstrapper помечен `windows_subsystem = "windows"`, чтобы ярлык не
+/// открывал чёрный квадрат на каждый запуск. Но когда идёт скачивание, показать
+/// прогресс больше негде.
+#[cfg(windows)]
+fn show_console() {
+    // SAFETY: вызов идёт из main до порождения потоков; повторный AllocConsole
+    // просто вернёт ошибку, которая нам не важна.
+    unsafe {
+        windows_sys::Win32::System::Console::AllocConsole();
+    }
+}
+
+#[cfg(not(windows))]
+fn show_console() {}
+
 fn core_binary_name() -> &'static str {
     if cfg!(windows) {
         "noro-launcher-core.exe"
@@ -134,9 +151,32 @@ async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> 
         .as_str()
         .unwrap_or("unknown");
 
+    // На Windows релизная сборка идёт без консоли, поэтому весь вывод уходил в
+    // никуда: игрок запускал ярлык и минуту смотрел в пустой рабочий стол, пока
+    // качались пятнадцать мегабайт. Консоль открываем только здесь — когда
+    // действительно есть что показать.
+    show_console();
     eprintln!("скачивание версии {version}...");
-    let resp = client.get(download_url).send().await?.error_for_status()?;
-    let bytes = resp.bytes().await?;
+    let mut resp = client.get(download_url).send().await?.error_for_status()?;
+
+    // Читаем по кускам ради прогресса: reqwest отдаёт их сам, без futures.
+    let total = resp.content_length().unwrap_or(0);
+    let mut bytes: Vec<u8> = Vec::with_capacity(total as usize);
+    let mut shown = 0u64;
+    while let Some(chunk) = resp.chunk().await? {
+        bytes.extend_from_slice(&chunk);
+        let done = bytes.len() as u64;
+        // Печатаем раз в пять процентов, иначе строка мельтешит.
+        if total > 0 && done * 20 / total > shown {
+            shown = done * 20 / total;
+            eprintln!(
+                "  {}% ({:.1} из {:.1} МБ)",
+                done * 100 / total,
+                done as f64 / 1_048_576.0,
+                total as f64 / 1_048_576.0
+            );
+        }
+    }
 
     // Проверка SHA256.
     use sha2::Digest;

@@ -2265,7 +2265,7 @@ dependencies = [
 
 [[package]]
 name = "frontend"
-version = "0.1.0"
+version = "1.2.3"
 dependencies = [
  "base64",
  "bridge",
@@ -4264,6 +4264,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "windows-sys 0.60.2",
  "winres",
 ]
 

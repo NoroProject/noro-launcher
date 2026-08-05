@@ -41,6 +41,20 @@ const editorFilePath = ref('')
 const rules = useSyncRules(props.buildId)
 
 /** Клик по метке меняет режим и сразу сохраняет — как chmod, без «применить». */
+/** Выбор режима из контекстного меню — без перебора по кругу. */
+async function setSyncFromMenu(mode: SyncMode) {
+  if (!ctxItem.value) return
+  const path = ctxItem.value.path
+  ctxVisible.value = false
+  rules.setMode(path, mode)
+  try {
+    await rules.save()
+  } catch (e) {
+    notify.fail(e)
+    await rules.load()
+  }
+}
+
 async function toggleRule(path: string) {
   rules.cycle(path)
   try {
@@ -379,6 +393,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       <FileManagerGrid
         v-else
         :items="currentItems"
+        :rule="rules.ruleFor"
+        @toggle-rule="toggleRule"
         :selected="selected"
         :renaming-id="renamingId"
         :rename-value="renameValue"
@@ -410,6 +426,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       :y="ctxY"
       :is-folder="ctxItem?.type === 'folder'"
       :is-text="ctxIsText"
+      :sync-mode="ctxItem ? rules.ruleFor(ctxItem.path).mode : undefined"
+      @set-sync="setSyncFromMenu"
       :has-selection="selected.size > 0"
       @open="openItem(ctxItem!); closeCtx()"
       @edit="closeCtx(); openEditor()"
