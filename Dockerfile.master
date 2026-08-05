@@ -14,12 +14,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/noro-master /usr/local/bin/noro-master
+COPY entrypoint.master.sh /usr/local/bin/entrypoint.sh
 
-RUN useradd -m -u 10001 noro
-USER noro
+# Каталог тома обязан существовать в образе и принадлежать noro: иначе Docker
+# создаёт точку монтирования от root, и процесс под uid 10001 не может писать.
+RUN useradd -m -u 10001 noro \
+    && mkdir -p /app/data \
+    && chown -R noro:noro /app \
+    && chmod +x /usr/local/bin/entrypoint.sh
 
 ENV NORO_BIND=0.0.0.0:8080
 ENV NORO_DATA_DIR=/app/data
+ENV HOME=/home/noro
 
 EXPOSE 8080
+# USER здесь не ставим: entrypoint стартует от root, чинит владельца тома и сам
+# сбрасывает права на noro (uid 10001) через setpriv.
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["noro-master"]

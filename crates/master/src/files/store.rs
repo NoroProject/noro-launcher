@@ -39,12 +39,18 @@ impl FileStore {
         let dst = self.path_for(&sha1);
         if !dst.exists() {
             if let Some(parent) = dst.parent() {
-                tokio::fs::create_dir_all(parent).await?;
+                tokio::fs::create_dir_all(parent)
+                    .await
+                    .with_context(|| format!("создание директории {}", parent.display()))?;
             }
             // Пишем во временный файл, затем атомарно переименовываем.
             let tmp = dst.with_extension("tmp");
-            tokio::fs::write(&tmp, data).await?;
-            tokio::fs::rename(&tmp, &dst).await?;
+            tokio::fs::write(&tmp, data)
+                .await
+                .with_context(|| format!("запись во временный файл {}", tmp.display()))?;
+            tokio::fs::rename(&tmp, &dst)
+                .await
+                .with_context(|| format!("переименование в {}", dst.display()))?;
         }
         Ok(StoredFile {
             sha1,
