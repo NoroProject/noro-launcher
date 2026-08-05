@@ -27,3 +27,15 @@ hdiutil create \
   "$OUT"
 
 hdiutil verify -quiet "$OUT"
+
+# Подписать сам образ, а не только бандл внутри.
+#
+# Подписывается тем же Developer ID Application — для .dmg отдельный сертификат
+# не нужен, Developer ID Installer существует только для пакетов .pkg. Без этой
+# подписи штамп нотаризации пришивался бы к контейнеру, целостность которого
+# ничем не подтверждена.
+IDENTITY="${MACOS_SIGN_IDENTITY:--}"
+if [ "$IDENTITY" != "-" ]; then
+  codesign --force --sign "$IDENTITY" --timestamp "$OUT"
+  codesign --verify --strict "$OUT"
+fi
