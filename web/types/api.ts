@@ -130,6 +130,8 @@ export interface LauncherVersionRow {
   signature: string;
   is_current: boolean;
   built_at: string;
+  /** `bootstrapper` — то, что качает игрок; `core` — то, что качает bootstrapper. */
+  kind: string;
 }
 
 export interface ServerCoreRow {

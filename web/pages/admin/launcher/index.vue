@@ -86,20 +86,12 @@ async function deploy(versionId: string) {
     <UAlert v-if="error" class="mb-5" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="humanError(error)" />
 
     <section class="noro-panel overflow-hidden">
-      <table v-if="versions?.length" class="noro-table">
-        <thead><tr><th>Version</th><th>Platform</th><th>SHA256</th><th>Current</th><th /></tr></thead>
-        <tbody>
-          <tr v-for="version in versions" :key="version.id">
-            <td class="font-semibold text-[var(--noro-text)]">{{ version.version }}</td>
-            <td>{{ version.platform }}</td>
-            <td><code class="text-xs text-[var(--noro-muted)]">{{ version.sha256.slice(0, 16) }}...</code></td>
-            <td><UBadge :color="version.is_current ? 'success' : 'neutral'" variant="subtle">{{ version.is_current ? 'current' : 'stored' }}</UBadge></td>
-            <td class="text-right">
-              <AtomButton variant="primary" :loading="busy === `deploy-${version.id}`" icon="i-lucide-send" size="sm" @click="deploy(version.id)">Deploy</AtomButton>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <LauncherVersionsTable
+        v-if="versions?.length"
+        :versions="versions"
+        :busy="busy"
+        @deploy="deploy"
+      />
       <EmptyState v-else icon="i-lucide-rocket" title="No versions yet" text="Build a launcher tag from the toolbar." />
     </section>
 
