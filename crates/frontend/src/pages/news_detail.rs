@@ -95,12 +95,13 @@ fn body(ui: &LauncherUI, item: &NewsItem) -> AnyElement {
             .child(item.title.clone()),
     )
     .child(meta(item))
+    // Тело новости — markdown: заголовки, списки, выделения и ссылки.
     .child(
         div()
-            .font_family(FONT_PIXEL_ALT)
-            .text_size(px(16.))
-            .text_color(rgb(TEXT_SECONDARY))
-            .child(item.body.clone()),
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .children(super::markdown::render(&item.body)),
     )
     .into_any_element()
 }

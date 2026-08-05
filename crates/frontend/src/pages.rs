@@ -7,6 +7,7 @@ pub mod game_console;
 mod game_empty;
 mod game_status;
 mod game_sync;
+mod markdown;
 mod mod_icon;
 mod news;
 mod news_detail;
