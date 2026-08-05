@@ -101,7 +101,9 @@ zip = "2"
 fastnbt = "2"
 walkdir = "2"
 dirs = "5"
-keyring = { version = "3", features = ["apple-native"] }
+# Платформенный бэкенд включается в crates/backend по target: без него keyring 3
+# молча берёт mock-хранилище в памяти.
+keyring = { version = "3", default-features = false }
 url = "2"
 urlencoding = "2"
 open = "5"

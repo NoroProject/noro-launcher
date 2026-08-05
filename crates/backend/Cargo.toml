@@ -32,7 +32,6 @@ base64 = { workspace = true }
 parking_lot = { workspace = true }
 once_cell = { workspace = true }
 dirs = { workspace = true }
-keyring = { workspace = true }
 regex = { workspace = true }
 memchr = { workspace = true }
 open = { workspace = true }
@@ -41,3 +40,17 @@ walkdir = { workspace = true }
 zip = { workspace = true }
 fastnbt = { workspace = true }
 futures = { workspace = true }
+
+# Каждой ОС — свой системный сейф. Общая строка с одним лишь apple-native
+# оставляла Windows и Linux на mock-хранилище: save отчитывался об успехе, а
+# после перезапуска сессии не было, и лаунчер снова просил вход.
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+# linux-native — keyutils ядра, без dbus: Secret Service утащил бы C-зависимости
+# в cross-сборку aarch64.
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["linux-native"] }
