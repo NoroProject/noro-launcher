@@ -144,6 +144,19 @@ function iconColor(it: FmItem) {
               </template>
             </span>
           </td>
+          <td class="text-center">
+            <!-- Режим синхронизации, как права доступа: клик перебирает по кругу.
+                 Унаследованное от папки показано приглушённо — первый клик по
+                 нему задаёт файлу собственное правило. -->
+            <button
+              class="font-mono text-xs font-bold hover:opacity-100"
+              :class="[MODE_CLASS[rule(it.path).mode], rule(it.path).from ? 'opacity-40' : '']"
+              :title="ruleTitle(it.path)"
+              @click.stop="emit('toggle-rule', it.path)"
+            >
+              {{ MODE_LABEL[rule(it.path).mode] }}
+            </button>
+          </td>
           <td class="text-right text-[var(--noro-muted)]">
             {{ it.type === 'file' ? fmtSize(it.size) : `${it.count} items` }}
           </td>
@@ -152,7 +165,7 @@ function iconColor(it: FmItem) {
           </td>
         </tr>
         <tr v-if="!items.length">
-          <td colspan="3" class="text-center text-[var(--noro-muted)] py-8">
+          <td colspan="4" class="text-center text-[var(--noro-muted)] py-8">
             Empty folder
           </td>
         </tr>
