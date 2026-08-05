@@ -41,3 +41,18 @@ pub fn mc_uuid_from_discord(discord_id: &str) -> uuid::Uuid {
 /// ключом через env `NORO_SIGNING_PUBKEY`. Этот seed НИКОГДА не должен использоваться
 /// в проде — он публичен в исходниках.
 pub const DEV_SIGNING_SEED: [u8; 32] = *b"noro-launcher-dev-signing-seed!!";
+
+/// Имя каталога данных лаунчера внутри системного data-dir.
+///
+/// Debug-сборка живёт отдельно от установленной: иначе разработка затирает
+/// боевой `config.json`, инстансы и скачанный core на той же машине, а лаунчер
+/// начинает ходить в локальный мастер, чьи манифесты подписаны dev-ключом.
+/// `NORO_LAUNCHER_DIR` перекрывает выбор, когда нужен ещё один изолированный
+/// профиль.
+pub fn launcher_dir_name() -> String {
+    match std::env::var("NORO_LAUNCHER_DIR") {
+        Ok(custom) if !custom.is_empty() => custom,
+        _ if cfg!(debug_assertions) => "noro-launcher-dev".into(),
+        _ => "noro-launcher".into(),
+    }
+}

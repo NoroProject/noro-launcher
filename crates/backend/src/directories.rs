@@ -12,7 +12,7 @@ impl LauncherDirectories {
     pub fn new() -> Self {
         let root = dirs::data_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("noro-launcher");
+            .join(schema::launcher_dir_name());
         Self { root }
     }
 

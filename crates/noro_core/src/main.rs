@@ -17,7 +17,7 @@ fn main() {
 
     let app_dir = dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("noro-launcher");
+        .join(schema::launcher_dir_name());
     let _ = std::fs::create_dir_all(&app_dir);
 
     let lockfile_path = app_dir.join("app.lock");
