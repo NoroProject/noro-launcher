@@ -108,7 +108,7 @@ jobs:
             macos-latest)
               cp "$OUT/noro-launcher-core" dist/noro-launcher-core-${{ matrix.target }}
               bash .github/scripts/make-app.sh "$OUT/noro-launcher" NoroLauncher.app
-              tar -czf dist/noro-launcher-${{ matrix.target }}.app.tar.gz NoroLauncher.app
+              bash .github/scripts/make-dmg.sh NoroLauncher.app dist/noro-launcher-${{ matrix.target }}.dmg
               ;;
             *)
               cp "$OUT/noro-launcher" dist/noro-launcher-${{ matrix.target }}

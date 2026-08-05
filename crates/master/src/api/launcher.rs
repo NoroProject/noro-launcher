@@ -63,7 +63,7 @@ pub async fn downloads(State(state): State<AppState>) -> AppResult<Json<serde_js
 fn filename_for(platform: &str) -> String {
     match platform {
         p if p.starts_with("windows") => "NoroLauncher.exe".into(),
-        p if p.starts_with("macos") => "NoroLauncher.app.tar.gz".into(),
+        p if p.starts_with("macos") => "NoroLauncher.dmg".into(),
         _ => "noro-launcher".into(),
     }
 }

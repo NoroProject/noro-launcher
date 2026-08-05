@@ -12,6 +12,7 @@ VERSION="${3:-1.0}"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/noro-launcher"
+chmod +x "$APP/Contents/MacOS/noro-launcher"
 cp assets/icon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
