@@ -1069,10 +1069,18 @@ pub async fn set_current_launcher_version(
             .bind(&r.platform)
             .execute(pool)
             .await?;
-        sqlx::query("UPDATE launcher_versions SET is_current=TRUE WHERE id=$1")
-            .bind(id)
-            .execute(pool)
-            .await?;
+        // Вместе с выбранной строкой поднимается и её пара другого вида: core и
+        // установщик приходят из одной сборки, и «выкатить версию» означает обе.
+        // Иначе деплой core гасил бы установщик, и кнопка скачивания на сайте
+        // просто исчезала бы.
+        sqlx::query(
+            "UPDATE launcher_versions SET is_current=TRUE
+             WHERE platform=$1 AND version=$2",
+        )
+        .bind(&r.platform)
+        .bind(&r.version)
+        .execute(pool)
+        .await?;
     }
     Ok(row)
 }
