@@ -917,6 +917,37 @@ pub async fn upsert_base_build_file(
     Ok(())
 }
 
+/// Сборка разложена до мультиплатформенности?
+///
+/// Признак — java-файлы без платформы: раньше рантайм клали под ОС мастера и
+/// путь платформы не содержал, так что Windows получал чужой JRE.
+pub async fn has_legacy_java(pool: &PgPool, base_build_id: Uuid) -> Result<bool> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM base_build_files
+          WHERE base_build_id = $1 AND kind = 'java' AND platform IS NULL)",
+    )
+    .bind(base_build_id)
+    .fetch_one(pool)
+    .await?)
+}
+
+/// Убрать файлы вида: пути java сменились, и старые записи иначе остались бы
+/// висеть — клиент считал бы их нужными всем.
+pub async fn delete_base_build_files_kind(
+    pool: &PgPool,
+    base_build_id: Uuid,
+    kind: &str,
+) -> Result<u64> {
+    Ok(
+        sqlx::query("DELETE FROM base_build_files WHERE base_build_id = $1 AND kind = $2")
+            .bind(base_build_id)
+            .bind(kind)
+            .execute(pool)
+            .await?
+            .rows_affected(),
+    )
+}
+
 pub async fn base_build_files(pool: &PgPool, base_build_id: Uuid) -> Result<Vec<BaseBuildFileRow>> {
     Ok(sqlx::query_as::<_, BaseBuildFileRow>(
         "SELECT * FROM base_build_files WHERE base_build_id=$1 ORDER BY path",

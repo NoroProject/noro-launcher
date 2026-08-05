@@ -121,8 +121,18 @@ where
     if let Some(base) =
         crate::db::get_base_build(&state.db, mc_version, modloader, modloader_version).await?
     {
-        log("Base build уже существует, пропуск bootstrap");
-        return Ok(base);
+        // Сборки, сделанные до мультиплатформенности, несут java только под ОС
+        // мастера. Переиспользовать их нельзя: на других системах JVM не
+        // запустится, а сами по себе они не починятся — bootstrap для готовой
+        // сборки не запускается.
+        if !crate::db::has_legacy_java(&state.db, base.id).await? {
+            log("Base build уже существует, пропуск bootstrap");
+            return Ok(base);
+        }
+        let removed = crate::db::delete_base_build_files_kind(&state.db, base.id, "java").await?;
+        log(&format!(
+            "java разложена под одну платформу — перекладываем ({removed} файлов удалено)"
+        ));
     }
 
     // 2. Создаем временную запись (чтобы получить UUID для файлов).
