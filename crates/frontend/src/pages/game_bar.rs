@@ -1,9 +1,9 @@
 use super::common::Cx;
-use bridge::BuildState;
 use crate::components::cta_button;
 use crate::icons::ic;
 use crate::state::{LauncherUI, SyncUiState};
 use crate::theme::*;
+use bridge::BuildState;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight};
 use i18n::t;
 use schema::ServerEntry;

@@ -42,10 +42,13 @@ pub fn render(source: &str) -> Vec<AnyElement> {
                 kind = Kind::Item(depth.saturating_sub(1));
                 buf.push_str("• ");
             }
-            Event::Start(Tag::Strong) => open.push((buf.len(), style(FontWeight::BOLD, None, None))),
-            Event::Start(Tag::Emphasis) => {
-                open.push((buf.len(), style(FontWeight::NORMAL, Some(FontStyle::Italic), None)))
+            Event::Start(Tag::Strong) => {
+                open.push((buf.len(), style(FontWeight::BOLD, None, None)))
             }
+            Event::Start(Tag::Emphasis) => open.push((
+                buf.len(),
+                style(FontWeight::NORMAL, Some(FontStyle::Italic), None),
+            )),
             Event::Start(Tag::Link { .. }) => {
                 open.push((buf.len(), style(FontWeight::NORMAL, None, Some(BLUE))))
             }
@@ -58,7 +61,10 @@ pub fn render(source: &str) -> Vec<AnyElement> {
             Event::Code(text) => {
                 let start = buf.len();
                 buf.push_str(&text);
-                spans.push((start..buf.len(), style(FontWeight::NORMAL, None, Some(ACCENT))));
+                spans.push((
+                    start..buf.len(),
+                    style(FontWeight::NORMAL, None, Some(ACCENT)),
+                ));
             }
             Event::SoftBreak => buf.push(' '),
             Event::HardBreak => buf.push('\n'),
@@ -164,9 +170,5 @@ fn flush(
 }
 
 fn rule() -> AnyElement {
-    div()
-        .h(px(1.))
-        .w_full()
-        .bg(rgb(BORDER))
-        .into_any_element()
+    div().h(px(1.)).w_full().bg(rgb(BORDER)).into_any_element()
 }

@@ -44,9 +44,7 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
         .hover(|d| d.opacity(0.8))
         // Иконка приложения рядом с названием: голая надпись в шапке смотрелась
         // пустовато, а лаунчер уже имеет свой знак.
-        .child(
-            img("logo.png").size(px(26.)).flex_shrink_0(),
-        )
+        .child(img("logo.png").size(px(26.)).flex_shrink_0())
         .child(pixel_title("NORO", 24., CTA))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.page = this

@@ -473,7 +473,8 @@ impl LauncherUI {
             }
             MessageToFrontend::ServerList { servers } => self.replace_servers(servers),
             MessageToFrontend::NewsUpdated { items } => {
-                self.news_images.retain(|id, _| items.iter().any(|n| n.id == *id));
+                self.news_images
+                    .retain(|id, _| items.iter().any(|n| n.id == *id));
                 self.news = items;
             }
             MessageToFrontend::ConfigState {

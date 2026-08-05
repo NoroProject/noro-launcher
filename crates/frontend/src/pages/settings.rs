@@ -10,7 +10,6 @@ use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement, FontWeight};
 use i18n::t;
 
-
 pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()
         .size_full()

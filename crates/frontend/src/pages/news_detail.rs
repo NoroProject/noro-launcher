@@ -1,6 +1,6 @@
 //! Новость целиком: картинка, полный текст, автор и дата.
 
-use super::common::{page_header, panel, Cx, CONTENT_W};
+use super::common::{panel, Cx, CONTENT_W};
 use crate::icons::ic;
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
@@ -17,7 +17,7 @@ pub fn page(ui: &LauncherUI, id: Uuid, cx: &mut Cx) -> AnyElement {
         .bg(rgb(CONTENT_FALLBACK))
         .flex()
         .flex_col()
-        .child(page_header("newspaper", t("news-title")))
+        .child(header(cx))
         .child(
             div()
                 .flex_1()
@@ -35,44 +35,57 @@ pub fn page(ui: &LauncherUI, id: Uuid, cx: &mut Cx) -> AnyElement {
                         .flex_col()
                         .min_h_0()
                         .gap(px(16.))
-                .child(back_button(cx))
-                .child(match item {
-                    Some(item) => body(ui, item),
-                    // Новость могли удалить на мастере, пока её читали.
-                    None => panel()
-                        .p(px(20.))
-                        .font_family(FONT_PIXEL_ALT)
-                        .text_size(px(16.))
-                        .text_color(rgb(TEXT_MUTED))
-                        .child(t("news-empty"))
-                        .into_any_element(),
-                }),
+                        .child(match item {
+                            Some(item) => body(ui, item),
+                            // Новость могли удалить на мастере, пока её читали.
+                            None => panel()
+                                .p(px(20.))
+                                .font_family(FONT_PIXEL_ALT)
+                                .text_size(px(16.))
+                                .text_color(rgb(TEXT_MUTED))
+                                .child(t("news-empty"))
+                                .into_any_element(),
+                        }),
                 ),
         )
         .into_any_element()
 }
 
-fn back_button(cx: &mut Cx) -> AnyElement {
+/// Шапка чтения: стрелка возврата стоит рядом с заголовком, а не отдельной
+/// кнопкой над карточкой — там она висела в пустоте.
+fn header(cx: &mut Cx) -> AnyElement {
     div()
-        .id("news-back")
+        .h(px(72.))
+        .px(px(16.))
         .flex()
         .items_center()
         .gap(px(8.))
-        .w(px(120.))
-        .h(px(32.))
-        .px(px(12.))
-        .rounded(px(R_SM))
-        .cursor_pointer()
-        .font_family(FONT_PIXEL_ALT)
-        .text_size(px(14.))
-        .text_color(rgb(TEXT_SECONDARY))
-        .hover(|d| d.bg(rgba(0xffffff10)))
-        .child(ic("arrow-left", 14., TEXT_SECONDARY))
-        .child(t("news-back"))
-        .on_click(cx.listener(|this, _e, _w, cx| {
-            this.page = Page::News;
-            cx.notify();
-        }))
+        .border_b_1()
+        .border_color(rgb(BORDER))
+        .child(
+            div()
+                .id("news-back")
+                .size(px(32.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(R_SM))
+                .cursor_pointer()
+                .hover(|d| d.bg(rgba(0xffffff10)))
+                .child(ic("arrow-left", 16., TEXT_SECONDARY))
+                .on_click(cx.listener(|this, _e, _w, cx| {
+                    this.page = Page::News;
+                    cx.notify();
+                })),
+        )
+        .child(
+            div()
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(18.))
+                .font_weight(FontWeight::BOLD)
+                .text_color(rgb(CTA))
+                .child(t("news-title")),
+        )
         .into_any_element()
 }
 
