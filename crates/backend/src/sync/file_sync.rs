@@ -31,11 +31,15 @@ pub async fn sync_server(
 
     // 2. Вычислить эффективный набор файлов (исключив выключенные опц. моды).
     let excluded = excluded_optional_files(manifest, enabled_optional, user);
+    // Ignored раньше значил только «не удаляй»: файл из манифеста всё равно
+    // скачивался и затирал правки игрока. Папка в ignored не спасала ничего,
+    // что лежит внутри и пришло с сервера.
     let effective: Vec<&FileEntry> = manifest
         .verified_files
         .iter()
         .filter(|f| f.side.needed_on_client())
         .filter(|f| !excluded.contains(&f.path))
+        .filter(|f| !is_protected(&f.path, &manifest.unmanaged_paths))
         .collect();
 
     // 3. Проверка файлов — что нужно скачать.
@@ -61,7 +65,14 @@ pub async fn sync_server(
                 | ArtifactKind::ClientJar
                 | ArtifactKind::Other
         );
-        if needs_download(&dest, f.size, &f.sha1, verify_hash).await {
+        // User-managed ставим один раз: дальше файл принадлежит игроку, и
+        // расхождение хеша — это его правки, а не повод их затереть.
+        let wanted = if is_protected(&f.path, &manifest.user_managed_paths) {
+            !dest.exists()
+        } else {
+            needs_download(&dest, f.size, &f.sha1, verify_hash).await
+        };
+        if wanted {
             tasks.push((
                 kind,
                 DownloadTask {
