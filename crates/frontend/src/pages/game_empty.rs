@@ -1,10 +1,10 @@
 //! Экран без серверов. Вынесен из `game.rs`, чтобы тот остался в лимите строк.
 
 use super::common::{tabs, Cx};
-use crate::icons::ic;
+use crate::components::{mascot, Mood};
 use crate::state::LauncherUI;
 use crate::theme::*;
-use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
+use gpui::{div, prelude::*, px, rgb, AnyElement, FontWeight};
 use i18n::t;
 
 pub fn empty(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
@@ -27,18 +27,9 @@ pub fn empty(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .items_center()
                 .justify_center()
                 .gap(px(16.))
-                .child(
-                    div()
-                        .size(px(64.))
-                        .rounded(px(R_LG))
-                        .bg(rgba(0xffffff08))
-                        .border_1()
-                        .border_color(rgb(BORDER))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .child(ic("server", 28., TEXT_MUTED)),
-                )
+                // Маскот тут не украшение: он отличает «пусто, так и задумано»
+                // от «не загрузилось» — иконка-заглушка это не показывала.
+                .child(mascot(Mood::Thinking, 132.))
                 .child(
                     div()
                         .font_family(FONT_PIXEL_ALT)

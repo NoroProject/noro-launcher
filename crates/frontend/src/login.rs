@@ -1,6 +1,8 @@
 //! ATOM-style login screen.
 
-use crate::components::{atom_art, cta_button, tiny_atom_logo, version_badge};
+use crate::components::{
+    atom_art, cta_button, mascot, pixel_title, tiny_atom_logo, version_badge, Mood,
+};
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent, Context, FontWeight};
@@ -28,11 +30,16 @@ fn left_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             .flex_col()
             .items_center()
             .justify_center()
+            .gap(px(20.))
+            // Проверка сессии занимает секунды, и всё это время экран был пустым
+            // с одной строкой посередине. Маскот показывает, что лаунчер жив.
+            .child(mascot(Mood::Loading, 148.))
+            .child(pixel_title("NORO", 28., CTA))
             .child(
                 div()
                     .font_family(FONT_PIXEL_ALT)
-                    .text_size(px(24.))
-                    .text_color(rgb(TEXT_SECONDARY))
+                    .text_size(px(16.))
+                    .text_color(rgb(TEXT_MUTED))
                     .child(t("login-checking")),
             )
             .into_any_element();

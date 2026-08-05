@@ -1,7 +1,7 @@
 //! Мелкие части сайдбара: логотип, нижние иконки навигации, пустое состояние.
 
 use super::common::Cx;
-use crate::components::pixel_title;
+use crate::components::{mascot, pixel_title, Mood};
 use crate::icons::ic;
 use crate::state::Page;
 use crate::theme::*;
@@ -66,7 +66,7 @@ pub fn empty_hint() -> AnyElement {
         .flex_col()
         .items_center()
         .gap(px(8.))
-        .child(ic("server", 20., TEXT_MUTED))
+        .child(mascot(Mood::Sleeping, 72.))
         .child(
             div()
                 .text_center()
