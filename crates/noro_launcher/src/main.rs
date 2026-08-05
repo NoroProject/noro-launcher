@@ -6,6 +6,7 @@
 //! который обновляется автоматически в `AppData/noro-launcher/`.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod splash;
 mod verify;
 
 use std::path::PathBuf;
@@ -39,32 +40,29 @@ fn main() -> ExitCode {
     }
 
     // Сюда попадаем на первом запуске, при забракованном core и при обновлении.
-    eprintln!("скачивание лаунчера...");
-    match rt.block_on(download_core(&app_dir, &core_path)) {
-        Ok(()) => run_core(&core_path),
-        Err(e) => {
+    // Дальше — минуты закачки, поэтому показываем окно: GPUI забирает главный
+    // поток себе, а скачивание уходит в фон и рапортует прогресс в общий слот.
+    let progress: splash::Shared = Default::default();
+    let work_progress = progress.clone();
+    let work_dir = app_dir.clone();
+    let work_core = core_path.clone();
+    let outcome = splash::run_with(progress, move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime");
+        rt.block_on(download_core(&work_dir, &work_core, &work_progress))
+    });
+
+    match outcome {
+        Some(Ok(())) => run_core(&core_path),
+        Some(Err(e)) => {
             eprintln!("ошибка скачивания: {e:#}");
             ExitCode::FAILURE
         }
+        None => ExitCode::FAILURE,
     }
 }
-
-/// Показать окно консоли, если его нет.
-///
-/// Релизный bootstrapper помечен `windows_subsystem = "windows"`, чтобы ярлык не
-/// открывал чёрный квадрат на каждый запуск. Но когда идёт скачивание, показать
-/// прогресс больше негде.
-#[cfg(windows)]
-fn show_console() {
-    // SAFETY: вызов идёт из main до порождения потоков; повторный AllocConsole
-    // просто вернёт ошибку, которая нам не важна.
-    unsafe {
-        windows_sys::Win32::System::Console::AllocConsole();
-    }
-}
-
-#[cfg(not(windows))]
-fn show_console() {}
 
 fn core_binary_name() -> &'static str {
     if cfg!(windows) {
@@ -118,10 +116,17 @@ async fn update_pending(app_dir: &PathBuf) -> bool {
     let Ok(info) = resp.json::<serde_json::Value>().await else {
         return false;
     };
-    info["version"].as_str().is_some_and(|remote| remote != installed)
+    info["version"]
+        .as_str()
+        .is_some_and(|remote| remote != installed)
 }
 
-async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> {
+async fn download_core(
+    app_dir: &PathBuf,
+    dest: &PathBuf,
+    progress: &splash::Shared,
+) -> anyhow::Result<()> {
+    progress.lock().label = "Проверка версии…".into();
     let master_url = verify::master_url();
     let platform = current_platform();
     let url = format!(
@@ -147,35 +152,19 @@ async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> 
         .as_str()
         .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| anyhow::anyhow!("мастер не отдал подпись лаунчера"))?;
-    let version = info["version"]
-        .as_str()
-        .unwrap_or("unknown");
+    let version = info["version"].as_str().unwrap_or("unknown");
 
-    // На Windows релизная сборка идёт без консоли, поэтому весь вывод уходил в
-    // никуда: игрок запускал ярлык и минуту смотрел в пустой рабочий стол, пока
-    // качались пятнадцать мегабайт. Консоль открываем только здесь — когда
-    // действительно есть что показать.
-    show_console();
-    eprintln!("скачивание версии {version}...");
+    progress.lock().label = format!("Загрузка {version}");
     let mut resp = client.get(download_url).send().await?.error_for_status()?;
 
     // Читаем по кускам ради прогресса: reqwest отдаёт их сам, без futures.
     let total = resp.content_length().unwrap_or(0);
     let mut bytes: Vec<u8> = Vec::with_capacity(total as usize);
-    let mut shown = 0u64;
     while let Some(chunk) = resp.chunk().await? {
         bytes.extend_from_slice(&chunk);
-        let done = bytes.len() as u64;
-        // Печатаем раз в пять процентов, иначе строка мельтешит.
-        if total > 0 && done * 20 / total > shown {
-            shown = done * 20 / total;
-            eprintln!(
-                "  {}% ({:.1} из {:.1} МБ)",
-                done * 100 / total,
-                done as f64 / 1_048_576.0,
-                total as f64 / 1_048_576.0
-            );
-        }
+        let mut p = progress.lock();
+        p.done = bytes.len() as u64;
+        p.total = total;
     }
 
     // Проверка SHA256.
@@ -204,7 +193,7 @@ async fn download_core(app_dir: &PathBuf, dest: &PathBuf) -> anyhow::Result<()> 
     let version_file = app_dir.join("version");
     std::fs::write(version_file, version).ok();
 
-    eprintln!("готово!");
+    progress.lock().label = "Готово".into();
     Ok(())
 }
 
@@ -215,8 +204,6 @@ fn current_platform() -> &'static str {
         ("macos", "x86_64") => "macos-x86_64",
         ("macos", "aarch64") => "macos-aarch64",
         ("windows", "x86_64") => "windows-x86_64",
-        (os, arch) => {
-            Box::leak(format!("{os}-{arch}").into_boxed_str())
-        }
+        (os, arch) => Box::leak(format!("{os}-{arch}").into_boxed_str()),
     }
 }

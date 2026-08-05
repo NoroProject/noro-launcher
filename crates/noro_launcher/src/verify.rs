@@ -35,9 +35,7 @@ pub fn verify_bytes(data: &[u8], signature_b64: &str) -> Result<()> {
     let raw = base64::engine::general_purpose::STANDARD
         .decode(signature_b64.trim())
         .map_err(|_| anyhow!("подпись не base64"))?;
-    let sig: [u8; 64] = raw
-        .try_into()
-        .map_err(|_| anyhow!("подпись не 64 байта"))?;
+    let sig: [u8; 64] = raw.try_into().map_err(|_| anyhow!("подпись не 64 байта"))?;
     verifying_key()?
         .verify(data, &Signature::from_bytes(&sig))
         .map_err(|_| anyhow!("подпись не совпала с зашитым ключом"))
