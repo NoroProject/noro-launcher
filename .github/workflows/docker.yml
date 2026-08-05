@@ -18,7 +18,18 @@ jobs:
     permissions:
       contents: read
       packages: write
-      
+
+    # Мастер и веб собираются параллельно, а не по очереди в одном job: долгая
+    # Rust-сборка держала веб в хвосте, хотя они друг от друга не зависят.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: noro-master
+            file: ./Dockerfile.master
+          - image: noro-web
+            file: ./Dockerfile.web
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,22 +46,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata for Master
-        id: meta-master
+      - name: Extract metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/noro-master
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
-            type=ref,event=tag
-            type=sha,format=short
-
-      - name: Extract metadata for Web
-        id: meta-web
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/noro-web
+          images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
@@ -63,26 +63,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Master image
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.master
+          file: ${{ matrix.file }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta-master.outputs.tags }}
-          labels: ${{ steps.meta-master.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push Web image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.web
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta-web.outputs.tags }}
-          labels: ${{ steps.meta-web.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Кеш раздельный по образам: с общим scope мастер и веб затирали слои
+          # друг друга, и каждая сборка начиналась почти с нуля.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
