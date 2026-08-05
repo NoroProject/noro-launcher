@@ -1,6 +1,6 @@
 //! Новость целиком: картинка, полный текст, автор и дата.
 
-use super::common::{page_header, panel, Cx};
+use super::common::{page_header, panel, Cx, CONTENT_W};
 use crate::icons::ic;
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
@@ -14,19 +14,27 @@ pub fn page(ui: &LauncherUI, id: Uuid, cx: &mut Cx) -> AnyElement {
 
     div()
         .size_full()
-        .relative()
         .bg(rgb(CONTENT_FALLBACK))
+        .flex()
+        .flex_col()
         .child(page_header("newspaper", t("news-title")))
         .child(
             div()
-                .absolute()
-                .top(px(96.))
-                .left(px(40.))
-                .right(px(40.))
-                .bottom(px(32.))
+                .flex_1()
+                .min_h_0()
+                .px(px(32.))
+                .py(px(24.))
                 .flex()
                 .flex_col()
-                .gap(px(16.))
+                .items_center()
+                .child(
+                    div()
+                        .w_full()
+                        .max_w(px(CONTENT_W))
+                        .flex()
+                        .flex_col()
+                        .min_h_0()
+                        .gap(px(16.))
                 .child(back_button(cx))
                 .child(match item {
                     Some(item) => body(ui, item),
@@ -39,6 +47,7 @@ pub fn page(ui: &LauncherUI, id: Uuid, cx: &mut Cx) -> AnyElement {
                         .child(t("news-empty"))
                         .into_any_element(),
                 }),
+                ),
         )
         .into_any_element()
 }

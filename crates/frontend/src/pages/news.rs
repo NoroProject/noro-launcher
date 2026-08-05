@@ -1,4 +1,4 @@
-use super::common::{page_header, panel, Cx};
+use super::common::{page_header, panel, Cx, CONTENT_W};
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
@@ -8,20 +8,28 @@ use schema::NewsItem;
 pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()
         .size_full()
-        .relative()
         .bg(rgb(CONTENT_FALLBACK))
+        .flex()
+        .flex_col()
         .child(page_header("newspaper", t("news-title")))
         .child(
             div()
-                .absolute()
-                .top(px(96.))
-                .left(px(40.))
-                .right(px(40.))
-                .bottom(px(32.))
+                .flex_1()
+                .min_h_0()
+                .px(px(32.))
+                .py(px(24.))
                 .flex()
                 .flex_col()
-                .gap(px(16.))
-                .children(cards(&ui.news, cx)),
+                .items_center()
+                .child(
+                    div()
+                        .w_full()
+                        .max_w(px(CONTENT_W))
+                        .flex()
+                        .flex_col()
+                        .gap(px(16.))
+                        .children(cards(&ui.news, cx)),
+                ),
         )
         .into_any_element()
 }

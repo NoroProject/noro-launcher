@@ -1,6 +1,6 @@
 //! Глобальные настройки лаунчера (без вкладок сервера).
 
-use super::common::{panel, Cx};
+use super::common::{panel, Cx, CONTENT_W};
 use super::settings_panel::settings_panel;
 use super::settings_rows::row;
 use crate::components::{btn, version_badge};
@@ -10,9 +10,6 @@ use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement, FontWeight};
 use i18n::t;
 
-/// Колонка настроек не растягивается на всю ширину окна: иначе подпись и
-/// её элемент управления расходятся по разным краям экрана.
-const CONTENT_W: f32 = 720.;
 
 pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()

@@ -17,6 +17,10 @@ pub fn page_title(text: impl Into<gpui::SharedString>) -> AnyElement {
         .into_any_element()
 }
 
+/// Ширина колонки на страницах, не привязанных к серверу: во всю ширину окна
+/// строки читались бы поперёк экрана.
+pub const CONTENT_W: f32 = 720.;
+
 pub fn panel() -> gpui::Div {
     div()
         .rounded(px(R_SM))
