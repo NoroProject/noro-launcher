@@ -10,6 +10,15 @@ pub enum Platform {
 }
 
 impl Platform {
+    /// Все платформы, под которые бывает клиент: сборка готовится сразу для всех.
+    pub const ALL: [Platform; 5] = [
+        Platform::LinuxX64,
+        Platform::LinuxArm64,
+        Platform::MacX64,
+        Platform::MacArm64,
+        Platform::WindowsX64,
+    ];
+
     pub fn host() -> Self {
         match (std::env::consts::OS, std::env::consts::ARCH) {
             ("linux", "aarch64") => Platform::LinuxArm64,

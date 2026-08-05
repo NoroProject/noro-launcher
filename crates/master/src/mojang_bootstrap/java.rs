@@ -55,7 +55,7 @@ pub async fn bootstrap_java(ctx: &BootstrapCtx<'_>, component: &str) -> Result<(
             None => continue,
         };
         let sha1 = raw["sha1"].as_str().map(String::from);
-        let path = format!("runtime/{key}");
+        let path = format!("runtime/{}/{key}", ctx.platform.tag());
         tasks.push((path, url, sha1));
     }
 

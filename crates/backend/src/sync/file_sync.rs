@@ -40,6 +40,9 @@ pub async fn sync_server(
         .filter(|f| f.side.needed_on_client())
         .filter(|f| !excluded.contains(&f.path))
         .filter(|f| !is_protected(&f.path, &manifest.unmanaged_paths))
+        // Java-рантайм и natives лежат в сборке под все платформы сразу; чужие
+        // не только бесполезны, но и весят как пять лишних JRE.
+        .filter(|f| f.matches_platform())
         .collect();
 
     // 3. Проверка файлов — что нужно скачать.
@@ -241,6 +244,10 @@ fn is_protected(rel: &str, protected: &[String]) -> bool {
 /// Найти исполняемый java-бинарник среди файлов манифеста.
 pub fn find_java(instance_dir: &Path, manifest: &BuildManifest) -> Option<PathBuf> {
     for f in &manifest.verified_files {
+        // Рантаймов в манифесте теперь несколько — берём тот, что для нашей ОС.
+        if !f.matches_platform() {
+            continue;
+        }
         if manifest.kind_of(&f.path) == ArtifactKind::Java
             && (f.path.ends_with("/bin/java") || f.path.ends_with("/bin/java.exe"))
         {

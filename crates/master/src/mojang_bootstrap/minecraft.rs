@@ -46,11 +46,18 @@ pub async fn bootstrap_vanilla(ctx: &mut BootstrapCtx<'_>) -> Result<Value> {
         .await?;
     }
 
-    // 4. Библиотеки и natives.
+    // 4. Библиотеки и natives — под каждую платформу клиента.
+    //
+    // Раньше и здесь, и в java стояла платформа мастера: сборка уезжала на
+    // Windows с линуксовым рантаймом, и JVM не стартовала. Пути natives уже
+    // различаются классификатором Mojang, так что коллизий не будет.
     if let Some(libs) = vj["libraries"].as_array() {
         ctx.logf(format!("обработка {} библиотек", libs.len()));
-        for lib in libs {
-            process_library(ctx, lib).await?;
+        for platform in Platform::ALL {
+            ctx.platform = platform;
+            for lib in libs {
+                process_library(ctx, lib).await?;
+            }
         }
     }
 
@@ -67,9 +74,12 @@ pub async fn bootstrap_vanilla(ctx: &mut BootstrapCtx<'_>) -> Result<Value> {
         assets::bootstrap_assets(ctx, &assets_index_name, url, sha1).await?;
     }
 
-    // 8. Java.
+    // 8. Java — свой рантайм каждой платформе, они лежат в runtime/{платформа}/.
     if let Some(jv) = vj["javaVersion"]["component"].as_str() {
-        java::bootstrap_java(ctx, jv).await?;
+        for platform in Platform::ALL {
+            ctx.platform = platform;
+            java::bootstrap_java(ctx, jv).await?;
+        }
     }
 
     Ok(vj)

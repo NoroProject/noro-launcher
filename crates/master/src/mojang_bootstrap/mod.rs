@@ -68,6 +68,7 @@ impl<'a> BootstrapCtx<'a> {
             stored.size as i64,
             side,
             crate::manifest::kind_to_str(kind),
+            platform_tag(kind, self.platform),
         )
         .await?;
         Ok(())
@@ -91,10 +92,17 @@ impl<'a> BootstrapCtx<'a> {
             stored.size as i64,
             side,
             crate::manifest::kind_to_str(kind),
+            platform_tag(kind, self.platform),
         )
         .await?;
         Ok(stored.sha1)
     }
+}
+
+/// Java-рантайм и natives — разные бинарники под каждую ОС, остальное одинаково
+/// всюду. Помечаем только их: клиент скачает свой набор, а не пять чужих.
+fn platform_tag(kind: ArtifactKind, platform: platform::Platform) -> Option<&'static str> {
+    matches!(kind, ArtifactKind::Java | ArtifactKind::Native).then(|| platform.tag())
 }
 
 /// Гарантировать наличие готового base_build. Если его нет — скачивает и собирает все

@@ -71,8 +71,12 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
     let mut artifact_kinds = BTreeMap::new();
 
     // Функция-хелпер для добавления файла в итоговый манифест.
-    let mut add_file =
-        |path: String, sha1: String, size: i64, side_str: String, kind_str: String| {
+    let mut add_file = |path: String,
+                        sha1: String,
+                        size: i64,
+                        side_str: String,
+                        kind_str: String,
+                        platform: Option<String>| {
             let kind = kind_from_str(&kind_str);
             artifact_kinds.insert(path.clone(), kind);
             // java-бинарники нужно делать исполняемыми на unix.
@@ -87,14 +91,16 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
                 url: state.config.file_url(&sha1),
                 side: side_from_str(&side_str),
                 executable,
+                platform,
             });
         };
 
     for f in base_files {
-        add_file(f.path, f.sha1, f.size, f.side, f.kind);
+        add_file(f.path, f.sha1, f.size, f.side, f.kind, f.platform);
     }
+    // Файлы самой сборки — моды и конфиги, они одинаковы для всех платформ.
     for f in build_files {
-        add_file(f.path, f.sha1, f.size, f.side, f.kind);
+        add_file(f.path, f.sha1, f.size, f.side, f.kind, None);
     }
 
     let optional_mods: Vec<OptionalMod> =

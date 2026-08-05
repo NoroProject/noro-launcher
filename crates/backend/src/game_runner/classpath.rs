@@ -21,7 +21,9 @@ pub fn build_classpath(instance_dir: &Path, manifest: &BuildManifest) -> String 
     let forge_like = is_forge_like(manifest);
 
     for f in &manifest.verified_files {
-        if !f.side.needed_on_client() {
+        // Natives лежат в сборке под все платформы; чужие не скачивались, и
+        // ссылки на них в classpath указывали бы в пустоту.
+        if !f.side.needed_on_client() || !f.matches_platform() {
             continue;
         }
         let kind = manifest.kind_of(&f.path);

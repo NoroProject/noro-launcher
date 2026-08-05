@@ -897,11 +897,13 @@ pub async fn upsert_base_build_file(
     size: i64,
     side: &str,
     kind: &str,
+    platform: Option<&str>,
 ) -> Result<()> {
     sqlx::query(
-        "INSERT INTO base_build_files (base_build_id, path, sha1, size, side, kind)
-         VALUES ($1,$2,$3,$4,$5,$6)
-         ON CONFLICT (base_build_id, path) DO UPDATE SET sha1=$3, size=$4, side=$5, kind=$6",
+        "INSERT INTO base_build_files (base_build_id, path, sha1, size, side, kind, platform)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (base_build_id, path)
+         DO UPDATE SET sha1=$3, size=$4, side=$5, kind=$6, platform=$7",
     )
     .bind(base_build_id)
     .bind(path)
@@ -909,6 +911,7 @@ pub async fn upsert_base_build_file(
     .bind(size)
     .bind(side)
     .bind(kind)
+    .bind(platform)
     .execute(pool)
     .await?;
     Ok(())

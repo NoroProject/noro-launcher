@@ -34,6 +34,23 @@ pub struct FileEntry {
     /// Исполняемый ли файл (для java-бинарников на unix нужен chmod +x).
     #[serde(default)]
     pub executable: bool,
+    /// Платформа, которой файл предназначен ("windows-x86_64"). `None` — всем.
+    ///
+    /// Java-рантайм и natives — разные бинарники под каждую ОС. Без пометки
+    /// сборка несла рантайм только той платформы, на которой крутится мастер, и
+    /// на остальных JVM не запускалась.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform: Option<String>,
+}
+
+impl FileEntry {
+    /// Нужен ли файл этой машине. Java и natives помечены платформой, остальное
+    /// одинаково всюду.
+    pub fn matches_platform(&self) -> bool {
+        self.platform
+            .as_deref()
+            .is_none_or(|p| p == crate::current_platform())
+    }
 }
 
 /// Категория артефакта — помогает лаунчеру понимать стадию синхронизации и

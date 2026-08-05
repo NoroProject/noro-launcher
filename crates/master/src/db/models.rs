@@ -174,4 +174,6 @@ pub struct BaseBuildFileRow {
     pub size: i64,
     pub side: String,
     pub kind: String,
+    /// Платформа файла ("windows-x86_64"); NULL — нужен всем.
+    pub platform: Option<String>,
 }
