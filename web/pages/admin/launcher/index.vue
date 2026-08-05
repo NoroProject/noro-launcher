@@ -43,6 +43,24 @@ async function buildLauncher() {
   }
 }
 
+/** Вся версия разом: пять платформ в двух видах — по одной их не наклацаешь. */
+async function deployAll(ids: string[]) {
+  busy.value = 'deploy-all'
+  try {
+    // Последовательно: мастер на каждый деплой рассылает лаунчерам обновление,
+    // и параллельный залп сделал бы порядок рассылки случайным.
+    for (const id of ids) {
+      await auth.request(`/api/admin/launcher/deploy/${id}`, { method: 'POST' })
+    }
+    await refresh()
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
+  } finally {
+    busy.value = null
+  }
+}
+
 async function deploy(versionId: string) {
   busy.value = `deploy-${versionId}`
   try {
@@ -80,6 +98,7 @@ async function deploy(versionId: string) {
         :versions="versions"
         :busy="busy"
         @deploy="deploy"
+        @deploy-many="deployAll"
       />
       <EmptyState v-else icon="i-lucide-rocket" title="No versions yet" text="Build a launcher tag from the toolbar." />
     </section>

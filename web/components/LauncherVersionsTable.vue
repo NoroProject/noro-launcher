@@ -6,7 +6,7 @@ const props = defineProps<{
   busy: string | null
 }>()
 
-defineEmits<{ deploy: [id: string] }>()
+defineEmits<{ deploy: [id: string], deployMany: [ids: string[]] }>()
 
 /**
  * Одна версия даёт десять строк: пять платформ, и у каждой две разновидности —
@@ -25,8 +25,26 @@ const groups = computed(() => {
     items: [...items].sort(
       (a, b) => a.platform.localeCompare(b.platform) || a.kind.localeCompare(b.kind)
     ),
+    // Выкаченное деплоить незачем — кнопка группы двигает только остальное.
+    pending: items.filter(i => !i.is_current).map(i => i.id),
   }))
 })
+
+// Раскрыта свежая версия, старые свёрнуты: разворачивать десять строк ради
+// давно выкаченной сборки незачем. Выбор переживает refresh таблицы.
+const expanded = ref(new Set<string>())
+const touched = ref(false)
+watchEffect(() => {
+  const first = groups.value[0]?.version
+  if (!touched.value && first) expanded.value = new Set([first])
+})
+
+function toggle(version: string) {
+  touched.value = true
+  const next = new Set(expanded.value)
+  next.has(version) ? next.delete(version) : next.add(version)
+  expanded.value = next
+}
 </script>
 
 <template>
@@ -36,35 +54,61 @@ const groups = computed(() => {
     </thead>
     <tbody v-for="group in groups" :key="group.version">
       <tr>
-        <th colspan="5" class="bg-[var(--noro-input)] text-left text-[var(--noro-text)]">
-          {{ group.version }}
+        <th colspan="5" class="bg-[var(--noro-input)] px-4 py-2">
+          <div class="flex items-center gap-3">
+            <button class="flex flex-1 items-center gap-2 text-left" @click="toggle(group.version)">
+              <UIcon
+                :name="expanded.has(group.version) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                class="size-4 text-[var(--noro-muted)]"
+              />
+              <span class="text-[var(--noro-text)]">{{ group.version }}</span>
+              <span class="text-xs font-normal text-[var(--noro-muted)]">
+                {{ group.items.length }} builds
+              </span>
+            </button>
+            <!-- Деплой всей версии разом: платформ пять, и раскликивать их по
+                 одной ради одного релиза — то ещё занятие. -->
+            <AtomButton
+              v-if="group.pending.length"
+              variant="secondary"
+              size="sm"
+              icon="i-lucide-send"
+              :loading="busy === 'deploy-all'"
+              @click="$emit('deployMany', group.pending)"
+            >
+              Deploy all
+            </AtomButton>
+          </div>
         </th>
       </tr>
-      <tr v-for="version in group.items" :key="version.id">
-        <td>{{ version.platform }}</td>
-        <td class="text-xs text-[var(--noro-muted)]">{{ version.kind }}</td>
-        <td><code class="text-xs text-[var(--noro-muted)]">{{ version.sha256.slice(0, 16) }}...</code></td>
-        <td>
-          <UBadge :color="version.is_current ? 'success' : 'neutral'" variant="subtle">
-            {{ version.is_current ? 'current' : 'stored' }}
-          </UBadge>
-        </td>
-        <td class="text-right">
-          <!-- У выкаченного деплоить нечего: кнопка остаётся только у остальных.
-               Core и bootstrapper переезжают порознь — установщик можно держать
-               на старой версии, пока он копит репутацию SmartScreen. -->
-          <AtomButton
-            v-if="!version.is_current"
-            variant="primary"
-            size="sm"
-            icon="i-lucide-send"
-            :loading="busy === `deploy-${version.id}`"
-            @click="$emit('deploy', version.id)"
-          >
-            Deploy
-          </AtomButton>
-        </td>
-      </tr>
+
+      <template v-if="expanded.has(group.version)">
+        <tr v-for="version in group.items" :key="version.id">
+          <td>{{ version.platform }}</td>
+          <td class="text-xs text-[var(--noro-muted)]">{{ version.kind }}</td>
+          <td><code class="text-xs text-[var(--noro-muted)]">{{ version.sha256.slice(0, 16) }}...</code></td>
+          <td>
+            <UBadge :color="version.is_current ? 'success' : 'neutral'" variant="subtle">
+              {{ version.is_current ? 'current' : 'stored' }}
+            </UBadge>
+          </td>
+          <td class="text-right">
+            <!-- У выкаченного деплоить нечего: кнопка остаётся только у остальных.
+                 Core и bootstrapper переезжают порознь — установщик можно держать
+                 на старой версии, пока он копит репутацию SmartScreen. -->
+            <AtomButton
+              v-if="!version.is_current"
+              variant="primary"
+              size="sm"
+              icon="i-lucide-send"
+              :loading="busy === `deploy-${version.id}`"
+              @click="$emit('deploy', version.id)"
+            >
+              Deploy
+            </AtomButton>
+          </td>
+        </tr>
+      </template>
     </tbody>
   </table>
 </template>
