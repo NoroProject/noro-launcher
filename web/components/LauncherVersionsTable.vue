@@ -51,8 +51,8 @@ const groups = computed(() => {
         </td>
         <td class="text-right">
           <!-- У выкаченного деплоить нечего: кнопка остаётся только у остальных.
-               Деплой поднимает core и bootstrapper пары разом, поэтому строки
-               одной платформы меняют статус вместе. -->
+               Core и bootstrapper переезжают порознь — установщик можно держать
+               на старой версии, пока он копит репутацию SmartScreen. -->
           <AtomButton
             v-if="!version.is_current"
             variant="primary"

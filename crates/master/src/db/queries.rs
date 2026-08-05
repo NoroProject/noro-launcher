@@ -1100,23 +1100,23 @@ pub async fn set_current_launcher_version(
             .fetch_optional(pool)
             .await?;
     if let Some(ref r) = row {
-        // Снять флаг с других версий той же платформы, поставить на эту.
-        sqlx::query("UPDATE launcher_versions SET is_current=FALSE WHERE platform=$1")
+        // Гасим только ту же разновидность на той же платформе. Core и
+        // установщик переезжают порознь намеренно: репутация SmartScreen
+        // привязана к хешу .exe, и подменять установщик ради обновления, которое
+        // целиком живёт в core, значит обнулять её на ровном месте.
+        //
+        // Гашение по одной платформе целиком (как было раньше) утаскивало за
+        // собой установщик и убирало кнопку скачивания с сайта — отсюда парный
+        // подъём, который и лишал выбора.
+        sqlx::query("UPDATE launcher_versions SET is_current=FALSE WHERE platform=$1 AND kind=$2")
             .bind(&r.platform)
+            .bind(&r.kind)
             .execute(pool)
             .await?;
-        // Вместе с выбранной строкой поднимается и её пара другого вида: core и
-        // установщик приходят из одной сборки, и «выкатить версию» означает обе.
-        // Иначе деплой core гасил бы установщик, и кнопка скачивания на сайте
-        // просто исчезала бы.
-        sqlx::query(
-            "UPDATE launcher_versions SET is_current=TRUE
-             WHERE platform=$1 AND version=$2",
-        )
-        .bind(&r.platform)
-        .bind(&r.version)
-        .execute(pool)
-        .await?;
+        sqlx::query("UPDATE launcher_versions SET is_current=TRUE WHERE id=$1")
+            .bind(r.id)
+            .execute(pool)
+            .await?;
     }
     Ok(row)
 }
