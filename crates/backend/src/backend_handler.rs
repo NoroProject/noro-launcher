@@ -321,6 +321,15 @@ impl BackendState {
     }
 
     /// Вычислить и отправить опциональные моды сервера (с учётом прав).
+    /// Сообщить фронту, что сейчас можно сделать со сборкой.
+    fn send_build_state(&self, server_id: uuid::Uuid, manifest: &schema::BuildManifest) {
+        let dir = self.ctx.dirs.instance(&server_id);
+        self.ctx.send(bridge::MessageToFrontend::BuildStateChanged {
+            server_id,
+            state: crate::sync::build_state(&dir, manifest),
+        });
+    }
+
     fn send_optional_mods(&self, server_id: Uuid, manifest: &schema::BuildManifest) {
         use crate::directories::safe_join;
         let enabled = self.ctx.optional.get().for_server(&server_id);
@@ -408,6 +417,7 @@ impl BackendState {
                 self.send_server_recommendation(server_id, &manifest);
                 // Всегда отдаём опц. моды во frontend (для карточки сервера).
                 self.send_optional_mods(server_id, &manifest);
+                self.send_build_state(server_id, &manifest);
                 if self.pending_launch.contains_key(&server_id) {
                     self.begin_launch(server_id, manifest);
                 }

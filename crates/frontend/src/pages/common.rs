@@ -37,7 +37,7 @@ pub fn panel() -> gpui::Div {
 pub fn page_header(icon: &'static str, title: impl Into<gpui::SharedString>) -> AnyElement {
     div()
         .h(px(72.))
-        .px(px(32.))
+        .px(px(24.))
         .flex()
         .items_center()
         .gap(px(12.))

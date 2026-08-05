@@ -1,4 +1,5 @@
 use super::common::Cx;
+use bridge::BuildState;
 use crate::components::cta_button;
 use crate::icons::ic;
 use crate::state::{LauncherUI, SyncUiState};
@@ -36,7 +37,13 @@ pub fn bottom_bar(
                 .items_center()
                 .gap(px(16.))
                 .child(console_button(ui.console_window.is_some(), cx))
-                .child(play_button(server.id, sync, locked, cx)),
+                .child(play_button(
+                    server.id,
+                    sync,
+                    locked,
+                    ui.build_state.get(&server.id).copied().unwrap_or_default(),
+                    cx,
+                )),
         )
         .into_any_element()
 }
@@ -115,7 +122,13 @@ fn version_block(server: &ServerEntry) -> AnyElement {
         .into_any_element()
 }
 
-fn play_button(server_id: Uuid, sync: &SyncUiState, locked: bool, cx: &mut Cx) -> AnyElement {
+fn play_button(
+    server_id: Uuid,
+    sync: &SyncUiState,
+    locked: bool,
+    build: BuildState,
+    cx: &mut Cx,
+) -> AnyElement {
     if locked {
         return disabled(t("game-locked"));
     }
@@ -125,10 +138,17 @@ fn play_button(server_id: Uuid, sync: &SyncUiState, locked: bool, cx: &mut Cx) -
     if sync.running {
         return stop_button(server_id, cx);
     }
+    // Действие одно и то же — синхронизация с последующим запуском, но называть
+    // его «играть», когда на диске пусто или лежит прошлая версия, — врать.
+    let (icon, label) = match build {
+        BuildState::Missing => ("download", t("game-install")),
+        BuildState::Outdated => ("refresh", t("game-update")),
+        BuildState::Ready => ("play", t("game-start")),
+    };
     cta_button(
         "start-game",
-        Some("play"),
-        t("game-start"),
+        Some(icon),
+        label,
         cx.listener(move |this, _e: &ClickEvent, _w, cx| {
             this.launch(server_id);
             cx.notify();

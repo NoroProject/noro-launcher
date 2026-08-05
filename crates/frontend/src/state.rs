@@ -133,6 +133,8 @@ pub struct LauncherUI {
     pub servers: Vec<ServerEntry>,
     pub news: Vec<NewsItem>,
     pub sync: HashMap<Uuid, SyncUiState>,
+    /// Что делать со сборкой: ставить, обновлять или запускать.
+    pub build_state: HashMap<Uuid, bridge::BuildState>,
     pub logs: HashMap<Uuid, Vec<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
     pub background_images: HashMap<Uuid, Arc<Image>>,
@@ -213,6 +215,7 @@ impl LauncherUI {
             servers: Vec::new(),
             news: Vec::new(),
             sync: HashMap::new(),
+            build_state: HashMap::new(),
             logs: HashMap::new(),
             optional_mods: HashMap::new(),
             background_images: HashMap::new(),
@@ -622,6 +625,9 @@ impl LauncherUI {
                         }
                     });
                 }
+            }
+            MessageToFrontend::BuildStateChanged { server_id, state } => {
+                self.build_state.insert(server_id, state);
             }
             MessageToFrontend::LauncherUpdateAvailable { version } => {
                 self.update_available = Some(version);

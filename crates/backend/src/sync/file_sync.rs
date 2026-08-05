@@ -130,8 +130,27 @@ pub async fn sync_server(
     progress(SyncStage::Cleaning, 0, 0, String::new());
     clean_extra(instance_dir, &effective, manifest).await?;
 
+    // Отметка о том, что именно установлено. Без неё «поставить» и «обновить»
+    // не отличить от «запустить»: набор файлов на диске сам по себе не говорит,
+    // какой версии сборки он соответствует.
+    let _ = tokio::fs::write(version_marker(instance_dir), &manifest.version).await;
+
     progress(SyncStage::Done, 1, 1, String::new());
     Ok(())
+}
+
+/// Файл с версией установленной сборки.
+pub fn version_marker(instance_dir: &Path) -> PathBuf {
+    instance_dir.join(".noro-build")
+}
+
+/// Что можно сделать со сборкой: поставить, обновить или запустить.
+pub fn build_state(instance_dir: &Path, manifest: &BuildManifest) -> bridge::BuildState {
+    match std::fs::read_to_string(version_marker(instance_dir)) {
+        Ok(installed) if installed.trim() == manifest.version => bridge::BuildState::Ready,
+        Ok(_) => bridge::BuildState::Outdated,
+        Err(_) => bridge::BuildState::Missing,
+    }
 }
 
 /// Сопоставление стадий и категорий артефактов.

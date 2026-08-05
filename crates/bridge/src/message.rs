@@ -157,6 +157,18 @@ pub enum LoginErrorKind {
     Network(String),
 }
 
+/// Что лаунчер может сделать со сборкой прямо сейчас.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BuildState {
+    /// Файлов нет — сборку нужно поставить.
+    #[default]
+    Missing,
+    /// Установлена другая версия — нужно обновить.
+    Outdated,
+    /// Всё на месте, можно играть.
+    Ready,
+}
+
 /// Backend → Frontend.
 #[derive(Debug)]
 pub enum MessageToFrontend {
@@ -173,6 +185,12 @@ pub enum MessageToFrontend {
     },
     NewsUpdated {
         items: Vec<NewsItem>,
+    },
+
+    /// Состояние локальной копии сборки — от него зависит подпись главной кнопки.
+    BuildStateChanged {
+        server_id: Uuid,
+        state: BuildState,
     },
 
     /// Текущая конфигурация лаунчера (для экрана настроек).

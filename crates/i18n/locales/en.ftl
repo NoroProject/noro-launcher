@@ -84,6 +84,8 @@ login-auto-login = Auto login
 ## Game bar
 game-build = BUILD
 game-start = START GAME
+game-install = INSTALL
+game-update = UPDATE
 game-stop = STOP
 game-preparing = PREPARING
 game-locked = LOCKED

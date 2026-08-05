@@ -487,6 +487,11 @@ pub fn spawn_sync_and_launch(
             return;
         }
         ctx.send(MessageToFrontend::SyncComplete { server_id });
+        // Файлы уже на месте — кнопка должна перестать звать ставить или обновлять.
+        ctx.send(MessageToFrontend::BuildStateChanged {
+            server_id,
+            state: crate::sync::build_state(&instance_dir, &manifest),
+        });
         modal.finish();
 
         // После синхронизации файлов, но до запуска: игра читает servers.dat

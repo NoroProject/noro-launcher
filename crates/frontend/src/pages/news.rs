@@ -16,7 +16,7 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             div()
                 .flex_1()
                 .min_h_0()
-                .px(px(32.))
+                .px(px(24.))
                 .py(px(24.))
                 .flex()
                 .flex_col()

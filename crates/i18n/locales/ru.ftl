@@ -86,6 +86,8 @@ login-auto-login = Входить автоматически
 ## Панель игры
 game-build = СБОРКА
 game-start = ЗАПУСТИТЬ
+game-install = УСТАНОВИТЬ
+game-update = ОБНОВИТЬ
 game-stop = ОСТАНОВИТЬ
 game-preparing = ПОДГОТОВКА
 game-locked = НЕТ ДОСТУПА
