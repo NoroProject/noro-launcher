@@ -106,6 +106,7 @@ fn system_router() -> Router<AppState> {
         .route("/api/admin/launcher/versions", get(launcher::list_versions))
         .route("/api/admin/launcher/github", get(launcher::github_latest))
         .route("/api/admin/launcher/build", post(launcher::build))
+        .route("/api/admin/launcher/builds", get(launcher::build_jobs))
         .route(
             "/api/admin/launcher/build/{job_id}/log",
             get(launcher::build_log),

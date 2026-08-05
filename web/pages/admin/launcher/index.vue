@@ -13,7 +13,6 @@ const { data: versions, refresh, pending, error } = await useAsyncData('admin-la
 const tag = ref('')
 const latest = ref<Record<string, unknown> | null>(null)
 const jobId = ref('')
-const jobLog = ref<Record<string, unknown> | null>(null)
 const busy = ref<string | null>(null)
 const showBuild = ref(false)
 const showLog = ref(false)
@@ -39,16 +38,6 @@ async function buildLauncher() {
     notify.ok()
   } catch (e) {
     notify.fail(e)
-  } finally {
-    busy.value = null
-  }
-}
-
-async function loadLog() {
-  if (!jobId.value) return
-  busy.value = 'log'
-  try {
-    jobLog.value = await auth.request<Record<string, unknown>>(`/api/admin/launcher/build/${jobId.value}/log`)
   } finally {
     busy.value = null
   }
@@ -114,12 +103,6 @@ async function deploy(versionId: string) {
       </div>
     </AtomModal>
 
-    <AtomModal v-model="showLog" title="BUILD LOG" subtitle="Inspect launcher builder output" wide>
-      <div class="flex gap-2">
-        <input v-model="jobId" class="noro-input" placeholder="job_id">
-        <AtomButton variant="secondary" :loading="busy === 'log'" icon="i-lucide-file-text" @click="loadLog" />
-      </div>
-      <pre v-if="jobLog" class="mt-3 max-h-80 overflow-auto rounded-lg bg-[var(--noro-input)] p-3 text-xs text-[var(--noro-text)]">{{ JSON.stringify(jobLog, null, 2) }}</pre>
-    </AtomModal>
+    <LauncherBuildLog v-model="showLog" :job-id="jobId" />
   </NoroShell>
 </template>
