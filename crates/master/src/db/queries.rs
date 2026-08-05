@@ -375,6 +375,42 @@ pub struct NewSession {
     pub expires_at: DateTime<Utc>,
 }
 
+/// Выдать лаунчеру одноразовый код, по которому он заберёт токены сессии.
+///
+/// Живёт минуты: код едет в URL loopback-редиректа, и чем короче окно, тем
+/// меньше стоит его перехват.
+pub async fn create_launcher_code(
+    pool: &PgPool,
+    user_id: Uuid,
+    session: &NewSession,
+) -> Result<Uuid> {
+    let code = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO launcher_auth_codes (code, user_id, access_token, refresh_token, expires_at)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(code)
+    .bind(user_id)
+    .bind(session.access_token)
+    .bind(session.refresh_token)
+    .bind(Utc::now() + Duration::minutes(5))
+    .execute(pool)
+    .await?;
+    Ok(code)
+}
+
+/// Забрать токены по коду. Код одноразовый: DELETE ... RETURNING не даст двум
+/// параллельным запросам получить одну и ту же сессию.
+pub async fn take_launcher_code(pool: &PgPool, code: Uuid) -> Result<Option<(Uuid, Uuid, Uuid)>> {
+    Ok(sqlx::query_as(
+        "DELETE FROM launcher_auth_codes WHERE code = $1 AND expires_at > NOW()
+         RETURNING user_id, access_token, refresh_token",
+    )
+    .bind(code)
+    .fetch_optional(pool)
+    .await?)
+}
+
 pub async fn create_session(
     pool: &PgPool,
     user_id: Uuid,

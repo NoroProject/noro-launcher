@@ -3,10 +3,11 @@
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Query, State};
-use axum::response::{Html, IntoResponse, Redirect};
+use axum::response::{IntoResponse, Redirect};
 use axum::Json;
 use chrono::Duration;
 use serde::Deserialize;
+use uuid::Uuid;
 use serde_json::Value;
 
 const DISCORD_AUTHORIZE: &str = "https://discord.com/api/oauth2/authorize";
@@ -133,27 +134,36 @@ pub async fn launcher_callback(
         Duration::days(30),
     )
     .await?;
-    let profile = crate::db::load_profile(&state.db, user_id).await?;
-
-    // POST на локальный сервер лаунчера.
-    let payload = serde_json::json!({
-        "access_token": session.access_token,
-        "refresh_token": session.refresh_token,
-        "user": profile,
-    });
-    let url = format!("http://127.0.0.1:{port}/callback");
-    let _ = state.http().post(&url).json(&payload).send().await;
-
-    Ok(Html(SUCCESS_HTML))
+    // Редирект отправляет на loopback БРАУЗЕР игрока. Раньше мастер сам делал
+    // POST на 127.0.0.1 — свой собственный, а не игрока, поэтому с боевого
+    // сервера токены не доходили никуда.
+    let code = crate::db::create_launcher_code(&state.db, user_id, &session).await?;
+    Ok(Redirect::to(&format!(
+        "http://127.0.0.1:{port}/callback?code={code}"
+    )))
 }
 
-const SUCCESS_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>Sign in complete</title><style>
-body{font-family:system-ui,sans-serif;background:#1a1b26;color:#c0caf5;display:flex;
-align-items:center;justify-content:center;height:100vh;margin:0}
-.card{text-align:center}.card h1{color:#7aa2f7}</style></head>
-<body><div class="card"><h1>Sign in complete</h1>
-<p>You can return to the launcher and close this window.</p></div></body></html>"#;
+#[derive(Deserialize)]
+pub struct ExchangeReq {
+    pub code: Uuid,
+}
+
+/// Обменять одноразовый код на токены сессии. Ходит сюда сам лаунчер по HTTPS.
+pub async fn launcher_exchange(
+    State(state): State<AppState>,
+    Json(req): Json<ExchangeReq>,
+) -> AppResult<Json<serde_json::Value>> {
+    let (user_id, access_token, refresh_token) =
+        crate::db::take_launcher_code(&state.db, req.code)
+            .await?
+            .ok_or_else(|| AppError::BadRequest("код входа недействителен или истёк".into()))?;
+    let profile = crate::db::load_profile(&state.db, user_id).await?;
+    Ok(Json(serde_json::json!({
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "user": profile,
+    })))
+}
 
 async fn consume_state(state: &AppState, csrf: &str) -> AppResult<StateRow> {
     let row = sqlx::query_as::<_, StateRow>(

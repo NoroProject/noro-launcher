@@ -1,5 +1,9 @@
 //! Discord OAuth в лаунчере: поднимаем локальный HTTP-сервер на случайном порту,
-//! открываем браузер на мастере, ждём POST с токенами на localhost.
+//! открываем браузер на мастере, ловим редирект с одноразовым кодом и меняем его
+//! на токены запросом к мастеру.
+//!
+//! Раньше токены присылал сам мастер — POST на `127.0.0.1:{port}`, то есть на
+//! свой же localhost: с боевого сервера они не доходили никуда.
 
 use super::token_store::StoredAuth;
 use anyhow::{anyhow, bail, Context, Result};
@@ -39,8 +43,8 @@ pub async fn login(master_url: &str, cancelled: impl Fn() -> bool) -> Result<Log
         let accept = tokio::time::timeout(Duration::from_millis(500), listener.accept()).await;
         match accept {
             Ok(Ok((stream, _addr))) => {
-                if let Some(result) = handle_connection(stream).await? {
-                    return Ok(result);
+                if let Some(code) = handle_connection(stream).await? {
+                    return exchange(master_url, &code).await;
                 }
             }
             Ok(Err(e)) => return Err(anyhow!("accept failed: {e}")),
@@ -54,89 +58,79 @@ pub async fn login(master_url: &str, cancelled: impl Fn() -> bool) -> Result<Log
     }
 }
 
-#[derive(serde::Deserialize)]
-struct CallbackPayload {
-    access_token: String,
-    refresh_token: String,
-    user: UserProfile,
-}
-
-/// Обработать одно входящее соединение. Возвращает Some при успешном /callback.
-async fn handle_connection(mut stream: tokio::net::TcpStream) -> Result<Option<LoginResult>> {
+/// Обработать одно входящее соединение. Возвращает Some с одноразовым кодом.
+async fn handle_connection(mut stream: tokio::net::TcpStream) -> Result<Option<String>> {
     let mut buf = Vec::new();
-    let mut tmp = [0u8; 4096];
+    let mut tmp = [0u8; 2048];
 
-    // Читаем до конца заголовков, затем тело по Content-Length.
-    let mut header_end = None;
+    // Нужна только строка запроса: код приезжает в query, тела у GET нет.
     loop {
         let n = stream.read(&mut tmp).await?;
         if n == 0 {
             break;
         }
         buf.extend_from_slice(&tmp[..n]);
-        if let Some(pos) = find_subsequence(&buf, b"\r\n\r\n") {
-            header_end = Some(pos + 4);
-            break;
-        }
-        if buf.len() > 1024 * 1024 {
+        if find_subsequence(&buf, b"\r\n\r\n").is_some() || buf.len() > 8192 {
             break;
         }
     }
 
-    let Some(header_end) = header_end else {
-        respond(&mut stream, 400, "Bad Request").await?;
+    let head = String::from_utf8_lossy(&buf);
+    let request_line = head.lines().next().unwrap_or("");
+    let Some(code) = request_line
+        .strip_prefix("GET /callback?")
+        .and_then(|rest| rest.split_whitespace().next())
+        .and_then(|query| query.split('&').find_map(|kv| kv.strip_prefix("code=")))
+    else {
+        respond(&mut stream, 404, "text/plain", "Not Found").await?;
         return Ok(None);
     };
 
-    let headers = String::from_utf8_lossy(&buf[..header_end]);
-    let first_line = headers.lines().next().unwrap_or("");
-    // Только POST /callback нас интересует.
-    if !first_line.starts_with("POST /callback") {
-        respond(&mut stream, 404, "Not Found").await?;
-        return Ok(None);
-    }
-
-    let content_length: usize = headers
-        .lines()
-        .find_map(|l| {
-            let l = l.to_ascii_lowercase();
-            l.strip_prefix("content-length:")
-                .map(|v| v.trim().parse().unwrap_or(0))
-        })
-        .unwrap_or(0);
-
-    // Дочитать тело.
-    while buf.len() < header_end + content_length {
-        let n = stream.read(&mut tmp).await?;
-        if n == 0 {
-            break;
-        }
-        buf.extend_from_slice(&tmp[..n]);
-    }
-    let body = &buf[header_end..(header_end + content_length).min(buf.len())];
-
-    match serde_json::from_slice::<CallbackPayload>(body) {
-        Ok(payload) => {
-            respond(&mut stream, 200, "OK").await?;
-            Ok(Some(LoginResult {
-                auth: StoredAuth {
-                    access_token: payload.access_token,
-                    refresh_token: payload.refresh_token,
-                },
-                user: payload.user,
-            }))
-        }
-        Err(e) => {
-            respond(&mut stream, 400, "Bad JSON").await?;
-            Err(anyhow!("failed to parse callback: {e}"))
-        }
-    }
+    let code = code.to_string();
+    respond(&mut stream, 200, "text/html; charset=utf-8", SUCCESS_HTML).await?;
+    Ok(Some(code))
 }
 
-async fn respond(stream: &mut tokio::net::TcpStream, code: u16, msg: &str) -> Result<()> {
-    let body = format!("{code} {msg}");
+/// Обменять код на токены. Идёт к мастеру напрямую, поэтому по HTTPS, и токены
+/// не оказываются ни в адресной строке, ни в истории браузера.
+async fn exchange(master_url: &str, code: &str) -> Result<LoginResult> {
+    #[derive(serde::Deserialize)]
+    struct ExchangeResp {
+        access_token: String,
+        refresh_token: String,
+        user: UserProfile,
+    }
+
+    let url = format!("{}/auth/launcher/exchange", master_url.trim_end_matches('/'));
+    let resp: ExchangeResp = reqwest::Client::new()
+        .post(&url)
+        .json(&serde_json::json!({ "code": code }))
+        .send()
+        .await
+        .context("запрос обмена кода входа")?
+        .error_for_status()
+        .context("мастер отверг код входа")?
+        .json()
+        .await
+        .context("разбор ответа на обмен кода")?;
+
+    Ok(LoginResult {
+        auth: StoredAuth {
+            access_token: resp.access_token,
+            refresh_token: resp.refresh_token,
+        },
+        user: resp.user,
+    })
+}
+
+async fn respond(
+    stream: &mut tokio::net::TcpStream,
+    code: u16,
+    content_type: &str,
+    body: &str,
+) -> Result<()> {
     let resp = format!(
-        "HTTP/1.1 {code} {msg}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        "HTTP/1.1 {code} OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         body.len(),
         body
     );
@@ -148,3 +142,9 @@ async fn respond(stream: &mut tokio::net::TcpStream, code: u16, msg: &str) -> Re
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
+
+const SUCCESS_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Sign in complete</title><style>body{font-family:system-ui,sans-serif;background:#0b1626;
+color:#dbe6ff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+h1{color:#e85aa5}</style></head><body><div style="text-align:center"><h1>Sign in complete</h1>
+<p>You can return to the launcher and close this window.</p></div></body></html>"#;

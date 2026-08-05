@@ -112,6 +112,10 @@ fn router(state: AppState) -> Router {
             "/auth/discord/launcher/callback",
             get(auth::discord::launcher_callback),
         )
+        .route(
+            "/auth/launcher/exchange",
+            post(auth::discord::launcher_exchange),
+        )
         .route("/auth/refresh", post(auth::discord::refresh))
         .route("/auth/logout", get(auth::discord::logout))
         .route("/auth/me", get(cabinet::me));
