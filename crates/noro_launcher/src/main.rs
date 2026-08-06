@@ -72,8 +72,15 @@ fn main() -> ExitCode {
             if res.is_err() {
                 return;
             }
-            // Не ждём выхода core: bootstrapper не переживёт `cx.quit()`, и его
-            // код возврата всё равно уже некому прочитать.
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::CommandExt;
+                let err = std::process::Command::new(&launch_path)
+                    .args(std::env::args_os().skip(1))
+                    .exec();
+                eprintln!("не удалось запустить {}: {err}", launch_path.display());
+            }
+            #[cfg(not(unix))]
             if let Err(e) = std::process::Command::new(&launch_path)
                 .args(std::env::args_os().skip(1))
                 .spawn()
@@ -132,20 +139,31 @@ fn core_binary_name() -> &'static str {
 }
 
 fn run_core(path: &std::path::Path) -> ExitCode {
-    let status = std::process::Command::new(path)
-        .args(std::env::args_os().skip(1))
-        .status();
-    match status {
-        Ok(s) => {
-            if s.success() {
-                ExitCode::SUCCESS
-            } else {
+    let mut cmd = std::process::Command::new(path);
+    cmd.args(std::env::args_os().skip(1));
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        let err = cmd.exec();
+        eprintln!("не удалось запустить {}: {err}", path.display());
+        ExitCode::FAILURE
+    }
+
+    #[cfg(not(unix))]
+    {
+        match cmd.status() {
+            Ok(s) => {
+                if s.success() {
+                    ExitCode::SUCCESS
+                } else {
+                    ExitCode::FAILURE
+                }
+            }
+            Err(e) => {
+                eprintln!("не удалось запустить {}: {e}", path.display());
                 ExitCode::FAILURE
             }
-        }
-        Err(e) => {
-            eprintln!("не удалось запустить {}: {e}", path.display());
-            ExitCode::FAILURE
         }
     }
 }
