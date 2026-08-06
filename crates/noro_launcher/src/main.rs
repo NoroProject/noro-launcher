@@ -53,21 +53,12 @@ fn main() -> ExitCode {
     let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
     let work_dir = app_dir.clone();
     let work_core = core_path.clone();
-    // На macOS `cx.quit()` вызывает `[NSApp terminate:]` и убивает процесс,
-    // не возвращая управление из `run_with`. Поэтому запуск core делается
-    // через `before_quit`, который гарантированно вызовется до `cx.quit()`.
-    let success = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let success_w = success.clone();
     let launch_path = core_path.clone();
-    let before_quit: Option<Box<dyn FnOnce() + Send + 'static>> =
-        Some(Box::new(move || {
-            if success.load(std::sync::atomic::Ordering::Acquire) {
-                let _ = std::process::Command::new(&launch_path)
-                    .args(std::env::args_os().skip(1))
-                    .spawn();
-            }
-        }));
 
+    // Запуск core висит на колбэке `run_with`, а не на коде после него: оттуда
+    // до нас доходит только Linux. На macOS и Windows GPUI убивает процесс
+    // внутри `run_with`, и раньше обновление на этом и заканчивалось — окно
+    // закрывалось, а лаунчер не стартовал.
     let outcome = splash::run_with(
         rx,
         move || {
@@ -75,19 +66,26 @@ fn main() -> ExitCode {
                 .enable_all()
                 .build()
                 .expect("tokio runtime");
-            let res = rt.block_on(download_core(&work_dir, &work_core, &reporter));
-            if res.is_ok() {
-                success_w.store(true, std::sync::atomic::Ordering::Release);
-            }
-            res
+            rt.block_on(download_core(&work_dir, &work_core, &reporter))
         },
-        before_quit,
+        Some(Box::new(move |res: &anyhow::Result<()>| {
+            if res.is_err() {
+                return;
+            }
+            // Не ждём выхода core: bootstrapper не переживёт `cx.quit()`, и его
+            // код возврата всё равно уже некому прочитать.
+            if let Err(e) = std::process::Command::new(&launch_path)
+                .args(std::env::args_os().skip(1))
+                .spawn()
+            {
+                eprintln!("не удалось запустить {}: {e}", launch_path.display());
+            }
+        })),
     );
 
-    // Если `run_with` всё-таки вернёт управление (Linux/Windows) — запускаем
-    // core отсюда. На macOS сюда не доходим.
+    // Сюда приходит только Linux, и core здесь уже запущен колбэком.
     match outcome {
-        Some(Ok(())) => run_core(&core_path),
+        Some(Ok(())) => ExitCode::SUCCESS,
         Some(Err(e)) => {
             eprintln!("ошибка скачивания: {e:#}");
             ExitCode::FAILURE

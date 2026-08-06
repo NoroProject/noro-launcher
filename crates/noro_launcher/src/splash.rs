@@ -141,13 +141,15 @@ impl gpui::AssetSource for SplashAssetSource {
 /// Показать окно и держать его, пока `work` не закончит. Возвращает результат
 /// работы: сама закачка идёт в фоне, GPUI требует главный поток себе.
 ///
-/// `before_quit` вызывается ПЕРЕД `cx.quit()` — это единственное безопасное
-/// место для запуска core, потому что на macOS `cx.quit()` вызывает
-/// `[NSApp terminate:]` и убивает процесс, не возвращая управление.
+/// `on_done` получает результат сразу, как только `work` его вернул, — до
+/// `cx.quit()`. Это единственная точка, которая срабатывает на всех платформах:
+/// `run` не возвращает управление ни на macOS (`quit` упирается в
+/// `[NSApp terminate:]`), ни на Windows (GPUI зовёт `ExitProcess`). Всё, что
+/// должно случиться после закачки, вешается сюда, а не на код после `run_with`.
 pub fn run_with<T, F>(
     rx: UnboundedReceiver<Progress>,
     work: F,
-    before_quit: Option<Box<dyn FnOnce() + Send + 'static>>,
+    on_done: Option<Box<dyn FnOnce(&T) + Send + 'static>>,
 ) -> Option<T>
 where
     T: Send + 'static,
@@ -182,13 +184,13 @@ where
             // Работа идёт в отдельном потоке: главный занят отрисовкой.
             let quit = cx.background_executor().spawn(async move {
                 let value = work();
+                if let Some(cb) = on_done {
+                    cb(&value);
+                }
                 slot.lock().replace(value);
             });
             cx.spawn(async move |cx| {
                 quit.await;
-                if let Some(cb) = before_quit {
-                    cb();
-                }
                 let _ = cx.update(|cx| cx.quit());
             })
             .detach();
