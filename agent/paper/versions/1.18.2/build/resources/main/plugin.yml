@@ -1,9 +1,0 @@
-name: NoroAgent
-version: '0.1.0'
-main: dev.noro.agent.paper.NoroAgentPlugin
-api-version: '1.18'
-authors: [noro]
-description: Projects master roles, access and online count onto this server.
-# Мягкая зависимость: доступ и heartbeat работают и без LuckPerms, без него
-# отключается только раскладка ролей по группам.
-softdepend: [LuckPerms]
