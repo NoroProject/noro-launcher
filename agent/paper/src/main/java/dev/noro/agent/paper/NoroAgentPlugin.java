@@ -4,6 +4,8 @@ import dev.noro.agent.core.AgentConfig;
 import dev.noro.agent.core.HeartbeatTask;
 import dev.noro.agent.core.MasterClient;
 import dev.noro.agent.core.LuckPermsSupport;
+import dev.noro.agent.core.NoroAgentApi;
+import dev.noro.agent.core.ProfileCache;
 import dev.noro.agent.core.RoleApplier;
 import java.util.List;
 import org.bukkit.permissions.Permission;
@@ -31,12 +33,16 @@ public final class NoroAgentPlugin extends JavaPlugin {
         MasterClient client = new MasterClient(config);
         RoleApplier roleSync = LuckPermsSupport.tryCreate(getSLF4JLogger());
         PaperPermissions permissions = new PaperPermissions(this);
+        // Общий с NoroAgentApi: чужие плагины читают профиль оттуда же.
+        ProfileCache profiles = NoroAgentApi.cache();
 
         getServer()
                 .getPluginManager()
                 .registerEvents(
-                        new LoginListener(config, client, roleSync, permissions, getSLF4JLogger()), this);
+                        new LoginListener(config, client, roleSync, permissions, profiles, getSLF4JLogger()),
+                        this);
         getServer().getPluginManager().registerEvents(permissions, this);
+        PlaceholderSupport.register(this, profiles, getSLF4JLogger());
 
         heartbeat = new HeartbeatTask(client, new PaperServerStatus(getServer()), config, getSLF4JLogger());
         heartbeat.start();

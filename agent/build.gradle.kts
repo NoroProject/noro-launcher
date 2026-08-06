@@ -14,6 +14,9 @@ allprojects {
         maven("https://repo.essential.gg/repository/maven-public") { name = "Essential" }
         maven("https://maven.architectury.dev/") { name = "Architectury" }
         maven("https://libraries.minecraft.net/") { name = "Mojang" }
+        maven("https://repo.extendedclip.com/releases/") { name = "PlaceholderAPI" }
+        // Text Placeholder API: то же, что PlaceholderAPI, но для Fabric.
+        maven("https://maven.nucleoid.xyz/") { name = "Nucleoid" }
     }
 }
 

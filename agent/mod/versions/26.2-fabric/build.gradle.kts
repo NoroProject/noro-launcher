@@ -11,6 +11,8 @@ dependencies {
     implementation("net.fabricmc:fabric-loader:0.19.3")
     implementation("net.fabricmc.fabric-api:fabric-api:0.156.0+26.2")
 
+    compileOnly("eu.pb4:placeholder-api:3.1.0-beta.1+26.2")
+
     compileOnly("net.luckperms:api:5.5")
     compileOnly(project(":core"))
 }

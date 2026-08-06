@@ -1,0 +1,91 @@
+package dev.noro.agent.core;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+class PlaceholderValuesTest {
+
+    private static final UUID UUID_ONE = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    /** Старшая роль без иконки: в игре видна иконка следующей за ней. */
+    private static final RoleInfo OWNER = new RoleInfo("owner", "Owner", "owner", "#ff0000", null, 100);
+
+    private static final RoleInfo ADMIN = new RoleInfo("admin", "Админ", "admin", "#ff8c82", "★", 50);
+
+    private static final RoleInfo VIP = new RoleInfo("vip", "VIP", "vip", "#00ff00", "✦", 10);
+
+    private static PlayerProfile profile() {
+        return new PlayerProfile(
+                UUID_ONE,
+                "Steve",
+                false,
+                true,
+                List.of(VIP, OWNER, ADMIN),
+                "https://cdn/skin.png",
+                null,
+                List.of("owner", "admin", "vip"),
+                List.of("noro.fly", "essentials.*"));
+    }
+
+    @Test
+    void takesTopRoleBySortOrder() {
+        assertEquals("Owner", PlaceholderValues.resolve(profile(), "role"));
+        assertEquals("owner", PlaceholderValues.resolve(profile(), "role_name"));
+        assertEquals("100", PlaceholderValues.resolve(profile(), "role_sort"));
+        assertEquals("3", PlaceholderValues.resolve(profile(), "role_count"));
+    }
+
+    @Test
+    void prefixSkipsRolesWithoutIcon() {
+        // owner старше, но иконки у него нет — префикс даёт admin.
+        assertEquals("§x§f§f§8§c§8§2★§r", PlaceholderValues.resolve(profile(), "prefix"));
+        assertEquals("★", PlaceholderValues.resolve(profile(), "prefix_plain"));
+    }
+
+    @Test
+    void iconsGoInOrderOfImportance() {
+        assertEquals("§x§f§f§8§c§8§2★§r§x§0§0§f§f§0§0✦§r", PlaceholderValues.resolve(profile(), "roles_icons"));
+        assertEquals("Owner, Админ, VIP", PlaceholderValues.resolve(profile(), "roles"));
+    }
+
+    @Test
+    void groupsKeepMasterOrder() {
+        assertEquals("owner", PlaceholderValues.resolve(profile(), "group"));
+        assertEquals("owner, admin, vip", PlaceholderValues.resolve(profile(), "groups"));
+        assertEquals("3", PlaceholderValues.resolve(profile(), "group_count"));
+    }
+
+    @Test
+    void answersMembershipAndPermissions() {
+        assertEquals("true", PlaceholderValues.resolve(profile(), "has_role_admin"));
+        assertEquals("false", PlaceholderValues.resolve(profile(), "has_role_mod"));
+        assertEquals("true", PlaceholderValues.resolve(profile(), "has_group_vip"));
+        assertEquals("true", PlaceholderValues.resolve(profile(), "permission_noro.fly"));
+        // Wildcard раскрывается так же, как при выдаче прав.
+        assertEquals("true", PlaceholderValues.resolve(profile(), "permission_essentials.home"));
+        assertEquals("false", PlaceholderValues.resolve(profile(), "permission_noro.ban"));
+    }
+
+    @Test
+    void unknownKeyStaysUnanswered() {
+        assertNull(PlaceholderValues.resolve(profile(), "nope"));
+        // Голый префикс без хвоста — тоже не наш ключ.
+        assertNull(PlaceholderValues.resolve(profile(), "has_role_"));
+        assertNull(PlaceholderValues.resolve(null, "role"));
+    }
+
+    @Test
+    void missingDataBecomesEmptyString() {
+        PlayerProfile bare = new PlayerProfile(
+                UUID_ONE, "Steve", false, true, List.of(), null, null, List.of(), List.of());
+        assertEquals("", PlaceholderValues.resolve(bare, "prefix"));
+        assertEquals("", PlaceholderValues.resolve(bare, "role"));
+        assertEquals("", PlaceholderValues.resolve(bare, "cape_url"));
+        assertEquals("", PlaceholderValues.resolve(bare, "group"));
+        assertEquals("0", PlaceholderValues.resolve(bare, "permission_count"));
+    }
+}

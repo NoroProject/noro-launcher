@@ -4,6 +4,8 @@ main: dev.noro.agent.paper.NoroAgentPlugin
 api-version: '${apiVersion}'
 authors: [noro]
 description: Projects master roles, access and online count onto this server.
-# Мягкая зависимость: доступ и heartbeat работают и без LuckPerms, без него
-# отключается только раскладка ролей по группам.
-softdepend: [LuckPerms]
+# Мягкие зависимости: доступ и heartbeat работают и без них. Без LuckPerms
+# отключается раскладка ролей по группам, без PlaceholderAPI — `%noro_…%`.
+# Обе должны стартовать раньше агента: LuckPerms — чтобы нашёлся его API,
+# PlaceholderAPI — чтобы было где зарегистрировать расширение.
+softdepend: [LuckPerms, PlaceholderAPI]

@@ -43,6 +43,14 @@ subprojects {
         options.encoding = "UTF-8"
     }
 
+    // PlaceholderAPI одинаков для всех версий игры и собран под Java 8, поэтому
+    // живёт здесь, а не в двадцати шести `versions/*/build.gradle.kts`. Версия
+    // намеренно не самая свежая: расширение пользуется только той частью API,
+    // которая не менялась, а рантайм на серверах бывает старым.
+    dependencies {
+        "compileOnly"("me.clip:placeholderapi:2.11.6")
+    }
+
     tasks.named<Jar>("jar") {
         from(coreClasses)
     }

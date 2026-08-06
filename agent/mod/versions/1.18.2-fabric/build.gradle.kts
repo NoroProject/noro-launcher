@@ -9,6 +9,8 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:0.19.3")
     modImplementation("net.fabricmc.fabric-api:fabric-api:0.77.0+1.18.2")
 
+    modCompileOnly("eu.pb4:placeholder-api:1.1.3+1.17.1")
+
     compileOnly("net.luckperms:api:5.5")
     compileOnly(project(":core"))
 }

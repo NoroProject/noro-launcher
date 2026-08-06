@@ -5,6 +5,8 @@ import dev.noro.agent.core.AgentConfig;
 import dev.noro.agent.core.HeartbeatTask;
 import dev.noro.agent.core.MasterClient;
 import dev.noro.agent.core.LuckPermsSupport;
+import dev.noro.agent.core.NoroAgentApi;
+import dev.noro.agent.core.ProfileCache;
 import dev.noro.agent.core.RoleApplier;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -32,6 +34,9 @@ public final class AgentRuntime {
     private RoleApplier roleSync;
     private HeartbeatTask heartbeat;
     private ModPermissions permissions;
+
+    /** Общий с {@link NoroAgentApi}: чужие моды читают профиль оттуда же. */
+    private final ProfileCache profiles = NoroAgentApi.cache();
 
     /**
      * Сервер запоминаем со старта, а не спрашиваем у игрока: {@code ServerPlayer.getServer()}
@@ -66,6 +71,9 @@ public final class AgentRuntime {
         roleSync = LuckPermsSupport.tryCreate(LOG);
         heartbeat = new HeartbeatTask(client, new ModServerStatus(server), config, LOG);
         heartbeat.start();
+        // Тоже после старта и по той же причине: Text Placeholder API — мод,
+        // и до этого момента его может не быть в пути классов.
+        ModPlaceholders.register(profiles);
         // Каталог узлов уходит мимо главного потока: старт сервера не должен
         // ждать сеть ради подсказки в админке.
         CompletableFuture.runAsync(permissions::report);
@@ -83,9 +91,10 @@ public final class AgentRuntime {
         permissions.load(uuid);
     }
 
-    /** Права живут ровно столько, сколько игрок на сервере. */
+    /** Права и профиль живут ровно столько, сколько игрок на сервере. */
     public void onPlayerLeave(UUID uuid) {
         permissions.forget(uuid);
+        profiles.forget(uuid);
     }
 
     public void onServerStopping() {
@@ -132,6 +141,8 @@ public final class AgentRuntime {
             //#endif
             return;
         }
+        // Пустой профиль отсеивает сам кэш: мастер мог не ответить.
+        profiles.remember(uuid, decision.profile());
         if (roleSync != null && decision.profile() != null) {
             roleSync.apply(uuid, decision.profile());
         }

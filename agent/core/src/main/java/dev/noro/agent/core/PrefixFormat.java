@@ -30,8 +30,13 @@ public final class PrefixFormat {
         return color + icon + RESET;
     }
 
-    /** Цвет необязателен: без него иконка просто наследует цвет контекста. */
-    private static String color(String hex) {
+    /**
+     * Цвет необязателен: без него иконка просто наследует цвет контекста.
+     *
+     * @return {@code §x§…} либо пустая строка — её и надо подставлять как есть,
+     *         тогда отсутствие цвета ничего не ломает в собранной строке
+     */
+    public static String color(String hex) {
         if (hex == null || !HEX.matcher(hex).matches()) {
             return "";
         }

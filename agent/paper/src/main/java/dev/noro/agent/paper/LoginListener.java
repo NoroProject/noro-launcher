@@ -4,12 +4,14 @@ import dev.noro.agent.core.AccessGate;
 import dev.noro.agent.core.AgentConfig;
 import dev.noro.agent.core.MasterClient;
 import dev.noro.agent.core.PermissionSet;
+import dev.noro.agent.core.ProfileCache;
 import dev.noro.agent.core.RoleApplier;
 import net.kyori.adventure.text.Component;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.slf4j.Logger;
 
 /**
@@ -27,6 +29,7 @@ final class LoginListener implements Listener {
     private final MasterClient client;
     private final RoleApplier roleSync;
     private final PaperPermissions permissions;
+    private final ProfileCache profiles;
     private final Logger log;
 
     LoginListener(
@@ -34,11 +37,13 @@ final class LoginListener implements Listener {
             MasterClient client,
             RoleApplier roleSync,
             PaperPermissions permissions,
+            ProfileCache profiles,
             Logger log) {
         this.config = config;
         this.client = client;
         this.roleSync = roleSync;
         this.permissions = permissions;
+        this.profiles = profiles;
         this.log = log;
     }
 
@@ -60,8 +65,18 @@ final class LoginListener implements Listener {
         }
         // Раньше, чем игрок появится в мире: дальше сеть трогать уже нельзя.
         permissions.remember(event.getUniqueId(), PermissionSet.of(decision.profile().permissions()));
+        profiles.remember(event.getUniqueId(), decision.profile());
         if (roleSync != null) {
             roleSync.apply(event.getUniqueId(), decision.profile()).join();
         }
+    }
+
+    /**
+     * Профиль живёт ровно столько, сколько игрок на сервере: за него отвечает
+     * тот же слушатель, который его и завёл.
+     */
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        profiles.forget(event.getPlayer().getUniqueId());
     }
 }
