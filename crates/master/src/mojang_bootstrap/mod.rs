@@ -13,6 +13,7 @@ pub mod java;
 pub mod maven;
 pub mod minecraft;
 pub mod platform;
+mod processor_java;
 
 use crate::state::AppState;
 use anyhow::{Context, Result};

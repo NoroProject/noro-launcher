@@ -23,8 +23,13 @@ RUN cargo build --release -p master --bin noro-master
 FROM debian:bookworm-slim
 WORKDIR /app
 
+# JRE нужна не для игры, а для процессоров установщика Forge/NeoForge: их
+# запускает сам мастер при bootstrap сборки. Рантаймы Mojang для этого не
+# годятся — под ключом `linux` у них только x86_64, и на arm64-хосте такой
+# бинарник не стартует. Хватает 17: все процессоры собраны под Java 8.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/noro-master /usr/local/bin/noro-master

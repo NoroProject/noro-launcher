@@ -339,7 +339,7 @@ async fn run_processors(
     let Some(processors) = profile["processors"].as_array() else {
         return Ok(());
     };
-    let java = find_master_java(ctx).await?;
+    let java = super::processor_java::find(ctx).await?;
 
     for (idx, proc) in processors.iter().enumerate() {
         // Пропустить процессоры не для client-стороны.
@@ -446,59 +446,6 @@ fn read_jar_main_class(jar: &Path) -> Result<String> {
         }
     }
     bail!("Main-Class не найден в {}", jar.display())
-}
-
-/// Найти java-бинарник, скачанный на этапе vanilla bootstrap, для запуска процессоров.
-async fn find_master_java(ctx: &BootstrapCtx<'_>) -> Result<PathBuf> {
-    // Java на macOS/Linux не является одним самодостаточным бинарником: bin/java
-    // ищет соседние lib/*.dylib/*.so через rpath. Поэтому восстанавливаем весь
-    // runtime tree из FileStore во временную директорию.
-    let files = crate::db::base_build_files(&ctx.state.db, ctx.base_build_id).await?;
-    let java_files: Vec<_> = files.iter().filter(|f| f.kind == "java").collect();
-    if java_files.is_empty() {
-        return Ok(PathBuf::from("java"));
-    }
-
-    let runtime_dir = ctx
-        .state
-        .config
-        .data_dir
-        .join("tmp")
-        .join(format!("java-runtime-{}", ctx.base_build_id));
-    let _ = tokio::fs::remove_dir_all(&runtime_dir).await;
-    tokio::fs::create_dir_all(&runtime_dir).await?;
-
-    let mut java_bin = None;
-    for f in java_files {
-        let Some(rel) = f.path.strip_prefix("runtime/") else {
-            continue;
-        };
-        let dst = runtime_dir.join(rel);
-        if let Some(parent) = dst.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-        tokio::fs::copy(ctx.state.files.path_for(&f.sha1), &dst)
-            .await
-            .with_context(|| format!("stage java {}", f.path))?;
-
-        if f.path.ends_with("/bin/java") || f.path.ends_with("/bin/java.exe") {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mut perms = tokio::fs::metadata(&dst).await?.permissions();
-                perms.set_mode(0o755);
-                tokio::fs::set_permissions(&dst, perms).await?;
-            }
-            java_bin = Some(dst);
-        }
-    }
-
-    let java_bin = java_bin.ok_or_else(|| anyhow!("java runtime скачан, но bin/java не найден"))?;
-
-    // Гарантируем абсолютный путь, так как процессор запускается из другой директории
-    let java_bin = tokio::fs::canonicalize(&java_bin).await.unwrap_or(java_bin);
-
-    Ok(java_bin)
 }
 
 async fn register_processed_outputs(
