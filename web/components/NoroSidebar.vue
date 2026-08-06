@@ -66,7 +66,9 @@ function linkClass(path: string) {
 <template>
     <aside class="flex flex-col bg-[var(--noro-sidebar)] lg:sticky lg:top-0 lg:h-screen lg:w-72">
         <div class="flex h-20 shrink-0 items-center gap-3 bg-[var(--noro-bg-deep)] px-5">
-            <div class="grid size-10 place-items-center rounded-lg bg-[var(--noro-cream)] text-sm font-black text-[var(--noro-on-cream)]">N</div>
+            <div class="grid size-10 place-items-center rounded-lg">
+                <img src="/icon.png"/>
+            </div>
             <div>
                 <div class="noro-pixel text-lg uppercase text-[var(--noro-cream)]">NORO</div>
                 <div class="text-xs font-bold uppercase leading-tight tracking-wider text-[var(--noro-muted)]">{{ inAdminArea ? "admin control" : "player cabinet" }}</div>

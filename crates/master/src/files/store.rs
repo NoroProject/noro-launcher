@@ -58,7 +58,7 @@ impl FileStore {
                     .with_context(|| format!("создание директории {}", parent.display()))?;
             }
             // Пишем во временный файл, затем атомарно переименовываем.
-            let tmp = dst.with_extension("tmp");
+            let tmp = dst.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
             tokio::fs::write(&tmp, data)
                 .await
                 .with_context(|| format!("запись во временный файл {}", tmp.display()))?;

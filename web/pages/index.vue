@@ -20,7 +20,9 @@ const steps = [
   <div class="min-h-screen overflow-hidden">
     <header class="mx-auto flex max-w-7xl items-center justify-between px-5 py-6">
       <NuxtLink to="/" class="flex items-center gap-3">
-        <div class="grid size-12 place-items-center rounded-lg bg-[var(--noro-cream)] text-lg font-black text-[var(--noro-on-cream)]">N</div>
+        <div class="grid size-12 place-items-center rounded-lg">
+            <img src="/icon.png"/>
+        </div>
         <div>
           <div class="noro-pixel text-xl uppercase text-[var(--noro-cream)]">NORO</div>
           <div class="text-xs font-black uppercase tracking-wider text-[var(--noro-muted)]">launcher</div>

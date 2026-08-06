@@ -33,13 +33,14 @@ onMounted(async () => {
     <div class="noro-panel grid w-full max-w-5xl overflow-hidden p-0 md:grid-cols-[420px_1fr]">
       <section class="p-8 md:p-12">
         <div class="mb-12 flex items-center gap-3">
-          <div class="grid size-12 place-items-center rounded-lg bg-[var(--noro-cream)] text-lg font-black text-[var(--noro-on-cream)]">N</div>
+          <div class="grid size-12 place-items-center rounded-lg">
+              <img src="/icon.png"/>
+          </div>
           <div class="text-xs font-black uppercase tracking-wider text-[var(--noro-muted)]">Secure login</div>
         </div>
 
         <div>
           <h1 class="noro-pixel text-4xl leading-none text-[var(--noro-cream)]">NORO LAUNCHER</h1>
-          <p class="mt-4 text-sm font-semibold uppercase tracking-wider text-[var(--noro-muted)]">Discord OAuth through the master server</p>
         </div>
 
         <UAlert
@@ -55,10 +56,6 @@ onMounted(async () => {
           {{ busy || auth.loading.value ? 'WAITING...' : 'SIGN IN WITH DISCORD' }}
         </NuxtLink>
 
-        <div class="mt-8 grid gap-3 text-sm text-[var(--noro-text)]">
-          <label class="flex items-center gap-3 font-semibold"><span class="size-4 rounded-sm border-2 border-[var(--noro-cream)]" />Save session</label>
-          <label class="flex items-center gap-3 font-semibold"><span class="size-4 rounded-sm border-2 border-[var(--noro-cream)]" />Auto login</label>
-        </div>
       </section>
 
       <section class="relative hidden min-h-[520px] overflow-hidden bg-[var(--noro-bg-deep)] md:block">
