@@ -85,14 +85,14 @@ pub async fn bootstrap_fabric(ctx: &mut BootstrapCtx<'_>, loader: Modloader) -> 
     if let Some(jvm) = profile["arguments"]["jvm"].as_array() {
         for a in jvm {
             if let Some(s) = a.as_str() {
-                ctx.jvm_args.push(s.to_string());
+                ctx.jvm_args.push(schema::ManifestArg::new_string(s));
             }
         }
     }
     if let Some(game) = profile["arguments"]["game"].as_array() {
         for a in game {
             if let Some(s) = a.as_str() {
-                ctx.game_args.push(s.to_string());
+                ctx.game_args.push(schema::ManifestArg::new_string(s));
             }
         }
     }

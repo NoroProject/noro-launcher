@@ -140,7 +140,15 @@ impl gpui::AssetSource for SplashAssetSource {
 
 /// Показать окно и держать его, пока `work` не закончит. Возвращает результат
 /// работы: сама закачка идёт в фоне, GPUI требует главный поток себе.
-pub fn run_with<T, F>(rx: UnboundedReceiver<Progress>, work: F) -> Option<T>
+///
+/// `before_quit` вызывается ПЕРЕД `cx.quit()` — это единственное безопасное
+/// место для запуска core, потому что на macOS `cx.quit()` вызывает
+/// `[NSApp terminate:]` и убивает процесс, не возвращая управление.
+pub fn run_with<T, F>(
+    rx: UnboundedReceiver<Progress>,
+    work: F,
+    before_quit: Option<Box<dyn FnOnce() + Send + 'static>>,
+) -> Option<T>
 where
     T: Send + 'static,
     F: FnOnce() -> T + Send + 'static,
@@ -178,6 +186,9 @@ where
             });
             cx.spawn(async move |cx| {
                 quit.await;
+                if let Some(cb) = before_quit {
+                    cb();
+                }
                 let _ = cx.update(|cx| cx.quit());
             })
             .detach();

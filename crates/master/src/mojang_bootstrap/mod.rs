@@ -31,8 +31,8 @@ pub struct BootstrapCtx<'a> {
     pub platform: platform::Platform,
     /// Главный класс (определяется модлоадером).
     pub main_class: String,
-    pub jvm_args: Vec<String>,
-    pub game_args: Vec<String>,
+    pub jvm_args: Vec<schema::ManifestArg>,
+    pub game_args: Vec<schema::ManifestArg>,
     pub assets_index_name: String,
     /// Опциональная функция логирования прогресса (для админки/CLI).
     pub log: Box<dyn Fn(&str) + Send + Sync + 'a>,

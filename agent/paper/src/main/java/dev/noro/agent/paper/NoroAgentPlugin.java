@@ -51,16 +51,17 @@ public final class NoroAgentPlugin extends JavaPlugin {
         // после всех — только там каталог полон. Собираем его в главном потоке,
         // а отправляем мимо: сеть на тике держать нельзя. Раз за старт — дальше
         // набор не меняется.
-        getServer().getScheduler().runTaskLater(this, () -> {
-            List<String> nodes = getServer().getPluginManager().getPermissions().stream()
-                    .map(Permission::getName)
-                    .sorted()
-                    .toList();
-            getServer().getScheduler().runTaskAsynchronously(this, () -> reportNodes(client, nodes));
-        }, 1L);
+        // Отправку подключаем сразу: чужой плагин мог заявить свои узлы уже в
+        // своём onEnable, до нашего тика, и они ждут в каталоге.
+        NoroAgentApi.permissionNodes().attach(
+                nodes -> getServer().getScheduler().runTaskAsynchronously(this, () -> reportNodes(client, nodes)));
+        getServer().getScheduler().runTaskLater(this, () -> NoroAgentApi.permissionNodes().register(
+                getServer().getPluginManager().getPermissions().stream()
+                        .map(Permission::getName)
+                        .toList()), 1L);
     }
 
-    private void reportNodes(MasterClient client, List<String> nodes) {
+    private void reportNodes(MasterClient client, java.util.Collection<String> nodes) {
         try {
             client.reportNodes(nodes);
             getSLF4JLogger().info("Reported {} permission nodes to master", nodes.size());

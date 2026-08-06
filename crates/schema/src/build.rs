@@ -139,10 +139,10 @@ pub struct BuildManifest {
     pub main_class: String,
     /// Дополнительные JVM-аргументы из version.json (модульные флаги Forge и т.п.).
     #[serde(default)]
-    pub jvm_args: Vec<String>,
+    pub jvm_args: Vec<ManifestArg>,
     /// Game-аргументы (--tweakClass и т.п.) с плейсхолдерами.
     #[serde(default)]
-    pub game_args: Vec<String>,
+    pub game_args: Vec<ManifestArg>,
     /// Имя версии ассетов ("1.21" или "legacy").
     pub assets_index_name: String,
 
@@ -197,17 +197,70 @@ impl BuildManifest {
     }
 }
 
-/// serde-хелпер: Vec<u8> как массив чисел (надёжно для JSON, не зависит от base64-фичи).
-mod serde_bytes_vec {
+pub mod serde_bytes_vec {
     use serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S: Serializer>(bytes: &[u8], s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_bytes(bytes)
+    pub fn serialize<S: Serializer>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_seq(bytes.iter().copied())
     }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
-        // Принимаем как seq байтов, так и bytes — serde_json даёт seq.
-        let v: Vec<u8> = Vec::deserialize(d)?;
-        Ok(v)
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+        let nums: Vec<u8> = Vec::deserialize(deserializer)?;
+        Ok(nums)
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ManifestRuleOs {
+    pub name: Option<String>,
+    pub arch: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ManifestRule {
+    pub action: String,
+    pub os: Option<ManifestRuleOs>,
+    pub features: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum ManifestArg {
+    String(String),
+    Conditional {
+        rules: Vec<ManifestRule>,
+        #[serde(deserialize_with = "deserialize_arg_value")]
+        value: Vec<String>,
+    },
+}
+
+impl ManifestArg {
+    pub fn new_string(s: impl Into<String>) -> Self {
+        Self::String(s.into())
+    }
+}
+
+fn deserialize_arg_value<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct ValueVisitor;
+    impl<'de> serde::de::Visitor<'de> for ValueVisitor {
+        type Value = Vec<String>;
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string or an array of strings")
+        }
+        fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<Self::Value, E> {
+            Ok(vec![value.to_owned()])
+        }
+        fn visit_string<E: serde::de::Error>(self, value: String) -> Result<Self::Value, E> {
+            Ok(vec![value])
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let mut vec = Vec::new();
+            while let Some(elem) = seq.next_element::<String>()? {
+                vec.push(elem);
+            }
+            Ok(vec)
+        }
+    }
+    deserializer.deserialize_any(ValueVisitor)
 }

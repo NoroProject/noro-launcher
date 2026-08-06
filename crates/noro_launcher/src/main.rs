@@ -53,14 +53,39 @@ fn main() -> ExitCode {
     let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
     let work_dir = app_dir.clone();
     let work_core = core_path.clone();
-    let outcome = splash::run_with(rx, move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("tokio runtime");
-        rt.block_on(download_core(&work_dir, &work_core, &reporter))
-    });
+    // На macOS `cx.quit()` вызывает `[NSApp terminate:]` и убивает процесс,
+    // не возвращая управление из `run_with`. Поэтому запуск core делается
+    // через `before_quit`, который гарантированно вызовется до `cx.quit()`.
+    let success = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let success_w = success.clone();
+    let launch_path = core_path.clone();
+    let before_quit: Option<Box<dyn FnOnce() + Send + 'static>> =
+        Some(Box::new(move || {
+            if success.load(std::sync::atomic::Ordering::Acquire) {
+                let _ = std::process::Command::new(&launch_path)
+                    .args(std::env::args_os().skip(1))
+                    .spawn();
+            }
+        }));
 
+    let outcome = splash::run_with(
+        rx,
+        move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("tokio runtime");
+            let res = rt.block_on(download_core(&work_dir, &work_core, &reporter));
+            if res.is_ok() {
+                success_w.store(true, std::sync::atomic::Ordering::Release);
+            }
+            res
+        },
+        before_quit,
+    );
+
+    // Если `run_with` всё-таки вернёт управление (Linux/Windows) — запускаем
+    // core отсюда. На macOS сюда не доходим.
     match outcome {
         Some(Ok(())) => run_core(&core_path),
         Some(Err(e)) => {
@@ -75,24 +100,28 @@ fn main() -> ExitCode {
 #[cfg(debug_assertions)]
 fn splash_preview() -> ExitCode {
     let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
-    splash::run_with(rx, move || {
-        let stages = [
-            ("Проверка версии…", 0u64),
-            ("Загрузка launcher-v1.2.3", 15_358_608),
-        ];
-        loop {
-            for (label, total) in stages {
-                for step in 0..=100 {
-                    let _ = reporter.send(splash::Progress {
-                        label: label.to_string(),
-                        done: total / 100 * step,
-                        total,
-                    });
-                    std::thread::sleep(std::time::Duration::from_millis(60));
+    splash::run_with(
+        rx,
+        move || {
+            let stages = [
+                ("Проверка версии…", 0u64),
+                ("Загрузка launcher-v1.2.3", 15_358_608),
+            ];
+            loop {
+                for (label, total) in stages {
+                    for step in 0..=100 {
+                        let _ = reporter.send(splash::Progress {
+                            label: label.to_string(),
+                            done: total / 100 * step,
+                            total,
+                        });
+                        std::thread::sleep(std::time::Duration::from_millis(60));
+                    }
                 }
             }
-        }
-    });
+        },
+        None,
+    );
     ExitCode::SUCCESS
 }
 

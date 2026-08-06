@@ -197,43 +197,27 @@ pub fn rules_allow(rules: Option<&Value>, platform: Platform) -> bool {
 /// Извлечь jvm/game аргументы (с placeholder'ами) из version.json.
 pub fn extract_arguments(ctx: &mut BootstrapCtx<'_>, vj: &Value) {
     if let Some(args) = vj["arguments"].as_object() {
-        ctx.jvm_args = extract_arg_list(args.get("jvm"), ctx.platform);
-        ctx.game_args = extract_arg_list(args.get("game"), ctx.platform);
+        ctx.jvm_args = extract_arg_list(args.get("jvm"));
+        ctx.game_args = extract_arg_list(args.get("game"));
     } else if let Some(legacy) = vj["minecraftArguments"].as_str() {
         // Версии до 1.13.
-        ctx.game_args = legacy.split_whitespace().map(String::from).collect();
+        ctx.game_args = legacy.split_whitespace().map(|s| schema::ManifestArg::new_string(s)).collect();
         ctx.jvm_args = vec![
-            "-Djava.library.path=${natives_directory}".to_string(),
-            "-cp".to_string(),
-            "${classpath}".to_string(),
+            schema::ManifestArg::new_string("-Djava.library.path=${natives_directory}"),
+            schema::ManifestArg::new_string("-cp"),
+            schema::ManifestArg::new_string("${classpath}"),
         ];
     }
 }
 
-fn extract_arg_list(list: Option<&Value>, platform: Platform) -> Vec<String> {
+fn extract_arg_list(list: Option<&Value>) -> Vec<schema::ManifestArg> {
     let Some(arr) = list.and_then(|v| v.as_array()) else {
         return Vec::new();
     };
     let mut out = Vec::new();
     for item in arr {
-        match item {
-            Value::String(s) => out.push(s.clone()),
-            Value::Object(obj) => {
-                if rules_allow(obj.get("rules"), platform) {
-                    match &item["value"] {
-                        Value::String(s) => out.push(s.clone()),
-                        Value::Array(vs) => {
-                            for v in vs {
-                                if let Some(s) = v.as_str() {
-                                    out.push(s.to_string());
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
+        if let Ok(arg) = serde_json::from_value::<schema::ManifestArg>(item.clone()) {
+            out.push(arg);
         }
     }
     out

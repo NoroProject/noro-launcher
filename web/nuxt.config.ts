@@ -21,7 +21,9 @@ export default defineNuxtConfig({
         { name: 'description', content: 'Cabinet and admin panel for Noro Launcher' }
       ],
       // Шрифты локальные (public/fonts) — те же, что в лаунчере.
-      link: []
+      link: [
+        { rel: 'icon', type: 'image/png', href: '/favicon.png' }
+      ]
     }
   }
 })

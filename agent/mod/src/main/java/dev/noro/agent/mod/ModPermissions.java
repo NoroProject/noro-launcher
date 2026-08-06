@@ -3,9 +3,9 @@ package dev.noro.agent.mod;
 import dev.noro.agent.core.AccessGate;
 import dev.noro.agent.core.AgentConfig;
 import dev.noro.agent.core.MasterClient;
+import dev.noro.agent.core.NoroAgentApi;
 import dev.noro.agent.core.PermissionSet;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,8 +31,6 @@ final class ModPermissions {
      * второго запроса за тем же самым.
      */
     private final Map<UUID, AccessGate.Decision> negotiated = new ConcurrentHashMap<>();
-
-    private volatile List<String> nodes = List.of();
 
     ModPermissions(MasterClient client, AgentConfig config) {
         this.client = client;
@@ -73,15 +71,19 @@ final class ModPermissions {
     }
 
     void rememberNodes(Collection<String> names) {
-        nodes = List.copyOf(names);
+        NoroAgentApi.permissionNodes().register(names);
     }
 
     /**
-     * Отправляет каталог мастеру. Зовётся один раз со старта сервера: узлы
-     * регистрируются до него и после уже не меняются.
+     * Подключает отправку каталога. Дальше он уходит сам — и на том, что успели
+     * собрать с реестра лоадера, и на том, что позже заявят чужие моды: на
+     * Fabric реестра нет вовсе, и заявка — единственный источник.
      */
     void report() {
-        List<String> current = nodes;
+        NoroAgentApi.permissionNodes().attach(this::send);
+    }
+
+    private void send(Collection<String> current) {
         if (current.isEmpty()) {
             return;
         }

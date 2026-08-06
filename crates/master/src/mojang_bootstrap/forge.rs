@@ -166,32 +166,41 @@ fn merge_arguments(ctx: &mut BootstrapCtx<'_>, vj: &Value) {
     if let Some(jvm) = vj["arguments"]["jvm"].as_array() {
         for a in jvm {
             if let Some(s) = a.as_str() {
-                ctx.jvm_args.push(s.to_string());
+                ctx.jvm_args.push(schema::ManifestArg::new_string(s));
             }
         }
     }
     if let Some(game) = vj["arguments"]["game"].as_array() {
         for a in game {
             if let Some(s) = a.as_str() {
-                ctx.game_args.push(s.to_string());
+                ctx.game_args.push(schema::ManifestArg::new_string(s));
             }
         }
     }
 }
 
-fn extend_ignore_list(jvm_args: &mut Vec<String>) {
+fn extend_ignore_list(jvm_args: &mut Vec<schema::ManifestArg>) {
     // client.jar = vanilla obfuscated client, must not enter the game module layer.
     let names: Vec<&str> = vec!["client.jar"];
 
-    if let Some(arg) = jvm_args.iter_mut().find(|a| a.starts_with("-DignoreList=")) {
-        for name in &names {
-            if !arg.contains(*name) {
-                arg.push(',');
-                arg.push_str(name);
+    let mut found = false;
+    for arg in jvm_args.iter_mut() {
+        if let schema::ManifestArg::String(s) = arg {
+            if s.starts_with("-DignoreList=") {
+                for name in &names {
+                    if !s.contains(*name) {
+                        s.push(',');
+                        s.push_str(name);
+                    }
+                }
+                found = true;
+                break;
             }
         }
-    } else {
-        jvm_args.push(format!("-DignoreList={}", names.join(",")));
+    }
+    
+    if !found {
+        jvm_args.push(schema::ManifestArg::new_string(format!("-DignoreList={}", names.join(","))));
     }
 }
 

@@ -112,9 +112,9 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
 
     // Объединяем аргументы: из base_build (ванилла/лоадер) + из build (если есть кастомные)
     // Сейчас берем напрямую из base_build.
-    let jvm_args: Vec<String> =
+    let jvm_args: Vec<schema::ManifestArg> =
         serde_json::from_value(base_build.jvm_args.clone()).unwrap_or_default();
-    let game_args: Vec<String> =
+    let game_args: Vec<schema::ManifestArg> =
         serde_json::from_value(base_build.game_args.clone()).unwrap_or_default();
 
     let mut manifest = BuildManifest {

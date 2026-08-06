@@ -1,5 +1,6 @@
 package dev.noro.agent.core;
 
+import java.util.Collection;
 import java.util.UUID;
 
 /**
@@ -21,12 +22,37 @@ import java.util.UUID;
 public final class NoroAgentApi {
 
     private static final ProfileCache CACHE = new ProfileCache();
+    private static final PermissionNodeCatalog NODES = new PermissionNodeCatalog();
 
     private NoroAgentApi() {}
 
     /** Хранилище, которое агент наполняет на входе игрока. Не для чужого кода. */
     public static ProfileCache cache() {
         return CACHE;
+    }
+
+    /**
+     * Каталог узлов прав, по которому мастер подсказывает в админке.
+     *
+     * <p>Реестра узлов нет на Fabric ни у одного мода, а на Forge и NeoForge он
+     * заполняется раньше, чем большинство модов успевает прочитать свой конфиг.
+     * Поэтому узлы принимаются здесь, а не только собираются с платформы.
+     */
+    public static PermissionNodeCatalog permissionNodes() {
+        return NODES;
+    }
+
+    /**
+     * Заявляет узлы прав, которые понимает чужой мод или плагин.
+     *
+     * <p>Звать можно когда угодно и сколько угодно раз: каталог сам решит, надо
+     * ли отправлять. Принимает и отдаёт только типы JDK, поэтому годится для
+     * вызова через reflection наравне с {@link #value(UUID, String)}.
+     *
+     * @param nodes полные имена узлов, например {@code nbitchat.chat.local}
+     */
+    public static void registerPermissionNodes(Collection<String> nodes) {
+        NODES.register(nodes);
     }
 
     /**
