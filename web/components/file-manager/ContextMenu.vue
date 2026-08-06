@@ -76,7 +76,7 @@ onUnmounted(() => {
             </span>
             <UIcon name="i-lucide-chevron-right" class="size-3.5" />
           </button>
-          <div v-if="syncOpen" class="fm-ctx absolute left-full top-0 ml-0.5">
+          <div v-if="syncOpen" class="fm-ctx-sub">
             <button
               v-for="mode in MODE_ORDER"
               :key="mode"
