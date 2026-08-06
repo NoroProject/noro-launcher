@@ -88,7 +88,7 @@ pub async fn publish(
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_ADMIN_BUILDS)?;
-    let manifest = rebuild_manifest(&state, id).await?;
+    let manifest = rebuild_manifest(&state, id, false).await?;
     crate::db::set_build_published(&state.db, id, true).await?;
     broadcast_builds_changed(&state, manifest.server_id);
 
@@ -105,7 +105,7 @@ pub async fn rebuild(
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_ADMIN_BUILDS)?;
-    let manifest = rebuild_manifest(&state, id).await?;
+    let manifest = rebuild_manifest(&state, id, false).await?;
     broadcast_builds_changed(&state, manifest.server_id);
 
     Ok(Json(json!({
@@ -114,21 +114,47 @@ pub async fn rebuild(
     })))
 }
 
-async fn rebuild_manifest(state: &AppState, id: Uuid) -> AppResult<schema::BuildManifest> {
+/// То же, но с нуля: base build сносится и качается заново мимо кэша стора.
+///
+/// Обычный `rebuild` переиспользует всё, что уже считается готовым, и потому
+/// не лечит испортившееся — свёрнутые под одну ОС аргументы или битый блоб.
+/// Моды и конфиги сборки остаются: их bootstrap воссоздать не может.
+pub async fn rebuild_clean(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_ADMIN_BUILDS)?;
+    let manifest = rebuild_manifest(&state, id, true).await?;
+    broadcast_builds_changed(&state, manifest.server_id);
+
+    Ok(Json(json!({
+        "ok": true,
+        "summary": crate::manifest::manifest_summary(&manifest),
+    })))
+}
+
+/// `clean` — снести base build и качать заново вместо переиспользования готового.
+async fn rebuild_manifest(
+    state: &AppState,
+    id: Uuid,
+    clean: bool,
+) -> AppResult<schema::BuildManifest> {
     let build = crate::db::get_build(&state.db, id)
         .await?
         .ok_or_else(|| AppError::NotFound("сборка".into()))?;
 
-    crate::mojang_bootstrap::ensure_base_build(
-        state,
-        &build.mc_version,
-        &build.modloader,
-        build.modloader_version.as_deref(),
-        |msg| {
-            tracing::info!(target: "bootstrap", "{msg}");
-        },
-    )
-    .await
+    let log = |msg: &str| {
+        tracing::info!(target: "bootstrap", "{msg}");
+    };
+    let mc = &build.mc_version;
+    let loader = &build.modloader;
+    let loader_version = build.modloader_version.as_deref();
+    if clean {
+        crate::mojang_bootstrap::rebuild_base_build(state, mc, loader, loader_version, log).await
+    } else {
+        crate::mojang_bootstrap::ensure_base_build(state, mc, loader, loader_version, log).await
+    }
     .map_err(AppError::Other)?;
 
     let build = crate::db::get_build(&state.db, id).await?.unwrap();

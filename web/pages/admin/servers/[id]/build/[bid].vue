@@ -121,6 +121,25 @@ async function rebuild() {
     });
 }
 
+async function rebuildClean() {
+    if (
+        !confirm(
+            "Discard the Minecraft and loader base and download it again from scratch?\n\n" +
+                "Mods and configs are kept. The file cache is ignored, so this takes minutes — " +
+                "and until it finishes, players cannot fetch this build.",
+        )
+    )
+        return;
+    await run("rebuild-clean", async () => {
+        await auth.request(
+            `/api/admin/builds/${buildId.value}/rebuild-clean`,
+            { method: "POST" },
+        );
+        await buildPayload.refresh();
+        await filesData.refresh();
+    });
+}
+
 async function unpublish() {
     await run("unpublish", async () => {
         await auth.request(`/api/admin/builds/${buildId.value}/unpublish`, {
@@ -372,6 +391,7 @@ function deleteOptional(index: number) {
                     :build-pending="buildPayload.pending.value"
                     @publish="publish"
                     @rebuild="rebuild"
+                    @rebuild-clean="rebuildClean"
                     @unpublish="unpublish"
                     @delete="deleteBuild"
                 />

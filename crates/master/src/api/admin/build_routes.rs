@@ -13,6 +13,10 @@ pub fn router() -> Router<AppState> {
         )
         .route("/api/admin/builds/{id}/publish", post(builds::publish))
         .route("/api/admin/builds/{id}/rebuild", post(builds::rebuild))
+        .route(
+            "/api/admin/builds/{id}/rebuild-clean",
+            post(builds::rebuild_clean),
+        )
         .route("/api/admin/builds/{id}/unpublish", post(builds::unpublish))
         .route("/api/admin/builds/{id}/paths", put(builds::set_paths))
         .route("/api/admin/builds/{id}/versions", put(builds::set_versions))

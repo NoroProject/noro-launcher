@@ -931,6 +931,27 @@ pub async fn has_legacy_java(pool: &PgPool, base_build_id: Uuid) -> Result<bool>
     .await?)
 }
 
+/// Снести base build целиком. `base_build_files` уходят каскадом, блобы в сторе
+/// остаются: они адресуются по содержимому и делятся между сборками.
+pub async fn delete_base_build(
+    pool: &PgPool,
+    mc_version: &str,
+    modloader: &str,
+    modloader_version: Option<&str>,
+) -> Result<u64> {
+    Ok(sqlx::query(
+        "DELETE FROM base_builds
+          WHERE mc_version = $1 AND modloader = $2
+            AND modloader_version IS NOT DISTINCT FROM $3",
+    )
+    .bind(mc_version)
+    .bind(modloader)
+    .bind(modloader_version)
+    .execute(pool)
+    .await?
+    .rows_affected())
+}
+
 /// Убрать файлы вида: пути java сменились, и старые записи иначе остались бы
 /// висеть — клиент считал бы их нужными всем.
 pub async fn delete_base_build_files_kind(

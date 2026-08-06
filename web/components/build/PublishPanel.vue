@@ -9,7 +9,13 @@ const props = withDefaults(
     }>(),
     {},
 );
-defineEmits<{ publish: []; rebuild: []; unpublish: []; delete: [] }>();
+defineEmits<{
+    publish: [];
+    rebuild: [];
+    rebuildClean: [];
+    unpublish: [];
+    delete: [];
+}>();
 
 const isDraft = computed(() => !props.build?.published);
 </script>
@@ -93,6 +99,20 @@ const isDraft = computed(() => !props.build?.published);
                 >
                     Rebuild Version
                 </AtomButton>
+
+                <UTooltip
+                    text="Discards the Minecraft and loader base, then downloads it again ignoring the cache. Mods and configs are kept. Takes minutes."
+                >
+                    <AtomButton
+                        icon="i-lucide-flame"
+                        variant="outline"
+                        block
+                        :disabled="busy === 'rebuild-clean'"
+                        @click="$emit('rebuildClean')"
+                    >
+                        Rebuild from Scratch
+                    </AtomButton>
+                </UTooltip>
 
                 <div class="grid grid-cols-2 gap-1.5 mt-0.5">
                     <AtomButton

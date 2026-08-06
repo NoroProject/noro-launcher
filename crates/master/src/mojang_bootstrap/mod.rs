@@ -34,6 +34,9 @@ pub struct BootstrapCtx<'a> {
     pub jvm_args: Vec<schema::ManifestArg>,
     pub game_args: Vec<schema::ManifestArg>,
     pub assets_index_name: String,
+    /// Не доверять содержимому стора: качать всё заново и перезаписывать.
+    /// Ставится только пересбором «с нуля» из админки.
+    pub refetch: bool,
     /// Опциональная функция логирования прогресса (для админки/CLI).
     pub log: Box<dyn Fn(&str) + Send + Sync + 'a>,
 }
@@ -54,12 +57,15 @@ impl<'a> BootstrapCtx<'a> {
         expected_sha1: Option<&str>,
         _artifact_type: &str,
     ) -> Result<()> {
-        let stored = self
-            .state
-            .files
-            .put_url(self.state.http(), url, expected_sha1)
-            .await
-            .with_context(|| format!("скачивание {path}"))?;
+        let files = &self.state.files;
+        let stored = if self.refetch {
+            files
+                .put_url_overwriting(self.state.http(), url, expected_sha1)
+                .await
+        } else {
+            files.put_url(self.state.http(), url, expected_sha1).await
+        }
+        .with_context(|| format!("скачивание {path}"))?;
 
         crate::db::upsert_base_build_file(
             &self.state.db,
@@ -84,7 +90,12 @@ impl<'a> BootstrapCtx<'a> {
         data: &[u8],
         _artifact_type: &str,
     ) -> Result<String> {
-        let stored = self.state.files.put_bytes(data).await?;
+        let files = &self.state.files;
+        let stored = if self.refetch {
+            files.put_bytes_overwriting(data).await?
+        } else {
+            files.put_bytes(data).await?
+        };
         crate::db::upsert_base_build_file(
             &self.state.db,
             self.base_build_id,
@@ -136,7 +147,50 @@ where
         ));
     }
 
-    // 2. Создаем временную запись (чтобы получить UUID для файлов).
+    bootstrap(state, mc_version, modloader, modloader_version, false, log).await
+}
+
+/// Собрать base_build заново, не переиспользуя ничего из прошлого раза.
+///
+/// Нужно, когда испортилось то, что `ensure_base_build` считает готовым и
+/// поэтому не трогает: свёрнутые под одну ОС аргументы (до 1.3.1 мастер
+/// вычислял `rules` у себя), битый блоб в сторе, оборвавшийся на середине
+/// прошлый bootstrap. Запись со всеми её файлами удаляется, артефакты качаются
+/// заново мимо кэша стора.
+///
+/// Файлы самой сборки — моды, конфиги, всё загруженное и импортированное — не
+/// трогает: воссоздать их bootstrap не может, они не выводятся из манифестов.
+pub async fn rebuild_base_build<F>(
+    state: &AppState,
+    mc_version: &str,
+    modloader: &str,
+    modloader_version: Option<&str>,
+    log: F,
+) -> Result<crate::db::models::BaseBuildRow>
+where
+    F: Fn(&str) + Send + Sync,
+{
+    let removed =
+        crate::db::delete_base_build(&state.db, mc_version, modloader, modloader_version).await?;
+    log(&format!(
+        "снесён прошлый base build ({removed} записей), качаем заново мимо кэша"
+    ));
+
+    bootstrap(state, mc_version, modloader, modloader_version, true, log).await
+}
+
+async fn bootstrap<F>(
+    state: &AppState,
+    mc_version: &str,
+    modloader: &str,
+    modloader_version: Option<&str>,
+    refetch: bool,
+    log: F,
+) -> Result<crate::db::models::BaseBuildRow>
+where
+    F: Fn(&str) + Send + Sync,
+{
+    // Временная запись — чтобы получить UUID для файлов.
     let base_build_id = crate::db::upsert_base_build(
         &state.db,
         mc_version,
@@ -161,6 +215,7 @@ where
         jvm_args: Vec::new(),
         game_args: Vec::new(),
         assets_index_name: mc_version.to_string(),
+        refetch,
         log: Box::new(log),
     };
 

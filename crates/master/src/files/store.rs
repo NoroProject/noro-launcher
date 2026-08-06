@@ -35,9 +35,23 @@ impl FileStore {
 
     /// Сохранить байты, вернуть их sha1. Если уже есть — не перезаписывает.
     pub async fn put_bytes(&self, data: &[u8]) -> Result<StoredFile> {
+        self.write_bytes(data, false).await
+    }
+
+    /// Сохранить байты, перезаписав то, что лежит по этому же хешу.
+    ///
+    /// Обычно перезаписывать бессмысленно: путь берётся из содержимого, значит
+    /// там уже лежит оно же. Смысл появляется, когда содержимое под вопросом —
+    /// битый или обрезанный блоб хешируется по-прежнему, потому что хеш считают
+    /// от свежих байтов, а не от файла.
+    pub async fn put_bytes_overwriting(&self, data: &[u8]) -> Result<StoredFile> {
+        self.write_bytes(data, true).await
+    }
+
+    async fn write_bytes(&self, data: &[u8], overwrite: bool) -> Result<StoredFile> {
         let sha1 = hex::encode(Sha1::digest(data));
         let dst = self.path_for(&sha1);
-        if !dst.exists() {
+        if overwrite || !dst.exists() {
             if let Some(parent) = dst.parent() {
                 tokio::fs::create_dir_all(parent)
                     .await
@@ -73,9 +87,30 @@ impl FileStore {
         url: &str,
         expected_sha1: Option<&str>,
     ) -> Result<StoredFile> {
+        self.fetch(client, url, expected_sha1, false).await
+    }
+
+    /// Как `put_url`, но не верит на слово тому, что уже лежит: качает заново и
+    /// перезаписывает. Для пересбора «с нуля», где под сомнением как раз стор.
+    pub async fn put_url_overwriting(
+        &self,
+        client: &reqwest::Client,
+        url: &str,
+        expected_sha1: Option<&str>,
+    ) -> Result<StoredFile> {
+        self.fetch(client, url, expected_sha1, true).await
+    }
+
+    async fn fetch(
+        &self,
+        client: &reqwest::Client,
+        url: &str,
+        expected_sha1: Option<&str>,
+        overwrite: bool,
+    ) -> Result<StoredFile> {
         // Если ожидаемый хеш уже в сторе — скачивать не нужно.
         if let Some(sha1) = expected_sha1 {
-            if self.exists(sha1) {
+            if !overwrite && self.exists(sha1) {
                 let size = tokio::fs::metadata(self.path_for(sha1)).await?.len();
                 return Ok(StoredFile {
                     sha1: sha1.to_string(),
@@ -91,7 +126,7 @@ impl FileStore {
             .error_for_status()
             .with_context(|| format!("статус ответа для {url}"))?;
         let bytes = resp.bytes().await?;
-        let stored = self.put_bytes(&bytes).await?;
+        let stored = self.write_bytes(&bytes, overwrite).await?;
         if let Some(expected) = expected_sha1 {
             if !expected.eq_ignore_ascii_case(&stored.sha1) {
                 anyhow::bail!(
@@ -159,3 +194,7 @@ pub async fn write_temp(dir: &Path, name: &str, data: &[u8]) -> Result<PathBuf> 
     f.flush().await?;
     Ok(path)
 }
+
+#[cfg(test)]
+#[path = "store_tests.rs"]
+mod tests;
