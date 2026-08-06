@@ -201,7 +201,10 @@ pub fn extract_arguments(ctx: &mut BootstrapCtx<'_>, vj: &Value) {
         ctx.game_args = extract_arg_list(args.get("game"));
     } else if let Some(legacy) = vj["minecraftArguments"].as_str() {
         // Версии до 1.13.
-        ctx.game_args = legacy.split_whitespace().map(|s| schema::ManifestArg::new_string(s)).collect();
+        ctx.game_args = legacy
+            .split_whitespace()
+            .map(schema::ManifestArg::new_string)
+            .collect();
         ctx.jvm_args = vec![
             schema::ManifestArg::new_string("-Djava.library.path=${natives_directory}"),
             schema::ManifestArg::new_string("-cp"),

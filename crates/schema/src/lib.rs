@@ -5,6 +5,7 @@
 
 pub mod build;
 pub mod launcher;
+pub mod manifest_args;
 pub mod news;
 pub mod permissions;
 pub mod server;
@@ -13,6 +14,7 @@ pub mod ws_protocol;
 
 pub use build::*;
 pub use launcher::*;
+pub use manifest_args::*;
 pub use news::*;
 pub use permissions::*;
 pub use server::*;

@@ -183,24 +183,26 @@ fn extend_ignore_list(jvm_args: &mut Vec<schema::ManifestArg>) {
     // client.jar = vanilla obfuscated client, must not enter the game module layer.
     let names: Vec<&str> = vec!["client.jar"];
 
-    let mut found = false;
-    for arg in jvm_args.iter_mut() {
-        if let schema::ManifestArg::String(s) = arg {
-            if s.starts_with("-DignoreList=") {
-                for name in &names {
-                    if !s.contains(*name) {
-                        s.push(',');
-                        s.push_str(name);
-                    }
+    // Список приходит из version.json обычной строкой, без rules, — условным
+    // он не бывает, поэтому ищем только среди строк.
+    let existing = jvm_args.iter_mut().find_map(|arg| match arg {
+        schema::ManifestArg::String(s) if s.starts_with("-DignoreList=") => Some(s),
+        _ => None,
+    });
+
+    match existing {
+        Some(list) => {
+            for name in &names {
+                if !list.contains(*name) {
+                    list.push(',');
+                    list.push_str(name);
                 }
-                found = true;
-                break;
             }
         }
-    }
-    
-    if !found {
-        jvm_args.push(schema::ManifestArg::new_string(format!("-DignoreList={}", names.join(","))));
+        None => jvm_args.push(schema::ManifestArg::new_string(format!(
+            "-DignoreList={}",
+            names.join(",")
+        ))),
     }
 }
 

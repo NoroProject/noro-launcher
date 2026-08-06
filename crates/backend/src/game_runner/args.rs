@@ -1,3 +1,4 @@
+use super::rules::arg_values;
 use super::{classpath, LoginInfo, ServerConnect};
 use crate::directories::safe_join;
 use schema::{ArtifactKind, BuildManifest};
@@ -24,8 +25,8 @@ pub fn push_jvm_args(cmd: &mut Command, ctx: &Substitution<'_>, loader_client_na
     }
 
     for arg in &ctx.manifest.jvm_args {
-        for s in get_arg_values(arg) {
-            let mut substituted = substitute(&s, ctx);
+        for s in arg_values(arg) {
+            let mut substituted = substitute(s, ctx);
             if substituted.starts_with("-DignoreList=") {
                 classpath::remove_from_ignore_list(&mut substituted, loader_client_name);
             }
@@ -41,68 +42,15 @@ pub fn push_game_args(cmd: &mut Command, ctx: &Substitution<'_>, connect: Option
         }
     } else {
         for arg in &ctx.manifest.game_args {
-            for s in get_arg_values(arg) {
-                cmd.arg(substitute(&s, ctx));
+            for s in arg_values(arg) {
+                cmd.arg(substitute(s, ctx));
             }
         }
     }
+
     if let Some(server) = connect {
         cmd.arg("--quickPlayMultiplayer")
             .arg(format!("{}:{}", server.host, server.port));
-    }
-}
-
-fn rules_allow(rules: &[schema::ManifestRule]) -> bool {
-    if rules.is_empty() {
-        return true;
-    }
-    let mut allowed = false;
-    for rule in rules {
-        let action_allow = rule.action == "allow";
-        if rule.features.is_some() {
-            continue;
-        }
-        let os_matches = match &rule.os {
-            None => true,
-            Some(os) => {
-                let name_ok = os.name.as_deref().map(|n| n == mojang_os_name()).unwrap_or(true);
-                let arch_ok = os.arch.as_deref().map(|a| a == mojang_arch()).unwrap_or(true);
-                name_ok && arch_ok
-            }
-        };
-        if os_matches {
-            allowed = action_allow;
-        }
-    }
-    allowed
-}
-
-fn mojang_os_name() -> &'static str {
-    match std::env::consts::OS {
-        "macos" => "osx",
-        "linux" => "linux",
-        "windows" => "windows",
-        _ => "linux",
-    }
-}
-
-fn mojang_arch() -> &'static str {
-    match std::env::consts::ARCH {
-        "aarch64" => "arm64",
-        _ => "x86_64",
-    }
-}
-
-fn get_arg_values(arg: &schema::ManifestArg) -> Vec<String> {
-    match arg {
-        schema::ManifestArg::String(s) => vec![s.clone()],
-        schema::ManifestArg::Conditional { rules, value } => {
-            if rules_allow(rules) {
-                value.clone()
-            } else {
-                Vec::new()
-            }
-        }
     }
 }
 

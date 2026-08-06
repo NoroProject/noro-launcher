@@ -4,6 +4,7 @@ mod args;
 mod authlib;
 mod classpath;
 mod java;
+mod rules;
 
 use crate::config::LauncherConfig;
 use crate::directories::LauncherDirectories;
