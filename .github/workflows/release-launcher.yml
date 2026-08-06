@@ -138,6 +138,12 @@ jobs:
               ;;
             macos-latest)
               cp "$OUT/noro-launcher-core" dist/noro-launcher-core-${{ matrix.target }}
+              IDENTITY="${MACOS_SIGN_IDENTITY:--}"
+              if [ "$IDENTITY" = "-" ]; then
+                codesign --force --sign - --timestamp=none "dist/noro-launcher-core-${{ matrix.target }}"
+              else
+                codesign --force --sign "$IDENTITY" --options runtime --timestamp "dist/noro-launcher-core-${{ matrix.target }}"
+              fi
               bash .github/scripts/make-app.sh "$OUT/noro-launcher" NoroLauncher.app
               bash .github/scripts/make-dmg.sh NoroLauncher.app dist/noro-launcher-${{ matrix.target }}.dmg
               bash .github/scripts/notarize.sh dist/noro-launcher-${{ matrix.target }}.dmg
