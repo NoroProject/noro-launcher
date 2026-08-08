@@ -151,13 +151,14 @@ pub fn parse_hex(c: &str) -> u32 {
 }
 
 pub fn progress_label(s: &crate::state::SyncUiState) -> String {
-    if s.total == 0 {
+    let total = s.total();
+    if total == 0 {
         String::new()
     } else {
         format!(
             "{:.0} / {:.0} MB",
-            s.done as f64 / 1_048_576.0,
-            s.total as f64 / 1_048_576.0
+            s.done() as f64 / 1_048_576.0,
+            total as f64 / 1_048_576.0
         )
     }
 }

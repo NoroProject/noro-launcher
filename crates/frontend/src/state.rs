@@ -33,19 +33,29 @@ pub enum Page {
 pub struct SyncUiState {
     pub stage: String,
     pub detail: String,
-    pub done: u64,
-    pub total: u64,
+    /// Байты по стадиям загрузки: они идут параллельно, и у каждой своя полоса.
+    /// BTreeMap — чтобы порядок строк не зависел от того, кто отчитался первым.
+    pub stages: std::collections::BTreeMap<SyncStage, (u64, u64)>,
     pub syncing: bool,
     pub failed: Option<String>,
     pub running: bool,
 }
 
 impl SyncUiState {
+    pub fn done(&self) -> u64 {
+        self.stages.values().map(|(d, _)| d).sum()
+    }
+
+    pub fn total(&self) -> u64 {
+        self.stages.values().map(|(_, t)| t).sum()
+    }
+
     pub fn fraction(&self) -> f32 {
-        if self.total == 0 {
+        let total = self.total();
+        if total == 0 {
             0.0
         } else {
-            (self.done as f32 / self.total as f32).clamp(0.0, 1.0)
+            (self.done() as f32 / total as f32).clamp(0.0, 1.0)
         }
     }
 }
@@ -529,9 +539,19 @@ impl LauncherUI {
             } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = stage != SyncStage::Done;
-                s.stage = stage.label().to_string();
-                s.done = done;
-                s.total = total;
+                if stage.is_download() {
+                    s.stages.insert(stage, (done, total));
+                    // Стадий в работе несколько — называть заголовком одну из
+                    // них значило бы врать про остальные.
+                    s.stage = "Downloading...".into();
+                } else {
+                    // Проверка файлов открывает новый прогон: полосы прошлого
+                    // запуска к нему не относятся.
+                    if stage == SyncStage::CheckingFiles && done == 0 {
+                        s.stages.clear();
+                    }
+                    s.stage = stage.label().to_string();
+                }
                 if !file.is_empty() {
                     s.detail = file;
                 }

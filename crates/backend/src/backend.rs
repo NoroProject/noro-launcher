@@ -9,7 +9,7 @@ use crate::ws_client::{self, WsClient};
 use bridge::{BackendReceiver, FrontendHandle, MessageToBackend, MessageToFrontend, QuitHandler};
 use parking_lot::Mutex;
 use schema::{BuildManifest, ClientWsMsg, ServerEntry, ServerWsMsg, UserProfile};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -448,6 +448,11 @@ pub fn spawn_sync_and_launch(
         // Прогресс синхронизации → frontend + модалка.
         let to_fe = ctx.frontend.clone();
         let modal_clone = modal.clone();
+        // Стадии загрузки идут параллельно, а полоса в модалке одна. Держим
+        // последний отчёт каждой стадии и показываем сумму — иначе полоса
+        // скакала бы туда-сюда вслед за тем, чей отчёт пришёл последним.
+        let totals: Arc<Mutex<BTreeMap<bridge::SyncStage, (u64, u64)>>> =
+            Arc::new(Mutex::new(BTreeMap::new()));
         let progress: crate::sync::ProgressFn = Arc::new(move |stage, done, total, file| {
             to_fe.send(MessageToFrontend::SyncProgress {
                 server_id,
@@ -456,8 +461,19 @@ pub fn spawn_sync_and_launch(
                 total,
                 file: file.clone(),
             });
-            modal_clone.set_stage(stage.label());
-            modal_clone.set_progress(done, total);
+            if stage.is_download() {
+                let (sum_done, sum_total) = {
+                    let mut g = totals.lock();
+                    g.insert(stage, (done, total));
+                    g.values()
+                        .fold((0u64, 0u64), |(d, t), (sd, st)| (d + sd, t + st))
+                };
+                modal_clone.set_stage("Downloading...");
+                modal_clone.set_progress(sum_done, sum_total);
+            } else {
+                modal_clone.set_stage(stage.label());
+                modal_clone.set_progress(done, total);
+            }
             if !file.is_empty() {
                 modal_clone.set_detail(file);
             }

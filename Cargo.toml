@@ -75,6 +75,9 @@ reqwest = { version = "0.12", default-features = false, features = [
     "stream",
     "rustls-tls",
     "multipart",
+    # Без неё крейт h2 вообще не попадает в сборку, и лаунчер качает тысячи
+    # ассетов по HTTP/1.1 — по одному запросу на соединение.
+    "http2",
 ] }
 
 # Крипто/хеши

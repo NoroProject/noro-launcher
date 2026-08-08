@@ -1,5 +1,5 @@
 use super::common::progress_label;
-use crate::components::progress_bar;
+use crate::components::{progress_bar, stage_row};
 use crate::components::{mascot, Mood};
 use crate::state::SyncUiState;
 use crate::theme::*;
@@ -65,6 +65,17 @@ pub fn sync_overlay(_server_id: Uuid, sync: &SyncUiState) -> AnyElement {
                         ),
                 )
                 .child(progress_bar(sync.fraction()))
+                // Полосы стадий под общей: видно, что качается прямо сейчас, и
+                // что осталось. Пока стадий нет (идёт проверка файлов) — пусто.
+                .when(!sync.stages.is_empty() && sync.failed.is_none(), |d| {
+                    d.child(
+                        div().flex().flex_col().gap(px(4.)).children(
+                            sync.stages
+                                .iter()
+                                .map(|(stage, (done, total))| stage_row(*stage, *done, *total)),
+                        ),
+                    )
+                })
                 .when(!sync.detail.is_empty(), |d| {
                     d.child(
                         div()

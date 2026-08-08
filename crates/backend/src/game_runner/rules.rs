@@ -92,8 +92,11 @@ fn version_matches(pattern: &str) -> bool {
 #[cfg(target_os = "windows")]
 fn os_version() -> String {
     // `cmd /c ver` отдаёт "Microsoft Windows [Version 10.0.19045.5011]".
+    use std::os::windows::process::CommandExt;
     std::process::Command::new("cmd")
         .args(["/c", "ver"])
+        // Без флага на секунду мигает консольное окно — прямо при запуске игры.
+        .creation_flags(super::CREATE_NO_WINDOW)
         .output()
         .ok()
         .and_then(|o| String::from_utf8(o.stdout).ok())

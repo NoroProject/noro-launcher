@@ -97,34 +97,45 @@ pub async fn sync_server(
         }
     }
 
-    // 4. Скачать по категориям (для наглядных стадий).
-    for (stage, kinds) in STAGE_GROUPS {
+    // 4. Скачать все стадии разом. Они трогают непересекающиеся файлы, поэтому
+    //    ждать очереди незачем: раньше тысяча мелких ассетов простаивала, пока
+    //    докачается JDK, хотя канал в это время занят одним потоком.
+    let jobs = STAGE_GROUPS.iter().filter_map(|g| {
         let group: Vec<DownloadTask> = tasks
             .iter()
-            .filter(|(k, _)| kinds.contains(k))
+            .filter(|(k, _)| g.kinds.contains(k))
             .map(|(_, t)| t.clone())
             .collect();
         if group.is_empty() {
-            continue;
+            return None;
         }
         let total: u64 = group.iter().map(|t| t.size).sum();
-        let count = group.len();
-        progress(*stage, 0, total, format!("{count} файлов"));
+        // Полосу стадии нужно показать до старта, иначе она появится в UI
+        // только с первым отчётом — то есть уже наполовину заполненной.
+        progress(g.stage, 0, total, String::new());
 
         let prog = progress.clone();
-        let stage_copy = *stage;
-        download_all(
-            client,
-            group,
-            8,
-            move |done| prog(stage_copy, done, total, String::new()),
-            {
-                let c = cancelled.clone();
-                move || c()
-            },
-        )
-        .await?;
-    }
+        let cancelled = cancelled.clone();
+        let client = client.clone();
+        Some(async move {
+            download_all(
+                &client,
+                group,
+                g.concurrency,
+                {
+                    let prog = prog.clone();
+                    move |done| prog(g.stage, done, total, String::new())
+                },
+                move || cancelled(),
+            )
+            .await?;
+            // Последний порог прогресса мог не сработать — досылаем точный итог,
+            // чтобы полоса не замерла на 99%.
+            prog(g.stage, total, total, String::new());
+            Ok::<_, anyhow::Error>(())
+        })
+    });
+    futures::future::try_join_all(jobs).await?;
 
     // 5. Удалить лишние файлы (всё, что не в effective и не защищено).
     progress(SyncStage::Cleaning, 0, 0, String::new());
@@ -153,26 +164,52 @@ pub fn build_state(instance_dir: &Path, manifest: &BuildManifest) -> bridge::Bui
     }
 }
 
+/// Стадия загрузки: какие артефакты в неё входят и сколько запросов держать
+/// в полёте. Единого хорошего числа нет — профили нагрузки слишком разные.
+struct StageGroup {
+    stage: SyncStage,
+    kinds: &'static [ArtifactKind],
+    concurrency: usize,
+}
+
 /// Сопоставление стадий и категорий артефактов.
-const STAGE_GROUPS: &[(SyncStage, &[ArtifactKind])] = &[
-    (SyncStage::DownloadingJava, &[ArtifactKind::Java]),
-    (SyncStage::DownloadingMinecraft, &[ArtifactKind::ClientJar]),
-    (
-        SyncStage::DownloadingLibraries,
-        &[
+///
+/// Параллелизм подобран под размер файлов: у ассетов их тысячи по несколько
+/// килобайт, и время уходит на round-trip, а не на передачу — им нужно много
+/// запросов сразу. Крупным архивам это наоборот вредит: они делят один канал
+/// и все финишируют позже, чем если бы качались по очереди.
+const STAGE_GROUPS: &[StageGroup] = &[
+    StageGroup {
+        stage: SyncStage::DownloadingJava,
+        kinds: &[ArtifactKind::Java],
+        concurrency: 8,
+    },
+    StageGroup {
+        stage: SyncStage::DownloadingMinecraft,
+        kinds: &[ArtifactKind::ClientJar],
+        // Один файл — параллелить нечего.
+        concurrency: 2,
+    },
+    StageGroup {
+        stage: SyncStage::DownloadingLibraries,
+        kinds: &[
             ArtifactKind::Library,
             ArtifactKind::Runtime,
             ArtifactKind::Native,
         ],
-    ),
-    (
-        SyncStage::DownloadingAssets,
-        &[ArtifactKind::Asset, ArtifactKind::AssetIndex],
-    ),
-    (
-        SyncStage::DownloadingMods,
-        &[ArtifactKind::Mod, ArtifactKind::Config, ArtifactKind::Other],
-    ),
+        concurrency: 16,
+    },
+    StageGroup {
+        stage: SyncStage::DownloadingAssets,
+        kinds: &[ArtifactKind::Asset, ArtifactKind::AssetIndex],
+        // Мультиплексируются в одно HTTP/2-соединение, так что это не 48 сокетов.
+        concurrency: 48,
+    },
+    StageGroup {
+        stage: SyncStage::DownloadingMods,
+        kinds: &[ArtifactKind::Mod, ArtifactKind::Config, ArtifactKind::Other],
+        concurrency: 12,
+    },
 ];
 
 /// Пути файлов выключенных (или недоступных по правам) опциональных модов.

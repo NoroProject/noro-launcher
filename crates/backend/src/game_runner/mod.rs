@@ -17,6 +17,10 @@ use tokio::process::{Child, Command};
 pub use authlib::ensure_authlib_injector;
 pub use classpath::classpath_separator;
 
+/// `CREATE_NO_WINDOW` из winbase.h — запустить процесс без консольного окна.
+#[cfg(windows)]
+pub(crate) const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
 /// Данные для входа в игру.
 pub struct LoginInfo {
     pub username: String,
@@ -92,6 +96,12 @@ pub async fn launch(
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
     cmd.kill_on_drop(true);
+    // java.exe — консольное приложение, а лаунчер GUI-процесс без консоли, так
+    // что Windows заводит для него отдельное окно. Оно не просто пустое и
+    // лишнее: закрытие консоли шлёт CTRL_CLOSE_EVENT всей группе процессов, и
+    // игра умирает вместе с ней. Пайпы флаг не трогает — логи идут как шли.
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
     cmd.spawn().context("не удалось запустить JVM")
 }
 

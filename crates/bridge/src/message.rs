@@ -94,7 +94,10 @@ pub enum MessageToBackend {
 }
 
 /// Стадии синхронизации — пользователь видит детальный прогресс.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Порядок вариантов — это и порядок полос в UI: стадии загрузки идут
+/// параллельно, и `Ord` держит их список стабильным, а не в порядке прихода.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SyncStage {
     CheckingFiles,
     DownloadingJava,
@@ -121,6 +124,34 @@ impl SyncStage {
             SyncStage::Cleaning => "Cleaning extra files...",
             SyncStage::Done => "Done",
         }
+    }
+
+    /// Короткая метка для строки стадии — рядом с полосой места мало.
+    pub fn short_label(&self) -> &'static str {
+        match self {
+            SyncStage::CheckingFiles => "Checking",
+            SyncStage::DownloadingJava => "Java",
+            SyncStage::DownloadingMinecraft => "Minecraft",
+            SyncStage::DownloadingLibraries => "Libraries",
+            SyncStage::DownloadingAssets => "Assets",
+            SyncStage::DownloadingMods => "Mods",
+            SyncStage::ApplyingForgePatches => "Forge",
+            SyncStage::Cleaning => "Cleaning",
+            SyncStage::Done => "Done",
+        }
+    }
+
+    /// Качает ли стадия файлы. У таких прогресс в байтах и своя полоса; у
+    /// остальных счётчик в штуках, и сложить их в общий итог нельзя.
+    pub fn is_download(&self) -> bool {
+        matches!(
+            self,
+            SyncStage::DownloadingJava
+                | SyncStage::DownloadingMinecraft
+                | SyncStage::DownloadingLibraries
+                | SyncStage::DownloadingAssets
+                | SyncStage::DownloadingMods
+        )
     }
 }
 
