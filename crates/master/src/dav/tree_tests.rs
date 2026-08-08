@@ -64,16 +64,22 @@ fn directories_exist_only_while_they_hold_files() {
 #[test]
 fn under_collects_whole_subtree() {
     let files = sample();
-    let paths: Vec<_> = under(&files, "config").iter().map(|f| f.path.clone()).collect();
+    let paths: Vec<_> = under(&files, "config")
+        .iter()
+        .map(|f| f.path.clone())
+        .collect();
     assert_eq!(paths.len(), 2);
     assert!(paths.iter().all(|p| p.starts_with("config/")));
 }
 
 #[test]
 fn normalize_rejects_escaping_and_trims_slashes() {
-    assert_eq!(normalize("/config/foo.toml/").as_deref(), Some("config/foo.toml"));
+    assert_eq!(
+        normalize("/config/foo.toml/").as_deref(),
+        Some("config/foo.toml")
+    );
     assert_eq!(normalize("").as_deref(), Some(""));
-    assert_eq!(normalize("//config//a//"). as_deref(), Some("config/a"));
+    assert_eq!(normalize("//config//a//").as_deref(), Some("config/a"));
     // Выход за корень сборки недопустим.
     assert_eq!(normalize("../../etc/passwd"), None);
     assert_eq!(normalize("config/../../x"), None);

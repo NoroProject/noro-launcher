@@ -46,10 +46,8 @@ pub fn sync(instance_dir: &Path, server: &ServerEntry) -> Result<bool> {
     let mut ours: HashSet<String> = desired.iter().map(|(_, ip)| ip.clone()).collect();
     ours.extend(previous(&stamp_path));
 
-    let mut out: Vec<HashMap<String, Value>> = desired
-        .iter()
-        .map(|(name, ip)| record(name, ip))
-        .collect();
+    let mut out: Vec<HashMap<String, Value>> =
+        desired.iter().map(|(name, ip)| record(name, ip)).collect();
     for entry in existing.servers {
         let ip = entry.get("ip").and_then(as_str).unwrap_or_default();
         if !ours.contains(&ip) {
@@ -58,8 +56,8 @@ pub fn sync(instance_dir: &Path, server: &ServerEntry) -> Result<bool> {
     }
 
     std::fs::create_dir_all(instance_dir).ok();
-    let bytes = fastnbt::to_bytes(&ServersDat { servers: out })
-        .context("сериализация servers.dat")?;
+    let bytes =
+        fastnbt::to_bytes(&ServersDat { servers: out }).context("сериализация servers.dat")?;
     std::fs::write(&path, bytes).with_context(|| format!("запись {}", path.display()))?;
     std::fs::write(&stamp_path, stamp_with_ips(&stamp, &desired)).ok();
     Ok(true)

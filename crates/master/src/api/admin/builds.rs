@@ -427,7 +427,9 @@ pub async fn move_files(
     let to = clean_path(&req.to)?;
     // Переезд папки внутрь себя оставил бы её файлы без пути наверх.
     if to == from || to.starts_with(&format!("{from}/")) {
-        return Err(AppError::BadRequest("путь назначения внутри исходного".into()));
+        return Err(AppError::BadRequest(
+            "путь назначения внутри исходного".into(),
+        ));
     }
 
     let prefix = format!("{from}/");

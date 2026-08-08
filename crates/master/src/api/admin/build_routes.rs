@@ -56,7 +56,10 @@ pub fn router() -> Router<AppState> {
             "/api/admin/builds/{id}/files/prefix",
             delete(builds::delete_files_by_prefix),
         )
-        .route("/api/admin/builds/{id}/files/move", post(builds::move_files))
+        .route(
+            "/api/admin/builds/{id}/files/move",
+            post(builds::move_files),
+        )
         .route(
             "/api/admin/builds/{id}/mods/search",
             get(builds::search_mods),

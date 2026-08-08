@@ -40,7 +40,10 @@ pub async fn trigger(state: &AppState, tag: &str, job_id: Uuid) -> Result<bool> 
     let branch = state.config.github_ref.as_deref().unwrap_or("master");
     let resp = state
         .http()
-        .post(api(state, &format!("actions/workflows/{WORKFLOW}/dispatches")))
+        .post(api(
+            state,
+            &format!("actions/workflows/{WORKFLOW}/dispatches"),
+        ))
         .header("User-Agent", "noro-master")
         .header("Accept", "application/vnd.github+json")
         .bearer_auth(tok)
@@ -91,7 +94,10 @@ pub async fn wait(state: &AppState, job_id: Uuid, mut log: impl FnMut(String)) -
 
     loop {
         if tokio::time::Instant::now() >= deadline {
-            return Err(anyhow!("сборка не завершилась за {} минут", MAX_WAIT.as_secs() / 60));
+            return Err(anyhow!(
+                "сборка не завершилась за {} минут",
+                MAX_WAIT.as_secs() / 60
+            ));
         }
 
         match find_run(state, &marker).await? {
@@ -140,7 +146,10 @@ async fn find_run(state: &AppState, marker: &str) -> Result<Option<serde_json::V
         return Ok(None);
     }
     let body: serde_json::Value = resp.json().await?;
-    let runs = body["workflow_runs"].as_array().cloned().unwrap_or_default();
+    let runs = body["workflow_runs"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
     Ok(runs
         .into_iter()
         .find(|r| r["name"].as_str().is_some_and(|n| n.contains(marker))))

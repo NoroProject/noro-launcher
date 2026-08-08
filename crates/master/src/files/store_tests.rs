@@ -37,7 +37,10 @@ async fn plain_put_leaves_a_corrupted_blob_alone() {
     store.put_bytes(b"real content").await.expect("повторное");
 
     let on_disk = std::fs::read(store.path_for(&stored.sha1)).expect("чтение");
-    assert_eq!(on_disk, b"garbage", "обычная запись не должна была тронуть блоб");
+    assert_eq!(
+        on_disk, b"garbage",
+        "обычная запись не должна была тронуть блоб"
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }

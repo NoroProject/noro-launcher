@@ -22,7 +22,9 @@ public final class GroupPrefix {
      * ещё нет: на свежем сервере иначе не появилось бы вообще ничего.
      */
     public static CompletableFuture<Void> apply(LuckPerms luckPerms, RoleInfo role) {
-        if (!role.hasPrefix()) {
+        // Группу спрашиваем здесь: префикс сам по себе от LuckPerms не зависит,
+        // а вот проецировать роль без `lp_group` попросту некуда.
+        if (role.lpGroup() == null || !role.hasPrefix()) {
             return CompletableFuture.completedFuture(null);
         }
         String desired = PrefixFormat.of(role.color(), role.icon());

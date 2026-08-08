@@ -1,9 +1,9 @@
 //! Админ: роли и их права.
 
 use crate::api::auth::AdminAuth;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use axum::extract::{Path, State, Query};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use schema::{Role, PERM_ADMIN_ROLES};
 use serde::Deserialize;
@@ -57,6 +57,9 @@ pub struct UpdateReq {
     /// Иконка роли: имя из набора либо юникод-символ.
     #[serde(default)]
     pub icon: Option<String>,
+    /// Роль-родитель, чьи права действуют и здесь. `None` — наследования нет.
+    #[serde(default)]
+    pub parent_id: Option<Uuid>,
 }
 
 pub async fn update(
@@ -66,6 +69,9 @@ pub async fn update(
     Json(req): Json<UpdateReq>,
 ) -> AppResult<Json<Role>> {
     admin.require(PERM_ADMIN_ROLES)?;
+    if let Some(parent) = req.parent_id {
+        reject_cycle(&state, id, parent).await?;
+    }
     crate::db::update_role(
         &state.db,
         id,
@@ -75,6 +81,7 @@ pub async fn update(
         req.sort_order,
         req.lp_group.as_deref(),
         req.icon.as_deref(),
+        req.parent_id,
     )
     .await?;
     let roles = crate::db::list_roles(&state.db).await?;
@@ -89,8 +96,40 @@ pub async fn update(
             sort_order: req.sort_order,
             lp_group: req.lp_group,
             icon: req.icon,
+            permission_grants: vec![],
+            parent_id: req.parent_id,
+            inherited_permissions: vec![],
         },
     )))
+}
+
+/// Не даёт замкнуть наследование в кольцо.
+///
+/// Роль не может быть родителем самой себе ни напрямую, ни через цепочку:
+/// иначе «права предков» перестают быть конечным списком, а админ получает
+/// иерархию, в которой ни одна роль не главнее другой. Обход ограничен числом
+/// ролей — если кольцо уже есть в данных, подниматься по нему можно вечно.
+async fn reject_cycle(state: &AppState, role: Uuid, parent: Uuid) -> AppResult<()> {
+    if role == parent {
+        return Err(AppError::BadRequest(
+            "роль не может наследовать саму себя".into(),
+        ));
+    }
+    let links = crate::db::role_parent_links(&state.db).await?;
+    let mut current = Some(parent);
+    for _ in 0..links.len() {
+        let Some(node) = current else { return Ok(()) };
+        if node == role {
+            return Err(AppError::BadRequest(
+                "цикл наследования: эта роль уже выше по цепочке".into(),
+            ));
+        }
+        current = links
+            .iter()
+            .find(|(id, _)| *id == node)
+            .and_then(|(_, p)| *p);
+    }
+    Ok(())
 }
 
 pub async fn delete(

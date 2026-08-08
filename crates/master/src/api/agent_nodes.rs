@@ -44,5 +44,7 @@ pub async fn report(
 
     let accepted = nodes.len();
     crate::db::replace_permission_nodes(&state.db, server_id, &nodes).await?;
-    Ok(Json(serde_json::json!({ "ok": true, "accepted": accepted })))
+    Ok(Json(
+        serde_json::json!({ "ok": true, "accepted": accepted }),
+    ))
 }

@@ -33,9 +33,8 @@ impl Resource {
 
 /// `base` — префикс URL вида `/dav/{build_id}`.
 pub fn multistatus(base: &str, resources: &[Resource]) -> String {
-    let mut xml = String::from(
-        r#"<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">"#,
-    );
+    let mut xml =
+        String::from(r#"<?xml version="1.0" encoding="utf-8"?><D:multistatus xmlns:D="DAV:">"#);
     for res in resources {
         xml.push_str(&response(base, res));
     }

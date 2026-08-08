@@ -78,6 +78,23 @@ class PlaceholderValuesTest {
         assertNull(PlaceholderValues.resolve(null, "role"));
     }
 
+    /**
+     * Сервер без LuckPerms — у ролей нет и не будет `lp_group`, но иконка есть.
+     * Раньше префикс был завязан на группу, и в таком раскладе он пропадал у
+     * всех: в чате и в табе не появлялось ничего.
+     */
+    @Test
+    void prefixDoesNotNeedALuckPermsGroup() {
+        RoleInfo groupless = new RoleInfo("admin", "Админ", null, "#5865f2", "★", 100);
+        PlayerProfile profile = new PlayerProfile(
+                UUID_ONE, "Steve", false, true, List.of(groupless), null, null, List.of(), List.of());
+
+        assertEquals("§x§5§8§6§5§f§2★§r", PlaceholderValues.resolve(profile, "prefix"));
+        assertEquals("★", PlaceholderValues.resolve(profile, "prefix_plain"));
+        // roles_icons отдаёт иконки в цвете своих ролей, а не голыми символами.
+        assertEquals("§x§5§8§6§5§f§2★§r", PlaceholderValues.resolve(profile, "roles_icons"));
+    }
+
     @Test
     void missingDataBecomesEmptyString() {
         PlayerProfile bare = new PlayerProfile(

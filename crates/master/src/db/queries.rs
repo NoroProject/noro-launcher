@@ -4,7 +4,7 @@
 use super::models::*;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
-use schema::{Modloader, Role, ServerEntry, UserProfile};
+use schema::{Modloader, PermissionGrant, Role, ServerEntry, UserProfile};
 use sqlx::PgPool;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -109,11 +109,19 @@ pub async fn load_profile(pool: &PgPool, user_id: Uuid) -> Result<UserProfile> {
 
 pub async fn profile_from_row(pool: &PgPool, u: UserRow) -> Result<UserProfile> {
     let roles = load_user_roles(pool, u.id).await?;
-    let permissions: Vec<String> =
-        sqlx::query_scalar("SELECT permission FROM user_permissions WHERE user_id = $1")
+    let grants: Vec<(String, Option<Uuid>)> =
+        sqlx::query_as("SELECT permission, server_id FROM user_permissions WHERE user_id = $1")
             .bind(u.id)
             .fetch_all(pool)
             .await?;
+    let permissions = grants.iter().map(|(p, _)| p.clone()).collect();
+    let permission_grants = grants
+        .into_iter()
+        .map(|(permission, server_id)| PermissionGrant {
+            permission,
+            server_id,
+        })
+        .collect();
     Ok(UserProfile {
         id: u.id,
         uuid: u.mc_uuid,
@@ -125,6 +133,7 @@ pub async fn profile_from_row(pool: &PgPool, u: UserRow) -> Result<UserProfile> 
         cape_url: u.cape_url,
         roles,
         permissions,
+        permission_grants,
         banned: u.banned,
     })
 }
@@ -157,12 +166,22 @@ pub async fn effective_permissions(
     server_id: Uuid,
 ) -> Result<Vec<String>> {
     let rows: Vec<String> = sqlx::query_scalar(
-        "SELECT permission FROM user_permissions \
+        // Роли игрока вместе с их предками: наследование должно доезжать до
+        // игры так же, как оно видно в админке, иначе право «есть» на сайте и
+        // «нет» на сервере.
+        "WITH RECURSIVE granted AS ( \
+             SELECT role_id AS id FROM user_roles WHERE user_id = $1 \
+           UNION \
+             SELECT r.parent_id FROM roles r \
+               JOIN granted g ON r.id = g.id \
+              WHERE r.parent_id IS NOT NULL \
+         ) \
+         SELECT permission FROM user_permissions \
           WHERE user_id = $1 AND (server_id IS NULL OR server_id = $2) \
          UNION \
          SELECT rp.permission FROM role_permissions rp \
-           JOIN user_roles ur ON ur.role_id = rp.role_id \
-          WHERE ur.user_id = $1 AND (rp.server_id IS NULL OR rp.server_id = $2)",
+           JOIN granted g ON g.id = rp.role_id \
+          WHERE rp.server_id IS NULL OR rp.server_id = $2",
     )
     .bind(user_id)
     .bind(server_id)
@@ -217,11 +236,20 @@ pub async fn builds_with_optional_mods(pool: &PgPool) -> Result<Vec<BuildRow>> {
 }
 
 pub async fn role_with_perms(pool: &PgPool, r: RoleRow) -> Result<Role> {
-    let permissions: Vec<String> =
-        sqlx::query_scalar("SELECT permission FROM role_permissions WHERE role_id = $1")
+    let grants: Vec<(String, Option<Uuid>)> =
+        sqlx::query_as("SELECT permission, server_id FROM role_permissions WHERE role_id = $1")
             .bind(r.id)
             .fetch_all(pool)
             .await?;
+    let permissions = grants.iter().map(|(p, _)| p.clone()).collect();
+    let permission_grants = grants
+        .into_iter()
+        .map(|(permission, server_id)| PermissionGrant {
+            permission,
+            server_id,
+        })
+        .collect();
+    let inherited_permissions = inherited_role_permissions(pool, r.id).await?;
     Ok(Role {
         id: r.id,
         name: r.name,
@@ -232,7 +260,45 @@ pub async fn role_with_perms(pool: &PgPool, r: RoleRow) -> Result<Role> {
         sort_order: r.sort_order,
         lp_group: r.lp_group,
         icon: r.icon,
+        permission_grants,
+        parent_id: r.parent_id,
+        inherited_permissions,
     })
+}
+
+/// Права всех предков роли — родителя, его родителя и так далее.
+///
+/// Свои права роли сюда не попадают: их спрашивают отдельно, и админке нужно
+/// видеть границу между «выдано здесь» и «пришло сверху».
+///
+/// UNION, а не UNION ALL: на UNION рекурсия останавливается, когда новых строк
+/// больше нет, поэтому замкнутая цепочка ролей даёт конечный ответ, а не висящий
+/// запрос. Циклы запрещает API, но резолвер прав не должен зависеть от того,
+/// что данные в базе непременно правильные.
+pub async fn inherited_role_permissions(pool: &PgPool, role_id: Uuid) -> Result<Vec<String>> {
+    Ok(sqlx::query_scalar(
+        "WITH RECURSIVE ancestors AS (
+             SELECT parent_id AS id FROM roles WHERE id = $1 AND parent_id IS NOT NULL
+           UNION
+             SELECT r.parent_id FROM roles r
+               JOIN ancestors a ON r.id = a.id
+              WHERE r.parent_id IS NOT NULL
+         )
+         SELECT DISTINCT rp.permission FROM role_permissions rp
+           JOIN ancestors a ON a.id = rp.role_id",
+    )
+    .bind(role_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Пары «роль → её родитель» целиком. Таблица ролей маленькая и читается
+/// одним запросом, поэтому проверять цикл проще в памяти, чем ещё одним
+/// рекурсивным SQL.
+pub async fn role_parent_links(pool: &PgPool) -> Result<Vec<(Uuid, Option<Uuid>)>> {
+    Ok(sqlx::query_as("SELECT id, parent_id FROM roles")
+        .fetch_all(pool)
+        .await?)
 }
 
 pub async fn user_by_access_token(pool: &PgPool, token: Uuid) -> Result<Option<UserRow>> {
@@ -509,10 +575,11 @@ pub async fn update_role(
     sort_order: i32,
     lp_group: Option<&str>,
     icon: Option<&str>,
+    parent_id: Option<Uuid>,
 ) -> Result<()> {
     sqlx::query(
         "UPDATE roles SET display_name=$2, color=$3, is_default=$4, sort_order=$5,
-         lp_group=$6, icon=$7 WHERE id=$1",
+         lp_group=$6, icon=$7, parent_id=$8 WHERE id=$1",
     )
     .bind(id)
     .bind(display_name)
@@ -521,6 +588,7 @@ pub async fn update_role(
     .bind(sort_order)
     .bind(lp_group.filter(|s| !s.trim().is_empty()))
     .bind(icon.filter(|s| !s.trim().is_empty()))
+    .bind(parent_id)
     .execute(pool)
     .await?;
     Ok(())

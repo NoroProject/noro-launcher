@@ -41,31 +41,54 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
     trigger_and_wait(state, job_id, tag).await?;
 
     set_status(state, job_id, "downloading").await?;
-    append_log(state, job_id, &format!("запрос релиза {tag} из GitHub...\n")).await?;
+    append_log(
+        state,
+        job_id,
+        &format!("запрос релиза {tag} из GitHub...\n"),
+    )
+    .await?;
 
-    let repo_str = state.config.github_repo.as_deref().unwrap_or("NexBitstd/NoroLauncher");
+    let repo_str = state
+        .config
+        .github_repo
+        .as_deref()
+        .unwrap_or("NexBitstd/NoroLauncher");
     let url = format!("https://api.github.com/repos/{repo_str}/releases/tags/{tag}");
-    
+
     let mut req = state.http().get(&url).header("User-Agent", "noro-master");
     if let Some(tok) = &state.config.github_token {
         req = req.bearer_auth(tok);
     }
-    
-    let resp = req.send().await.with_context(|| "ошибка запроса к GitHub API")?;
+
+    let resp = req
+        .send()
+        .await
+        .with_context(|| "ошибка запроса к GitHub API")?;
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(anyhow::anyhow!("GitHub API вернул статус: {} ({})", status, text));
+        return Err(anyhow::anyhow!(
+            "GitHub API вернул статус: {} ({})",
+            status,
+            text
+        ));
     }
-    
+
     let release: serde_json::Value = resp.json().await?;
-    let assets = release["assets"].as_array().ok_or_else(|| anyhow::anyhow!("В релизе нет ассетов"))?;
-    
+    let assets = release["assets"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("В релизе нет ассетов"))?;
+
     if assets.is_empty() {
         return Err(anyhow::anyhow!("Ассеты для релиза {} не найдены", tag));
     }
 
-    append_log(state, job_id, &format!("найдено {} ассетов\n", assets.len())).await?;
+    append_log(
+        state,
+        job_id,
+        &format!("найдено {} ассетов\n", assets.len()),
+    )
+    .await?;
 
     let target_platforms = [
         ("x86_64-pc-windows-msvc", "windows-x86_64"),
@@ -88,7 +111,7 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
         } else {
             continue;
         };
-        
+
         let mut matched_platform = None;
         for (target, plat) in &target_platforms {
             if name.contains(target) {
@@ -96,29 +119,38 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
                 break;
             }
         }
-        
-        let Some(platform) = matched_platform else { continue; };
+
+        let Some(platform) = matched_platform else {
+            continue;
+        };
         let asset_url = asset["url"].as_str().unwrap_or_default();
-        
+
         append_log(state, job_id, &format!("скачивание {}...\n", name)).await?;
-        
+
         // Скачивание через API с токеном (чтобы работало с приватными репозиториями)
-        let mut dl_req = state.http().get(asset_url)
+        let mut dl_req = state
+            .http()
+            .get(asset_url)
             .header("User-Agent", "noro-master")
             .header("Accept", "application/octet-stream");
-            
+
         if let Some(tok) = &state.config.github_token {
             dl_req = dl_req.bearer_auth(tok);
         }
-        
+
         let resp = dl_req.send().await?;
         if !resp.status().is_success() {
-            append_log(state, job_id, &format!("ошибка скачивания {}: {}\n", name, resp.status())).await?;
+            append_log(
+                state,
+                job_id,
+                &format!("ошибка скачивания {}: {}\n", name, resp.status()),
+            )
+            .await?;
             continue;
         }
-        
+
         let bytes = resp.bytes().await?;
-        
+
         let sha256 = sha256_bytes(&bytes);
         let signature = base64::engine::general_purpose::STANDARD.encode(state.signer.sign(&bytes));
         let stored = state.files.put_bytes(&bytes).await?;
@@ -132,14 +164,25 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
             bytes.len() as i64,
             &signature,
             kind,
-        ).await?;
-        
+        )
+        .await?;
+
         saved_count += 1;
-        append_log(state, job_id, &format!("сохранено: {kind} {platform}, id={id}, {} байт\n", bytes.len())).await?;
+        append_log(
+            state,
+            job_id,
+            &format!(
+                "сохранено: {kind} {platform}, id={id}, {} байт\n",
+                bytes.len()
+            ),
+        )
+        .await?;
     }
-    
+
     if saved_count == 0 {
-        return Err(anyhow::anyhow!("Не удалось скачать ни один бинарник noro-launcher для известных платформ"));
+        return Err(anyhow::anyhow!(
+            "Не удалось скачать ни один бинарник noro-launcher для известных платформ"
+        ));
     }
 
     set_status(state, job_id, "done").await?;
@@ -154,7 +197,12 @@ async fn trigger_and_wait(state: &AppState, job_id: Uuid, tag: &str) -> Result<(
     set_status(state, job_id, "building").await?;
 
     if dispatch::release_exists(state, tag).await.unwrap_or(false) {
-        append_log(state, job_id, &format!("релиз {tag} уже собран — беру его ассеты\n")).await?;
+        append_log(
+            state,
+            job_id,
+            &format!("релиз {tag} уже собран — беру его ассеты\n"),
+        )
+        .await?;
         return Ok(());
     }
 

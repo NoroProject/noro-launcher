@@ -67,7 +67,10 @@ pub async fn run() -> Result<()> {
 }
 
 fn router(state: AppState) -> Router {
-    use api::{agent, agent_artifact, agent_nodes, auth, cabinet, file_serve, launcher, textures, translations};
+    use api::{
+        agent, agent_artifact, agent_nodes, auth, cabinet, file_serve, launcher, textures,
+        translations,
+    };
 
     // Yggdrasil (authlib-injector) — без авторизации.
     let yggdrasil = Router::new().nest(

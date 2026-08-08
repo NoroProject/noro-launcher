@@ -100,7 +100,5 @@ async fn staged(ctx: &BootstrapCtx<'_>) -> Result<PathBuf> {
 
     let java_bin = java_bin.ok_or_else(|| anyhow!("java runtime скачан, но bin/java не найден"))?;
     // Абсолютный путь обязателен: процессор запускается из другой директории.
-    Ok(tokio::fs::canonicalize(&java_bin)
-        .await
-        .unwrap_or(java_bin))
+    Ok(tokio::fs::canonicalize(&java_bin).await.unwrap_or(java_bin))
 }

@@ -18,6 +18,12 @@ const role = computed(() => roles.value.find(item => item.id === id.value))
 const permissions = computed(() =>
   toPermissionEntries(role.value?.permission_grants, role.value?.permissions || [])
 )
+const inherited = computed(() => role.value?.inherited_permissions || [])
+/** Родителем может стать любая роль, кроме этой: цикл мастер всё равно отклонит. */
+const parentOptions = computed(() => roles.value.filter(item => item.id !== id.value))
+const parentName = computed(() =>
+  roles.value.find(item => item.id === role.value?.parent_id)?.display_name || ''
+)
 const grants = usePermissionGrants(computed(() => `/api/admin/roles/${id.value}`))
 const form = reactive({
   display_name: '',
@@ -25,7 +31,8 @@ const form = reactive({
   is_default: false,
   sort_order: 0,
   lp_group: '',
-  icon: ''
+  icon: '',
+  parent_id: ''
 })
 const busy = ref<string | null>(null)
 
@@ -37,7 +44,8 @@ watchEffect(() => {
     is_default: role.value.is_default,
     sort_order: role.value.sort_order || 0,
     lp_group: role.value.lp_group || '',
-    icon: role.value.icon || ''
+    icon: role.value.icon || '',
+    parent_id: role.value.parent_id || ''
   })
 })
 
@@ -52,7 +60,9 @@ async function run(name: string, action: () => Promise<void>) {
 }
 
 async function save() {
-  await run('save', () => auth.request(`/api/admin/roles/${id.value}`, { method: 'PUT', body: form }))
+  // Пустая строка из <select> — это «без родителя», а не роль с пустым id.
+  const body = { ...form, parent_id: form.parent_id || null }
+  await run('save', () => auth.request(`/api/admin/roles/${id.value}`, { method: 'PUT', body }))
 }
 
 async function removeRole() {
@@ -63,15 +73,13 @@ async function removeRole() {
 }
 
 async function addPermission(entries: PermissionEntry[]) {
-  await run('perm', () => grants.addMany(entries))
+  await run(entries.length === 1 ? `perm-${entries[0]!.permission}` : 'perm', () =>
+    grants.addMany(entries)
+  )
 }
 
-async function removePermission(entry: PermissionEntry) {
-  await run(`perm-${entry.permission}`, () => grants.remove(entry))
-}
-
-async function movePermission(entry: PermissionEntry, serverId: string | null) {
-  await run(`perm-${entry.permission}`, () => grants.move(entry, serverId))
+async function removePermission(entries: PermissionEntry[]) {
+  await run(`perm-${entries[0]?.permission}`, () => grants.removeMany(entries))
 }
 </script>
 
@@ -97,6 +105,19 @@ async function movePermission(entry: PermissionEntry, serverId: string | null) {
           </span>
         </label>
         <label>
+          <span class="noro-label">Inherits from</span>
+          <select v-model="form.parent_id" class="noro-input noro-select">
+            <option value="">Nothing — own permissions only</option>
+            <option v-for="item in parentOptions" :key="item.id" :value="item.id">
+              {{ item.display_name }}
+            </option>
+          </select>
+          <span class="mt-2 block text-xs text-[var(--noro-muted)]">
+            Everything the parent grants applies here too, all the way up the chain.
+            A role cannot inherit from one that already inherits from it.
+          </span>
+        </label>
+        <label>
           <span class="noro-label">LuckPerms group</span>
           <input v-model="form.lp_group" class="noro-input" placeholder="vip">
           <span class="mt-2 block text-xs text-[var(--noro-muted)]">
@@ -119,16 +140,18 @@ async function movePermission(entry: PermissionEntry, serverId: string | null) {
         </div>
       </form>
 
-      <AdminPermissionEditor
-        title="Role permissions"
-        subtitle="Everyone in this role inherits them. Pick a build to scope a permission to it."
-        :entries="permissions"
-        :servers="servers"
-        :busy="busy"
-        @add="addPermission"
-        @remove="removePermission"
-        @move="movePermission"
-      />
+      <div class="grid gap-5">
+        <AdminPermissionEditor
+          title="Role permissions"
+          subtitle="Everyone in this role gets them. Pick the builds a permission applies to, or all of them."
+          :entries="permissions"
+          :servers="servers"
+          :busy="busy"
+          @add="addPermission"
+          @remove="removePermission"
+        />
+        <AdminInheritedPermissions :permissions="inherited" :parent-name="parentName" />
+      </div>
     </div>
   </NoroShell>
 </template>

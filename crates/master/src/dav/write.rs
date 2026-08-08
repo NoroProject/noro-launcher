@@ -61,7 +61,10 @@ pub async fn delete(
         });
     }
     for file in targets {
-        if crate::db::delete_build_file(&state.db, file.id).await.is_err() {
+        if crate::db::delete_build_file(&state.db, file.id)
+            .await
+            .is_err()
+        {
             return status(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
@@ -104,8 +107,12 @@ pub async fn mv(
             Some(tail) => format!("{destination}{tail}"),
             None => destination.clone(),
         };
-        if store(state, build_id, &moved, &file.sha1, file.size).await.is_err()
-            || crate::db::delete_build_file(&state.db, file.id).await.is_err()
+        if store(state, build_id, &moved, &file.sha1, file.size)
+            .await
+            .is_err()
+            || crate::db::delete_build_file(&state.db, file.id)
+                .await
+                .is_err()
         {
             return status(StatusCode::INTERNAL_SERVER_ERROR);
         }
@@ -149,10 +156,8 @@ async fn store(
 /// Тот же сигнал, что шлёт файловый менеджер: админки обновят дерево.
 async fn notify(state: &AppState, build_id: Uuid) {
     if let Ok(Some(build)) = crate::db::get_build(&state.db, build_id).await {
-        state
-            .ws
-            .broadcast(&schema::ServerWsMsg::BuildsChanged {
-                server_id: build.server_id,
-            });
+        state.ws.broadcast(&schema::ServerWsMsg::BuildsChanged {
+            server_id: build.server_id,
+        });
     }
 }

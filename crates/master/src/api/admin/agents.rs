@@ -24,7 +24,10 @@ pub struct AgentFile {
     pub url: String,
 }
 
-pub async fn list(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Vec<AgentFile>>> {
+pub async fn list(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+) -> AppResult<Json<Vec<AgentFile>>> {
     admin.require(PERM_ADMIN_SERVERS)?;
 
     let dir = state.config.data_dir.join("agents");

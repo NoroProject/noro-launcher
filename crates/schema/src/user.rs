@@ -5,6 +5,18 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Выдача права в конкретном контексте: `server_id: None` — на всех сборках.
+///
+/// Плоского списка узлов для админки мало: одно и то же право может быть выдано
+/// глобально и на паре сборок сразу, и без `server_id` эти выдачи неразличимы —
+/// список показывал их одинаково, а снять точечную было нечем.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PermissionGrant {
+    pub permission: Permission,
+    #[serde(default)]
+    pub server_id: Option<Uuid>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Role {
     pub id: Uuid,
@@ -26,6 +38,18 @@ pub struct Role {
     /// ником, поэтому нужен глиф, переживающий и веб, и чат в игре.
     #[serde(default)]
     pub icon: Option<String>,
+    /// Те же права, но с контекстом сборки. `permissions` остаётся плоским:
+    /// проверки прав про контекст не знают, он нужен только админке.
+    #[serde(default)]
+    pub permission_grants: Vec<PermissionGrant>,
+    /// Роль, у которой эта наследует права. `None` — своих достаточно.
+    #[serde(default)]
+    pub parent_id: Option<Uuid>,
+    /// Права, пришедшие по цепочке родителей. Отдельным списком, а не
+    /// подмешаны в `permissions`: иначе в админке не отличить своё право от
+    /// чужого, а снятие унаследованного молча не делало бы ничего.
+    #[serde(default)]
+    pub inherited_permissions: Vec<Permission>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -45,6 +69,9 @@ pub struct UserProfile {
     /// Прямые права поверх ролей.
     #[serde(default)]
     pub permissions: Vec<Permission>,
+    /// Они же с контекстом сборки — для админки, см. [`PermissionGrant`].
+    #[serde(default)]
+    pub permission_grants: Vec<PermissionGrant>,
     #[serde(default)]
     pub banned: bool,
 }
@@ -61,13 +88,18 @@ pub struct CapeRow {
 }
 
 impl UserProfile {
-    /// Все эффективные права: прямые + из всех ролей.
+    /// Все эффективные права: прямые + из всех ролей, вместе с тем, что роли
+    /// получили от своих родителей.
     pub fn all_permissions(&self) -> impl Iterator<Item = &str> {
-        self.permissions.iter().map(String::as_str).chain(
-            self.roles
-                .iter()
-                .flat_map(|r| r.permissions.iter().map(String::as_str)),
-        )
+        self.permissions
+            .iter()
+            .map(String::as_str)
+            .chain(self.roles.iter().flat_map(|r| {
+                r.permissions
+                    .iter()
+                    .chain(r.inherited_permissions.iter())
+                    .map(String::as_str)
+            }))
     }
 
     /// Есть ли у пользователя право (с учётом wildcard'ов).

@@ -31,6 +31,7 @@ pub struct RoleRow {
     pub sort_order: i32,
     pub lp_group: Option<String>,
     pub icon: Option<String>,
+    pub parent_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]

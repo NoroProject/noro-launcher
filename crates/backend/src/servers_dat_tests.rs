@@ -94,13 +94,20 @@ fn without_proxy_every_node_is_listed() {
 
     let got = names(&dir);
     assert!(got.contains(&("Survival".into(), "s1.noro.dev".into())));
-    assert!(got.contains(&("Creative".into(), "s2.noro.dev:25566".into())), "{got:?}");
+    assert!(
+        got.contains(&("Creative".into(), "s2.noro.dev:25566".into())),
+        "{got:?}"
+    );
 }
 
 #[test]
 fn keeps_player_entries_and_drops_removed_ones() {
     let dir = tempdir();
-    sync(&dir, &build(vec![node("Old", "old.noro.dev", 25565, false)])).unwrap();
+    sync(
+        &dir,
+        &build(vec![node("Old", "old.noro.dev", 25565, false)]),
+    )
+    .unwrap();
 
     // Игрок дописал свой сервер.
     let mut dat: ServersDat =
@@ -108,11 +115,18 @@ fn keeps_player_entries_and_drops_removed_ones() {
     dat.servers.push(record("Друг", "friend.example"));
     std::fs::write(dir.join("servers.dat"), fastnbt::to_bytes(&dat).unwrap()).unwrap();
 
-    sync(&dir, &build(vec![node("New", "new.noro.dev", 25566, false)])).unwrap();
+    sync(
+        &dir,
+        &build(vec![node("New", "new.noro.dev", 25566, false)]),
+    )
+    .unwrap();
 
     let got = names(&dir);
     assert!(got.contains(&("New".into(), "new.noro.dev:25566".into())));
-    assert!(got.contains(&("Друг".into(), "friend.example".into())), "{got:?}");
+    assert!(
+        got.contains(&("Друг".into(), "friend.example".into())),
+        "{got:?}"
+    );
     assert!(
         !got.iter().any(|(_, ip)| ip == "old.noro.dev"),
         "снятый со сборки сервер должен уйти: {got:?}"

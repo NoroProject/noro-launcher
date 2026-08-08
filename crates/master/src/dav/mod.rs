@@ -27,7 +27,8 @@ use base64::Engine;
 use uuid::Uuid;
 
 /// Методы сверх обычного HTTP, которые понимает наш DAV.
-const ALLOW: &str = "OPTIONS, GET, HEAD, PROPFIND, PROPPATCH, PUT, DELETE, MKCOL, MOVE, LOCK, UNLOCK";
+const ALLOW: &str =
+    "OPTIONS, GET, HEAD, PROPFIND, PROPPATCH, PUT, DELETE, MKCOL, MOVE, LOCK, UNLOCK";
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -96,9 +97,17 @@ async fn authorize(
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Basic "))
-        .and_then(|encoded| base64::engine::general_purpose::STANDARD.decode(encoded).ok())
+        .and_then(|encoded| {
+            base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .ok()
+        })
         .and_then(|raw| String::from_utf8(raw).ok())
-        .map(|pair| pair.split_once(':').map(|(_, pass)| pass.to_string()).unwrap_or(pair));
+        .map(|pair| {
+            pair.split_once(':')
+                .map(|(_, pass)| pass.to_string())
+                .unwrap_or(pair)
+        });
 
     let Some(token) = token else {
         return Err(unauthorized());

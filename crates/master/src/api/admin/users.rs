@@ -110,7 +110,8 @@ pub async fn add_permission(
     Json(req): Json<PermReq>,
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_ADMIN_USERS)?;
-    crate::db::add_user_permission(&state.db, id, &req.permission, req.server_id, admin.user_id).await?;
+    crate::db::add_user_permission(&state.db, id, &req.permission, req.server_id, admin.user_id)
+        .await?;
     notify_user(&state, id).await
 }
 

@@ -29,16 +29,12 @@ export function usePermissionGrants(base: Ref<string>) {
     await auth.request(entryUrl(entry), { method: 'DELETE' })
   }
 
-  /**
-   * Переезд между контекстами. Атомарной ручки нет, поэтому порядок решает всё:
-   * сначала выдаём в новом контексте, потом снимаем в старом. При обратном
-   * порядке сорвавшийся POST оставлял бы право потерянным — так и пропал `*`
-   * у роли admin. Теперь худший исход — право в двух контекстах, и это видно.
-   */
-  async function move(entry: PermissionEntry, serverId: string | null) {
-    await add({ permission: entry.permission, server_id: serverId })
-    await remove(entry)
+  /** Снять право сразу во всех контекстах — крестик в списке делает именно это. */
+  async function removeMany(entries: PermissionEntry[]) {
+    for (const entry of entries) {
+      await remove(entry)
+    }
   }
 
-  return { add, addMany, remove, move }
+  return { add, addMany, remove, removeMany }
 }

@@ -102,7 +102,9 @@ fn safe_segment(raw: &str) -> AppResult<String> {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b'_');
     if !ok {
-        return Err(AppError::BadRequest(format!("недопустимое значение: {raw}")));
+        return Err(AppError::BadRequest(format!(
+            "недопустимое значение: {raw}"
+        )));
     }
     Ok(raw.to_ascii_lowercase())
 }
@@ -129,6 +131,9 @@ mod tests {
             r#""url":"http://localhost:8080/files/da39a3ee5e6b4b0d3255bfef95601890afd80709","#,
             r#""signature":""}"#
         );
-        assert_eq!(String::from_utf8(artifact.signing_bytes()).unwrap(), expected);
+        assert_eq!(
+            String::from_utf8(artifact.signing_bytes()).unwrap(),
+            expected
+        );
     }
 }

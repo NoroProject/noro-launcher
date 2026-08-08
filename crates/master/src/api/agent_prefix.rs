@@ -12,7 +12,11 @@ pub fn prefix_nodes(roles: &[AgentRole]) -> Vec<String> {
         .filter_map(|role| {
             let icon = role.icon.as_deref()?;
             let color = role.color.as_deref().unwrap_or("");
-            Some(format!("prefix.{}.{}", role.sort_order, legacy_prefix(color, icon)))
+            Some(format!(
+                "prefix.{}.{}",
+                role.sort_order,
+                legacy_prefix(color, icon)
+            ))
         })
         .collect()
 }

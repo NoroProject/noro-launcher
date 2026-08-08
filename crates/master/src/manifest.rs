@@ -77,23 +77,21 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
                         side_str: String,
                         kind_str: String,
                         platform: Option<String>| {
-            let kind = kind_from_str(&kind_str);
-            artifact_kinds.insert(path.clone(), kind);
-            // java-бинарники нужно делать исполняемыми на unix.
-            let executable = kind == ArtifactKind::Java
-                && (path.ends_with("/java")
-                    || path.ends_with("/javaw")
-                    || path.ends_with("/java.exe"));
-            verified_files.push(FileEntry {
-                path,
-                sha1: sha1.clone(),
-                size: size as u64,
-                url: state.config.file_url(&sha1),
-                side: side_from_str(&side_str),
-                executable,
-                platform,
-            });
-        };
+        let kind = kind_from_str(&kind_str);
+        artifact_kinds.insert(path.clone(), kind);
+        // java-бинарники нужно делать исполняемыми на unix.
+        let executable = kind == ArtifactKind::Java
+            && (path.ends_with("/java") || path.ends_with("/javaw") || path.ends_with("/java.exe"));
+        verified_files.push(FileEntry {
+            path,
+            sha1: sha1.clone(),
+            size: size as u64,
+            url: state.config.file_url(&sha1),
+            side: side_from_str(&side_str),
+            executable,
+            platform,
+        });
+    };
 
     for f in base_files {
         add_file(f.path, f.sha1, f.size, f.side, f.kind, f.platform);

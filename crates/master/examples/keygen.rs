@@ -48,7 +48,9 @@ fn self_check(key: &SigningKey, public_hex: &str) {
         .verify(probe, &Signature::from_bytes(&sig.to_bytes()))
         .expect("пара ключей не сходится — публиковать её нельзя");
     assert!(
-        verifying.verify(b"tampered", &Signature::from_bytes(&sig.to_bytes())).is_err(),
+        verifying
+            .verify(b"tampered", &Signature::from_bytes(&sig.to_bytes()))
+            .is_err(),
         "подпись обязана отвергать изменённые данные"
     );
 }

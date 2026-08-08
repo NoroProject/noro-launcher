@@ -67,10 +67,7 @@ pub async fn build(
 
 /// Последние задачи сборки — чтобы job_id не приходилось откуда-то переписывать
 /// руками: у админки не было списка, и лог прошлой сборки открыть было нечем.
-pub async fn build_jobs(
-    State(state): State<AppState>,
-    admin: AdminAuth,
-) -> AppResult<Json<Value>> {
+pub async fn build_jobs(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Value>> {
     admin.require(PERM_ADMIN_LAUNCHER)?;
     let rows: Vec<(Uuid, String, String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
         "SELECT id, github_tag, status, created_at FROM launcher_build_jobs
@@ -80,12 +77,14 @@ pub async fn build_jobs(
     .await?;
     let items: Vec<Value> = rows
         .into_iter()
-        .map(|(id, tag, status, created_at)| json!({
-            "id": id,
-            "tag": tag,
-            "status": status,
-            "created_at": created_at,
-        }))
+        .map(|(id, tag, status, created_at)| {
+            json!({
+                "id": id,
+                "tag": tag,
+                "status": status,
+                "created_at": created_at,
+            })
+        })
         .collect();
     Ok(Json(json!(items)))
 }

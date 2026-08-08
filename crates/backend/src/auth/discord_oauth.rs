@@ -101,7 +101,10 @@ async fn exchange(master_url: &str, code: &str) -> Result<LoginResult> {
         user: UserProfile,
     }
 
-    let url = format!("{}/auth/launcher/exchange", master_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/auth/launcher/exchange",
+        master_url.trim_end_matches('/')
+    );
     let resp: ExchangeResp = reqwest::Client::new()
         .post(&url)
         .json(&serde_json::json!({ "code": code }))

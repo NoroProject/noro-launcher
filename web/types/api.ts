@@ -6,7 +6,7 @@ export interface Role {
   display_name: string;
   color?: string | null;
   permissions: string[];
-  /** Права с контекстом сборки. Мастер пока не отдаёт — см. toPermissionEntries. */
+  /** Права с контекстом сборки. */
   permission_grants?: PermissionEntry[];
   is_default: boolean;
   sort_order?: number;
@@ -14,6 +14,10 @@ export interface Role {
   lp_group?: string | null;
   /** Юникод-символ рядом с названием роли. */
   icon?: string | null;
+  /** Роль, чьи права действуют и здесь. */
+  parent_id?: string | null;
+  /** Права, пришедшие от родителя и его родителей. Только для чтения. */
+  inherited_permissions?: string[];
 }
 
 export interface UserProfile {
@@ -27,7 +31,7 @@ export interface UserProfile {
   cape_url?: string | null;
   roles: Role[];
   permissions: string[];
-  /** Прямые права с контекстом сборки. Мастер пока не отдаёт. */
+  /** Прямые права с контекстом сборки. */
   permission_grants?: PermissionEntry[];
   banned?: boolean;
 }

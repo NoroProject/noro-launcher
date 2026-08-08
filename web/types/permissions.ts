@@ -15,8 +15,10 @@ export interface PermissionEntry {
 }
 
 /**
- * Мастер пока отдаёт только плоский список узлов, без контекста. Когда появится
- * `permission_grants`, берём его; до тех пор считаем все права глобальными.
+ * Контекст берём из `permission_grants`. Плоский список узлов остаётся запасным
+ * путём: у него контекста нет вовсе, и всё в нём приходится считать глобальным —
+ * пока мастер не отдавал грантов, из-за этого точечно выданное право выглядело
+ * в админке выданным везде.
  */
 export function toPermissionEntries(
   grants: PermissionEntry[] | undefined,
@@ -26,7 +28,3 @@ export function toPermissionEntries(
   return nodes.map(permission => ({ permission, server_id: null }))
 }
 
-/** Ключ строки списка: одно право может быть выдано в нескольких контекстах. */
-export function permissionKey(entry: PermissionEntry) {
-  return `${entry.server_id || 'global'}:${entry.permission}`
-}

@@ -88,4 +88,3 @@ pub fn restart(exe: &std::path::Path) -> ! {
     let _ = std::process::Command::new(exe).spawn();
     std::process::exit(0);
 }
-

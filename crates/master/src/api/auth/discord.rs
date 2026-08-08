@@ -7,8 +7,8 @@ use axum::response::{IntoResponse, Redirect};
 use axum::Json;
 use chrono::Duration;
 use serde::Deserialize;
-use uuid::Uuid;
 use serde_json::Value;
+use uuid::Uuid;
 
 const DISCORD_AUTHORIZE: &str = "https://discord.com/api/oauth2/authorize";
 const DISCORD_TOKEN: &str = "https://discord.com/api/oauth2/token";
@@ -153,10 +153,9 @@ pub async fn launcher_exchange(
     State(state): State<AppState>,
     Json(req): Json<ExchangeReq>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let (user_id, access_token, refresh_token) =
-        crate::db::take_launcher_code(&state.db, req.code)
-            .await?
-            .ok_or_else(|| AppError::BadRequest("код входа недействителен или истёк".into()))?;
+    let (user_id, access_token, refresh_token) = crate::db::take_launcher_code(&state.db, req.code)
+        .await?
+        .ok_or_else(|| AppError::BadRequest("код входа недействителен или истёк".into()))?;
     let profile = crate::db::load_profile(&state.db, user_id).await?;
     Ok(Json(serde_json::json!({
         "access_token": access_token,

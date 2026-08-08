@@ -70,15 +70,13 @@ async function removeRole(roleId: string) {
 }
 
 async function addPermission(entries: PermissionEntry[]) {
-  await run('perm', () => grants.addMany(entries))
+  await run(entries.length === 1 ? `perm-${entries[0]!.permission}` : 'perm', () =>
+    grants.addMany(entries)
+  )
 }
 
-async function removePermission(entry: PermissionEntry) {
-  await run(`perm-${entry.permission}`, () => grants.remove(entry))
-}
-
-async function movePermission(entry: PermissionEntry, serverId: string | null) {
-  await run(`perm-${entry.permission}`, () => grants.move(entry, serverId))
+async function removePermission(entries: PermissionEntry[]) {
+  await run(`perm-${entries[0]?.permission}`, () => grants.removeMany(entries))
 }
 </script>
 
@@ -143,13 +141,12 @@ async function movePermission(entry: PermissionEntry, serverId: string | null) {
         <AdminUserRoles :roles="roles" :user-roles="user.roles" :busy="busy" @add="addRole" @remove="removeRole" />
         <AdminPermissionEditor
           title="Direct Permissions"
-          subtitle="Granted to this player on top of their roles. Pick a build to scope a permission to it."
+          subtitle="Granted to this player on top of their roles. Pick the builds a permission applies to, or all of them."
           :entries="permissions"
           :servers="servers"
           :busy="busy"
           @add="addPermission"
           @remove="removePermission"
-          @move="movePermission"
         />
       </section>
     </div>

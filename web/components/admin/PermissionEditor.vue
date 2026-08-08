@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ServerRow } from '~/types/api'
 import type { PermissionEntry } from '~/types/permissions'
-import { permissionKey } from '~/types/permissions'
 
 const props = defineProps<{
   title: string
@@ -13,8 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   add: [entries: PermissionEntry[]]
-  remove: [entry: PermissionEntry]
-  move: [entry: PermissionEntry, serverId: string | null]
+  remove: [entries: PermissionEntry[]]
 }>()
 
 const node = ref('')
@@ -39,32 +37,49 @@ const fresh = computed(() => targets.value.filter(server =>
   !props.entries.some(e => e.permission === node.value.trim() && e.server_id === server)
 ))
 
-/** Группируем по контексту: глобальные сверху, дальше сборки по алфавиту. */
-const groups = computed(() => {
-  const byContext = new Map<string, PermissionEntry[]>()
+/**
+ * Одна строка на право, а не на выдачу: право живёт сразу в нескольких
+ * контекстах, и раскладка по контекстам разносила его копии по разным местам
+ * списка — понять, где оно вообще действует, было нельзя.
+ */
+const rows = computed(() => {
+  const byPermission = new Map<string, (string | null)[]>()
   for (const entry of props.entries) {
-    const key = entry.server_id || ''
-    byContext.set(key, [...(byContext.get(key) || []), entry])
+    byPermission.set(entry.permission, [
+      ...(byPermission.get(entry.permission) || []),
+      entry.server_id
+    ])
   }
-  return [...byContext.entries()]
-    .map(([key, items]) => ({
-      key,
-      name: contextName(key),
-      items: [...items].sort((a, b) => a.permission.localeCompare(b.permission))
-    }))
-    .sort((a, b) => Number(Boolean(a.key)) - Number(Boolean(b.key)) || a.name.localeCompare(b.name))
+  return [...byPermission.entries()]
+    .map(([permission, contexts]) => ({ permission, contexts }))
+    .sort((a, b) => a.permission.localeCompare(b.permission))
 })
-
-function contextName(serverId: string) {
-  if (!serverId) return 'Global'
-  return props.servers.find(server => server.id === serverId)?.name || 'Unknown build'
-}
 
 function add() {
   const permission = node.value.trim()
   if (!permission || !fresh.value.length) return
   emit('add', fresh.value.map(server_id => ({ permission, server_id })))
   node.value = ''
+}
+
+/** Клик по чипу: где право уже есть — снимаем, где нет — выдаём. */
+function toggle(permission: string, serverId: string | null) {
+  const entry = { permission, server_id: serverId }
+  const granted = props.entries.some(
+    e => e.permission === permission && e.server_id === serverId
+  )
+  // Две ветки, а не имя события выражением: с вычисленным именем перегрузка
+  // `emit` не выводится и типы событий перестают проверяться вовсе.
+  if (granted) {
+    emit('remove', [entry])
+  } else {
+    emit('add', [entry])
+  }
+}
+
+/** Крестик снимает право целиком — во всех контекстах сразу. */
+function removeAll(permission: string) {
+  emit('remove', props.entries.filter(e => e.permission === permission))
 }
 </script>
 
@@ -112,28 +127,18 @@ function add() {
       Pick at least one build, or grant it on all of them.
     </p>
 
-    <div class="mt-5 grid gap-4">
-      <div v-for="group in groups" :key="group.key">
-        <div class="mb-2 flex items-center gap-2">
-          <UIcon :name="group.key ? 'i-lucide-box' : 'i-lucide-globe'" class="size-4 text-[var(--noro-muted)]" />
-          <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--noro-muted)]">{{ group.name }}</h3>
-          <span class="rounded bg-[var(--noro-input)] px-2 py-0.5 text-xs text-[var(--noro-muted)]">
-            {{ group.items.length }}
-          </span>
-        </div>
-        <div class="grid gap-2">
-          <AdminPermissionRow
-            v-for="entry in group.items"
-            :key="permissionKey(entry)"
-            :entry="entry"
-            :servers="servers"
-            :label="labels.get(entry.permission)"
-            :busy="busy === `perm-${entry.permission}`"
-            @remove="emit('remove', entry)"
-            @move="emit('move', entry, $event)"
-          />
-        </div>
-      </div>
+    <div class="mt-5 grid gap-2">
+      <AdminPermissionRow
+        v-for="row in rows"
+        :key="row.permission"
+        :permission="row.permission"
+        :contexts="row.contexts"
+        :servers="servers"
+        :label="labels.get(row.permission)"
+        :busy="busy === `perm-${row.permission}`"
+        @toggle="toggle(row.permission, $event)"
+        @remove="removeAll(row.permission)"
+      />
 
       <p v-if="!entries.length" class="rounded-lg bg-[var(--noro-input)] px-3 py-4 text-center text-sm text-[var(--noro-muted)]">
         No permissions granted yet.
