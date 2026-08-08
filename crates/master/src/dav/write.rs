@@ -12,8 +12,11 @@ use axum::http::StatusCode;
 use axum::response::Response;
 use uuid::Uuid;
 
-/// Потолок на файл: DAV — это про конфиги, моды заливают через админку.
-const MAX_BYTES: usize = 32 * 1024 * 1024;
+/// Потолок на файл. Прежние 32 МиБ исходили из того, что DAV — про конфиги, и
+/// молча роняли заливку мода на 32.5 МиБ: Finder успевал положить крошечный
+/// `._двойник` и отваливался на самом jar'е, а в сборке оставался один мусор.
+/// Ограничение остаётся только потому, что тело целиком лежит в памяти.
+const MAX_BYTES: usize = 512 * 1024 * 1024;
 
 pub async fn put(state: &AppState, build_id: Uuid, path: &str, body: Body) -> Response {
     if path.is_empty() {
