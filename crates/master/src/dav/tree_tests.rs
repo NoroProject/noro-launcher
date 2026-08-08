@@ -78,3 +78,13 @@ fn normalize_rejects_escaping_and_trims_slashes() {
     assert_eq!(normalize("../../etc/passwd"), None);
     assert_eq!(normalize("config/../../x"), None);
 }
+
+#[test]
+fn macos_junk_is_recognised_by_any_segment() {
+    assert!(is_macos_junk("mods/._NBitChat.jar"));
+    assert!(is_macos_junk(".DS_Store"));
+    assert!(is_macos_junk(".Trashes/501/whatever.jar"));
+    // Точка в имени сама по себе мусором не делает.
+    assert!(!is_macos_junk("mods/NBitChat.jar"));
+    assert!(!is_macos_junk("config/.mixin.out/x"));
+}

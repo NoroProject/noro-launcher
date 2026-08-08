@@ -405,6 +405,71 @@ pub async fn delete_files_by_prefix(
     Ok(Json(json!({ "ok": true })))
 }
 
+#[derive(Deserialize)]
+pub struct MoveReq {
+    pub from: String,
+    pub to: String,
+}
+
+/// Переименовать файл или папку.
+///
+/// <p>Содержимое остаётся на месте: в базе лежат только пути, поэтому и для
+/// папки это просто смена префикса у её файлов — тот же приём, что у MOVE в
+/// WebDAV.
+pub async fn move_files(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    Json(req): Json<MoveReq>,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_ADMIN_BUILDS)?;
+    let from = clean_path(&req.from)?;
+    let to = clean_path(&req.to)?;
+    // Переезд папки внутрь себя оставил бы её файлы без пути наверх.
+    if to == from || to.starts_with(&format!("{from}/")) {
+        return Err(AppError::BadRequest("путь назначения внутри исходного".into()));
+    }
+
+    let prefix = format!("{from}/");
+    let targets: Vec<BuildFileRow> = crate::db::build_files(&state.db, id)
+        .await?
+        .into_iter()
+        .filter(|f| f.path == from || f.path.starts_with(&prefix))
+        .collect();
+    if targets.is_empty() {
+        return Err(AppError::NotFound(format!("файлов по пути {from} нет")));
+    }
+
+    for file in &targets {
+        let moved = format!("{to}{}", &file.path[from.len()..]);
+        crate::db::upsert_build_file(
+            &state.db,
+            id,
+            &moved,
+            &file.sha1,
+            file.size,
+            &file.side,
+            guess_kind(&moved),
+        )
+        .await?;
+        crate::db::delete_build_file(&state.db, file.id).await?;
+    }
+
+    let server_id = build_server_id(&state, id).await?;
+    broadcast_builds_changed(&state, server_id);
+    Ok(Json(json!({ "moved": targets.len() })))
+}
+
+/// Путь внутри сборки: без ведущих и хвостовых слэшей, без `..` и пустых
+/// сегментов — иначе переименование стало бы способом писать мимо сборки.
+fn clean_path(raw: &str) -> AppResult<String> {
+    let path = raw.trim().trim_matches('/');
+    if path.is_empty() || path.split('/').any(|part| part == ".." || part.is_empty()) {
+        return Err(AppError::BadRequest(format!("некорректный путь: {raw}")));
+    }
+    Ok(path.to_string())
+}
+
 fn guess_kind(path: &str) -> &'static str {
     if path.starts_with("mods/") {
         "mod"

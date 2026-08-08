@@ -19,6 +19,11 @@ pub async fn put(state: &AppState, build_id: Uuid, path: &str, body: Body) -> Re
     if path.is_empty() {
         return status(StatusCode::CONFLICT);
     }
+    // Отказ Finder показывает пользователю как сбой копирования всей папки,
+    // поэтому мусор не отвергаем, а принимаем и выбрасываем.
+    if tree::is_macos_junk(path) {
+        return status(StatusCode::CREATED);
+    }
     let data = match axum::body::to_bytes(body, MAX_BYTES).await {
         Ok(data) => data,
         Err(_) => return status(StatusCode::PAYLOAD_TOO_LARGE),
@@ -44,7 +49,13 @@ pub async fn delete(
 ) -> Response {
     let targets = tree::under(files, path);
     if targets.is_empty() {
-        return status(StatusCode::NOT_FOUND);
+        // Мусора у нас нет, потому что мы его и не сохраняли: для Finder это
+        // должно выглядеть как обычное удаление.
+        return status(if tree::is_macos_junk(path) {
+            StatusCode::NO_CONTENT
+        } else {
+            StatusCode::NOT_FOUND
+        });
     }
     for file in targets {
         if crate::db::delete_build_file(&state.db, file.id).await.is_err() {
@@ -77,7 +88,11 @@ pub async fn mv(
     };
     let targets = tree::under(files, path);
     if targets.is_empty() {
-        return status(StatusCode::NOT_FOUND);
+        return status(if tree::is_macos_junk(path) {
+            StatusCode::CREATED
+        } else {
+            StatusCode::NOT_FOUND
+        });
     }
 
     for file in targets {

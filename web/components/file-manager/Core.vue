@@ -250,8 +250,28 @@ function cancelRename() {
 }
 
 async function commitRename() {
-  // Rename not supported by backend yet — just cancel
+  const key = renamingId.value
+  const name = renameValue.value.trim()
+  const item = currentItems.value.find(it =>
+    (it.type === 'folder' ? `d:${it.name}` : `f:${it.id}`) === key
+  )
+  // Инпут закрываем до запроса: blur коммитит повторно, и без этого
+  // переименование уходило на сервер дважды.
   cancelRename()
+  if (!item || !name || name === item.name || name.includes('/')) return
+
+  loading.value = true
+  try {
+    await auth.request(`/api/admin/builds/${props.buildId}/files/move`, {
+      method: 'POST',
+      body: { from: currentPath.value + item.name, to: currentPath.value + name },
+    })
+    await loadFiles()
+    emit('changed')
+    notify.ok()
+  } catch (e) {
+    notify.fail(e)
+  } finally { loading.value = false }
 }
 
 function copyPath() {

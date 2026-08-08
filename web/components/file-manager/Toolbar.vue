@@ -14,7 +14,9 @@ const emit = defineEmits<{
   back: []
   'set-view': [mode: 'list' | 'grid']
   'new-folder': []
-  upload: []
+  // Событие идёт наверх вместе с input: выбранные файлы лежат в нём, а открыть
+  // диалог второй раз уже нельзя — жест пользователя израсходован на первый.
+  upload: [event: Event]
   refresh: []
 }>()
 </script>
@@ -73,7 +75,7 @@ const emit = defineEmits<{
     </button>
     <label class="fm-icon-btn" title="Upload files">
       <UIcon name="i-lucide-upload" class="size-4" />
-      <input type="file" multiple class="hidden" @change="emit('upload')" />
+      <input type="file" multiple class="hidden" @change="emit('upload', $event)" />
     </label>
     <button
       class="fm-icon-btn"

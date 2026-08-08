@@ -30,6 +30,25 @@ pub fn normalize(raw: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
+/// Служебные файлы, которые macOS раскладывает по любому тому: AppleDouble
+/// (`._имя` — ресурсная вилка) и хозяйство Finder. В сборке им делать нечего.
+const MACOS_JUNK: [&str; 7] = [
+    "._",
+    ".DS_Store",
+    ".Spotlight-V100",
+    ".Trashes",
+    ".fseventsd",
+    ".TemporaryItems",
+    ".DocumentRevisions-V100",
+];
+
+/// Проверяем каждый сегмент, а не только имя файла: мусор бывает и каталогом
+/// (`.Trashes/501/…`), и тогда всё его содержимое такой же мусор.
+pub fn is_macos_junk(path: &str) -> bool {
+    path.split('/')
+        .any(|part| MACOS_JUNK.iter().any(|junk| part.starts_with(junk)))
+}
+
 /// Существует ли такой каталог, то есть есть ли под ним хоть один файл.
 pub fn is_dir(files: &[BuildFileRow], path: &str) -> bool {
     if path.is_empty() {
