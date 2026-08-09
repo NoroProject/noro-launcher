@@ -38,21 +38,27 @@ function save() {
     <div class="grid gap-3 px-5 py-4 transition hover:bg-white/5">
         <div v-if="!editing" class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex min-w-0 items-center gap-3">
-                <span
-                    class="size-3 shrink-0 rounded-full"
-                    :class="item.live ? 'bg-[var(--noro-success)]' : 'bg-[var(--noro-muted)]'"
-                />
-                <img
-                    v-if="item.icon_url"
-                    :src="item.icon_url"
-                    :alt="item.name"
-                    class="size-10 shrink-0 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] object-cover"
-                >
-                <div
-                    v-else
-                    class="grid size-10 shrink-0 place-items-center rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-muted)]"
-                >
-                    <UIcon name="i-lucide-server" class="size-5" />
+                <!-- Индикатор сидит на иконке, а не отдельной точкой слева: у
+                     офлайн-сервера она красилась в muted и оставляла пустой
+                     отступ, из-за чего строка выглядела съехавшей. -->
+                <div class="relative shrink-0">
+                    <img
+                        v-if="item.icon_url"
+                        :src="item.icon_url"
+                        :alt="item.name"
+                        class="size-10 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] object-cover"
+                    >
+                    <div
+                        v-else
+                        class="grid size-10 place-items-center rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-muted)]"
+                    >
+                        <UIcon name="i-lucide-server" class="size-5" />
+                    </div>
+                    <span
+                        class="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[var(--noro-panel)]"
+                        :class="item.live ? 'bg-[var(--noro-success)]' : 'bg-[var(--noro-muted)]'"
+                        :title="item.live ? 'Online' : 'Offline'"
+                    />
                 </div>
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">

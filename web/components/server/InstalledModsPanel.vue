@@ -13,6 +13,7 @@ const emit = defineEmits<{
     upload: [file: File];
 }>();
 
+const notify = useNotify();
 const search = ref("");
 const dropActive = ref(false);
 const viewMode = ref<"grid" | "list">("grid");
@@ -51,8 +52,20 @@ async function acceptSuggestion(id: string, mode: "optional" | "regular", instal
     acceptingId.value = id;
     try {
         await accept(id, mode, installOnServers);
+        notify.ok("Mod added to the build");
+    } catch (e) {
+        notify.fail(e, "Failed to accept the request");
     } finally {
         acceptingId.value = null;
+    }
+}
+
+async function rejectSuggestion(id: string) {
+    try {
+        await reject(id);
+        notify.ok("Request rejected");
+    } catch (e) {
+        notify.fail(e, "Failed to reject the request");
     }
 }
 
@@ -152,7 +165,7 @@ function handleDrop(e: DragEvent) {
                                 Accept
                             </AtomButton>
                         </UDropdownMenu>
-                        <AtomButton variant="dark" size="sm" icon="i-lucide-x" @click="reject(item.id)">
+                        <AtomButton variant="dark" size="sm" icon="i-lucide-x" @click="rejectSuggestion(item.id)">
                             Reject
                         </AtomButton>
                     </div>
