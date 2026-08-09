@@ -16,7 +16,8 @@ const emit = defineEmits<{
 const search = ref("");
 const dropActive = ref(false);
 const viewMode = ref<"grid" | "list">("grid");
-const modIcons = ref<Record<string, string>>({});
+
+const { icons: modIcons, resolveModIcons } = useModIconResolver();
 
 function fileSizeDisplay(bytes: number) {
     if (!bytes) return "0 B";
@@ -24,10 +25,6 @@ function fileSizeDisplay(bytes: number) {
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
-
-function cleanModName(path: string) {
-    return path.replace(/^mods\//, "").replace(/\.jar$/i, "");
 }
 
 const mods = computed(() => {
@@ -50,45 +47,9 @@ const catalogUrl = computed(() => {
     return `/admin/mods?server=${props.serverId}&build=${props.buildId}`;
 });
 
-async function fetchModrinthIcons() {
-    const sha1List = mods.value
-        .map((m) => m.sha1)
-        .filter((hash) => hash && !modIcons.value[hash]);
-
-    if (!sha1List.length) return;
-
-    try {
-        const res = await $fetch<Record<string, { project_id: string }>>(
-            "https://api.modrinth.com/v2/version_files",
-            {
-                method: "POST",
-                body: { hashes: sha1List.slice(0, 100), algorithm: "sha1" },
-            },
-        );
-
-        const projectIds = Array.from(
-            new Set(Object.values(res).map((v) => v.project_id)),
-        ).filter(Boolean);
-
-        if (projectIds.length) {
-            const projects = await $fetch<Array<{ id: string; icon_url?: string }>>(
-                `https://api.modrinth.com/v2/projects?ids=${JSON.stringify(projectIds)}`,
-            );
-
-            const projMap = new Map(projects.map((p) => [p.id, p.icon_url]));
-            for (const [hash, info] of Object.entries(res)) {
-                const icon = projMap.get(info.project_id);
-                if (icon) modIcons.value[hash] = icon;
-            }
-        }
-    } catch {
-        // Fallback to default icons
-    }
-}
-
 watch(
     () => mods.value.map((m) => m.sha1).join(","),
-    () => fetchModrinthIcons(),
+    () => resolveModIcons(mods.value),
     { immediate: true },
 );
 
@@ -237,7 +198,7 @@ function handleDrop(e: DragEvent) {
                     </div>
                     <div class="min-w-0">
                         <span class="font-bold text-xs text-[var(--noro-text)] truncate block font-mono">
-                            {{ cleanModName(mod.path) }}
+                            {{ cleanModTitle(mod.path) }}
                         </span>
                         <div class="flex items-center gap-2 text-[10px] text-[var(--noro-muted)] mt-0.5">
                             <span>{{ fileSizeDisplay(mod.size) }}</span>
