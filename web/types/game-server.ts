@@ -9,6 +9,7 @@ export interface GameServer {
   online: number;
   max_online: number;
   version: string | null;
+  icon_url?: string | null;
   last_seen_at: string | null;
   created_at: string;
   /** Агент выходил на связь недавно. */

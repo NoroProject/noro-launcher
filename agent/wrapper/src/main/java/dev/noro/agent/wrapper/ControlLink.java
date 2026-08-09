@@ -27,8 +27,26 @@ public final class ControlLink implements AutoCloseable {
     private final RequestPump pump;
     private final Logger log;
 
+    private static javax.net.ssl.SSLContext createSslContext() {
+        try {
+            javax.net.ssl.SSLContext ctx = javax.net.ssl.SSLContext.getInstance("TLS");
+            ctx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
+                public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {}
+                public java.security.cert.X509Certificate[] getAcceptedIssuers() { return new java.security.cert.X509Certificate[0]; }
+            }}, new java.security.SecureRandom());
+            return ctx;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private final HttpClient http =
-            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+            HttpClient.newBuilder()
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .sslContext(createSslContext())
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
     private final Outbox outbox;
     private final ScheduledExecutorService timer =
             Executors.newSingleThreadScheduledExecutor(Threads.daemonFactory("noro-link-timer"));
@@ -65,12 +83,14 @@ public final class ControlLink implements AutoCloseable {
         if (closed) {
             return;
         }
+        String targetUri = config.masterUrl().replaceFirst("^http", "ws") + "/api/agent/ws";
+        log.info("Connecting to master WebSocket at {}", targetUri);
         http.newWebSocketBuilder()
                 .header("Authorization", "Bearer " + config.secret())
                 .connectTimeout(Duration.ofSeconds(15))
-                .buildAsync(URI.create(config.masterUrl().replaceFirst("^http", "ws") + "/api/agent/ws"), new Handler())
+                .buildAsync(URI.create(targetUri), new Handler())
                 .exceptionally(error -> {
-                    log.warn("Control link failed to connect: {}", error.getMessage());
+                    log.warn("Control link failed to connect: {}", error.getMessage(), error);
                     scheduleReconnect();
                     return null;
                 });

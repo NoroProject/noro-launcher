@@ -130,11 +130,27 @@ async function createServer() {
                         class="border-t border-[var(--noro-border)] hover:bg-white/5"
                     >
                         <td class="px-5 py-4">
-                            <div class="font-bold text-[var(--noro-cream)]">
-                                {{ server.name }}
-                            </div>
-                            <div class="text-xs text-[var(--noro-muted)]">
-                                {{ server.description || "No description" }}
+                            <div class="flex items-center gap-3">
+                                <img
+                                    v-if="server.icon_url"
+                                    :src="server.icon_url"
+                                    :alt="server.name"
+                                    class="size-10 shrink-0 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] object-cover"
+                                >
+                                <div
+                                    v-else
+                                    class="grid size-10 shrink-0 place-items-center rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-muted)]"
+                                >
+                                    <UIcon name="i-lucide-box" class="size-5" />
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="font-bold text-[var(--noro-cream)] truncate">
+                                        {{ server.name }}
+                                    </div>
+                                    <div class="text-xs text-[var(--noro-muted)] truncate">
+                                        {{ server.description || "No description" }}
+                                    </div>
+                                </div>
                             </div>
                         </td>
                         <td class="px-5 py-4">

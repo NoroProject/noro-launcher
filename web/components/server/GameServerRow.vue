@@ -42,6 +42,18 @@ function save() {
                     class="size-3 shrink-0 rounded-full"
                     :class="item.live ? 'bg-[var(--noro-success)]' : 'bg-[var(--noro-muted)]'"
                 />
+                <img
+                    v-if="item.icon_url"
+                    :src="item.icon_url"
+                    :alt="item.name"
+                    class="size-10 shrink-0 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] object-cover"
+                >
+                <div
+                    v-else
+                    class="grid size-10 shrink-0 place-items-center rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-muted)]"
+                >
+                    <UIcon name="i-lucide-server" class="size-5" />
+                </div>
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
                         <span class="truncate text-sm font-bold text-white">{{ item.name }}</span>
