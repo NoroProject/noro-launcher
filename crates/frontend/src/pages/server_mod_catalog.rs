@@ -12,12 +12,17 @@ use gpui::{
 use uuid::Uuid;
 
 pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    let server = ui.servers.iter().find(|s| s.id == server_id);
+    let mc_ver = server.map(|s| s.mc_version.clone());
+    let loader = server.map(|s| s.modloader.as_str().to_string());
+
     // Автоматически запускаем базовый поиск при первом входе, если выдача пустая
     if ui.mod_catalog_hits.is_empty() {
         ui.backend.send(MessageToBackend::SearchCatalog {
             query: "".to_string(),
             provider: ui.mod_catalog_provider.clone(),
-            mc_version: None,
+            mc_version: mc_ver.clone(),
+            loader: loader.clone(),
         });
     }
 
@@ -58,10 +63,17 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
 }
 
 fn page_header(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    let server = ui.servers.iter().find(|s| s.id == server_id);
+    let subtitle = if let Some(s) = server {
+        format!("{} · {}", s.mc_version, s.modloader.as_str())
+    } else {
+        "Mod Catalog".to_string()
+    };
+
     let title = if let Some(ref selected) = ui.mod_catalog_selected {
         selected.title.clone()
     } else {
-        "Mod Catalog".to_string()
+        format!("Mod Catalog ({subtitle})")
     };
 
     div()
@@ -109,11 +121,12 @@ fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement
         .flex()
         .flex_col()
         .gap(px(16.))
-        .child(search_bar(ui, cx))
+        .child(search_bar(ui, server_id, cx))
         .child(
             div()
+                .id("catalog-hits-scroll")
                 .flex_1()
-                .overflow_hidden()
+                .overflow_y_scroll()
                 .rounded(px(R_MD))
                 .bg(rgb(BG_PANEL))
                 .border_1()
@@ -128,7 +141,7 @@ fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement
                         .font_family(FONT_PIXEL_ALT)
                         .text_size(px(14.))
                         .text_color(rgb(TEXT_MUTED))
-                        .child("Searching mods catalog...")
+                        .child("Searching compatible mods...")
                         .into_any_element()
                 } else {
                     let items: Vec<AnyElement> = hits
@@ -146,8 +159,16 @@ fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement
         .into_any_element()
 }
 
-fn search_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+fn search_bar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let provider = ui.mod_catalog_provider.clone();
+    let server = ui.servers.iter().find(|s| s.id == server_id);
+    let mc_ver = server.map(|s| s.mc_version.clone());
+    let loader = server.map(|s| s.modloader.as_str().to_string());
+
+    let mc_for_modrinth = mc_ver.clone();
+    let ldr_for_modrinth = loader.clone();
+    let mc_for_curse = mc_ver.clone();
+    let ldr_for_curse = loader.clone();
 
     div()
         .flex()
@@ -187,7 +208,8 @@ fn search_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                         this.backend.send(MessageToBackend::SearchCatalog {
                             query: "".to_string(),
                             provider: "modrinth".to_string(),
-                            mc_version: None,
+                            mc_version: mc_for_modrinth.clone(),
+                            loader: ldr_for_modrinth.clone(),
                         });
                         cx.notify();
                     }),
@@ -201,7 +223,8 @@ fn search_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                         this.backend.send(MessageToBackend::SearchCatalog {
                             query: "".to_string(),
                             provider: "curseforge".to_string(),
-                            mc_version: None,
+                            mc_version: mc_for_curse.clone(),
+                            loader: ldr_for_curse.clone(),
                         });
                         cx.notify();
                     }),
@@ -247,7 +270,8 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
                         .gap(px(8.))
                         .child(
                             div()
-                                .truncate()
+                                .flex_1()
+                                .min_w_0()
                                 .font_family(FONT_PIXEL_ALT)
                                 .text_size(px(14.))
                                 .font_weight(FontWeight::BOLD)
@@ -256,6 +280,7 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
                         )
                         .child(
                             div()
+                                .flex_shrink_0()
                                 .px(px(6.))
                                 .py(px(1.))
                                 .rounded(px(R_SM))

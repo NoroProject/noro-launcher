@@ -38,10 +38,15 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .border_b_1()
                 .border_color(rgb(BORDER))
                 .when(!collapsed, |d| d.child(logo(cx)))
+                .when(collapsed, |d| d.justify_center())
                 .child(nav_icon(
                     "sidebar-toggle-btn",
-                    "menu",
-                    collapsed,
+                    if collapsed {
+                        "panel-left-open"
+                    } else {
+                        "panel-left-close"
+                    },
+                    false,
                     cx.listener(|this, _e, _w, cx| {
                         this.sidebar_collapsed = !this.sidebar_collapsed;
                         cx.notify();
@@ -71,27 +76,30 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .py(px(10.))
                 .flex()
                 .items_center()
-                .gap(px(4.))
-                .when(!collapsed, |d| d.child(user_card(ui, cx)))
-                .when(!collapsed, |d| d.child(div().flex_1()))
-                .child(nav_icon(
-                    "news-bottom",
-                    "newspaper",
-                    ui.page == Page::News,
-                    cx.listener(|this, _e, _w, cx| {
-                        this.page = Page::News;
-                        cx.notify();
-                    }),
-                ))
-                .child(nav_icon(
-                    "settings-bottom",
-                    "settings",
-                    ui.page == Page::Settings,
-                    cx.listener(|this, _e, _w, cx| {
-                        this.page = Page::Settings;
-                        cx.notify();
-                    }),
-                )),
+                .when(collapsed, |d| d.justify_center().child(super::sidebar_user::user_avatar_only(ui, cx)))
+                .when(!collapsed, |d| {
+                    d.gap(px(4.))
+                        .child(user_card(ui, cx))
+                        .child(div().flex_1())
+                        .child(nav_icon(
+                            "news-bottom",
+                            "newspaper",
+                            ui.page == Page::News,
+                            cx.listener(|this, _e, _w, cx| {
+                                this.page = Page::News;
+                                cx.notify();
+                            }),
+                        ))
+                        .child(nav_icon(
+                            "settings-bottom",
+                            "settings",
+                            ui.page == Page::Settings,
+                            cx.listener(|this, _e, _w, cx| {
+                                this.page = Page::Settings;
+                                cx.notify();
+                            }),
+                        ))
+                }),
         )
         .into_any_element()
 }

@@ -267,7 +267,10 @@ impl LauncherUI {
 
     pub fn selected_server_id(&self) -> Option<Uuid> {
         match self.page {
-            Page::ServerDetail(id) | Page::ServerMods(id) | Page::ServerSettings(id) => Some(id),
+            Page::ServerDetail(id)
+            | Page::ServerMods(id)
+            | Page::ServerModCatalog(id)
+            | Page::ServerSettings(id) => Some(id),
             _ => self.servers.first().map(|s| s.id),
         }
     }

@@ -36,6 +36,20 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
+pub fn user_avatar_only(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    div()
+        .id("profile-card-avatar")
+        .cursor_pointer()
+        .hover(|d| d.opacity(0.8))
+        .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
+            this.page = Page::Profile;
+            this.start_skin_animation(cx);
+            cx.notify();
+        }))
+        .child(avatar(ui))
+        .into_any_element()
+}
+
 fn avatar(ui: &LauncherUI) -> AnyElement {
     if let Some(avatar) = &ui.avatar_image {
         return img(avatar.clone())

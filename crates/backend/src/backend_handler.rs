@@ -157,6 +157,7 @@ impl BackendState {
                 query,
                 provider,
                 mc_version,
+                loader,
             } => {
                 let ctx = self.ctx.clone();
                 tokio::spawn(async move {
@@ -169,6 +170,10 @@ impl BackendState {
                     if let Some(mc) = mc_version {
                         url.push_str("&mc=");
                         url.push_str(&urlencoding::encode(&mc));
+                    }
+                    if let Some(ldr) = loader {
+                        url.push_str("&loader=");
+                        url.push_str(&urlencoding::encode(&ldr));
                     }
 
                     let client = reqwest::Client::new();

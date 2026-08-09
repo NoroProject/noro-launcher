@@ -65,6 +65,7 @@ pub enum MessageToBackend {
         query: String,
         provider: String,
         mc_version: Option<String>,
+        loader: Option<String>,
     },
 
     // --- Настройки ---
