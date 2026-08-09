@@ -1,6 +1,6 @@
 //! Глобальные настройки лаунчера (без вкладок сервера).
 
-use super::common::{panel, Cx, CONTENT_W};
+use super::common::{panel, Cx};
 use super::settings_panel::settings_panel;
 use super::settings_rows::row;
 use crate::components::{btn, version_badge};
@@ -21,15 +21,13 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             div()
                 .flex_1()
                 .min_h_0()
-                .px(px(16.))
+                .px(px(32.))
                 .py(px(20.))
                 .flex()
                 .flex_col()
-                .items_center()
                 .child(
                     div()
                         .w_full()
-                        .max_w(px(CONTENT_W))
                         .flex()
                         .flex_col()
                         .gap(px(16.))
@@ -37,7 +35,6 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                         .when_some(ui.update_available.clone(), |d, v| {
                             d.child(update_panel(v.version, cx))
                         })
-                        // Своя версия — всегда, а не только когда есть обновление.
                         .child(version_badge()),
                 ),
         )

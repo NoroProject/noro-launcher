@@ -50,6 +50,7 @@ fn users_router() -> Router<AppState> {
         .route("/api/admin/users/{id}", get(users::get))
         .route("/api/admin/users/{id}/ban", put(users::ban))
         .route("/api/admin/users/{id}/cape", put(users::set_cape))
+        .route("/api/admin/users/{id}/capes", get(users::get_capes).put(users::set_granted_capes))
         .route(
             "/api/admin/users/{id}/roles/{role_id}",
             post(users::add_role).delete(users::remove_role),

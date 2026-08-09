@@ -134,6 +134,11 @@ fn router(state: AppState) -> Router {
         .route("/api/launcher/downloads", get(launcher::downloads))
         .route("/files/{sha1}", get(file_serve::serve_file))
         .route("/api/textures/default-skin", get(textures::default_skin))
+        .route("/api/textures/presets/{name}", get(textures::preset_skin_endpoint))
+        .route("/api/textures/renders", get(textures::render_endpoint))
+        .route("/api/textures/renders/head", get(textures::render_head_endpoint))
+        .route("/api/textures/renders/body", get(textures::render_body_endpoint))
+        .route("/api/textures/renders/cape", get(textures::render_cape_endpoint))
         .route("/api/launcher/locales", get(translations::list))
         .route("/api/launcher/locales/{locale}", get(translations::get));
 
@@ -144,7 +149,9 @@ fn router(state: AppState) -> Router {
         .route(
             "/api/me/skin",
             post(cabinet::upload_skin).delete(cabinet::delete_skin),
-        );
+        )
+        .route("/api/capes", get(cabinet::list_capes))
+        .route("/api/me/cape", put(cabinet::set_cape));
 
     // Агенты игровых серверов.
     let agent_api = Router::new()

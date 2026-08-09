@@ -87,6 +87,22 @@ pub struct CapeRow {
     pub uploaded_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SelectCapeReq {
+    pub cape_id: Option<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserCapesData {
+    pub granted_cape_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetUserCapesReq {
+    pub granted_cape_ids: Vec<Uuid>,
+    pub active_cape_id: Option<Uuid>,
+}
+
 impl UserProfile {
     /// Все эффективные права: прямые + из всех ролей, вместе с тем, что роли
     /// получили от своих родителей.

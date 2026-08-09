@@ -158,9 +158,21 @@ async fn handle_client_msg(
 
         ClientWsMsg::RequestServerList => {
             let rows = crate::db::list_servers(&state.db, true).await?;
+            let is_admin = match *authed_user {
+                Some(uid) => {
+                    let p = crate::db::load_profile(&state.db, uid).await?;
+                    p.has_permission(schema::PERM_ADMIN_SERVERS)
+                        || p.has_permission(schema::PERM_ADMIN_ALL)
+                        || p.has_permission(schema::PERM_SUPERADMIN)
+                }
+                None => false,
+            };
             let mut servers = Vec::new();
             for s in &rows {
-                servers.push(crate::db::server_entry(&state.db, s).await?);
+                let entry = crate::db::server_entry(&state.db, s).await?;
+                if is_admin || entry.current_build_id.is_some() {
+                    servers.push(entry);
+                }
             }
             let _ = tx.send(ServerWsMsg::ServerList { servers });
         }

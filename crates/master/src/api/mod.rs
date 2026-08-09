@@ -8,5 +8,6 @@ pub mod cabinet;
 pub mod file_serve;
 pub mod launcher;
 pub mod range;
+pub mod skin_render;
 pub mod textures;
 pub mod translations;

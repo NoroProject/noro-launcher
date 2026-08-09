@@ -143,6 +143,11 @@ pub enum MessageToBackend {
         bytes: Vec<u8>,
     },
 
+    RequestCapesList,
+    SelectCape {
+        cape_id: Option<Uuid>,
+    },
+
     /// Второй процесс попросил показать окно (single-instance).
     FocusWindow,
 
@@ -361,6 +366,9 @@ pub enum MessageToFrontend {
     SkinUploadFailed,
     PermissionsUpdated {
         user: UserProfile,
+    },
+    CapesList {
+        capes: Vec<schema::CapeRow>,
     },
 
     /// Соединение с мастером установлено/потеряно — для индикатора в UI.

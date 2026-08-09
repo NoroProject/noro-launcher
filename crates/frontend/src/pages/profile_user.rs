@@ -19,7 +19,7 @@ pub fn user_card(ui: &LauncherUI, user: &schema::UserProfile, cx: &mut Cx) -> An
         .collect();
 
     panel()
-        .p(px(24.))
+        .p(px(20.))
         .flex()
         .flex_col()
         .gap(px(16.))

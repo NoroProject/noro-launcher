@@ -149,6 +149,32 @@ pub async fn set_cape(
     notify_user(&state, id).await
 }
 
+pub async fn get_capes(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<schema::UserCapesData>> {
+    admin.require(PERM_ADMIN_USERS)?;
+    let granted_cape_ids = crate::db::list_user_granted_cape_ids(&state.db, id).await?;
+    Ok(Json(schema::UserCapesData { granted_cape_ids }))
+}
+
+pub async fn set_granted_capes(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    Json(req): Json<schema::SetUserCapesReq>,
+) -> AppResult<Json<UserProfile>> {
+    admin.require(PERM_ADMIN_USERS)?;
+    crate::db::set_user_granted_capes(&state.db, id, &req.granted_cape_ids).await?;
+    let active_cape_url = match req.active_cape_id {
+        Some(cape_id) => crate::db::get_cape_url(&state.db, cape_id).await?,
+        None => None,
+    };
+    crate::db::set_user_cape(&state.db, id, active_cape_url.as_deref()).await?;
+    notify_user(&state, id).await
+}
+
 async fn notify_user(state: &AppState, id: Uuid) -> AppResult<Json<UserProfile>> {
     let profile = crate::db::load_profile(&state.db, id).await?;
     state.ws.send_to_user(

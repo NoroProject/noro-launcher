@@ -2,7 +2,6 @@ use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, Context, FontWeight};
 use i18n::t;
-use uuid::Uuid;
 
 pub type Cx<'a> = Context<'a, LauncherUI>;
 
@@ -17,8 +16,6 @@ pub fn page_title(text: impl Into<gpui::SharedString>) -> AnyElement {
         .into_any_element()
 }
 
-/// Ширина колонки на страницах, не привязанных к серверу: во всю ширину окна
-/// строки читались бы поперёк экрана.
 pub const CONTENT_W: f32 = 720.;
 
 pub fn panel() -> gpui::Div {
@@ -29,11 +26,6 @@ pub fn panel() -> gpui::Div {
         .border_color(rgb(BORDER))
 }
 
-/// Шапка страницы: иконка и заголовок.
-///
-/// Новости и настройки лаунчера к серверу отношения не имеют, а вкладки
-/// «Игра / Моды / Настройки» переключают именно его — на этих экранах они сбивали
-/// с толку и вели в никуда.
 pub fn page_header(icon: &'static str, title: impl Into<gpui::SharedString>) -> AnyElement {
     div()
         .h(px(72.))
@@ -67,14 +59,9 @@ pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(tab(
             "tab-game",
             t("nav-game"),
-            matches!(
-                page,
-                crate::state::Page::Servers | crate::state::Page::ServerDetail(_)
-            ),
+            matches!(page, crate::state::Page::Servers | crate::state::Page::ServerDetail(_)),
             move |this, cx| {
-                this.page = sid
-                    .map(crate::state::Page::ServerDetail)
-                    .unwrap_or(crate::state::Page::Servers);
+                this.page = sid.map(crate::state::Page::ServerDetail).unwrap_or(crate::state::Page::Servers);
                 cx.notify();
             },
             cx,
@@ -123,11 +110,7 @@ fn tab(
         .items_center()
         .rounded(px(R_SM))
         .cursor_pointer()
-        .bg(if active {
-            rgba(0xf3e7b3f0)
-        } else {
-            rgba(0x0f2036d8)
-        })
+        .bg(if active { rgba(0xf3e7b3f0) } else { rgba(0x0f2036d8) })
         .border_1()
         .border_color(rgb(if active { CTA_HOV } else { BORDER }))
         .text_color(rgb(if active { ON_CTA } else { TEXT_SECONDARY }))
@@ -140,10 +123,7 @@ fn tab(
 }
 
 pub fn initial(name: &str) -> String {
-    name.chars()
-        .next()
-        .map(|c| c.to_uppercase().to_string())
-        .unwrap_or_else(|| "?".into())
+    name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_else(|| "?".into())
 }
 
 pub fn parse_hex(c: &str) -> u32 {
@@ -155,22 +135,6 @@ pub fn progress_label(s: &crate::state::SyncUiState) -> String {
     if total == 0 {
         String::new()
     } else {
-        format!(
-            "{:.0} / {:.0} MB",
-            s.done() as f64 / 1_048_576.0,
-            total as f64 / 1_048_576.0
-        )
+        format!("{:.0} / {:.0} MB", s.done() as f64 / 1_048_576.0, total as f64 / 1_048_576.0)
     }
 }
-
-pub fn cabinet_url(master_url: &str) -> String {
-    let base = if master_url.trim().is_empty() {
-        "http://localhost:8080"
-    } else {
-        master_url.trim_end_matches('/')
-    };
-    format!("{base}/cabinet/skin")
-}
-
-#[allow(dead_code)]
-pub fn _server_id(_id: Uuid) {}

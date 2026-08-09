@@ -1,120 +1,130 @@
-//! Skin preview card: the turning figure, drag-to-rotate and the upload button.
+//! Skin preview card: turning figure, drag-to-rotate, presets and upload button.
 
-use super::common::Cx;
+use super::common::{panel, Cx};
 use super::skin_drag;
 use crate::components::btn;
-use crate::state::{LauncherUI, Toast};
+use crate::icons::ic;
+use crate::state::LauncherUI;
 use crate::theme::*;
-use gpui::{div, img, prelude::*, px, rgb, AnyElement, CursorStyle, MouseButton};
+use gpui::{div, img, prelude::*, px, rgb, AnyElement, ClickEvent, CursorStyle, MouseButton, SharedString};
 use i18n::t;
-use schema::NotifLevel;
 
 const PREVIEW_W: f32 = crate::skin::PREVIEW_W as f32;
 const PREVIEW_H: f32 = crate::skin::PREVIEW_H as f32;
 
 pub fn skin_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    div()
-        .w(px(PREVIEW_W))
-        .flex()
-        .flex_col()
-        .gap(px(12.))
+    panel().p(px(16.)).w(px(PREVIEW_W + 32.)).flex().flex_col().gap(px(10.))
         .child(preview_box(ui, cx))
         .when(is_grabbable(ui), |d| d.child(drag_hint()))
         .child(upload_button(cx))
         .into_any_element()
 }
 
-/// Крутить можно только настоящую 3D-модель — плоская текстура-фолбэк
-/// на поворот не отзывается.
+pub fn skin_presets_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    let presets = [
+        ("Steve", "steve"), ("Alex", "alex"), ("Ari", "ari"), ("Zuri", "zuri"),
+        ("Efe", "efe"), ("Makena", "makena"), ("Kai", "kai"), ("Sunny", "sunny"),
+        ("Noor", "noor"),
+    ];
+
+    panel().p(px(14.)).flex_1().min_h_0().overflow_hidden().flex().flex_col().gap(px(12.))
+        .child(header_row(ui, cx))
+        .child(div().id("skin-presets-scroll").flex_1().min_h_0().overflow_y_scroll().pb(px(12.))
+            .child(div().flex().flex_wrap().gap(px(8.)).px(px(2.))
+                .children(ui.custom_presets.iter().map(|p| custom_preset_card(p, cx)))
+                .children(presets.into_iter().map(|(name, id)| standard_preset_card(ui, name, id, cx)))
+            ))
+        .into_any_element()
+}
+
+fn header_row(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    div().flex().items_center().justify_between()
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(13.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("Пресеты скинов"))
+        .when(ui.skin_bytes.is_some(), |d| d.child(
+            div().id("save-skin-btn").cursor_pointer().px(px(8.)).py(px(4.)).rounded(px(R_SM)).bg(rgb(CTA)).hover(|s| s.bg(rgb(CTA_HOV)))
+                .font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("+ СОХРАНИТЬ СКИН")
+                .on_click(cx.listener(|this, _, _, cx| { this.save_current_skin_preset(); cx.notify(); }))
+        )).into_any_element()
+}
+
+fn custom_preset_card(preset: &crate::state::SavedSkinPreset, cx: &mut Cx) -> AnyElement {
+    let bytes = preset.bytes.clone();
+    let id = preset.id.clone();
+    let apply_id: SharedString = format!("apply-{}", id).into();
+    let del_id: SharedString = format!("del-{}", id).into();
+
+    div().id(SharedString::from(id.clone())).w(px(112.)).p(px(6.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(CTA)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
+        .child(div().w(px(72.)).h(px(85.)).flex().items_center().justify_center().child(ic("user", 24., CTA)))
+        .child(div().w_full().truncate().text_center().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child(preset.name.clone()))
+        .child(div().flex().gap(px(4.))
+            .child(div().id(apply_id).px(px(8.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(CTA)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("Надеть")
+                .on_click(cx.listener(move |this, _, _, cx| { this.upload_skin(bytes.clone()); cx.notify(); })))
+            .child(div().id(del_id).px(px(6.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).text_color(rgb(TEXT_MUTED)).child("✕")
+                .on_click(cx.listener(move |this, _, _, cx| { this.custom_presets.retain(|p| p.id != id); cx.notify(); }))))
+        .into_any_element()
+}
+
+fn standard_preset_card(ui: &LauncherUI, name: &'static str, id: &'static str, cx: &mut Cx) -> AnyElement {
+    let img_el = if let Some(loaded_img) = ui.preset_images.get(id) {
+        img(loaded_img.clone()).w(px(72.)).h(px(85.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
+    } else {
+        div().w(px(72.)).h(px(85.)).flex().items_center().justify_center().child(ic("user", 24., TEXT_MUTED)).into_any_element()
+    };
+
+    div().id(id).w(px(112.)).p(px(6.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(BORDER)).hover(|s| s.bg(rgb(BG_INPUT)).border_color(rgb(CTA))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
+        .child(img_el)
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child(name))
+        .child(div().px(px(12.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).border_1().border_color(rgb(BORDER)).font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child("Надеть"))
+        .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| apply_preset(this, id, cx)))
+        .into_any_element()
+}
+
+fn apply_preset(this: &mut LauncherUI, name: &'static str, cx: &mut Cx) {
+    let master_url = this.config.master_url.clone();
+    let url = format!("{}/api/textures/presets/{}.png", master_url.trim_end_matches('/'), name);
+
+    cx.spawn(async move |this, cx| {
+        let loaded = crate::image_loader::load_image_and_bytes(url).await;
+        let _ = this.update(cx, |this, cx| {
+            if let Ok((_, bytes)) = loaded { this.upload_skin(bytes); }
+            cx.notify();
+        });
+    }).detach();
+}
+
 fn is_grabbable(ui: &LauncherUI) -> bool {
     ui.skin_bytes.is_some() && ui.skin_preview.is_some()
 }
 
 fn preview_box(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    div()
-        .id("skin-preview-area")
-        .w(px(PREVIEW_W))
-        .h(px(PREVIEW_H))
-        .bg(rgb(BG_INPUT))
-        .rounded(px(R_SM))
-        .border_1()
-        .border_color(rgb(BORDER))
-        .overflow_hidden()
-        .flex()
-        .items_center()
-        .justify_center()
-        .when(is_grabbable(ui), |d| {
-            d.cursor(CursorStyle::OpenHand)
-                .on_mouse_down(MouseButton::Left, cx.listener(skin_drag::on_grab))
-        })
+    div().id("skin-preview-area").w(px(PREVIEW_W)).h(px(PREVIEW_H)).bg(rgb(BG_INPUT)).rounded(px(R_SM)).border_1().border_color(rgb(BORDER)).overflow_hidden().flex().items_center().justify_center()
+        .when(is_grabbable(ui), |d| d.cursor(CursorStyle::OpenHand).on_mouse_down(MouseButton::Left, cx.listener(skin_drag::on_grab)))
         .child(preview_content(ui))
         .into_any_element()
 }
 
 fn drag_hint() -> AnyElement {
-    div()
-        .font_family(FONT_PIXEL_ALT)
-        .text_size(px(12.))
-        .text_color(rgb(TEXT_MUTED))
-        .child(t("profile-drag-to-rotate"))
-        .into_any_element()
+    div().font_family(FONT_PIXEL_ALT).text_size(px(11.)).text_color(rgb(TEXT_MUTED)).child(t("profile-drag-to-rotate")).into_any_element()
 }
 
 fn preview_content(ui: &LauncherUI) -> AnyElement {
-    if ui.skin_loading || ui.skin_uploading {
-        return placeholder(t("profile-skin-loading"));
-    }
-    if let Some(p) = &ui.skin_preview {
-        return img(p.clone())
-            .w(px(PREVIEW_W))
-            .h(px(PREVIEW_H))
-            .into_any_element();
-    }
-    if let Some(s) = &ui.skin_image {
-        return img(s.clone())
-            .w(px(PREVIEW_W))
-            .h(px(PREVIEW_H))
-            .into_any_element();
-    }
+    if ui.skin_loading || ui.skin_uploading { return placeholder(t("profile-skin-loading")); }
+    if let Some(p) = &ui.skin_preview { return img(p.clone()).w(px(PREVIEW_W)).h(px(PREVIEW_H)).into_any_element(); }
+    if let Some(s) = &ui.skin_image { return img(s.clone()).w(px(PREVIEW_W)).h(px(PREVIEW_H)).into_any_element(); }
     placeholder(t("profile-no-skin"))
 }
 
 fn placeholder(text: impl Into<gpui::SharedString>) -> AnyElement {
-    let text = text.into();
-    div()
-        .size_full()
-        .flex()
-        .items_center()
-        .justify_center()
-        .font_family(FONT_PIXEL_ALT)
-        .text_size(px(14.))
-        .text_color(rgb(TEXT_MUTED))
-        .child(text)
-        .into_any_element()
+    div().size_full().flex().items_center().justify_center().font_family(FONT_PIXEL_ALT).text_size(px(13.)).text_color(rgb(TEXT_MUTED)).child(text.into()).into_any_element()
 }
 
 fn upload_button(cx: &mut Cx) -> AnyElement {
-    btn(
-        "upload-skin",
-        t("profile-upload-skin"),
-        true,
-        cx.listener(on_upload_click),
-    )
-    .into_any_element()
+    btn("upload-skin", t("profile-upload-skin"), true, cx.listener(on_upload_click)).into_any_element()
 }
 
-fn on_upload_click(
-    this: &mut LauncherUI,
-    _e: &gpui::ClickEvent,
-    _w: &mut gpui::Window,
-    cx: &mut gpui::Context<LauncherUI>,
-) {
+fn on_upload_click(this: &mut LauncherUI, _e: &gpui::ClickEvent, _w: &mut gpui::Window, cx: &mut gpui::Context<LauncherUI>) {
     let script = "POSIX path of (choose file of type {\"public.png\"} with prompt \"Select Minecraft skin PNG\")";
-    if let Ok(output) = std::process::Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-    {
+    if let Ok(output) = std::process::Command::new("osascript").arg("-e").arg(script).output() {
         if output.status.success() {
             let p = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !p.is_empty() {
@@ -128,9 +138,6 @@ fn on_upload_click(
             }
         }
     }
-    this.toast = Some(Toast {
-        text: t("profile-skin-invalid"),
-        level: NotifLevel::Warning,
-    });
+    this.toast = Some(crate::state::Toast { text: t("profile-skin-invalid"), level: schema::NotifLevel::Warning });
     cx.notify();
 }

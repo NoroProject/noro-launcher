@@ -51,14 +51,13 @@ const fileStoreGb = computed(() => {
           <h2 class="font-bold text-[var(--noro-text)]">Data state</h2>
           <UIcon name="i-lucide-database" class="size-5 text-[var(--noro-cream)]" />
         </div>
-        <div class="grid gap-3 md:grid-cols-2">
-          <div class="rounded-lg bg-[var(--noro-input)] p-4">
-            <div class="text-sm font-bold uppercase tracking-wider text-[var(--noro-muted)]">FileStore</div>
-            <div class="mt-1 text-2xl font-black text-[var(--noro-text)]">{{ fileStoreGb }}</div>
-          </div>
-          <div class="rounded-lg bg-[var(--noro-input)] p-4">
-            <div class="text-sm font-bold uppercase tracking-wider text-[var(--noro-muted)]">Authed launchers</div>
-            <div class="mt-1 text-2xl font-black text-[var(--noro-text)]">{{ stats?.authed_launchers ?? 0 }}</div>
+        <div class="grid gap-3">
+          <div class="rounded-lg bg-[var(--noro-input)] p-4 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold uppercase tracking-wider text-[var(--noro-muted)]">FileStore Storage</div>
+              <div class="mt-1 text-2xl font-black text-[var(--noro-text)]">{{ fileStoreGb }}</div>
+            </div>
+            <UIcon name="i-lucide-hard-drive" class="size-8 text-[var(--noro-blue)]" />
           </div>
         </div>
       </section>

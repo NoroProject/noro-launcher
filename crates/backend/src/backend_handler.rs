@@ -396,6 +396,45 @@ impl BackendState {
                 }
             }
 
+            MessageToBackend::RequestCapesList => {
+                if let Some(token) = &self.access_token {
+                    let master = self.ctx.config.get().master_url.clone();
+                    let http = self.ctx.http.clone();
+                    let t = token.clone();
+                    let ctx = self.ctx.clone();
+                    tokio::spawn(async move {
+                        if let Ok(capes) = fetch_capes_from_master(&http, &master, &t).await {
+                            ctx.send(MessageToFrontend::CapesList { capes });
+                        }
+                    });
+                }
+            }
+
+            MessageToBackend::SelectCape { cape_id } => {
+                if let Some(token) = &self.access_token {
+                    let master = self.ctx.config.get().master_url.clone();
+                    let http = self.ctx.http.clone();
+                    let t = token.clone();
+                    let internal = self.ctx.internal.clone();
+                    let ctx = self.ctx.clone();
+                    tokio::spawn(async move {
+                        match select_cape_on_master(&http, &master, &t, cape_id).await {
+                            Ok(profile) => {
+                                let _ = internal.send(InternalEvent::ProfileUpdated { user: profile.clone() });
+                                ctx.send(MessageToFrontend::PermissionsUpdated { user: profile });
+                            }
+                            Err(e) => {
+                                ctx.send(MessageToFrontend::AddNotification {
+                                    key: "notif-cape-update-failed".into(),
+                                    args: [("reason".to_string(), e.to_string())].into(),
+                                    level: schema::NotifLevel::Error,
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+
             MessageToBackend::FocusWindow => {
                 self.ctx.send(MessageToFrontend::OpenOrFocusMainWindow);
             }
@@ -663,6 +702,55 @@ async fn upload_skin_to_master(
         .post(&url)
         .header("Authorization", format!("Bearer {}", token))
         .multipart(form)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let txt = res.text().await.unwrap_or_default();
+        return Err(format!("HTTP {} {}", status, txt));
+    }
+    res.json::<schema::UserProfile>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+async fn fetch_capes_from_master(
+    http: &reqwest::Client,
+    master: &str,
+    token: &str,
+) -> Result<Vec<schema::CapeRow>, String> {
+    let base = master.trim_end_matches('/');
+    let url = format!("{}/api/capes", base);
+    let res = http
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let txt = res.text().await.unwrap_or_default();
+        return Err(format!("HTTP {} {}", status, txt));
+    }
+    res.json::<Vec<schema::CapeRow>>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+async fn select_cape_on_master(
+    http: &reqwest::Client,
+    master: &str,
+    token: &str,
+    cape_id: Option<uuid::Uuid>,
+) -> Result<schema::UserProfile, String> {
+    let base = master.trim_end_matches('/');
+    let url = format!("{}/api/me/cape", base);
+    let req = schema::SelectCapeReq { cape_id };
+    let res = http
+        .put(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&req)
         .send()
         .await
         .map_err(|e| e.to_string())?;

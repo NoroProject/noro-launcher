@@ -94,3 +94,43 @@ pub async fn delete_skin(
         crate::db::load_profile(&state.db, user.user_id).await?,
     ))
 }
+
+pub async fn list_capes(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Vec<schema::CapeRow>>> {
+    let is_admin = user.profile.has_permission(schema::PERM_ADMIN_USERS);
+    if is_admin {
+        Ok(Json(crate::db::list_capes(&state.db).await?))
+    } else {
+        Ok(Json(crate::db::list_capes_for_user(&state.db, user.user_id).await?))
+    }
+}
+
+pub async fn set_cape(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(req): Json<schema::SelectCapeReq>,
+) -> AppResult<Json<UserProfile>> {
+    let is_admin = user.profile.has_permission(schema::PERM_ADMIN_USERS);
+    let cape_url = match req.cape_id {
+        Some(cape_id) => {
+            if !is_admin {
+                let allowed_ids = crate::db::list_user_granted_cape_ids(&state.db, user.user_id).await?;
+                if !allowed_ids.contains(&cape_id) {
+                    return Err(AppError::Forbidden("access to this cape is not granted".into()));
+                }
+            }
+            Some(
+                crate::db::get_cape_url(&state.db, cape_id)
+                    .await?
+                    .ok_or_else(|| AppError::NotFound("cape".into()))?,
+            )
+        }
+        None => None,
+    };
+    crate::db::set_user_cape(&state.db, user.user_id, cape_url.as_deref()).await?;
+    Ok(Json(
+        crate::db::load_profile(&state.db, user.user_id).await?,
+    ))
+}

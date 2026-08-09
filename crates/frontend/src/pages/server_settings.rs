@@ -29,7 +29,6 @@ pub fn page(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .left(px(32.))
                 .right(px(32.))
                 .bottom(px(32.))
-                .max_w(px(760.))
                 .flex()
                 .flex_col()
                 .gap(px(16.))

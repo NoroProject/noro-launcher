@@ -109,10 +109,28 @@ pub struct LogEntry {
     pub text: String,
 }
 
+/// Вкладка страницы профиля.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ProfileTab {
+    #[default]
+    Overview,
+    Skins,
+    Capes,
+}
+
+#[derive(Clone, Debug)]
+pub struct SavedSkinPreset {
+    pub id: String,
+    pub name: String,
+    pub bytes: Vec<u8>,
+    pub preview: Option<Arc<RenderImage>>,
+}
+
 /// Корневая сущность UI (GPUI Render).
 pub struct LauncherUI {
     pub backend: BackendHandle,
     pub page: Page,
+    pub profile_tab: ProfileTab,
     pub user: Option<UserProfile>,
     pub skin_image: Option<Arc<Image>>,
     /// Текущий кадр превью. `RenderImage`, а не `Image`: рисуется синхронно.
@@ -132,6 +150,11 @@ pub struct LauncherUI {
     pub cape_bytes: Option<Vec<u8>>,
     pub cape_url: Option<String>,
     pub cape_loading: bool,
+    pub capes: Vec<schema::CapeRow>,
+    pub cape_images: std::collections::HashMap<uuid::Uuid, std::sync::Arc<gpui::Image>>,
+    pub preset_images: std::collections::HashMap<String, std::sync::Arc<gpui::Image>>,
+    pub custom_presets: Vec<SavedSkinPreset>,
+    pub cape_selector_open: bool,
     pub avatar_image: Option<Arc<Image>>,
     pub avatar_loading: bool,
     /// Язык интерфейса. Сам каталог живёт в глобальном состоянии i18n.
@@ -214,6 +237,7 @@ impl LauncherUI {
         Self {
             backend,
             page: Page::Login,
+            profile_tab: ProfileTab::Overview,
             user: None,
             skin_image: None,
             skin_preview: None,
@@ -229,6 +253,11 @@ impl LauncherUI {
             cape_bytes: None,
             cape_url: None,
             cape_loading: false,
+            capes: Vec::new(),
+            cape_images: std::collections::HashMap::new(),
+            preset_images: std::collections::HashMap::new(),
+            custom_presets: Vec::new(),
+            cape_selector_open: false,
             avatar_image: None,
             avatar_loading: false,
             locale: i18n::Locale::default(),
@@ -470,6 +499,39 @@ impl LauncherUI {
         self.server_icon_urls.remove(&server_id);
     }
 
+    pub fn save_current_skin_preset(&mut self) {
+        if let Some(bytes) = &self.skin_bytes {
+            let num = self.custom_presets.len() + 1;
+            let name = format!("Смерч {}", num);
+            let id = uuid::Uuid::new_v4().to_string();
+            let preset = SavedSkinPreset {
+                id,
+                name,
+                bytes: bytes.clone(),
+                preview: self.skin_preview.clone(),
+            };
+            self.custom_presets.push(preset);
+        }
+    }
+
+    pub fn load_preset_renders(&mut self, cx: &mut Context<Self>) {
+        if !self.preset_images.is_empty() { return; }
+        let master_url = self.config.master_url.clone();
+        let presets = ["steve", "alex", "ari", "zuri", "efe", "makena", "kai", "sunny"];
+        for preset in presets {
+            let name = preset.to_string();
+            let url = format!("{}/api/textures/renders?preset={}&mode=bust&scale=5", master_url.trim_end_matches('/'), name);
+            cx.spawn(async move |this, cx| {
+                if let Ok(img) = crate::image_loader::load_image_from_url(url).await {
+                    let _ = this.update(cx, |this, cx| {
+                        this.preset_images.insert(name, img);
+                        cx.notify();
+                    });
+                }
+            }).detach();
+        }
+    }
+
     /// Обработать сообщение от backend.
     pub fn on_message(&mut self, msg: MessageToFrontend, cx: &mut Context<Self>) {
         match msg {
@@ -479,6 +541,7 @@ impl LauncherUI {
                 self.logging_in = false;
                 self.startup_checking = false;
                 self.login_error = None;
+                self.backend.send(MessageToBackend::RequestCapesList);
                 if self.page == Page::Login {
                     self.page = Page::Servers;
                 }
@@ -721,6 +784,22 @@ impl LauncherUI {
             MessageToFrontend::PermissionsUpdated { user } => {
                 self.user = Some(user);
                 self.load_user_skin(cx);
+            }
+            MessageToFrontend::CapesList { capes } => {
+                self.capes = capes.clone();
+                let master_url = self.config.master_url.clone();
+                for cape in capes {
+                    let id = cape.id;
+                    let render_url = format!("{}/api/textures/renders/cape?url={}&scale=10", master_url.trim_end_matches('/'), cape.url);
+                    cx.spawn(async move |this, cx| {
+                        if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await {
+                            let _ = this.update(cx, |this, cx| {
+                                this.cape_images.insert(id, img);
+                                cx.notify();
+                            });
+                        }
+                    }).detach();
+                }
             }
             MessageToFrontend::ConnectionState { online } => {
                 self.online = online;

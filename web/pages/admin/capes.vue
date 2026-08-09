@@ -2,7 +2,6 @@
 import type { CapeRow } from '~/types/cape'
 
 const auth = useAuth()
-
 const notify = useNotify()
 await auth.loadMe()
 
@@ -10,24 +9,48 @@ const name = ref('')
 const file = ref<File | null>(null)
 const busy = ref(false)
 const message = ref<string | null>(null)
-const { data: capes, refresh, pending, error } = await useAsyncData('admin-capes', () =>
+const error = ref<string | null>(null)
+const dragging = ref(false)
+const confirmDeleteId = ref<string | null>(null)
+
+const { data: capes, refresh, pending } = await useAsyncData('admin-capes', () =>
   auth.request<CapeRow[]>('/api/admin/capes'), { default: () => [] }
 )
 
-const fileLabel = computed(() => file.value?.name || 'Choose PNG cape')
 
-/** Локальный превью выбранного файла — видно, что грузишь, ещё до отправки. */
 const preview = ref<string | null>(null)
 
 function setFile(next: File | null) {
+  error.value = null
   if (preview.value) URL.revokeObjectURL(preview.value)
+  if (!next) {
+    file.value = null
+    preview.value = null
+    return
+  }
+  if (next.type !== 'image/png') {
+    error.value = 'Only PNG cape images are supported.'
+    return
+  }
+  if (next.size > 512 * 1024) {
+    error.value = `File is too large — ${Math.round(next.size / 1024)} KB of 512 KB allowed.`
+    return
+  }
   file.value = next
-  preview.value = next ? URL.createObjectURL(next) : null
+  preview.value = URL.createObjectURL(next)
+  if (!name.value.trim()) {
+    name.value = next.name.replace(/\.[^/.]+$/, '')
+  }
 }
 
 function onFile(event: Event) {
   const input = event.target as HTMLInputElement
   setFile(input.files?.[0] || null)
+}
+
+function onDrop(event: DragEvent) {
+  dragging.value = false
+  setFile(event.dataTransfer?.files?.[0] || null)
 }
 
 onBeforeUnmount(() => {
@@ -38,27 +61,32 @@ async function uploadCape() {
   if (!file.value || !name.value.trim()) return
   busy.value = true
   message.value = null
+  error.value = null
   try {
     await auth.upload<CapeRow>('/api/admin/capes', 'cape', file.value, { name: name.value.trim() })
     name.value = ''
     setFile(null)
-    message.value = 'Cape uploaded'
+    message.value = 'Cape uploaded successfully'
     await refresh()
     notify.ok()
   } catch (e) {
+    error.value = humanError(e)
     notify.fail(e)
   } finally {
     busy.value = false
   }
 }
 
-async function deleteCape(cape: CapeRow) {
+async function deleteCape(id: string) {
   busy.value = true
+  confirmDeleteId.value = null
   try {
-    await auth.request(`/api/admin/capes/${cape.id}`, { method: 'DELETE' })
+    await auth.request(`/api/admin/capes/${id}`, { method: 'DELETE' })
+    message.value = 'Cape deleted'
     await refresh()
     notify.ok()
   } catch (e) {
+    error.value = humanError(e)
     notify.fail(e)
   } finally {
     busy.value = false
@@ -67,7 +95,7 @@ async function deleteCape(cape: CapeRow) {
 </script>
 
 <template>
-  <NoroShell title="CAPES" subtitle="Upload cape PNG files and assign them from user management">
+  <NoroShell title="CAPES" subtitle="Cape Catalog & Cosmetics Management">
     <template #actions>
       <AtomButton
         icon="i-lucide-refresh-cw"
@@ -79,61 +107,123 @@ async function deleteCape(cape: CapeRow) {
       </AtomButton>
     </template>
 
-    <UAlert v-if="error" class="mb-5" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="humanError(error)" />
+
+
+    <UAlert v-if="error" class="mb-5" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
     <UAlert v-if="message" class="mb-5" color="success" variant="subtle" icon="i-lucide-check" :description="message" />
 
-    <div class="grid gap-5 xl:grid-cols-[380px_1fr]">
-      <section class="noro-panel p-5">
-        <h2 class="text-2xl font-black text-[var(--noro-text)]">Upload Cape</h2>
-        <p class="mt-2 text-sm font-medium text-[var(--noro-muted)]">Only admins can upload capes. Players receive capes from their user profile.</p>
-        <div class="mt-5 grid gap-3">
-          <input v-model="name" class="noro-input" placeholder="Cape name">
-          <!-- Нативный file input показывает «Choose File no file selected»
-               системным шрифтом и ломает вид панели, поэтому он скрыт. -->
-          <label class="cursor-pointer rounded-lg border border-dashed border-[var(--noro-border)] bg-[var(--noro-input)] p-4 transition hover:border-[var(--noro-cream)]/50">
-            <span class="noro-label">PNG file</span>
-            <span class="mt-1 flex items-center gap-2">
-              <UIcon :name="file ? 'i-lucide-file-check-2' : 'i-lucide-upload-cloud'" class="size-5 shrink-0 text-[var(--noro-cream)]" />
-              <span class="min-w-0 truncate font-bold text-[var(--noro-cream)]">{{ fileLabel }}</span>
-            </span>
-            <span v-if="preview" class="mt-3 flex items-center gap-3">
-              <CapePreview :url="preview" alt="Selected cape" class="w-12 shrink-0" />
-              <span class="text-xs text-[var(--noro-muted)]">Front side preview</span>
-            </span>
+    <div class="grid gap-6 xl:grid-cols-[340px_1fr]">
+      <!-- Upload Panel -->
+      <section class="noro-panel flex flex-col p-6">
+        <h2 class="text-xl font-black text-[var(--noro-text)]">Add New Cape</h2>
+        <p class="mt-1 text-xs text-[var(--noro-muted)]">
+          Upload 64x32 or 22x17 Minecraft cape PNG textures.
+        </p>
+
+        <form class="mt-5 grid gap-4" @submit.prevent="uploadCape">
+          <label class="block">
+            <span class="noro-label mb-1.5 block">Cape Name</span>
+            <input
+              v-model="name"
+              class="noro-input w-full"
+              placeholder="e.g. Mojang 2011, Cherry Blossom"
+              maxlength="48"
+            >
+          </label>
+
+          <!-- Dropzone -->
+          <label
+            class="group relative grid cursor-pointer place-items-center gap-3 rounded-[var(--noro-r-sm)] border-2 border-dashed p-6 text-center transition-all duration-150"
+            :class="dragging
+              ? 'border-[var(--noro-cream)] bg-[color-mix(in_srgb,var(--noro-cream)_10%,var(--noro-input))]'
+              : 'border-[var(--noro-border)] bg-[var(--noro-input)] hover:border-[var(--noro-cream)]/50'"
+            @dragover.prevent="dragging = true"
+            @dragleave.prevent="dragging = false"
+            @drop.prevent="onDrop"
+          >
+            <div v-if="!preview" class="grid place-items-center gap-2">
+              <UIcon name="i-lucide-upload-cloud" class="size-8 text-[var(--noro-cream)] transition-transform group-hover:scale-110" />
+              <span class="text-xs font-bold text-[var(--noro-text)]">
+                {{ file ? file.name : 'Drop PNG file here or click to browse' }}
+              </span>
+              <span class="text-[10px] text-[var(--noro-muted)]">PNG texture up to 512 KB</span>
+            </div>
+
+            <div v-else class="flex flex-col items-center gap-2">
+              <div class="relative grid place-items-center rounded-md bg-[var(--noro-bg-deep)] p-3 border border-[var(--noro-border)]">
+                <CapePreview :url="preview" alt="Preview" class="w-16 shadow-lg" />
+              </div>
+              <span class="truncate text-xs font-bold text-[var(--noro-cream)]">{{ file?.name }}</span>
+            </div>
+
             <input class="hidden" type="file" accept="image/png" @change="onFile">
           </label>
+
           <AtomButton
             variant="primary"
             icon="i-lucide-upload"
+            type="submit"
             :disabled="busy || !file || !name.trim()"
-            @click="uploadCape"
+            class="mt-2 w-full justify-center"
           >
-            Upload Cape
+            {{ busy ? 'Uploading…' : 'Upload Cape' }}
           </AtomButton>
-        </div>
+        </form>
       </section>
 
-      <section class="grid gap-4 content-start sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        <article
-          v-for="cape in capes"
-          :key="cape.id"
-          class="group flex min-w-0 gap-4 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-panel)] p-4 transition hover:border-[var(--noro-cream)]/40"
-        >
-          <CapePreview :url="cape.url" :alt="cape.name" class="w-16 shrink-0" />
-          <div class="flex min-w-0 flex-1 flex-col">
-            <h3 class="truncate font-black text-[var(--noro-cream)]">{{ cape.name }}</h3>
-            <p class="mt-1 text-xs font-bold uppercase tracking-wider text-[var(--noro-blue)]">{{ Math.ceil(cape.size / 1024) }} KB</p>
-            <div class="mt-auto flex items-center gap-2 pt-3">
-              <UTooltip text="Open full texture">
-                <AtomButton icon="i-lucide-external-link" variant="ghost" size="sm" :to="cape.url" target="_blank" />
-              </UTooltip>
-              <UTooltip text="Delete cape">
-                <AtomButton icon="i-lucide-trash-2" variant="ghost" size="sm" :disabled="busy" @click="deleteCape(cape)" />
-              </UTooltip>
-            </div>
-          </div>
-        </article>
-        <EmptyState v-if="!capes?.length" icon="i-lucide-flag" title="No capes uploaded" class="sm:col-span-2 xl:col-span-3 2xl:col-span-4" />
+      <!-- Cape Catalog Minimal Grid -->
+      <section class="noro-panel p-6">
+        <h2 class="noro-label mb-4">Cape Catalog Grid</h2>
+
+        <div v-if="capes?.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          <UTooltip
+            v-for="cape in capes"
+            :key="cape.id"
+            :text="`${cape.name} (${Math.ceil(cape.size / 1024)} KB)`"
+          >
+            <article
+              class="group relative flex aspect-[10/16] cursor-pointer flex-col overflow-hidden rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] transition duration-200 hover:scale-105 hover:border-[var(--noro-cream)] hover:shadow-xl"
+            >
+              <!-- Cape 2D Render -->
+              <div class="relative flex size-full items-center justify-center p-1.5">
+                <CapePreview :url="cape.url" :alt="cape.name" class="h-full w-auto max-w-full shadow-md" />
+              </div>
+
+              <!-- Hover Overlay with Actions -->
+              <div class="absolute inset-0 flex flex-col justify-between bg-black/80 p-2 opacity-0 backdrop-blur-xs transition-opacity duration-150 group-hover:opacity-100">
+                <p class="truncate text-[10px] font-bold text-[var(--noro-cream)]">{{ cape.name }}</p>
+
+                <div class="flex items-center justify-between">
+                  <a
+                    :href="cape.url"
+                    target="_blank"
+                    class="grid size-6 place-items-center rounded bg-white/10 text-white transition hover:bg-white/20"
+                    title="Open PNG"
+                    @click.stop
+                  >
+                    <UIcon name="i-lucide-external-link" class="size-3.5" />
+                  </a>
+
+                  <button
+                    class="grid size-6 place-items-center rounded bg-red-500/20 text-red-400 transition hover:bg-red-500/40 hover:text-white"
+                    title="Delete cape"
+                    @click.stop="deleteCape(cape.id)"
+                  >
+                    <UIcon name="i-lucide-trash-2" class="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            </article>
+          </UTooltip>
+        </div>
+
+        <EmptyState
+          v-else
+          icon="i-lucide-flag"
+          title="No capes in catalog"
+          text="Upload PNG cape textures to make them available for players to equip."
+          class="min-h-[280px]"
+        />
       </section>
     </div>
   </NoroShell>

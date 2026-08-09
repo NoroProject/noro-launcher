@@ -4,6 +4,8 @@ import type { UserProfile } from '~/types/api'
 const auth = useAuth()
 await auth.loadMe()
 
+const masterUrl = useRuntimeConfig().public.masterUrl
+
 const { data: users, refresh, pending, error } = await useAsyncData('admin-users', () =>
   auth.request<UserProfile[]>('/api/admin/users?limit=200'), { default: () => [] }
 )
@@ -38,8 +40,28 @@ const { data: users, refresh, pending, error } = await useAsyncData('admin-users
         <tbody>
           <tr v-for="user in users" :key="user.id">
             <td>
-              <div class="font-semibold text-[var(--noro-text)]">{{ user.username }}</div>
-              <code class="text-xs text-[var(--noro-muted)]">{{ user.uuid }}</code>
+              <div class="flex items-center gap-3">
+                <!-- Avatar Stack: Profile Picture + Skin Head Badge -->
+                <div class="relative size-10 flex-shrink-0">
+                  <img
+                    :src="user.discord_avatar || '/default-avatar.png'"
+                    class="size-10 rounded-lg object-cover border border-[var(--noro-border)] bg-[var(--noro-input)]"
+                    alt="Avatar"
+                  >
+                  <!-- Skin Head Badge -->
+                  <div class="absolute -bottom-1 -right-1 size-5 rounded border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] overflow-hidden shadow">
+                    <img
+                      :src="user.skin_url ? `${masterUrl}/api/textures/renders/head?url=${encodeURIComponent(user.skin_url)}` : `${masterUrl}/api/textures/renders/head`"
+                      class="size-full object-contain"
+                      alt="Skin Head"
+                    >
+                  </div>
+                </div>
+                <div>
+                  <div class="font-semibold text-[var(--noro-text)]">{{ user.username }}</div>
+                  <code class="text-xs text-[var(--noro-muted)]">{{ user.uuid }}</code>
+                </div>
+              </div>
             </td>
             <td>{{ user.discord_username }}</td>
             <td>
@@ -54,9 +76,7 @@ const { data: users, refresh, pending, error } = await useAsyncData('admin-users
                 icon="i-lucide-settings"
                 :to="`/admin/users/${user.id}`"
                 class="!min-h-8 !min-w-8 !px-1.5"
-              >
-
-              </AtomButton>
+              />
             </td>
           </tr>
         </tbody>
