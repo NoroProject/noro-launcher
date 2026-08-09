@@ -41,6 +41,19 @@ export function cleanModTitle(path: string): string {
     return cleaned || filename;
 }
 
+function getCachedIcon(file: BuildFileRow): string | undefined {
+    if (file.sha1 && iconCache.has(file.sha1)) return iconCache.get(file.sha1);
+    if (file.path && iconCache.has(file.path)) return iconCache.get(file.path);
+    if (file.id && iconCache.has(file.id)) return iconCache.get(file.id);
+    return undefined;
+}
+
+function setCachedIcon(file: BuildFileRow, iconUrl: string) {
+    if (file.sha1) iconCache.set(file.sha1, iconUrl);
+    if (file.path) iconCache.set(file.path, iconUrl);
+    if (file.id) iconCache.set(file.id, iconUrl);
+}
+
 export function useModIconResolver() {
     const icons = ref<Record<string, string>>({});
     const auth = useAuth();
@@ -49,25 +62,25 @@ export function useModIconResolver() {
         const modsToResolve = files.filter((f) => {
             const isJar = f.path.toLowerCase().endsWith(".jar");
             const inMods = f.path.toLowerCase().startsWith("mods/");
-            return (isJar || inMods || f.kind === "mod") && f.sha1;
+            return isJar || inMods || f.kind === "mod";
         });
 
         if (!modsToResolve.length) return;
 
         // 1. Populate from cache
         for (const file of modsToResolve) {
-            if (iconCache.has(file.sha1)) {
-                icons.value[file.sha1] = iconCache.get(file.sha1)!;
+            const cached = getCachedIcon(file);
+            if (cached) {
+                if (file.sha1) icons.value[file.sha1] = cached;
+                if (file.id) icons.value[file.id] = cached;
             }
         }
 
-        const missingHashes = modsToResolve
-            .map((f) => f.sha1)
-            .filter((h) => h && !iconCache.has(h));
-
-        if (!missingHashes.length && !buildId) return;
+        const missingMods = modsToResolve.filter((f) => !getCachedIcon(f));
+        if (!missingMods.length && !buildId) return;
 
         // 2. Modrinth SHA1 Exact Lookup in batches of 100
+        const missingHashes = Array.from(new Set(missingMods.map((f) => f.sha1).filter(Boolean)));
         for (let i = 0; i < missingHashes.length; i += 100) {
             const hashBatch = missingHashes.slice(i, i + 100);
             try {
@@ -92,8 +105,11 @@ export function useModIconResolver() {
                     for (const [hash, info] of Object.entries(res)) {
                         const icon = projMap.get(info.project_id);
                         if (icon) {
-                            iconCache.set(hash, icon);
-                            icons.value[hash] = icon;
+                            for (const file of modsToResolve.filter((f) => f.sha1 === hash)) {
+                                setCachedIcon(file, icon);
+                                if (file.sha1) icons.value[file.sha1] = icon;
+                                if (file.id) icons.value[file.id] = icon;
+                            }
                         }
                     }
                 }
@@ -103,7 +119,7 @@ export function useModIconResolver() {
         }
 
         // 3. Fallback Search for ALL remaining unresolved mods in batches of 10
-        let unresolved = modsToResolve.filter((f) => !icons.value[f.sha1]);
+        let unresolved = modsToResolve.filter((f) => !getCachedIcon(f));
         for (let i = 0; i < unresolved.length; i += 10) {
             const searchBatch = unresolved.slice(i, i + 10);
             await Promise.allSettled(
@@ -118,8 +134,9 @@ export function useModIconResolver() {
 
                         const firstHit = searchRes.hits?.[0];
                         if (firstHit?.icon_url) {
-                            iconCache.set(file.sha1, firstHit.icon_url);
-                            icons.value[file.sha1] = firstHit.icon_url;
+                            setCachedIcon(file, firstHit.icon_url);
+                            if (file.sha1) icons.value[file.sha1] = firstHit.icon_url;
+                            if (file.id) icons.value[file.id] = firstHit.icon_url;
                         }
                     } catch {
                         // Ignore search failure
@@ -130,7 +147,7 @@ export function useModIconResolver() {
 
         // 4. Backend Inner Jar Icon Extraction for ALL remaining unresolved mods in batches of 10
         if (buildId) {
-            unresolved = modsToResolve.filter((f) => !icons.value[f.sha1]);
+            unresolved = modsToResolve.filter((f) => !getCachedIcon(f));
             for (let i = 0; i < unresolved.length; i += 10) {
                 const innerBatch = unresolved.slice(i, i + 10);
                 await Promise.allSettled(
@@ -140,8 +157,9 @@ export function useModIconResolver() {
                                 `/api/admin/builds/${buildId}/files/icon?path=${encodeURIComponent(file.path)}`,
                             );
                             if (res?.icon_url) {
-                                iconCache.set(file.sha1, res.icon_url);
-                                icons.value[file.sha1] = res.icon_url;
+                                setCachedIcon(file, res.icon_url);
+                                if (file.sha1) icons.value[file.sha1] = res.icon_url;
+                                if (file.id) icons.value[file.id] = res.icon_url;
                             }
                         } catch {
                             // Ignore missing inner icon
