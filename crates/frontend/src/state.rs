@@ -142,6 +142,9 @@ pub struct LauncherUI {
     pub mod_catalog_hits: Vec<bridge::CatalogHitInfo>,
     pub mod_catalog_selected: Option<bridge::CatalogHitInfo>,
     pub mod_catalog_provider: String,
+    pub mod_catalog_total: u32,
+    pub mod_catalog_offset: u32,
+    pub mod_catalog_limit: u32,
     pub startup_checking: bool,
     pub login_error: Option<String>,
 
@@ -229,6 +232,9 @@ impl LauncherUI {
             mod_catalog_hits: Vec::new(),
             mod_catalog_selected: None,
             mod_catalog_provider: "modrinth".to_string(),
+            mod_catalog_total: 0,
+            mod_catalog_offset: 0,
+            mod_catalog_limit: 20,
             startup_checking: true,
             login_error: None,
             servers: Vec::new(),
@@ -542,8 +548,16 @@ impl LauncherUI {
             } => {
                 self.server_recommendations.insert(server_id, settings);
             }
-            MessageToFrontend::CatalogSearchResults { hits } => {
+            MessageToFrontend::CatalogSearchResults {
+                hits,
+                total,
+                offset,
+                limit,
+            } => {
                 self.mod_catalog_hits = hits;
+                self.mod_catalog_total = total;
+                self.mod_catalog_offset = offset;
+                self.mod_catalog_limit = limit;
             }
             MessageToFrontend::SyncProgress {
                 server_id,

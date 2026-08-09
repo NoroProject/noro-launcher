@@ -66,6 +66,7 @@ pub enum MessageToBackend {
         provider: String,
         mc_version: Option<String>,
         loader: Option<String>,
+        offset: u32,
     },
 
     // --- Настройки ---
@@ -277,6 +278,9 @@ pub enum MessageToFrontend {
     },
     CatalogSearchResults {
         hits: Vec<CatalogHitInfo>,
+        total: u32,
+        offset: u32,
+        limit: u32,
     },
 
     /// Прогресс синхронизации (файлы, java, assets — всё через один канал).

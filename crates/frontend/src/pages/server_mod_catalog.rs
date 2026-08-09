@@ -23,6 +23,7 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             provider: ui.mod_catalog_provider.clone(),
             mc_version: mc_ver.clone(),
             loader: loader.clone(),
+            offset: 0,
         });
     }
 
@@ -159,6 +160,96 @@ fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement
                         .into_any_element()
                 }),
         )
+        .child(pagination_controls(ui, server_id, cx))
+        .into_any_element()
+}
+
+fn pagination_controls(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    let total = ui.mod_catalog_total;
+    let offset = ui.mod_catalog_offset;
+    let limit = if ui.mod_catalog_limit == 0 { 20 } else { ui.mod_catalog_limit };
+
+    let current_page = (offset / limit) + 1;
+    let total_pages = if total == 0 { 1 } else { (total + limit - 1) / limit };
+
+    let server = ui.servers.iter().find(|s| s.id == server_id);
+    let mc_ver = server.map(|s| s.mc_version.clone());
+    let loader = server.map(|s| s.modloader.as_str().to_string());
+    let provider = ui.mod_catalog_provider.clone();
+
+    let has_prev = offset >= limit;
+    let has_next = offset + limit < total;
+
+    let prev_offset = if has_prev { offset - limit } else { 0 };
+    let next_offset = offset + limit;
+
+    let mc_prev = mc_ver.clone();
+    let ldr_prev = loader.clone();
+    let prov_prev = provider.clone();
+
+    let mc_next = mc_ver.clone();
+    let ldr_next = loader.clone();
+    let prov_next = provider.clone();
+
+    div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .px(px(8.))
+        .py(px(4.))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .when(has_prev, |d| {
+                    d.child(btn(
+                        "prev-page-btn",
+                        "< Prev",
+                        false,
+                        cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                            this.backend.send(MessageToBackend::SearchCatalog {
+                                query: "".to_string(),
+                                provider: prov_prev.clone(),
+                                mc_version: mc_prev.clone(),
+                                loader: ldr_prev.clone(),
+                                offset: prev_offset,
+                            });
+                            cx.notify();
+                        }),
+                    ))
+                }),
+        )
+        .child(
+            div()
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(13.))
+                .text_color(rgb(TEXT_MUTED))
+                .child(format!("Page {current_page} of {total_pages} ({total} mods)")),
+        )
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .when(has_next, |d| {
+                    d.child(btn(
+                        "next-page-btn",
+                        "Next >",
+                        false,
+                        cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                            this.backend.send(MessageToBackend::SearchCatalog {
+                                query: "".to_string(),
+                                provider: prov_next.clone(),
+                                mc_version: mc_next.clone(),
+                                loader: ldr_next.clone(),
+                                offset: next_offset,
+                            });
+                            cx.notify();
+                        }),
+                    ))
+                }),
+        )
         .into_any_element()
 }
 
@@ -213,6 +304,7 @@ fn search_bar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                             provider: "modrinth".to_string(),
                             mc_version: mc_for_modrinth.clone(),
                             loader: ldr_for_modrinth.clone(),
+                            offset: 0,
                         });
                         cx.notify();
                     }),
@@ -228,6 +320,7 @@ fn search_bar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                             provider: "curseforge".to_string(),
                             mc_version: mc_for_curse.clone(),
                             loader: ldr_for_curse.clone(),
+                            offset: 0,
                         });
                         cx.notify();
                     }),

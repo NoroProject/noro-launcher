@@ -158,14 +158,16 @@ impl BackendState {
                 provider,
                 mc_version,
                 loader,
+                offset,
             } => {
                 let ctx = self.ctx.clone();
                 tokio::spawn(async move {
                     let master_url = ctx.config.get().master_url;
                     let mut url = format!(
-                        "{master_url}/api/admin/catalog/search?q={}&provider={}",
+                        "{master_url}/api/admin/catalog/search?q={}&provider={}&offset={}&limit=20",
                         urlencoding::encode(&query),
-                        urlencoding::encode(&provider)
+                        urlencoding::encode(&provider),
+                        offset
                     );
                     if let Some(mc) = mc_version {
                         url.push_str("&mc=");
@@ -179,6 +181,10 @@ impl BackendState {
                     let client = reqwest::Client::new();
                     if let Ok(res) = client.get(&url).send().await {
                         if let Ok(data) = res.json::<serde_json::Value>().await {
+                            let total = data.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                            let res_offset = data.get("offset").and_then(|v| v.as_u64()).unwrap_or(offset as u64) as u32;
+                            let res_limit = data.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as u32;
+
                             let mut hits = Vec::new();
                             if let Some(arr) = data.get("hits").and_then(|v| v.as_array()) {
                                 for h in arr {
@@ -224,7 +230,12 @@ impl BackendState {
                                     });
                                 }
                             }
-                            ctx.send(MessageToFrontend::CatalogSearchResults { hits });
+                            ctx.send(MessageToFrontend::CatalogSearchResults {
+                                hits,
+                                total,
+                                offset: res_offset,
+                                limit: res_limit,
+                            });
                         }
                     }
                 });
