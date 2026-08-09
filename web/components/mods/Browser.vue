@@ -69,11 +69,12 @@ onMounted(async () => {
             :categories="catalog.categories.value"
             :providers="catalog.providers.value"
             :mc-versions="versions.minecraft.value"
+            class="xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto noro-scroll"
             @toggle-category="catalog.toggleCategory"
             @reset="catalog.resetFilters"
         />
 
-        <div class="grid content-start gap-4">
+        <div class="grid content-start gap-4 min-w-0">
             <ModsSearchBar
                 v-model="catalog.filters.q"
                 v-model:sort="catalog.filters.sort"
@@ -96,7 +97,7 @@ onMounted(async () => {
                 :description="catalog.error.value"
             />
 
-            <div v-if="catalog.hits.value.length" class="grid gap-3">
+            <div v-if="catalog.hits.value.length" class="noro-scroll grid gap-3 max-h-[calc(100vh-16rem)] overflow-y-auto pr-1">
                 <ModsHitCard
                     v-for="hit in catalog.hits.value"
                     :key="`${hit.provider}:${hit.project_id}`"
@@ -143,7 +144,7 @@ onMounted(async () => {
             :loading="detail.loading.value"
             :loading-versions="detail.loadingVersions.value"
             :has-context="hasContext"
-            class="xl:sticky xl:top-4"
+            class="xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto noro-scroll"
             @close="detail.close"
             @install="version => startInstall(detail.hit.value!, version)"
         />
