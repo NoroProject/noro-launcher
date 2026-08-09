@@ -35,14 +35,20 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .flex()
                 .flex_col()
                 .gap(px(16.))
-                .child(page_header(server_id, &mods, cx))
+                .child(page_header(ui, server_id, &mods, cx))
                 .child(mod_list(ui, server_id, &mods, cx)),
         )
         .into_any_element()
 }
 
-fn page_header(server_id: Uuid, mods: &[OptionalModInfo], cx: &mut Cx) -> AnyElement {
+fn page_header(ui: &LauncherUI, server_id: Uuid, mods: &[OptionalModInfo], cx: &mut Cx) -> AnyElement {
     let enabled = mods.iter().filter(|m| m.enabled).count();
+    let allow_suggest = ui
+        .allow_mod_suggestions
+        .get(&server_id)
+        .copied()
+        .unwrap_or(true);
+
     div()
         .flex()
         .items_center()
@@ -64,15 +70,17 @@ fn page_header(server_id: Uuid, mods: &[OptionalModInfo], cx: &mut Cx) -> AnyEle
                 .text_color(rgb(TEXT_MUTED))
                 .child(format!("{enabled} / {} active", mods.len())),
         )
-        .child(crate::components::btn(
-            "mods-suggest-btn",
-            "+ Suggest Mod",
-            false,
-            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                this.page = crate::state::Page::ServerModCatalog(server_id);
-                cx.notify();
-            }),
-        ))
+        .when(allow_suggest, |d| {
+            d.child(crate::components::btn(
+                "mods-suggest-btn",
+                "+ Suggest Mod",
+                false,
+                cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.page = crate::state::Page::ServerModCatalog(server_id);
+                    cx.notify();
+                }),
+            ))
+        })
         .into_any_element()
 }
 

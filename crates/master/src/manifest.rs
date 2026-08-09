@@ -131,6 +131,7 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
         unmanaged_paths,
         user_managed_paths,
         optional_mods,
+        allow_optional_mod_suggestions: build.allow_optional_mod_suggestions,
         recommended_client_settings: RecommendedClientSettings {
             memory_min_mb: build.recommended_memory_min_mb.max(512) as u32,
             memory_max_mb: build

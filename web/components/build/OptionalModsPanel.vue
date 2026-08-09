@@ -4,11 +4,16 @@ import type { OptionalMod } from "~/types/api";
 const props = withDefaults(
     defineProps<{
         optionalMods?: OptionalMod[] | null;
+        allowSuggestions?: boolean;
         busy?: string | null;
     }>(),
-    {},
+    { allowSuggestions: true },
 );
-defineEmits<{ save: []; delete: [index: number] }>();
+defineEmits<{
+    save: [];
+    delete: [index: number];
+    "update:allowSuggestions": [value: boolean];
+}>();
 
 const expanded = ref<Record<number, boolean>>({});
 
@@ -40,16 +45,28 @@ function setFiles(mod: OptionalMod, value: string) {
                 </div>
             </div>
 
-            <AtomButton
-                v-if="optionalMods?.length"
-                variant="primary"
-                :loading="busy === 'optional'"
-                icon="i-lucide-save"
-                size="sm"
-                @click="$emit('save')"
-            >
-                Save Optional Mods
-            </AtomButton>
+            <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--noro-muted)] hover:text-[var(--noro-text)] transition-colors">
+                    <input
+                        type="checkbox"
+                        :checked="allowSuggestions"
+                        class="rounded border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-cyan)] focus:ring-0"
+                        @change="$emit('update:allowSuggestions', ($event.target as HTMLInputElement).checked)"
+                    />
+                    Allow Mod Suggestions
+                </label>
+
+                <AtomButton
+                    v-if="optionalMods?.length"
+                    variant="primary"
+                    :loading="busy === 'optional'"
+                    icon="i-lucide-save"
+                    size="sm"
+                    @click="$emit('save')"
+                >
+                    Save Optional Mods
+                </AtomButton>
+            </div>
         </div>
 
         <div class="p-5">

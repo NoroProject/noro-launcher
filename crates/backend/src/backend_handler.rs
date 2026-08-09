@@ -512,8 +512,11 @@ impl BackendState {
                 }
             })
             .collect();
-        self.ctx
-            .send(MessageToFrontend::OptionalMods { server_id, mods });
+        self.ctx.send(MessageToFrontend::OptionalMods {
+            server_id,
+            mods,
+            allow_suggestions: manifest.allow_optional_mod_suggestions,
+        });
     }
 
     fn send_server_recommendation(&self, server_id: Uuid, manifest: &schema::BuildManifest) {

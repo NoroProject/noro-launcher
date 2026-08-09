@@ -275,6 +275,15 @@ function deleteOptional(index: number) {
         optionalData.data.value.splice(index, 1);
     }
 }
+async function toggleAllowSuggestions(allow: boolean) {
+    await run("optional-toggle", async () => {
+        await auth.request(`/api/admin/builds/${buildId.value}/allow-suggestions`, {
+            method: "PUT",
+            body: { allow },
+        });
+        await buildPayload.refresh();
+    });
+}
 </script>
 
 <template>
@@ -382,9 +391,11 @@ function deleteOptional(index: number) {
                 <BuildFileManagerModal v-model="showFileManager" :build-id="buildId" @changed="filesData.refresh()" />
                 <BuildOptionalModsPanel
                     :optional-mods="optionalData.data.value"
+                    :allow-suggestions="build?.allow_optional_mod_suggestions ?? true"
                     :busy="busy"
                     @save="saveOptional"
                     @delete="deleteOptional"
+                    @update:allow-suggestions="toggleAllowSuggestions"
                 />
                 <BuildRecommendedSettingsPanel
                     :form="recommendedForm"

@@ -126,6 +126,10 @@ impl Default for RecommendedClientSettings {
     }
 }
 
+fn default_allow_optional_mod_suggestions() -> bool {
+    true
+}
+
 /// Главный документ синхронизации. Подписывается ed25519 ключом мастера;
 /// публичный ключ зашит в бинарник лаунчера.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -163,6 +167,9 @@ pub struct BuildManifest {
     pub user_managed_paths: Vec<String>,
 
     pub optional_mods: Vec<OptionalMod>,
+
+    #[serde(default = "default_allow_optional_mod_suggestions")]
+    pub allow_optional_mod_suggestions: bool,
 
     #[serde(default)]
     pub recommended_client_settings: RecommendedClientSettings,

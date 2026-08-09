@@ -271,6 +271,7 @@ pub enum MessageToFrontend {
     OptionalMods {
         server_id: Uuid,
         mods: Vec<OptionalModInfo>,
+        allow_suggestions: bool,
     },
     ServerClientRecommendation {
         server_id: Uuid,

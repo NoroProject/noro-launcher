@@ -155,6 +155,7 @@ pub struct LauncherUI {
     pub build_state: HashMap<Uuid, bridge::BuildState>,
     pub logs: HashMap<Uuid, Vec<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
+    pub allow_mod_suggestions: HashMap<Uuid, bool>,
     pub background_images: HashMap<Uuid, Arc<Image>>,
     pub news_images: HashMap<Uuid, Arc<Image>>,
     news_images_loading: HashSet<Uuid>,
@@ -243,6 +244,7 @@ impl LauncherUI {
             build_state: HashMap::new(),
             logs: HashMap::new(),
             optional_mods: HashMap::new(),
+            allow_mod_suggestions: HashMap::new(),
             background_images: HashMap::new(),
             news_images: HashMap::new(),
             news_images_loading: HashSet::new(),
@@ -539,8 +541,14 @@ impl LauncherUI {
                 }
             }
 
-            MessageToFrontend::OptionalMods { server_id, mods } => {
+            MessageToFrontend::OptionalMods {
+                server_id,
+                mods,
+                allow_suggestions,
+            } => {
                 self.optional_mods.insert(server_id, mods);
+                self.allow_mod_suggestions
+                    .insert(server_id, allow_suggestions);
             }
             MessageToFrontend::ServerClientRecommendation {
                 server_id,

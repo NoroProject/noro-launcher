@@ -55,16 +55,38 @@ fn fetch_image_and_bytes(url: String) -> Result<(Arc<Image>, Vec<u8>), String> {
             .map(str::trim)
             .map(str::to_string);
         let bytes = response.bytes().await.map_err(|e| e.to_string())?.to_vec();
-        let format = content_type
-            .as_deref()
-            .and_then(ImageFormat::from_mime_type)
+        let format = image_format_from_bytes(&bytes)
+            .or_else(|| {
+                content_type
+                    .as_deref()
+                    .and_then(ImageFormat::from_mime_type)
+            })
             .or_else(|| image_format_from_url(&url))
-            .or_else(|| image_format_from_bytes(&bytes))
             .ok_or_else(|| "unknown image format".to_string())?;
 
-        let img = Arc::new(Image::from_bytes(format, bytes.clone()));
-        Ok((img, bytes))
+        let (final_format, final_bytes) = normalize_image_bytes(bytes, format);
+        let img = Arc::new(Image::from_bytes(final_format, final_bytes.clone()));
+        Ok((img, final_bytes))
     })
+}
+
+fn normalize_image_bytes(bytes: Vec<u8>, fallback_format: ImageFormat) -> (ImageFormat, Vec<u8>) {
+    if bytes.starts_with(b"\x89PNG") {
+        return (ImageFormat::Png, bytes);
+    }
+    if bytes.starts_with(b"\xff\xd8\xff") {
+        return (ImageFormat::Jpeg, bytes);
+    }
+    if let Ok(dyn_img) = image::load_from_memory(&bytes) {
+        let mut png_bytes = Vec::new();
+        if dyn_img
+            .write_to(&mut std::io::Cursor::new(&mut png_bytes), image::ImageFormat::Png)
+            .is_ok()
+        {
+            return (ImageFormat::Png, png_bytes);
+        }
+    }
+    (fallback_format, bytes)
 }
 
 fn decode_data_url(url: &str) -> Result<Arc<Image>, String> {
@@ -72,7 +94,8 @@ fn decode_data_url(url: &str) -> Result<Arc<Image>, String> {
     let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
     let format = image_format_from_bytes(&bytes)
         .ok_or_else(|| "unknown image format in data URL".to_string())?;
-    Ok(Arc::new(Image::from_bytes(format, bytes)))
+    let (final_format, final_bytes) = normalize_image_bytes(bytes, format);
+    Ok(Arc::new(Image::from_bytes(final_format, final_bytes)))
 }
 
 fn fetch_image(url: String) -> Result<LoadedImage, String> {
@@ -94,14 +117,20 @@ fn fetch_image(url: String) -> Result<LoadedImage, String> {
             .map(str::trim)
             .map(str::to_string);
         let bytes = response.bytes().await.map_err(|e| e.to_string())?.to_vec();
-        let format = content_type
-            .as_deref()
-            .and_then(ImageFormat::from_mime_type)
+        let format = image_format_from_bytes(&bytes)
+            .or_else(|| {
+                content_type
+                    .as_deref()
+                    .and_then(ImageFormat::from_mime_type)
+            })
             .or_else(|| image_format_from_url(&url))
-            .or_else(|| image_format_from_bytes(&bytes))
             .ok_or_else(|| "unknown image format".to_string())?;
 
-        Ok(LoadedImage { format, bytes })
+        let (final_format, final_bytes) = normalize_image_bytes(bytes, format);
+        Ok(LoadedImage {
+            format: final_format,
+            bytes: final_bytes,
+        })
     })
 }
 

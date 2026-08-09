@@ -79,6 +79,7 @@ export interface BuildRow {
   assets_index_name: string;
   published: boolean;
   optional_mods: unknown[];
+  allow_optional_mod_suggestions?: boolean;
   recommended_memory_min_mb: number;
   recommended_memory_max_mb: number;
   recommended_jvm_flags: string;

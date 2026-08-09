@@ -732,6 +732,28 @@ pub async fn set_optional(
     Ok(Json(json!({ "ok": true })))
 }
 
+#[derive(Deserialize)]
+pub struct AllowSuggestionsReq {
+    pub allow: bool,
+}
+
+pub async fn set_allow_suggestions(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    Json(req): Json<AllowSuggestionsReq>,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_ADMIN_BUILDS)?;
+    sqlx::query("UPDATE builds SET allow_optional_mod_suggestions = $2 WHERE id = $1")
+        .bind(id)
+        .bind(req.allow)
+        .execute(&state.db)
+        .await?;
+    let server_id = build_server_id(&state, id).await?;
+    broadcast_builds_changed(&state, server_id);
+    Ok(Json(json!({ "ok": true })))
+}
+
 async fn fill_optional_icons(state: &AppState, mods: &mut [OptionalMod]) {
     for m in mods {
         if m.icon_url.as_deref().is_some_and(|u| !u.trim().is_empty()) {
