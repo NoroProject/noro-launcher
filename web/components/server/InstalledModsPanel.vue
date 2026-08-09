@@ -49,7 +49,7 @@ const catalogUrl = computed(() => {
 
 watch(
     () => mods.value.map((m) => m.sha1).join(","),
-    () => resolveModIcons(mods.value),
+    () => resolveModIcons(mods.value, props.buildId),
     { immediate: true },
 );
 

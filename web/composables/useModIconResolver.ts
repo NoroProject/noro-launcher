@@ -21,8 +21,9 @@ export function cleanModTitle(path: string): string {
 
 export function useModIconResolver() {
     const icons = ref<Record<string, string>>({});
+    const auth = useAuth();
 
-    async function resolveModIcons(files: BuildFileRow[]) {
+    async function resolveModIcons(files: BuildFileRow[], buildId?: string | null) {
         const modsToResolve = files.filter((f) => {
             const isJar = f.path.toLowerCase().endsWith(".jar");
             const inMods = f.path.toLowerCase().startsWith("mods/");
@@ -100,6 +101,26 @@ export function useModIconResolver() {
                 }
             }),
         );
+
+        // 4. Backend Inner Jar Icon Extraction (for local/custom mods)
+        if (buildId) {
+            const stillUnresolved = modsToResolve.filter((f) => !icons.value[f.sha1]);
+            await Promise.allSettled(
+                stillUnresolved.map(async (file) => {
+                    try {
+                        const res = await auth.request<{ icon_url?: string }>(
+                            `/api/admin/builds/${buildId}/files/icon?path=${encodeURIComponent(file.path)}`,
+                        );
+                        if (res?.icon_url) {
+                            iconCache.set(file.sha1, res.icon_url);
+                            icons.value[file.sha1] = res.icon_url;
+                        }
+                    } catch {
+                        // Ignore missing inner icon
+                    }
+                }),
+            );
+        }
     }
 
     return {
