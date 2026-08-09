@@ -33,6 +33,8 @@ export function useSyncRules(buildId: string) {
   const ignored = ref<string[]>([])
   const user = ref<string[]>([])
   const saving = ref(false)
+  /** Загрузка состоялась. Пока false, списки пустые не потому, что правил нет. */
+  const loaded = ref(false)
 
   async function load() {
     const build = await auth.request<{
@@ -41,6 +43,7 @@ export function useSyncRules(buildId: string) {
     }>(`/api/admin/builds/${buildId}`)
     ignored.value = build.unmanaged_paths || []
     user.value = build.user_managed_paths || []
+    loaded.value = true
   }
 
   /** Самое длинное правило, накрывающее путь: точное совпадение или папка выше. */
@@ -80,6 +83,11 @@ export function useSyncRules(buildId: string) {
   }
 
   async function save() {
+    // Ручка перезаписывает оба списка целиком, поэтому сохранять до успешной
+    // загрузки нельзя: пустые списки затрут все прежние правила молча.
+    if (!loaded.value) {
+      throw new Error('Sync rules are not loaded yet — refusing to overwrite them')
+    }
     saving.value = true
     try {
       await auth.request(`/api/admin/builds/${buildId}/paths`, {
@@ -93,5 +101,5 @@ export function useSyncRules(buildId: string) {
 
   const count = computed(() => ignored.value.length + user.value.length)
 
-  return { ignored, user, saving, count, load, ruleFor, setMode, cycle, save }
+  return { ignored, user, saving, loaded, count, load, ruleFor, setMode, cycle, save }
 }

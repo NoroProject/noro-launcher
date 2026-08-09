@@ -73,7 +73,14 @@ async function loadFiles() {
   } finally { loading.value = false }
 }
 
-onMounted(() => Promise.all([loadFiles(), rules.load()]))
+// Провал загрузки правил раньше был немым, а сохранение после него затирало
+// прежние правила пустыми списками. Теперь ошибка видна, и save() заблокирован.
+onMounted(async () => {
+  await Promise.all([
+    loadFiles(),
+    rules.load().catch((e) => notify.fail(e, 'Failed to load sync rules')),
+  ])
+})
 
 // ─── Breadcrumb ───
 const breadcrumb = computed(() => {
