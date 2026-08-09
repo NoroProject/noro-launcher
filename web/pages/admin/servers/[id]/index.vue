@@ -120,9 +120,9 @@ const buildEditor = useAdminBuildEditor(
             <!-- Navigation Tabs -->
             <ServerSectionTabs v-model="activeTab" />
 
-            <!-- Build Selector Bar (shown on Build & Client tabs) -->
+            <!-- Build Selector Bar (shown on Mods, Build & Client tabs) -->
             <ServerBuildSelectorBar
-                v-if="activeTab === 'build' || activeTab === 'client'"
+                v-if="activeTab === 'mods' || activeTab === 'build' || activeTab === 'client'"
                 :builds="builds"
                 :selected-id="selectedBuildId"
                 :pending="buildsPending"
@@ -158,6 +158,18 @@ const buildEditor = useAdminBuildEditor(
                     :toggling-role="togglingRole"
                     :has-access="hasAccess"
                     @toggle="toggleRoleAccess"
+                />
+            </template>
+
+            <!-- TAB 2: Installed Mods & Catalog -->
+            <template v-else-if="activeTab === 'mods'">
+                <ServerInstalledModsPanel
+                    :server-id="id"
+                    :build-id="selectedBuildId"
+                    :files="buildEditor.filesData.data.value"
+                    :busy="buildEditor.busy.value"
+                    @remove="buildEditor.removeFile"
+                    @upload="(file) => { buildEditor.fileUpload.value = file; buildEditor.uploadBuildFile(); }"
                 />
             </template>
 

@@ -16,6 +16,12 @@ const tabs: Array<{
         text: "Name, order, assets & visibility",
     },
     {
+        key: "mods",
+        label: "Mods",
+        icon: "i-lucide-puzzle",
+        text: "Installed mods & Modrinth catalog",
+    },
+    {
         key: "build",
         label: "Build & Files",
         icon: "i-lucide-box",
@@ -37,7 +43,7 @@ const tabs: Array<{
 </script>
 
 <template>
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <button
             v-for="tab in tabs"
             :key="tab.key"
