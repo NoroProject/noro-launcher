@@ -32,7 +32,7 @@ defineProps<{
                 </div>
             </header>
 
-            <section class="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col mx-auto max-w-[1440px] w-full p-5 md:p-8">
+            <section class="flex-1 min-h-0 overflow-y-auto noro-scroll flex flex-col mx-auto max-w-[1440px] w-full p-5 md:p-8">
                 <slot />
             </section>
         </main>
