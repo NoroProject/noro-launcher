@@ -159,15 +159,6 @@ const buildEditor = useAdminBuildEditor(
                     :has-access="hasAccess"
                     @toggle="toggleRoleAccess"
                 />
-
-                <ServerBuildsPanel
-                    :builds="builds"
-                    :server-id="id"
-                    :pending="buildsPending"
-                    :error="buildsError"
-                    @refresh="refreshBuilds"
-                    @create="showCreateBuild = true"
-                />
             </template>
 
             <!-- TAB 2: Build & Files -->
