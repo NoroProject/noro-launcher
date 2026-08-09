@@ -45,7 +45,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onHotkey));
             <input
                 ref="field"
                 :value="modelValue"
-                class="noro-input pl-10"
+                class="noro-input !pl-10"
                 placeholder="Search mods…  ( / )"
                 autocomplete="off"
                 @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"

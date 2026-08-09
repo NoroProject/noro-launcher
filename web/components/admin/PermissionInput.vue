@@ -61,7 +61,7 @@ function step(delta: number) {
   <div class="relative">
     <input
       :value="modelValue"
-      class="noro-input pr-10 font-mono"
+      class="noro-input !pr-10 font-mono"
       placeholder="noro.admin.users"
       spellcheck="false"
       autocomplete="off"
