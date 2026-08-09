@@ -65,12 +65,35 @@ pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
         .items_center()
         .justify_center()
         .cursor_pointer()
-        .hover(|d| d.bg(rgba((CTA << 8) | 0x20)))
+        .hover(|d| d.bg(rgba((CTA << 8) | 0x25)))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.sidebar_collapsed = false;
             cx.notify();
         }))
-        .child(img("logo.png").size(px(28.)).flex_shrink_0())
+        .child(
+            div()
+                .relative()
+                .size(px(28.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(img("logo.png").size_full())
+                .child(
+                    div()
+                        .absolute()
+                        .top(px(-4.))
+                        .right(px(-6.))
+                        .size(px(14.))
+                        .rounded_full()
+                        .bg(rgb(BG_PANEL))
+                        .border_1()
+                        .border_color(rgb(BORDER))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(ic("panel-left-open", 10., CTA)),
+                ),
+        )
         .into_any_element()
 }
 
