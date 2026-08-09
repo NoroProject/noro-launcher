@@ -136,7 +136,7 @@ onMounted(async () => {
                 :description="catalog.error.value"
             />
 
-            <div v-if="catalog.hits.value.length" class="noro-scroll grid gap-3 max-h-[calc(100vh-16rem)] overflow-y-auto pr-1">
+            <div v-if="catalog.hits.value.length" class="noro-scroll flex flex-col gap-3 max-h-[calc(100vh-16rem)] overflow-y-auto overflow-x-hidden pr-1.5 w-full">
                 <ModsHitCard
                     v-for="hit in catalog.hits.value"
                     :key="`${hit.provider}:${hit.project_id}`"

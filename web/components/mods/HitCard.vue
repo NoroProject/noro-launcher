@@ -20,7 +20,7 @@ const sideLabel = computed(() => {
 
 <template>
     <article
-        class="noro-card grid cursor-pointer gap-3 p-4 transition-colors"
+        class="noro-card grid cursor-pointer gap-3 p-4 transition-colors min-w-0 w-full overflow-hidden shrink-0"
         :class="selected
             ? 'border-[var(--noro-cream)] bg-[var(--noro-panel-2)]'
             : 'hover:border-[var(--noro-blue)]'"
