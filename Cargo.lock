@@ -668,6 +668,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "url",
+ "urlencoding",
  "uuid",
  "walkdir",
  "zip",
@@ -836,6 +837,7 @@ version = "1.4.5"
 dependencies = [
  "parking_lot",
  "schema",
+ "serde",
  "tokio",
  "uuid",
 ]

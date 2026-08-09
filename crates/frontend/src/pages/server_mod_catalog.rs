@@ -1,14 +1,26 @@
-//! Экран поиска и запроса модов в лаунчере для игроков.
+//! Экран полного каталога модов и детальной страницы мода в лаунчере.
 use super::common::{tabs, Cx};
 use crate::components::btn;
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
-use bridge::MessageToBackend;
-use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight, SharedString};
+use bridge::{CatalogHitInfo, MessageToBackend};
+use gpui::{
+    div, img, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight, ObjectFit,
+    SharedString,
+};
 use uuid::Uuid;
 
 pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    // Автоматически запускаем базовый поиск при первом входе, если выдача пустая
+    if ui.mod_catalog_hits.is_empty() {
+        ui.backend.send(MessageToBackend::SearchCatalog {
+            query: "".to_string(),
+            provider: ui.mod_catalog_provider.clone(),
+            mc_version: None,
+        });
+    }
+
     div()
         .size_full()
         .relative()
@@ -24,13 +36,23 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .flex()
                 .flex_col()
                 .gap(px(16.))
-                .child(page_header(server_id, cx))
-                .child(mod_catalog_body(ui, server_id, cx)),
+                .child(page_header(ui, server_id, cx))
+                .child(if let Some(selected) = ui.mod_catalog_selected.clone() {
+                    mod_detail_view(ui, server_id, selected, cx)
+                } else {
+                    mod_catalog_grid(ui, server_id, cx)
+                }),
         )
         .into_any_element()
 }
 
-fn page_header(server_id: Uuid, cx: &mut Cx) -> AnyElement {
+fn page_header(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    let title = if let Some(ref selected) = ui.mod_catalog_selected {
+        selected.title.clone()
+    } else {
+        "Mod Catalog".to_string()
+    };
+
     div()
         .flex()
         .items_center()
@@ -42,12 +64,23 @@ fn page_header(server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .text_size(px(18.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(CTA))
-                .child("Suggest Optional Mod"),
+                .child(title),
         )
         .child(div().flex_1())
+        .when(ui.mod_catalog_selected.is_some(), |d| {
+            d.child(btn(
+                "back-to-grid-btn",
+                "Back to Results",
+                false,
+                cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.mod_catalog_selected = None;
+                    cx.notify();
+                }),
+            ))
+        })
         .child(btn(
             "back-to-mods-btn",
-            "Back to Mods",
+            "Back to Server Mods",
             false,
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                 this.page = crate::state::Page::ServerMods(server_id);
@@ -57,123 +90,299 @@ fn page_header(server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-fn mod_catalog_body(_ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    let hits = ui.mod_catalog_hits.clone();
+
     div()
-        .rounded(px(R_MD))
-        .bg(rgb(BG_PANEL))
-        .border_1()
-        .border_color(rgb(BORDER))
-        .p(px(24.))
+        .flex_1()
         .flex()
         .flex_col()
         .gap(px(16.))
+        .child(search_bar(ui, cx))
         .child(
             div()
-                .font_family(FONT_PIXEL_ALT)
-                .text_size(px(14.))
-                .text_color(rgb(TEXT_PRIMARY))
-                .child("Find mods from Modrinth or CurseForge to request addition to this server assembly:"),
+                .flex_1()
+                .overflow_hidden()
+                .rounded(px(R_MD))
+                .bg(rgb(BG_PANEL))
+                .border_1()
+                .border_color(rgb(BORDER))
+                .p(px(16.))
+                .child(if hits.is_empty() {
+                    div()
+                        .size_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .font_family(FONT_PIXEL_ALT)
+                        .text_size(px(14.))
+                        .text_color(rgb(TEXT_MUTED))
+                        .child("Searching mods catalog...")
+                        .into_any_element()
+                } else {
+                    let items: Vec<AnyElement> = hits
+                        .into_iter()
+                        .map(|hit| mod_card(hit, server_id, cx))
+                        .collect();
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(8.))
+                        .children(items)
+                        .into_any_element()
+                }),
+        )
+        .into_any_element()
+}
+
+fn search_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    let provider = ui.mod_catalog_provider.clone();
+
+    div()
+        .flex()
+        .items_center()
+        .gap(px(12.))
+        .child(
+            div()
+                .flex_1()
+                .h(px(40.))
+                .px(px(16.))
+                .rounded(px(R_SM))
+                .bg(rgb(BG_PANEL))
+                .border_1()
+                .border_color(rgb(BORDER))
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .child(ic("search", 16., TEXT_MUTED))
+                .child(
+                    div()
+                        .font_family(FONT_PIXEL_ALT)
+                        .text_size(px(14.))
+                        .text_color(rgb(TEXT_MUTED))
+                        .child("Search catalog..."),
+                ),
         )
         .child(
             div()
                 .flex()
-                .flex_col()
-                .gap(px(8.))
-                .child(suggest_mod_preset(
-                    server_id,
-                    "modrinth",
-                    "sodium",
-                    "Sodium",
-                    "Modern rendering engine for Minecraft",
-                    cx,
+                .gap(px(4.))
+                .child(btn(
+                    "provider-modrinth",
+                    "Modrinth",
+                    provider == "modrinth",
+                    cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                        this.mod_catalog_provider = "modrinth".to_string();
+                        this.backend.send(MessageToBackend::SearchCatalog {
+                            query: "".to_string(),
+                            provider: "modrinth".to_string(),
+                            mc_version: None,
+                        });
+                        cx.notify();
+                    }),
                 ))
-                .child(suggest_mod_preset(
-                    server_id,
-                    "modrinth",
-                    "iris",
-                    "Iris Shaders",
-                    "Modern shader pack loader for Minecraft",
-                    cx,
-                ))
-                .child(suggest_mod_preset(
-                    server_id,
-                    "modrinth",
-                    "xaeros-minimap",
-                    "Xaero's Minimap",
-                    "Displays a mini-map in the corner of your screen",
-                    cx,
-                ))
-                .child(suggest_mod_preset(
-                    server_id,
-                    "modrinth",
-                    "appleskin",
-                    "AppleSkin",
-                    "Food and hunger HUD improvements",
-                    cx,
+                .child(btn(
+                    "provider-curseforge",
+                    "CurseForge",
+                    provider == "curseforge",
+                    cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                        this.mod_catalog_provider = "curseforge".to_string();
+                        this.backend.send(MessageToBackend::SearchCatalog {
+                            query: "".to_string(),
+                            provider: "curseforge".to_string(),
+                            mc_version: None,
+                        });
+                        cx.notify();
+                    }),
                 )),
         )
         .into_any_element()
 }
 
-fn suggest_mod_preset(
-    server_id: Uuid,
-    provider: &'static str,
-    project_id: &'static str,
-    title: &'static str,
-    description: &'static str,
-    cx: &mut Cx,
-) -> AnyElement {
-    let provider_str = provider.to_string();
-    let proj_id_str = project_id.to_string();
-    let title_str = title.to_string();
-    let desc_str = description.to_string();
+fn mod_card(hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    let hit_clone = hit.clone();
+    let hit_for_req = hit.clone();
+    let project_id_str = hit.project_id.clone();
 
     div()
-        .h(px(56.))
+        .id(SharedString::from(format!("mod-card-{project_id_str}")))
+        .h(px(72.))
         .px(px(16.))
         .rounded(px(R_SM))
         .bg(rgba(0xffffff0a))
         .border_1()
         .border_color(rgb(BORDER))
+        .hover(|s| s.bg(rgba(0xffffff15)))
+        .cursor_pointer()
         .flex()
         .items_center()
-        .justify_between()
-        .gap(px(12.))
+        .gap(px(16.))
+        .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+            this.mod_catalog_selected = Some(hit_clone.clone());
+            cx.notify();
+        }))
+        .child(mod_avatar(&hit.icon_url))
         .child(
             div()
+                .flex_1()
+                .min_w_0()
                 .flex()
                 .flex_col()
+                .gap(px(2.))
                 .child(
                     div()
-                        .font_family(FONT_PIXEL_ALT)
-                        .text_size(px(14.))
-                        .font_weight(FontWeight::BOLD)
-                        .text_color(rgb(TEXT_PRIMARY))
-                        .child(title),
+                        .flex()
+                        .items_center()
+                        .gap(px(8.))
+                        .child(
+                            div()
+                                .truncate()
+                                .font_family(FONT_PIXEL_ALT)
+                                .text_size(px(14.))
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(rgb(TEXT_PRIMARY))
+                                .child(hit.title.clone()),
+                        )
+                        .child(
+                            div()
+                                .px(px(6.))
+                                .py(px(1.))
+                                .rounded(px(R_SM))
+                                .bg(rgba(0x0f203688))
+                                .font_family(FONT_PIXEL_ALT)
+                                .text_size(px(9.))
+                                .text_color(rgb(CTA))
+                                .child(hit.provider.to_uppercase()),
+                        ),
                 )
                 .child(
                     div()
+                        .truncate()
                         .font_family(FONT_PIXEL_ALT)
                         .text_size(px(11.))
                         .text_color(rgb(TEXT_MUTED))
-                        .child(description),
+                        .child(hit.description.clone()),
                 ),
         )
         .child(btn(
-            SharedString::from(format!("btn-sug-{project_id}")),
-            "Request Mod",
+            SharedString::from(format!("btn-req-{project_id_str}")),
+            "Request",
             true,
             cx.listener(move |this, _e: &ClickEvent, _w, _cx| {
                 this.backend.send(MessageToBackend::SuggestOptionalMod {
                     server_id,
                     build_id: None,
-                    provider: provider_str.clone(),
-                    project_id: proj_id_str.clone(),
-                    title: title_str.clone(),
-                    icon_url: None,
-                    description: Some(desc_str.clone()),
+                    provider: hit_for_req.provider.clone(),
+                    project_id: hit_for_req.project_id.clone(),
+                    title: hit_for_req.title.clone(),
+                    icon_url: hit_for_req.icon_url.clone(),
+                    description: Some(hit_for_req.description.clone()),
                 });
             }),
         ))
+        .into_any_element()
+}
+
+fn mod_avatar(icon_url: &Option<String>) -> AnyElement {
+    let outer = div()
+        .size(px(44.))
+        .rounded(px(R_SM))
+        .overflow_hidden()
+        .flex_shrink_0()
+        .flex()
+        .items_center()
+        .justify_center();
+
+    if let Some(ref url) = icon_url {
+        outer
+            .child(img(url.clone()).size_full().object_fit(ObjectFit::Cover))
+            .into_any_element()
+    } else {
+        outer
+            .bg(rgba(0xffffff15))
+            .border_1()
+            .border_color(rgb(BORDER))
+            .child(ic("box", 20., TEXT_MUTED))
+            .into_any_element()
+    }
+}
+
+fn mod_detail_view(
+    _ui: &LauncherUI,
+    server_id: Uuid,
+    hit: CatalogHitInfo,
+    cx: &mut Cx,
+) -> AnyElement {
+    let hit_for_req = hit.clone();
+    div()
+        .flex_1()
+        .rounded(px(R_MD))
+        .bg(rgb(BG_PANEL))
+        .border_1()
+        .border_color(rgb(BORDER))
+        .p(px(32.))
+        .flex()
+        .flex_col()
+        .gap(px(24.))
+        .child(
+            div()
+                .flex()
+                .items_start()
+                .gap(px(24.))
+                .child(mod_avatar(&hit.icon_url))
+                .child(
+                    div()
+                        .flex_1()
+                        .flex()
+                        .flex_col()
+                        .gap(px(4.))
+                        .child(
+                            div()
+                                .font_family(FONT_PIXEL_ALT)
+                                .text_size(px(22.))
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(rgb(CTA))
+                                .child(hit.title.clone()),
+                        )
+                        .child(
+                            div()
+                                .font_family(FONT_PIXEL_ALT)
+                                .text_size(px(12.))
+                                .text_color(rgb(TEXT_MUTED))
+                                .child(format!(
+                                    "Provider: {} | Downloads: {}",
+                                    hit.provider.to_uppercase(),
+                                    hit.downloads
+                                )),
+                        ),
+                )
+                .child(btn(
+                    "request-detail-btn",
+                    "Request Mod for Assembly",
+                    true,
+                    cx.listener(move |this, _e: &ClickEvent, _w, _cx| {
+                        this.backend.send(MessageToBackend::SuggestOptionalMod {
+                            server_id,
+                            build_id: None,
+                            provider: hit_for_req.provider.clone(),
+                            project_id: hit_for_req.project_id.clone(),
+                            title: hit_for_req.title.clone(),
+                            icon_url: hit_for_req.icon_url.clone(),
+                            description: Some(hit_for_req.description.clone()),
+                        });
+                    }),
+                )),
+        )
+        .child(
+            div()
+                .border_t_1()
+                .border_color(rgb(BORDER))
+                .pt(px(20.))
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(14.))
+                .text_color(rgb(TEXT_PRIMARY))
+                .line_height(px(22.))
+                .child(hit.description),
+        )
         .into_any_element()
 }

@@ -28,14 +28,16 @@ pub fn server_item(
         .unwrap_or_else(|| "—".to_string());
     let sync = ui.sync_state(&id);
 
+    let collapsed = ui.sidebar_collapsed;
     div()
         .id(SharedString::from(format!("server-nav-{id}")))
-        .h(px(68.))
+        .h(px(56.))
         .w_full()
         .flex()
         .items_center()
+        .justify_center()
         .gap(px(12.))
-        .px(px(12.))
+        .px(px(if collapsed { 4. } else { 12. }))
         .rounded(px(R_MD))
         .cursor_pointer()
         .bg(if selected {
@@ -52,10 +54,10 @@ pub fn server_item(
             cx.notify();
         }))
         .child(icon_slot(ui, server))
-        .child(info_block(server, &version))
-        .child(div().flex_1())
-        .when(locked, |d| d.child(ic("lock", 14., WARNING)))
-        .child(status_dot(&sync))
+        .when(!collapsed, |d| d.child(info_block(server, &version)))
+        .when(!collapsed, |d| d.child(div().flex_1()))
+        .when(locked && !collapsed, |d| d.child(ic("lock", 14., WARNING)))
+        .when(!collapsed, |d| d.child(status_dot(&sync)))
         .into_any_element()
 }
 

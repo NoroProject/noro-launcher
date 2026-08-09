@@ -138,6 +138,10 @@ pub struct LauncherUI {
     pub locale: i18n::Locale,
     pub online: bool,
     pub logging_in: bool,
+    pub sidebar_collapsed: bool,
+    pub mod_catalog_hits: Vec<bridge::CatalogHitInfo>,
+    pub mod_catalog_selected: Option<bridge::CatalogHitInfo>,
+    pub mod_catalog_provider: String,
     pub startup_checking: bool,
     pub login_error: Option<String>,
 
@@ -221,6 +225,10 @@ impl LauncherUI {
             locale: i18n::Locale::default(),
             online: false,
             logging_in: false,
+            sidebar_collapsed: false,
+            mod_catalog_hits: Vec::new(),
+            mod_catalog_selected: None,
+            mod_catalog_provider: "modrinth".to_string(),
             startup_checking: true,
             login_error: None,
             servers: Vec::new(),
@@ -530,6 +538,9 @@ impl LauncherUI {
                 settings,
             } => {
                 self.server_recommendations.insert(server_id, settings);
+            }
+            MessageToFrontend::CatalogSearchResults { hits } => {
+                self.mod_catalog_hits = hits;
             }
             MessageToFrontend::SyncProgress {
                 server_id,

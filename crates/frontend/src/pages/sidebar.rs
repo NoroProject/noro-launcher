@@ -9,6 +9,7 @@ use gpui::{div, prelude::*, px, rgb, AnyElement};
 use i18n::t;
 
 pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    let collapsed = ui.sidebar_collapsed;
     let selected = ui.selected_server_id();
     let cards: Vec<AnyElement> = ui
         .servers
@@ -17,7 +18,7 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .collect();
 
     div()
-        .w(px(280.))
+        .w(px(if collapsed { 76. } else { 280. }))
         .h_full()
         .flex_shrink_0()
         .flex()
@@ -25,31 +26,29 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .bg(rgb(SIDEBAR))
         .border_r_1()
         .border_color(rgb(BORDER))
-        // Логотип
+        // Логотип + Кнопка сворачивания
         .child(
             div()
                 .h(px(72.))
-                .px(px(20.))
+                .px(px(16.))
                 .flex()
                 .items_center()
-                .gap(px(12.))
+                .justify_between()
+                .gap(px(8.))
                 .border_b_1()
                 .border_color(rgb(BORDER))
-                .child(logo(cx))
-                .child(div().flex_1())
-                .child(
-                    div()
-                        .font_family(FONT_PIXEL_ALT)
-                        .text_size(px(9.))
-                        .text_color(rgb(TEXT_MUTED))
-                        .child(t(if ui.online {
-                            "sidebar-online"
-                        } else {
-                            "sidebar-offline"
-                        })),
-                ),
+                .when(!collapsed, |d| d.child(logo(cx)))
+                .child(nav_icon(
+                    "sidebar-toggle-btn",
+                    "menu",
+                    collapsed,
+                    cx.listener(|this, _e, _w, cx| {
+                        this.sidebar_collapsed = !this.sidebar_collapsed;
+                        cx.notify();
+                    }),
+                )),
         )
-        // Список серверов (высота по содержимому)
+        // Список серверов
         .child(
             div()
                 .px(px(8.))
@@ -58,39 +57,45 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .flex_col()
                 .gap(px(4.))
                 .children(cards)
-                .when(ui.servers.is_empty(), |d| d.child(empty_hint())),
+                .when(ui.servers.is_empty() && !collapsed, |d| d.child(empty_hint())),
         )
-        // Прозрачный spacer — отодвигает нижнюю панель вниз
         .child(div().flex_1())
         // Нижняя панель
         .child(
             div()
                 .border_t_1()
                 .border_color(rgb(BORDER))
-                .px(px(12.))
+                .px(px(8.))
                 .py(px(10.))
                 .flex()
-                .gap(px(4.))
+                .flex_col()
+                .gap(px(6.))
                 .items_center()
-                .child(user_card(ui, cx))
-                .child(nav_icon(
-                    "news-bottom",
-                    "newspaper",
-                    ui.page == Page::News,
-                    cx.listener(|this, _e, _w, cx| {
-                        this.page = Page::News;
-                        cx.notify();
-                    }),
-                ))
-                .child(nav_icon(
-                    "settings-bottom",
-                    "settings",
-                    ui.page == Page::Settings,
-                    cx.listener(|this, _e, _w, cx| {
-                        this.page = Page::Settings;
-                        cx.notify();
-                    }),
-                )),
+                .when(!collapsed, |d| d.child(user_card(ui, cx)))
+                .child(
+                    div()
+                        .flex()
+                        .gap(px(4.))
+                        .items_center()
+                        .child(nav_icon(
+                            "news-bottom",
+                            "newspaper",
+                            ui.page == Page::News,
+                            cx.listener(|this, _e, _w, cx| {
+                                this.page = Page::News;
+                                cx.notify();
+                            }),
+                        ))
+                        .child(nav_icon(
+                            "settings-bottom",
+                            "settings",
+                            ui.page == Page::Settings,
+                            cx.listener(|this, _e, _w, cx| {
+                                this.page = Page::Settings;
+                                cx.notify();
+                            }),
+                        )),
+                ),
         )
         .into_any_element()
 }

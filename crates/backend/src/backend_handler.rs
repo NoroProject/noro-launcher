@@ -153,6 +153,78 @@ impl BackendState {
                 });
             }
 
+            MessageToBackend::SearchCatalog {
+                query,
+                provider,
+                mc_version,
+            } => {
+                let ctx = self.ctx.clone();
+                tokio::spawn(async move {
+                    let master_url = ctx.config.get().master_url;
+                    let mut url = format!(
+                        "{master_url}/api/admin/catalog/search?q={}&provider={}",
+                        urlencoding::encode(&query),
+                        urlencoding::encode(&provider)
+                    );
+                    if let Some(mc) = mc_version {
+                        url.push_str("&mc=");
+                        url.push_str(&urlencoding::encode(&mc));
+                    }
+
+                    let client = reqwest::Client::new();
+                    if let Ok(res) = client.get(&url).send().await {
+                        if let Ok(data) = res.json::<serde_json::Value>().await {
+                            let mut hits = Vec::new();
+                            if let Some(arr) = data.get("hits").and_then(|v| v.as_array()) {
+                                for h in arr {
+                                    let provider = h
+                                        .get("provider")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("modrinth")
+                                        .to_string();
+                                    let project_id = h
+                                        .get("project_id")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let title = h
+                                        .get("title")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let description = h
+                                        .get("description")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let icon_url = h
+                                        .get("icon_url")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string());
+                                    let author = h
+                                        .get("author")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string());
+                                    let downloads =
+                                        h.get("downloads").and_then(|v| v.as_u64()).unwrap_or(0);
+
+                                    hits.push(bridge::CatalogHitInfo {
+                                        provider,
+                                        project_id,
+                                        title,
+                                        description,
+                                        icon_url,
+                                        author,
+                                        downloads,
+                                    });
+                                }
+                            }
+                            ctx.send(MessageToFrontend::CatalogSearchResults { hits });
+                        }
+                    }
+                });
+            }
+
             MessageToBackend::SetMemory { min_mb, max_mb } => {
                 self.ctx.config.update(|c| {
                     c.memory_min_mb = min_mb;

@@ -36,6 +36,7 @@ regex = { workspace = true }
 memchr = { workspace = true }
 open = { workspace = true }
 url = { workspace = true }
+urlencoding = { workspace = true }
 walkdir = { workspace = true }
 zip = { workspace = true }
 fastnbt = { workspace = true }

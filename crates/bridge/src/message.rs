@@ -2,15 +2,27 @@
 
 use crate::modal_action::ModalAction;
 use schema::{LauncherVersion, NewsItem, NotifLevel, ServerEntry, UserProfile};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientSettingsState {
     pub memory_min_mb: u32,
     pub memory_max_mb: u32,
     pub jvm_flags: String,
     pub show_console_on_launch: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CatalogHitInfo {
+    pub provider: String,
+    pub project_id: String,
+    pub title: String,
+    pub description: String,
+    pub icon_url: Option<String>,
+    pub author: Option<String>,
+    pub downloads: u64,
 }
 
 /// Frontend → Backend.
@@ -48,6 +60,11 @@ pub enum MessageToBackend {
         title: String,
         icon_url: Option<String>,
         description: Option<String>,
+    },
+    SearchCatalog {
+        query: String,
+        provider: String,
+        mc_version: Option<String>,
     },
 
     // --- Настройки ---
@@ -256,6 +273,9 @@ pub enum MessageToFrontend {
     ServerClientRecommendation {
         server_id: Uuid,
         settings: ClientSettingsState,
+    },
+    CatalogSearchResults {
+        hits: Vec<CatalogHitInfo>,
     },
 
     /// Прогресс синхронизации (файлы, java, assets — всё через один канал).
