@@ -1,6 +1,6 @@
 //! Боковая панель: логотип, список серверов, кнопки внизу.
 use super::common::Cx;
-use super::sidebar_parts::{empty_hint, logo, nav_icon};
+use super::sidebar_parts::{collapsed_logo_toggle, empty_hint, logo, nav_icon};
 use super::sidebar_server::server_item;
 use super::sidebar_user::user_card;
 use crate::state::{LauncherUI, Page};
@@ -37,21 +37,20 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .gap(px(8.))
                 .border_b_1()
                 .border_color(rgb(BORDER))
-                .when(!collapsed, |d| d.child(logo(cx)))
-                .when(collapsed, |d| d.justify_center())
-                .child(nav_icon(
-                    "sidebar-toggle-btn",
-                    if collapsed {
-                        "panel-left-open"
-                    } else {
-                        "panel-left-close"
-                    },
-                    false,
-                    cx.listener(|this, _e, _w, cx| {
-                        this.sidebar_collapsed = !this.sidebar_collapsed;
-                        cx.notify();
-                    }),
-                )),
+                .when(!collapsed, |d| {
+                    d.child(logo(cx)).child(nav_icon(
+                        "sidebar-toggle-btn",
+                        "panel-left-close",
+                        false,
+                        cx.listener(|this, _e, _w, cx| {
+                            this.sidebar_collapsed = true;
+                            cx.notify();
+                        }),
+                    ))
+                })
+                .when(collapsed, |d| {
+                    d.justify_center().child(collapsed_logo_toggle(cx))
+                }),
         )
         // Список серверов (скроллируемый контейнер в центре)
         .child(

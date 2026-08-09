@@ -51,6 +51,7 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .bottom(px(32.))
                 .flex()
                 .flex_col()
+                .min_h_0()
                 .gap(px(16.))
                 .child(page_header(ui, server_id, cx))
                 .child(if let Some(selected) = ui.mod_catalog_selected.clone() {
@@ -118,6 +119,7 @@ fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement
 
     div()
         .flex_1()
+        .min_h_0()
         .flex()
         .flex_col()
         .gap(px(16.))
@@ -126,6 +128,7 @@ fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement
             div()
                 .id("catalog-hits-scroll")
                 .flex_1()
+                .min_h_0()
                 .overflow_y_scroll()
                 .rounded(px(R_MD))
                 .bg(rgb(BG_PANEL))

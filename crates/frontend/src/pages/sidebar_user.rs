@@ -22,9 +22,14 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .flex()
         .items_center()
         .gap(px(8.))
+        .px(px(8.))
+        .py(px(4.))
         .rounded(px(R_SM))
+        .bg(rgba(0xffffff05))
+        .border_1()
+        .border_color(rgb(BORDER))
         .cursor_pointer()
-        .hover(|d| d.bg(rgba(0xffffff08)))
+        .hover(|d| d.bg(rgba(0xffffff10)).border_color(rgba((CTA << 8) | 0x60)))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.page = Page::Profile;
             // Цикл анимации гаснет, когда профиль закрыт, — заводим заново.
@@ -39,8 +44,16 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 pub fn user_avatar_only(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()
         .id("profile-card-avatar")
+        .size(px(40.))
+        .rounded(px(R_SM))
+        .bg(rgba(0xffffff08))
+        .border_1()
+        .border_color(rgb(BORDER))
+        .flex()
+        .items_center()
+        .justify_center()
         .cursor_pointer()
-        .hover(|d| d.opacity(0.8))
+        .hover(|d| d.bg(rgba(0xffffff18)).border_color(rgba((CTA << 8) | 0x80)))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.page = Page::Profile;
             this.start_skin_animation(cx);
