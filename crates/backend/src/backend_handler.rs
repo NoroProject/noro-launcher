@@ -250,6 +250,30 @@ impl BackendState {
                 });
             }
 
+            MessageToBackend::RequestModProject {
+                provider,
+                project_id,
+            } => {
+                let ctx = self.ctx.clone();
+                let http = self.ctx.http.clone();
+                tokio::spawn(async move {
+                    let master_url = ctx.config.get().master_url;
+                    let url = format!(
+                        "{master_url}/api/admin/catalog/{}/project/{}",
+                        urlencoding::encode(&provider),
+                        urlencoding::encode(&project_id),
+                    );
+                    let Ok(res) = http.get(&url).send().await else {
+                        return;
+                    };
+                    // Поля страницы совпадают с ModProjectInfo по именам, а всё
+                    // лишнее из ответа мастера serde просто игнорирует.
+                    if let Ok(project) = res.json::<bridge::ModProjectInfo>().await {
+                        ctx.send(MessageToFrontend::ModProjectLoaded { project });
+                    }
+                });
+            }
+
             MessageToBackend::SetMemory { min_mb, max_mb } => {
                 self.ctx.config.update(|c| {
                     c.memory_min_mb = min_mb;

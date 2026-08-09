@@ -25,6 +25,30 @@ pub struct CatalogHitInfo {
     pub downloads: u64,
 }
 
+/// Страница мода целиком. Приходит отдельным запросом: в выдаче поиска нет ни
+/// описания, ни скриншотов, а тянуть их для каждой карточки списка незачем.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ModProjectInfo {
+    pub provider: String,
+    pub project_id: String,
+    /// Markdown у Modrinth, HTML у CurseForge.
+    #[serde(default)]
+    pub body: String,
+    #[serde(default)]
+    pub gallery: Vec<String>,
+    #[serde(default)]
+    pub categories: Vec<String>,
+    #[serde(default)]
+    pub game_versions: Vec<String>,
+    #[serde(default)]
+    pub loaders: Vec<String>,
+    pub source_url: Option<String>,
+    pub issues_url: Option<String>,
+    pub wiki_url: Option<String>,
+    pub page_url: Option<String>,
+    pub license: Option<String>,
+}
+
 /// Frontend → Backend.
 #[derive(Debug)]
 pub enum MessageToBackend {
@@ -67,6 +91,10 @@ pub enum MessageToBackend {
         mc_version: Option<String>,
         loader: Option<String>,
         offset: u32,
+    },
+    RequestModProject {
+        provider: String,
+        project_id: String,
     },
 
     // --- Настройки ---
@@ -282,6 +310,10 @@ pub enum MessageToFrontend {
         total: u32,
         offset: u32,
         limit: u32,
+    },
+    /// Полная страница мода — ответ на `RequestModProject`.
+    ModProjectLoaded {
+        project: ModProjectInfo,
     },
 
     /// Прогресс синхронизации (файлы, java, assets — всё через один канал).

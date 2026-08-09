@@ -144,6 +144,9 @@ pub struct LauncherUI {
     pub mod_catalog_provider: String,
     pub mod_catalog_query: String,
     pub mod_catalog_focus: Option<gpui::FocusHandle>,
+    /// Страница выбранного мода: описание, скриншоты, ссылки.
+    pub mod_project: Option<bridge::ModProjectInfo>,
+    pub mod_detail_gallery: bool,
     pub mod_catalog_total: u32,
     pub mod_catalog_offset: u32,
     pub mod_catalog_limit: u32,
@@ -237,6 +240,8 @@ impl LauncherUI {
             mod_catalog_provider: "modrinth".to_string(),
             mod_catalog_query: String::new(),
             mod_catalog_focus: None,
+            mod_project: None,
+            mod_detail_gallery: false,
             mod_catalog_total: 0,
             mod_catalog_offset: 0,
             mod_catalog_limit: 20,
@@ -570,6 +575,16 @@ impl LauncherUI {
                 self.mod_catalog_total = total;
                 self.mod_catalog_offset = offset;
                 self.mod_catalog_limit = limit;
+            }
+            MessageToFrontend::ModProjectLoaded { project } => {
+                // Ответ мог прийти после того, как игрок ушёл на другой мод.
+                let still_open = self
+                    .mod_catalog_selected
+                    .as_ref()
+                    .is_some_and(|s| s.project_id == project.project_id);
+                if still_open {
+                    self.mod_project = Some(project);
+                }
             }
             MessageToFrontend::SyncProgress {
                 server_id,

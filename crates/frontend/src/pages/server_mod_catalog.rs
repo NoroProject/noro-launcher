@@ -56,7 +56,7 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .gap(px(16.))
                 .child(page_header(ui, server_id, cx))
                 .child(if let Some(selected) = ui.mod_catalog_selected.clone() {
-                    mod_detail_view(ui, server_id, selected, cx)
+                    super::mod_detail::view(ui, server_id, selected, cx)
                 } else {
                     mod_catalog_grid(ui, server_id, cx)
                 }),
@@ -99,6 +99,8 @@ fn page_header(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 false,
                 cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                     this.mod_catalog_selected = None;
+                    this.mod_project = None;
+                    this.mod_detail_gallery = false;
                     cx.notify();
                 }),
             ))
@@ -462,6 +464,12 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
         .gap(px(16.))
         .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
             this.mod_catalog_selected = Some(hit_clone.clone());
+            this.mod_project = None;
+            this.mod_detail_gallery = false;
+            this.backend.send(MessageToBackend::RequestModProject {
+                provider: hit_clone.provider.clone(),
+                project_id: hit_clone.project_id.clone(),
+            });
             cx.notify();
         }))
         .child(mod_avatar(ui, &hit.icon_url))
@@ -528,7 +536,7 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
         .into_any_element()
 }
 
-fn mod_avatar(ui: &LauncherUI, icon_url: &Option<String>) -> AnyElement {
+pub(super) fn mod_avatar(ui: &LauncherUI, icon_url: &Option<String>) -> AnyElement {
     let outer = div()
         .size(px(44.))
         .rounded(px(R_SM))
@@ -550,85 +558,5 @@ fn mod_avatar(ui: &LauncherUI, icon_url: &Option<String>) -> AnyElement {
         .border_1()
         .border_color(rgb(BORDER))
         .child(ic("box", 20., TEXT_MUTED))
-        .into_any_element()
-}
-
-fn mod_detail_view(
-    ui: &LauncherUI,
-    server_id: Uuid,
-    hit: CatalogHitInfo,
-    cx: &mut Cx,
-) -> AnyElement {
-    let hit_for_req = hit.clone();
-    div()
-        .flex_1()
-        .rounded(px(R_MD))
-        .bg(rgb(BG_PANEL))
-        .border_1()
-        .border_color(rgb(BORDER))
-        .p(px(32.))
-        .flex()
-        .flex_col()
-        .gap(px(24.))
-        .child(
-            div()
-                .flex()
-                .items_start()
-                .gap(px(24.))
-                .child(mod_avatar(ui, &hit.icon_url))
-                .child(
-                    div()
-                        .flex_1()
-                        .flex()
-                        .flex_col()
-                        .gap(px(4.))
-                        .child(
-                            div()
-                                .font_family(FONT_PIXEL_ALT)
-                                .text_size(px(22.))
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(rgb(CTA))
-                                .child(hit.title.clone()),
-                        )
-                        .child(
-                            div()
-                                .font_family(FONT_PIXEL_ALT)
-                                .text_size(px(12.))
-                                .text_color(rgb(TEXT_MUTED))
-                                .child(format!(
-                                    "Provider: {} | Downloads: {}",
-                                    hit.provider.to_uppercase(),
-                                    hit.downloads
-                                )),
-                        ),
-                )
-                .child(btn(
-                    "request-detail-btn",
-                    "Request Mod for Assembly",
-                    true,
-                    cx.listener(move |this, _e: &ClickEvent, _w, _cx| {
-                        this.backend.send(MessageToBackend::SuggestOptionalMod {
-                            server_id,
-                            build_id: None,
-                            provider: hit_for_req.provider.clone(),
-                            project_id: hit_for_req.project_id.clone(),
-                            title: hit_for_req.title.clone(),
-                            icon_url: hit_for_req.icon_url.clone(),
-                            description: Some(hit_for_req.description.clone()),
-                        });
-                    }),
-                )),
-        )
-        .child(
-            div()
-                .border_t_1()
-                .border_color(rgb(BORDER))
-                .pt(px(20.))
-                .font_family(FONT_PIXEL_ALT)
-                .text_size(px(14.))
-                .text_color(rgb(TEXT_PRIMARY))
-                .line_height(px(22.))
-                .child(hit.description),
-        )
         .into_any_element()
 }
