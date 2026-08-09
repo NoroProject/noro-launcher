@@ -59,13 +59,13 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
 pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
     div()
         .id("collapsed-logo-toggle")
-        .size(px(44.))
+        .size(px(40.))
         .rounded(px(R_SM))
         .flex()
         .items_center()
         .justify_center()
         .cursor_pointer()
-        .hover(|d| d.bg(rgba((CTA << 8) | 0x25)))
+        .hover(|d| d.bg(rgba((CTA << 8) | 0x20)))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.sidebar_collapsed = false;
             cx.notify();
@@ -77,21 +77,21 @@ pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
                 .flex()
                 .items_center()
                 .justify_center()
-                .child(img("logo.png").size_full())
+                .child(img("logo.png").size(px(24.)))
                 .child(
                     div()
                         .absolute()
-                        .top(px(-4.))
-                        .right(px(-6.))
+                        .top(px(-2.))
+                        .right(px(-2.))
                         .size(px(14.))
                         .rounded_full()
-                        .bg(rgb(BG_PANEL))
+                        .bg(rgb(SIDEBAR))
                         .border_1()
-                        .border_color(rgb(BORDER))
+                        .border_color(rgba((CTA << 8) | 0x80))
                         .flex()
                         .items_center()
                         .justify_center()
-                        .child(ic("panel-left-open", 10., CTA)),
+                        .child(ic("panel-left-open", 9., CTA)),
                 ),
         )
         .into_any_element()

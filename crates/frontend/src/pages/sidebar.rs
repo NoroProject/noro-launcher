@@ -5,7 +5,7 @@ use super::sidebar_server::server_item;
 use super::sidebar_user::user_card;
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
-use gpui::{div, prelude::*, px, rgb, AnyElement};
+use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent};
 use i18n::t;
 
 pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
@@ -69,22 +69,24 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         // Нижняя панель
         .child(
             div()
+                .h(px(64.))
                 .border_t_1()
                 .border_color(rgb(BORDER))
-                .px(px(12.))
-                .py(px(10.))
+                .px(px(if collapsed { 4. } else { 12. }))
                 .flex()
                 .items_center()
-                .when(collapsed, |d| d.justify_center().child(super::sidebar_user::user_avatar_only(ui, cx)))
+                .when(collapsed, |d| {
+                    d.justify_center()
+                        .child(super::sidebar_user::user_avatar_only(ui, cx))
+                })
                 .when(!collapsed, |d| {
                     d.gap(px(4.))
                         .child(user_card(ui, cx))
-                        .child(div().flex_1())
                         .child(nav_icon(
                             "news-bottom",
                             "newspaper",
                             ui.page == Page::News,
-                            cx.listener(|this, _e, _w, cx| {
+                            cx.listener(|this, _e: &ClickEvent, _w, cx| {
                                 this.page = Page::News;
                                 cx.notify();
                             }),
@@ -93,7 +95,7 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                             "settings-bottom",
                             "settings",
                             ui.page == Page::Settings,
-                            cx.listener(|this, _e, _w, cx| {
+                            cx.listener(|this, _e: &ClickEvent, _w, cx| {
                                 this.page = Page::Settings;
                                 cx.notify();
                             }),
