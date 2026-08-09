@@ -10,11 +10,16 @@ await auth.loadMe();
 // установки тогда отмечена заранее, и лишний клик не нужен.
 const route = useRoute();
 const serverId = computed(() => (route.query.server as string) || undefined);
+const buildId = computed(() => (route.query.build as string) || undefined);
 const gameServerId = computed(() => (route.query.gs as string) || undefined);
 </script>
 
 <template>
     <NoroShell title="MOD CATALOG" subtitle="Modrinth and CurseForge in one place">
-        <ModsBrowser :server-id="serverId" :game-server-id="gameServerId" />
+        <ModsBrowser
+            :server-id="serverId"
+            :build-id="buildId"
+            :game-server-id="gameServerId"
+        />
     </NoroShell>
 </template>

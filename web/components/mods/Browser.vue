@@ -17,6 +17,7 @@ const props = defineProps<{
     loader?: string;
 }>();
 
+const auth = useAuth();
 const notify = useNotify();
 const versions = useVersionOptions();
 const catalog = useModCatalog(() => ({ mc: props.mc, loader: props.loader }));
@@ -55,6 +56,42 @@ const hasContext = computed(() => Boolean(catalog.filters.mc || catalog.filters.
 
 onMounted(async () => {
     await Promise.all([catalog.loadProviders(), versions.loadMinecraft().catch(() => {})]);
+
+    if (!catalog.filters.mc || !catalog.filters.loader) {
+        if (props.buildId) {
+            try {
+                const res = await auth.request<{ build: { version: string; modloader: string } }>(
+                    `/api/admin/builds/${props.buildId}`,
+                );
+                if (res?.build?.version && !catalog.filters.mc) {
+                    catalog.filters.mc = res.build.version;
+                }
+                if (res?.build?.modloader && !catalog.filters.loader) {
+                    catalog.filters.loader = res.build.modloader;
+                }
+            } catch {
+                // Ignore build fetch error
+            }
+        } else if (props.serverId) {
+            try {
+                const builds = await auth.request<Array<{ id: string; version: string; modloader: string }>>(
+                    `/api/admin/builds?server_id=${props.serverId}`,
+                );
+                if (builds?.length) {
+                    const latest = builds[0];
+                    if (latest.version && !catalog.filters.mc) {
+                        catalog.filters.mc = latest.version;
+                    }
+                    if (latest.modloader && !catalog.filters.loader) {
+                        catalog.filters.loader = latest.modloader;
+                    }
+                }
+            } catch {
+                // Ignore server builds fetch error
+            }
+        }
+    }
+
     await Promise.all([catalog.loadCategories(), catalog.search()]);
 });
 </script>
