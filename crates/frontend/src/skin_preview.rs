@@ -6,8 +6,9 @@ use crate::state::{LauncherUI, Page};
 use gpui::Context;
 use std::time::{Duration, Instant};
 
-/// Шаг отрисовки. Кадр стоит ~3–8 мс, так что ~30 к/с укладывается с запасом.
-const FRAME: Duration = Duration::from_millis(33);
+/// Период кадра. Замер: полный кадр (растеризация 560×680 + BGRA) — ~4 мс, так
+/// что 60 к/с укладывается с запасом; на 30 к/с вращение заметно рвано.
+const FRAME: Duration = Duration::from_millis(16);
 /// Полный цикл взмаха рук и ног.
 const SWAY_PERIOD_MS: f32 = 2400.0;
 /// Скорость автоповорота — полный оборот примерно за 6 секунд.
@@ -56,8 +57,9 @@ impl LauncherUI {
         cx.spawn(async move |this, cx| {
             let mut last = Instant::now();
             loop {
+                let started = Instant::now();
                 let elapsed = last.elapsed();
-                last = Instant::now();
+                last = started;
                 let Ok(job) = this.update(cx, |state, _| state.next_frame_job(elapsed)) else {
                     break; // окно закрылось
                 };
@@ -85,7 +87,12 @@ impl LauncherUI {
                 if alive.is_err() {
                     break;
                 }
-                executor.timer(FRAME).await;
+                // Пауза с учётом того, что кадр уже отнял. Раньше ждали FRAME
+                // поверх рендера, и период выходил ~37 мс вместо 33 — то есть
+                // частота всегда была ниже заявленной.
+                executor
+                    .timer(FRAME.saturating_sub(started.elapsed()))
+                    .await;
             }
         })
         .detach();
