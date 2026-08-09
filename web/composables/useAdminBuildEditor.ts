@@ -15,6 +15,7 @@ export function useAdminBuildEditor(
     const importKind = ref<PackImportKind>("mrpack");
     const busy = ref<string | null>(null);
     const message = ref<string | null>(null);
+    const messageError = ref(false);
     const showFileManager = ref(false);
     const importProgress = ref<ImportProgress | null>(null);
     let importTimer: ReturnType<typeof setInterval> | null = null;
@@ -77,9 +78,14 @@ export function useAdminBuildEditor(
     async function run(name: string, action: () => Promise<void>) {
         busy.value = name;
         message.value = null;
+        messageError.value = false;
         try {
             await action();
             message.value = "Done";
+        } catch (e) {
+            // Без этого упавший запрос выглядит как «кнопка ничего не делает».
+            messageError.value = true;
+            message.value = e instanceof Error ? e.message : String(e);
         } finally {
             busy.value = null;
         }
@@ -274,6 +280,17 @@ export function useAdminBuildEditor(
         });
     }
 
+    async function toggleAllowSuggestions(allow: boolean) {
+        if (!buildId.value) return;
+        await run("optional-toggle", async () => {
+            await auth.request(`/api/admin/builds/${buildId.value}/allow-suggestions`, {
+                method: "PUT",
+                body: { allow },
+            });
+            await buildPayload.refresh();
+        });
+    }
+
     function deleteOptional(index: number) {
         if (optionalData.data.value) {
             optionalData.data.value.splice(index, 1);
@@ -295,6 +312,7 @@ export function useAdminBuildEditor(
         importKind,
         busy,
         message,
+        messageError,
         showFileManager,
         importProgress,
         pathsForm,
@@ -311,5 +329,6 @@ export function useAdminBuildEditor(
         saveRecommended,
         saveOptional,
         deleteOptional,
+        toggleAllowSuggestions,
     };
 }

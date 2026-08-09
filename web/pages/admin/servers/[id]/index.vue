@@ -181,9 +181,9 @@ const buildEditor = useAdminBuildEditor(
                 <div v-else class="grid gap-5">
                     <UAlert
                         v-if="buildEditor.message.value"
-                        color="success"
+                        :color="buildEditor.messageError.value ? 'error' : 'success'"
                         variant="subtle"
-                        icon="i-lucide-check"
+                        :icon="buildEditor.messageError.value ? 'i-lucide-circle-alert' : 'i-lucide-check'"
                         :description="buildEditor.message.value"
                     />
 
@@ -267,9 +267,11 @@ const buildEditor = useAdminBuildEditor(
                         <BuildOptionalModsPanel
                             v-if="selectedBuildId"
                             :optional-mods="buildEditor.optionalData.data.value"
+                            :allow-suggestions="buildEditor.build.value?.allow_optional_mod_suggestions ?? true"
                             :busy="buildEditor.busy.value"
                             @save="buildEditor.saveOptional"
                             @delete="buildEditor.deleteOptional"
+                            @update:allow-suggestions="buildEditor.toggleAllowSuggestions"
                         />
                     </div>
 
