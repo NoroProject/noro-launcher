@@ -96,18 +96,18 @@ function handleDrop(e: DragEvent) {
 
             <div class="flex flex-wrap items-center gap-2">
                 <!-- Polished Search Input -->
-                <div class="relative flex items-center">
+                <div class="relative flex items-center h-9">
                     <UIcon name="i-lucide-search" class="absolute left-3 size-4 text-[var(--noro-muted)] pointer-events-none" />
                     <input
                         v-model="search"
                         type="text"
                         placeholder="Search mods..."
-                        class="noro-input-sm !pl-9 !pr-8 w-44 md:w-56 text-xs rounded-lg"
+                        class="noro-input-sm !pl-9 !pr-8 w-44 md:w-56 h-full text-xs rounded-lg !py-0"
                     />
                     <button
                         v-if="search"
                         type="button"
-                        class="absolute right-2 text-[var(--noro-muted)] hover:text-[var(--noro-text)]"
+                        class="absolute right-2.5 text-[var(--noro-muted)] hover:text-[var(--noro-text)]"
                         @click="search = ''"
                     >
                         <UIcon name="i-lucide-x" class="size-3.5" />
