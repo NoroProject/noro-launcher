@@ -28,7 +28,6 @@ export function useAdminBuildEditor(
     });
 
     const buildPayload = useAsyncData(
-        () => `admin-build-${buildId.value}`,
         async () => {
             if (!buildId.value) return null;
             return auth.request<{ build: BuildRow; file_count: number }>(
@@ -39,7 +38,6 @@ export function useAdminBuildEditor(
     );
 
     const filesData = useAsyncData(
-        () => `admin-build-files-${buildId.value}`,
         async () => {
             if (!buildId.value) return [];
             return auth.request<BuildFileRow[]>(
@@ -50,7 +48,6 @@ export function useAdminBuildEditor(
     );
 
     const optionalData = useAsyncData(
-        () => `admin-build-optional-${buildId.value}`,
         async () => {
             if (!buildId.value) return [];
             return auth.request<OptionalMod[]>(
