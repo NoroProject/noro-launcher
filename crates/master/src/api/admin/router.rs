@@ -41,6 +41,7 @@ fn catalog_router() -> Router<AppState> {
         .route("/api/admin/mod_suggestions", get(mod_suggestions::list_suggestions))
         .route("/api/admin/mod_suggestions/{id}/approve", post(mod_suggestions::approve_suggestion))
         .route("/api/admin/mod_suggestions/{id}/reject", post(mod_suggestions::reject_suggestion))
+        .route("/api/admin/mod_suggestions/{id}/accept", post(mod_suggestions::accept_suggestion))
 }
 
 fn users_router() -> Router<AppState> {

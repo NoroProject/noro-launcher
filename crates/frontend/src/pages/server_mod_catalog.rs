@@ -115,7 +115,7 @@ fn page_header(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+fn mod_catalog_grid(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let hits = ui.mod_catalog_hits.clone();
 
     div()
@@ -253,8 +253,14 @@ fn pagination_controls(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElem
         .into_any_element()
 }
 
-fn search_bar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let provider = ui.mod_catalog_provider.clone();
+    let query = ui.mod_catalog_query.clone();
+    let focus_handle = ui
+        .mod_catalog_focus
+        .get_or_insert_with(|| cx.focus_handle())
+        .clone();
+
     let server = ui.servers.iter().find(|s| s.id == server_id);
     let mc_ver = server.map(|s| s.mc_version.clone());
     let loader = server.map(|s| s.modloader.as_str().to_string());
@@ -264,12 +270,22 @@ fn search_bar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let mc_for_curse = mc_ver.clone();
     let ldr_for_curse = loader.clone();
 
+    let mc_for_enter = mc_ver.clone();
+    let ldr_for_enter = loader.clone();
+
+    let mc_for_submit = mc_ver.clone();
+    let ldr_for_submit = loader.clone();
+
+    let focus_handle_click = focus_handle.clone();
+
     div()
         .flex()
         .items_center()
         .gap(px(12.))
         .child(
             div()
+                .id("catalog-search-input")
+                .track_focus(&focus_handle)
                 .flex_1()
                 .h(px(40.))
                 .px(px(16.))
@@ -277,18 +293,113 @@ fn search_bar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .bg(rgb(BG_PANEL))
                 .border_1()
                 .border_color(rgb(BORDER))
+                .focus(|s| s.border_color(rgb(ACCENT)))
                 .flex()
                 .items_center()
                 .gap(px(8.))
+                .cursor_text()
+                .on_click(cx.listener(move |_this, _e: &ClickEvent, window, cx| {
+                    focus_handle_click.focus(window, cx);
+                    cx.notify();
+                }))
+                .on_key_down(cx.listener(move |this, event: &gpui::KeyDownEvent, _w, cx| {
+                    let keystroke = &event.keystroke;
+                    match keystroke.key.as_str() {
+                        "backspace" => {
+                            this.mod_catalog_query.pop();
+                        }
+                        "enter" => {
+                            let q = this.mod_catalog_query.trim().to_string();
+                            let prov = this.mod_catalog_provider.clone();
+                            let mc = mc_for_enter.clone();
+                            let ldr = ldr_for_enter.clone();
+                            this.mod_catalog_offset = 0;
+                            this.backend.send(MessageToBackend::SearchCatalog {
+                                query: q,
+                                provider: prov,
+                                mc_version: mc,
+                                loader: ldr,
+                                offset: 0,
+                            });
+                        }
+                        "space" => {
+                            this.mod_catalog_query.push(' ');
+                        }
+                        // key_char уже учитывает shift и раскладку, а при cmd/ctrl он
+                        // пустой — так что горячие клавиши не сыплются в строку поиска.
+                        _ => {
+                            if let Some(ch) = keystroke.key_char.as_deref() {
+                                this.mod_catalog_query.push_str(ch);
+                            }
+                        }
+                    }
+                    cx.notify();
+                }))
                 .child(ic("search", 16., TEXT_MUTED))
                 .child(
                     div()
+                        .flex_1()
                         .font_family(FONT_PIXEL_ALT)
                         .text_size(px(14.))
-                        .text_color(rgb(TEXT_MUTED))
-                        .child("Search catalog..."),
-                ),
+                        .text_color(if query.is_empty() {
+                            rgb(TEXT_MUTED)
+                        } else {
+                            rgb(TEXT_PRIMARY)
+                        })
+                        .child(if query.is_empty() {
+                            "Search catalog...".to_string()
+                        } else {
+                            format!("{query}_")
+                        }),
+                )
+                .when(!query.is_empty(), |d| {
+                    let mc_clear = mc_ver.clone();
+                    let ldr_clear = loader.clone();
+                    let prov_clear = provider.clone();
+                    d.child(
+                        div()
+                            .id("catalog-search-clear")
+                            .cursor_pointer()
+                            .font_family(FONT_PIXEL_ALT)
+                            .text_size(px(13.))
+                            .text_color(rgb(TEXT_MUTED))
+                            .hover(|s| s.text_color(rgb(CTA)))
+                            .child("✕")
+                            .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                                this.mod_catalog_query.clear();
+                                this.mod_catalog_offset = 0;
+                                this.backend.send(MessageToBackend::SearchCatalog {
+                                    query: "".to_string(),
+                                    provider: prov_clear.clone(),
+                                    mc_version: mc_clear.clone(),
+                                    loader: ldr_clear.clone(),
+                                    offset: 0,
+                                });
+                                cx.notify();
+                            })),
+                    )
+                }),
         )
+        .child(btn(
+            "search-submit-btn",
+            "Search",
+            false,
+            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                let q = this.mod_catalog_query.trim().to_string();
+                let prov = this.mod_catalog_provider.clone();
+                let mc = mc_for_submit.clone();
+                let ldr = ldr_for_submit.clone();
+                this.mod_catalog_offset = 0;
+                this.backend.send(MessageToBackend::SearchCatalog {
+                    query: q,
+                    provider: prov,
+                    mc_version: mc,
+                    loader: ldr,
+                    offset: 0,
+                });
+                cx.notify();
+            }),
+        ))
         .child(
             div()
                 .flex()
@@ -299,8 +410,9 @@ fn search_bar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                     provider == "modrinth",
                     cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                         this.mod_catalog_provider = "modrinth".to_string();
+                        let q = this.mod_catalog_query.trim().to_string();
                         this.backend.send(MessageToBackend::SearchCatalog {
-                            query: "".to_string(),
+                            query: q,
                             provider: "modrinth".to_string(),
                             mc_version: mc_for_modrinth.clone(),
                             loader: ldr_for_modrinth.clone(),
@@ -315,8 +427,9 @@ fn search_bar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                     provider == "curseforge",
                     cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                         this.mod_catalog_provider = "curseforge".to_string();
+                        let q = this.mod_catalog_query.trim().to_string();
                         this.backend.send(MessageToBackend::SearchCatalog {
-                            query: "".to_string(),
+                            query: q,
                             provider: "curseforge".to_string(),
                             mc_version: mc_for_curse.clone(),
                             loader: ldr_for_curse.clone(),

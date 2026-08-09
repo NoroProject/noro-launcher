@@ -152,3 +152,37 @@ fn interleave(a: Vec<ModHit>, b: Vec<ModHit>) -> Vec<ModHit> {
         }
     }
 }
+
+/// Найти последнюю совместимую версию мода и вернуть `ModSource` для resolve.
+pub async fn source_for_project(
+    state: &AppState,
+    provider_name: &str,
+    project_id: &str,
+    mc_version: &str,
+    modloader: &str,
+) -> AppResult<ModSource> {
+    let provider = provider_of(provider_name)?;
+    let vers = versions(state, provider, project_id, Some(mc_version), Some(modloader)).await?;
+    let ver = vers
+        .first()
+        .ok_or_else(|| AppError::BadRequest("нет совместимых версий".into()))?;
+
+    match provider {
+        Provider::Modrinth => Ok(ModSource::Modrinth {
+            version_id: ver.id.clone(),
+        }),
+        Provider::Curseforge => {
+            let pid: u64 = project_id
+                .parse()
+                .map_err(|_| AppError::BadRequest("некорректный CurseForge project_id".into()))?;
+            let fid: u64 = ver
+                .id
+                .parse()
+                .map_err(|_| AppError::BadRequest("некорректный CurseForge file_id".into()))?;
+            Ok(ModSource::Curseforge {
+                project_id: pid,
+                file_id: fid,
+            })
+        }
+    }
+}

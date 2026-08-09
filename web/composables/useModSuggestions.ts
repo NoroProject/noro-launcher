@@ -34,6 +34,18 @@ export function useModSuggestions(serverId: Ref<string | undefined>) {
         await fetchSuggestions();
     }
 
+    async function accept(
+        id: string,
+        mode: "optional" | "regular",
+        installOnServers = false,
+    ) {
+        await auth.request(`/api/admin/mod_suggestions/${id}/accept`, {
+            method: "POST",
+            body: { mode, install_on_servers: installOnServers },
+        });
+        await fetchSuggestions();
+    }
+
     async function reject(id: string) {
         await auth.request(`/api/admin/mod_suggestions/${id}/reject`, { method: "POST" });
         await fetchSuggestions();
@@ -42,5 +54,5 @@ export function useModSuggestions(serverId: Ref<string | undefined>) {
     onMounted(() => fetchSuggestions());
     watch(serverId, () => fetchSuggestions());
 
-    return { suggestions, loading, fetchSuggestions, approve, reject };
+    return { suggestions, loading, fetchSuggestions, approve, accept, reject };
 }

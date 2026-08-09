@@ -108,6 +108,87 @@ pub async fn approve_suggestion(
     Ok(Json(json!({ "ok": true, "suggestion": updated })))
 }
 
+#[derive(Deserialize)]
+pub struct AcceptSuggestionReq {
+    /// "optional" — add to optional_mods list; "regular" — add as normal build file.
+    pub mode: String,
+    /// When mode="regular", whether to also install on game servers.
+    #[serde(default)]
+    pub install_on_servers: bool,
+}
+
+/// Админ принимает заявку с выбором: как опциональный или как обычный мод.
+pub async fn accept_suggestion(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    Json(req): Json<AcceptSuggestionReq>,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_ADMIN_BUILDS)?;
+    let suggestion = crate::db::get_mod_suggestion(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("заявка".into()))?;
+
+    if suggestion.status == "approved" {
+        return Ok(Json(json!({ "ok": true, "already_approved": true })));
+    }
+
+    let bid = suggestion
+        .build_id
+        .ok_or_else(|| AppError::BadRequest("у заявки нет build_id".into()))?;
+    let build = crate::db::get_build(&state.db, bid)
+        .await?
+        .ok_or_else(|| AppError::NotFound("сборка".into()))?;
+
+    let source = crate::catalog::source_for_project(
+        &state,
+        &suggestion.provider,
+        &suggestion.project_id,
+        &build.mc_version,
+        &build.modloader,
+    )
+    .await?;
+
+    let resolved = crate::catalog::resolve::resolve(&state, &source).await?;
+    let path = format!("mods/{}", resolved.filename);
+
+    crate::db::upsert_build_file(
+        &state.db, bid, &path, &resolved.sha1, resolved.size as i64, "both", "mod",
+    )
+    .await?;
+
+    if req.mode == "optional" {
+        let entry = OptionalMod {
+            name: suggestion.title.clone(),
+            description: suggestion.description.clone().unwrap_or_default(),
+            category: "Suggested".into(),
+            files: vec![path.clone()],
+            enabled_by_default: false,
+            visible: true,
+            limited: false,
+            dependencies: vec![],
+            conflicts: vec![],
+            triggers: vec![],
+            icon_url: resolved.icon_url.clone().or(suggestion.icon_url.clone()),
+            author: resolved.author.clone(),
+        };
+        super::builds::append_optional_mod(&state, bid, entry).await?;
+    }
+
+    if req.install_on_servers {
+        let servers = crate::db::list_game_servers(&state.db, build.server_id).await?;
+        for gs in servers {
+            if !gs.is_proxy() {
+                let _ = crate::wrapper::ops::install_mod(&state, gs.id, &resolved).await;
+            }
+        }
+    }
+
+    super::builds::broadcast_builds_changed(&state, build.server_id);
+    crate::db::update_mod_suggestion_status(&state.db, id, "approved").await?;
+    Ok(Json(json!({ "ok": true, "mode": req.mode, "path": path })))
+}
+
 /// Админ отклоняет заявку.
 pub async fn reject_suggestion(
     State(state): State<AppState>,

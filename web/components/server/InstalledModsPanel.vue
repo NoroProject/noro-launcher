@@ -43,7 +43,18 @@ const filteredMods = computed(() => {
 });
 
 const serverIdRef = computed(() => props.serverId);
-const { suggestions, approve, reject } = useModSuggestions(serverIdRef);
+const { suggestions, accept, reject } = useModSuggestions(serverIdRef);
+
+const acceptingId = ref<string | null>(null);
+
+async function acceptSuggestion(id: string, mode: "optional" | "regular", installOnServers: boolean) {
+    acceptingId.value = id;
+    try {
+        await accept(id, mode, installOnServers);
+    } finally {
+        acceptingId.value = null;
+    }
+}
 
 const catalogUrl = computed(() => {
     if (!props.buildId) return `/admin/mods?server=${props.serverId}`;
@@ -87,7 +98,7 @@ function handleDrop(e: DragEvent) {
         <div v-if="suggestions.length" class="rounded-lg border border-[var(--noro-amber)]/40 bg-[var(--noro-amber)]/10 p-4 mb-2">
             <h3 class="flex items-center gap-2 font-bold text-sm text-[var(--noro-amber)] mb-3">
                 <UIcon name="i-lucide-sparkles" class="size-4" />
-                Requested Optional Mods from Players ({{ suggestions.length }})
+                Requested Mods from Players ({{ suggestions.length }})
             </h3>
             <div class="grid gap-2.5">
                 <div
@@ -106,9 +117,36 @@ function handleDrop(e: DragEvent) {
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                        <AtomButton variant="primary" size="sm" icon="i-lucide-check" @click="approve(item.id)">
-                            Approve
-                        </AtomButton>
+                        <UDropdownMenu
+                            :items="[
+                                [
+                                    {
+                                        label: 'Add as Optional Mod',
+                                        icon: 'i-lucide-toggle-right',
+                                        onSelect: () => acceptSuggestion(item.id, 'optional', false),
+                                    },
+                                    {
+                                        label: 'Add as Regular Mod',
+                                        icon: 'i-lucide-package-plus',
+                                        onSelect: () => acceptSuggestion(item.id, 'regular', false),
+                                    },
+                                    {
+                                        label: 'Add as Regular + Install on Servers',
+                                        icon: 'i-lucide-server',
+                                        onSelect: () => acceptSuggestion(item.id, 'regular', true),
+                                    },
+                                ],
+                            ]"
+                        >
+                            <AtomButton
+                                variant="primary"
+                                size="sm"
+                                icon="i-lucide-check"
+                                :loading="acceptingId === item.id"
+                            >
+                                Accept
+                            </AtomButton>
+                        </UDropdownMenu>
                         <AtomButton variant="dark" size="sm" icon="i-lucide-x" @click="reject(item.id)">
                             Reject
                         </AtomButton>
