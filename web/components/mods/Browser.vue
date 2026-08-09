@@ -60,11 +60,12 @@ onMounted(async () => {
     if (!catalog.filters.mc || !catalog.filters.loader) {
         if (props.buildId) {
             try {
-                const res = await auth.request<{ build: { version: string; modloader: string } }>(
+                const res = await auth.request<{ build: { version: string; mc_version: string; modloader: string } }>(
                     `/api/admin/builds/${props.buildId}`,
                 );
-                if (res?.build?.version && !catalog.filters.mc) {
-                    catalog.filters.mc = res.build.version;
+                const mcVersion = res?.build?.mc_version || res?.build?.version;
+                if (mcVersion && !catalog.filters.mc) {
+                    catalog.filters.mc = mcVersion;
                 }
                 if (res?.build?.modloader && !catalog.filters.loader) {
                     catalog.filters.loader = res.build.modloader;
@@ -74,13 +75,14 @@ onMounted(async () => {
             }
         } else if (props.serverId) {
             try {
-                const builds = await auth.request<Array<{ id: string; version: string; modloader: string }>>(
+                const builds = await auth.request<Array<{ id: string; version: string; mc_version: string; modloader: string }>>(
                     `/api/admin/builds?server_id=${props.serverId}`,
                 );
                 if (builds?.length) {
                     const latest = builds[0];
-                    if (latest.version && !catalog.filters.mc) {
-                        catalog.filters.mc = latest.version;
+                    const mcVersion = latest.mc_version || latest.version;
+                    if (mcVersion && !catalog.filters.mc) {
+                        catalog.filters.mc = mcVersion;
                     }
                     if (latest.modloader && !catalog.filters.loader) {
                         catalog.filters.loader = latest.modloader;
