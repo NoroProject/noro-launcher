@@ -62,7 +62,7 @@ onMounted(async () => {
 <template>
     <div
         class="grid items-start gap-5"
-        :class="detail.hit.value ? 'xl:grid-cols-[248px_1fr_400px]' : 'xl:grid-cols-[248px_1fr]'"
+        :class="detail.hit.value ? 'xl:grid-cols-[248px_1fr_420px]' : 'xl:grid-cols-[248px_1fr]'"
     >
         <ModsFacets
             :filters="catalog.filters"
@@ -144,7 +144,7 @@ onMounted(async () => {
             :loading="detail.loading.value"
             :loading-versions="detail.loadingVersions.value"
             :has-context="hasContext"
-            class="xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto noro-scroll"
+            class="xl:sticky xl:top-24 xl:h-[calc(100vh-7rem)]"
             @close="detail.close"
             @install="version => startInstall(detail.hit.value!, version)"
         />
