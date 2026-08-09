@@ -89,7 +89,12 @@ function handleDrop(e: DragEvent) {
                 <div>
                     <h2 class="font-bold text-[var(--noro-text)] text-base">Assembly Mods</h2>
                     <p class="text-xs text-[var(--noro-muted)]">
-                        {{ filteredMods.length }} / {{ mods.length }} installed mods in build
+                        <template v-if="search">
+                            {{ filteredMods.length }} of {{ mods.length }} mods found
+                        </template>
+                        <template v-else>
+                            {{ mods.length }} mods installed in build
+                        </template>
                     </p>
                 </div>
             </div>
