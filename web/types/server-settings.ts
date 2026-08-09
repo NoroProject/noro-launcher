@@ -1,6 +1,6 @@
 import type { BuildRow, Role } from "./api";
 
-export type ServerSettingsTab = "server" | "client";
+export type ServerSettingsTab = "server" | "build" | "instances" | "client";
 
 /**
  * Формат импортируемого модпака. Имя совпадает с сегментом маршрута

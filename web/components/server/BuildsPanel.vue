@@ -59,7 +59,7 @@ defineEmits<{
                         </td>
                         <td class="text-right">
                             <AtomButton
-                                :to="`/admin/servers/${serverId}/build/${build.id}`"
+                                :to="`/admin/servers/${serverId}?tab=build`"
                                 icon="i-lucide-settings"
                                 variant="ghost"
                             />

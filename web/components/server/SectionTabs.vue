@@ -12,20 +12,32 @@ const tabs: Array<{
     {
         key: "server",
         label: "Profile",
+        icon: "i-lucide-user",
+        text: "Name, order, assets & visibility",
+    },
+    {
+        key: "build",
+        label: "Build & Files",
+        icon: "i-lucide-box",
+        text: "Modpack import, files & publish",
+    },
+    {
+        key: "instances",
+        label: "Game Servers",
         icon: "i-lucide-server",
-        text: "Name, order, and visibility in the launcher",
+        text: "Backend servers & wrappers",
     },
     {
         key: "client",
-        label: "Client",
+        label: "Client Defaults",
         icon: "i-lucide-monitor",
-        text: "Minecraft version and loader defaults",
+        text: "RAM, JVM flags & optional mods",
     },
 ];
 </script>
 
 <template>
-    <div class="grid gap-3 md:grid-cols-2">
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <button
             v-for="tab in tabs"
             :key="tab.key"

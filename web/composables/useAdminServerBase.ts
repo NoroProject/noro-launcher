@@ -42,8 +42,17 @@ export function useAdminServerBase() {
   const auth = useAuth();
   const notify = useNotify()
 
-  const id = computed(() => String(route.params.id));
-  const activeTab = ref<ServerSettingsTab>("server");
+  const activeTab = ref<ServerSettingsTab>(
+    (route.query.tab as ServerSettingsTab) || "server",
+  );
+  watch(
+    () => route.query.tab,
+    (t) => {
+      if (t && ["server", "build", "instances", "client"].includes(t as string)) {
+        activeTab.value = t as ServerSettingsTab;
+      }
+    },
+  );
   const versions = useVersionOptions();
   
   const serversData = useAsyncData(
