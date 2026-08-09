@@ -347,6 +347,52 @@ pub async fn get_file_content(
     })))
 }
 
+/// Извлечь иконку мода прямо из содержимого .jar файла сборки с персистентным дисковым кэшем.
+pub async fn get_file_icon(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    Query(q): Query<FileContentQuery>,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_ADMIN_BUILDS)?;
+    let clean = clean_path(&q.path)?;
+    let files = crate::db::build_files(&state.db, id).await?;
+    let file = files
+        .into_iter()
+        .find(|f| f.path == clean)
+        .ok_or_else(|| AppError::NotFound("файл".into()))?;
+
+    let cache_dir = state.config.data_dir.join("cache").join("mod_icons");
+    let cache_file = cache_dir.join(format!("{}.txt", file.sha1));
+
+    if cache_file.exists() {
+        if let Ok(cached_url) = tokio::fs::read_to_string(&cache_file).await {
+            let icon_url = if cached_url.is_empty() {
+                None
+            } else {
+                Some(cached_url)
+            };
+            return Ok(Json(json!({
+                "path": file.path,
+                "sha1": file.sha1,
+                "icon_url": icon_url,
+            })));
+        }
+    }
+
+    let path = state.files.path_for(&file.sha1);
+    let icon_url = backend::mod_icon::extract_jar_icon(&path);
+
+    let _ = tokio::fs::create_dir_all(&cache_dir).await;
+    let _ = tokio::fs::write(&cache_file, icon_url.as_deref().unwrap_or("")).await;
+
+    Ok(Json(json!({
+        "path": file.path,
+        "sha1": file.sha1,
+        "icon_url": icon_url,
+    })))
+}
+
 /// Обновить содержимое текстового файла (создаёт новую версию по SHA1).
 pub async fn update_file_content(
     State(state): State<AppState>,

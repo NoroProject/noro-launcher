@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 schema = { workspace = true }
 i18n = { workspace = true }
+backend = { workspace = true }
 
 tokio = { workspace = true }
 tokio-util = { workspace = true }
