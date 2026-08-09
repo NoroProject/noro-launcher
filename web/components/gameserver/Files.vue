@@ -69,6 +69,70 @@ async function createFolder() {
     }
 }
 
+const ctxVisible = ref(false);
+const ctxX = ref(0);
+const ctxY = ref(0);
+const ctxEntry = ref<ServerEntry | null>(null);
+
+function openContextMenu(e: MouseEvent, entry?: ServerEntry) {
+    ctxX.value = e.clientX;
+    ctxY.value = e.clientY;
+    ctxEntry.value = entry || null;
+    ctxVisible.value = true;
+}
+
+function onCtxOpen() {
+    if (ctxEntry.value?.dir) {
+        files.open(ctxEntry.value.path);
+    }
+    ctxVisible.value = false;
+}
+
+function onCtxEdit() {
+    if (ctxEntry.value && !ctxEntry.value.dir) {
+        edit(ctxEntry.value.path);
+    }
+    ctxVisible.value = false;
+}
+
+function onCtxDownload() {
+    if (ctxEntry.value && !ctxEntry.value.dir) {
+        notify.info(`Downloading ${ctxEntry.value.name}...`);
+    }
+    ctxVisible.value = false;
+}
+
+function onCtxCopyPath() {
+    if (ctxEntry.value) {
+        navigator.clipboard.writeText(ctxEntry.value.path);
+        notify.success("Path copied to clipboard");
+    }
+    ctxVisible.value = false;
+}
+
+function onCtxApplyToMany() {
+    if (ctxEntry.value && !ctxEntry.value.dir) {
+        edit(ctxEntry.value.path);
+    }
+    ctxVisible.value = false;
+}
+
+function onCtxNewFolder() {
+    ctxVisible.value = false;
+    const name = prompt("New folder name:");
+    if (name && name.trim()) {
+        newFolder.value = name.trim();
+        createFolder();
+    }
+}
+
+function onCtxRemove() {
+    if (ctxEntry.value) {
+        remove(ctxEntry.value.path);
+    }
+    ctxVisible.value = false;
+}
+
 watch(
     () => props.enabled,
     (on) => {
@@ -79,8 +143,11 @@ watch(
 </script>
 
 <template>
-    <section class="noro-panel overflow-hidden">
-        <div class="flex flex-wrap items-center gap-3 border-b border-[var(--noro-border)] px-4 py-3">
+    <section
+        class="noro-panel flex flex-col h-full min-h-0 overflow-hidden"
+        @contextmenu.prevent="openContextMenu($event)"
+    >
+        <div class="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--noro-border)] px-4 py-3">
             <AtomButton
                 variant="ghost"
                 size="sm"
@@ -130,7 +197,7 @@ watch(
 
         <UAlert
             v-if="!enabled"
-            class="m-4"
+            class="m-4 shrink-0"
             color="warning"
             variant="subtle"
             icon="i-lucide-plug-zap"
@@ -138,13 +205,13 @@ watch(
         />
         <UAlert
             v-else-if="files.error.value"
-            class="m-4"
+            class="m-4 shrink-0"
             color="error"
             variant="subtle"
             icon="i-lucide-circle-alert"
             :description="files.error.value"
         />
-        <div v-else-if="files.entries.value.length" class="divide-y divide-[var(--noro-border)]">
+        <div v-else-if="files.entries.value.length" class="flex-1 min-h-0 overflow-y-auto noro-scroll divide-y divide-[var(--noro-border)]">
             <GameserverFileRow
                 v-for="entry in files.entries.value"
                 :key="entry.path"
@@ -152,9 +219,26 @@ watch(
                 @open="files.open(entry.path)"
                 @edit="edit(entry.path)"
                 @remove="remove(entry.path)"
+                @contextmenu="openContextMenu($event, entry)"
             />
         </div>
         <p v-else class="p-8 text-center text-sm text-[var(--noro-muted)]">Empty directory.</p>
+
+        <GameserverContextMenu
+            v-if="ctxVisible"
+            :x="ctxX"
+            :y="ctxY"
+            :entry="ctxEntry"
+            :siblings-count="siblings.length"
+            @open="onCtxOpen"
+            @edit="onCtxEdit"
+            @download="onCtxDownload"
+            @copy-path="onCtxCopyPath"
+            @apply-to-many="onCtxApplyToMany"
+            @new-folder="onCtxNewFolder"
+            @remove="onCtxRemove"
+            @close="ctxVisible = false"
+        />
 
         <GameserverFileEditor
             v-model="editorOpen"

@@ -44,14 +44,15 @@ const TABS = [
             </AtomButton>
         </template>
 
-        <div class="grid gap-5">
+        <div class="flex flex-col gap-5 h-full min-h-0 flex-1">
             <GameserverStatusPanel
+                class="shrink-0"
                 :state="wrapper.state.value"
                 :busy="wrapper.busy.value"
                 @power="wrapper.power"
             />
 
-            <nav class="flex flex-wrap gap-2">
+            <nav class="flex shrink-0 flex-wrap gap-2">
                 <button
                     v-for="item in TABS"
                     :key="item.id"
@@ -65,30 +66,36 @@ const TABS = [
                 </button>
             </nav>
 
-            <GameserverConsole
-                v-if="tab === 'console'"
-                :game-server-id="gameServerId"
-                :enabled="wrapper.connected.value"
-                @command="wrapper.command"
-            />
-            <GameserverFiles
-                v-else-if="tab === 'files'"
-                :game-server-id="gameServerId"
-                :enabled="wrapper.connected.value"
-                :siblings="siblings"
-            />
-            <GameserverMods
-                v-else-if="tab === 'mods'"
-                :game-server-id="gameServerId"
-                :server-id="serverId"
-                :enabled="wrapper.connected.value"
-                :platform="wrapper.state.value?.info?.platform ?? null"
-            />
-            <GameserverBackups
-                v-else-if="tab === 'backups'"
-                :game-server-id="gameServerId"
-                :enabled="wrapper.connected.value"
-            />
+            <div class="flex-1 min-h-0 flex flex-col">
+                <GameserverConsole
+                    v-if="tab === 'console'"
+                    :game-server-id="gameServerId"
+                    :enabled="wrapper.connected.value"
+                    @command="wrapper.command"
+                    class="h-full flex flex-col min-h-0"
+                />
+                <GameserverFiles
+                    v-else-if="tab === 'files'"
+                    :game-server-id="gameServerId"
+                    :enabled="wrapper.connected.value"
+                    :siblings="siblings"
+                    class="h-full flex flex-col min-h-0"
+                />
+                <GameserverMods
+                    v-else-if="tab === 'mods'"
+                    :game-server-id="gameServerId"
+                    :server-id="serverId"
+                    :enabled="wrapper.connected.value"
+                    :platform="wrapper.state.value?.info?.platform ?? null"
+                    class="h-full flex flex-col min-h-0"
+                />
+                <GameserverBackups
+                    v-else-if="tab === 'backups'"
+                    :game-server-id="gameServerId"
+                    :enabled="wrapper.connected.value"
+                    class="h-full flex flex-col min-h-0"
+                />
+            </div>
         </div>
     </NoroShell>
 </template>

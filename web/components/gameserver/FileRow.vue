@@ -3,7 +3,7 @@ import type { ServerEntry } from "~/types/wrapper";
 
 /** Строка файлового списка. Текстовое открывается редактором, прочее — нет. */
 const props = defineProps<{ entry: ServerEntry }>();
-defineEmits<{ open: []; edit: []; remove: [] }>();
+defineEmits<{ open: []; edit: []; remove: []; contextmenu: [event: MouseEvent] }>();
 
 /** Расширения, которые есть смысл править как текст. */
 const TEXT = [
@@ -17,7 +17,10 @@ const editable = computed(
 </script>
 
 <template>
-    <div class="flex items-center gap-3 px-4 py-3 transition hover:bg-white/5">
+    <div
+        class="flex items-center gap-3 px-4 py-3 transition hover:bg-white/5 cursor-pointer select-none"
+        @contextmenu.prevent="$emit('contextmenu', $event)"
+    >
         <UIcon
             :name="entry.dir ? 'i-lucide-folder' : editable ? 'i-lucide-file-text' : 'i-lucide-file'"
             class="size-4 shrink-0"

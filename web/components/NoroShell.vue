@@ -6,14 +6,14 @@ defineProps<{
 </script>
 
 <template>
-    <div class="min-h-screen lg:flex">
+    <div class="min-h-screen lg:h-screen lg:overflow-hidden lg:flex bg-[var(--noro-bg-deep)]">
         <NoroSidebar />
 
-        <main class="min-w-0 flex-1">
+        <main class="flex min-w-0 flex-1 flex-col lg:h-screen lg:overflow-hidden">
             <!-- z-30, а не z-10: контент часто использует z-10 для локальной
                  раскладки, и при равном значении он выигрывал по порядку в DOM
                  и перекрывал шапку. -->
-            <header class="sticky top-0 z-30 bg-[var(--noro-bg-deep)] px-5 md:px-8">
+            <header class="shrink-0 z-30 bg-[var(--noro-bg-deep)] px-5 md:px-8 border-b border-[var(--noro-border)]">
                 <div class="mx-auto flex min-h-20 max-w-[1440px] items-center justify-between gap-5">
                     <div class="min-w-0">
                         <h1 class="noro-pixel truncate text-2xl uppercase text-[var(--noro-cream)]">
@@ -32,7 +32,7 @@ defineProps<{
                 </div>
             </header>
 
-            <section class="mx-auto max-w-[1440px] p-5 md:p-8">
+            <section class="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col mx-auto max-w-[1440px] w-full p-5 md:p-8">
                 <slot />
             </section>
         </main>

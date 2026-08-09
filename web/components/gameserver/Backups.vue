@@ -37,8 +37,8 @@ function formatDate(ts: number) {
 </script>
 
 <template>
-    <div class="noro-panel p-5 grid gap-4">
-        <div class="flex items-center justify-between gap-4">
+    <div class="noro-panel p-5 flex flex-col h-full min-h-0 overflow-hidden gap-4">
+        <div class="flex shrink-0 items-center justify-between gap-4">
             <div>
                 <h3 class="text-sm font-bold uppercase tracking-wider text-[var(--noro-text)]">
                     Server Snapshots
@@ -57,7 +57,7 @@ function formatDate(ts: number) {
             </AtomButton>
         </div>
 
-        <form class="flex items-center gap-3" @submit.prevent="handleCreate">
+        <form class="flex shrink-0 items-center gap-3" @submit.prevent="handleCreate">
             <input
                 v-model="label"
                 type="text"
@@ -83,7 +83,7 @@ function formatDate(ts: number) {
             Loading snapshots...
         </div>
 
-        <div v-else-if="backups.error.value" class="text-xs text-red-400 p-3 bg-red-950/20 border border-red-900/40 rounded-lg">
+        <div v-else-if="backups.error.value" class="text-xs text-red-400 p-3 bg-red-950/20 border border-red-900/40 rounded-lg shrink-0">
             {{ backups.error.value }}
         </div>
 
@@ -91,7 +91,7 @@ function formatDate(ts: number) {
             No snapshots found.
         </div>
 
-        <div v-else class="grid gap-2">
+        <div v-else class="flex-1 min-h-0 overflow-y-auto noro-scroll grid gap-2">
             <div
                 v-for="b in backups.backups.value"
                 :key="b.name"

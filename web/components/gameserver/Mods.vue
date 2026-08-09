@@ -48,8 +48,8 @@ watch(
 </script>
 
 <template>
-    <section class="noro-panel overflow-hidden">
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--noro-border)] px-4 py-3">
+    <section class="noro-panel flex flex-col h-full min-h-0 overflow-hidden">
+        <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--noro-border)] px-4 py-3">
             <div>
                 <span class="noro-label noro-label-inline">{{ dir }}/</span>
                 <span class="ml-2 text-xs text-[var(--noro-muted)]">{{ jars.length }} jar(s)</span>
@@ -78,7 +78,7 @@ watch(
 
         <UAlert
             v-if="!enabled"
-            class="m-4"
+            class="m-4 shrink-0"
             color="warning"
             variant="subtle"
             icon="i-lucide-plug-zap"
@@ -86,13 +86,13 @@ watch(
         />
         <UAlert
             v-else-if="files.error.value"
-            class="m-4"
+            class="m-4 shrink-0"
             color="error"
             variant="subtle"
             icon="i-lucide-circle-alert"
             :description="files.error.value"
         />
-        <div v-else-if="jars.length" class="divide-y divide-[var(--noro-border)]">
+        <div v-else-if="jars.length" class="flex-1 min-h-0 overflow-y-auto noro-scroll divide-y divide-[var(--noro-border)]">
             <div
                 v-for="jar in jars"
                 :key="jar.path"

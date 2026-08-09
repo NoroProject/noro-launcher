@@ -83,9 +83,9 @@ const sortIcon = (col: string) => {
 </script>
 
 <template>
-    <section class="noro-panel overflow-hidden">
+    <section class="noro-panel flex flex-col h-full min-h-0 overflow-hidden">
         <div
-            class="flex items-center justify-between border-b border-[var(--noro-border)] px-5 py-4"
+            class="flex shrink-0 items-center justify-between border-b border-[var(--noro-border)] px-5 py-4"
         >
             <div class="flex items-center gap-3">
                 <div
@@ -116,7 +116,7 @@ const sortIcon = (col: string) => {
         </div>
 
         <div
-            class="flex items-center gap-1 border-b border-[var(--noro-border)] bg-black/10 px-5 py-2 overflow-x-auto"
+            class="flex shrink-0 items-center gap-1 border-b border-[var(--noro-border)] bg-black/10 px-5 py-2 overflow-x-auto"
         >
             <button
                 v-for="kind in availableKinds"
@@ -133,7 +133,7 @@ const sortIcon = (col: string) => {
             </button>
         </div>
 
-        <div class="noro-scroll overflow-y-auto" style="max-height: 65vh">
+        <div class="flex-1 min-h-0 overflow-y-auto noro-scroll">
             <table class="noro-table w-full">
                 <thead class="sticky top-0 z-[1]">
                     <tr>

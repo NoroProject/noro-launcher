@@ -371,7 +371,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div
-    class="fm-dropzone flex flex-col h-[520px]"
+    class="fm-dropzone flex flex-col h-full min-h-0"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
     @drop="onDrop"

@@ -47,8 +47,8 @@ watch(
 </script>
 
 <template>
-    <section class="noro-panel grid gap-3 p-4">
-        <div class="flex items-center justify-between gap-4">
+    <section class="noro-panel flex flex-col h-full min-h-0 gap-3 p-4 overflow-hidden">
+        <div class="flex shrink-0 items-center justify-between gap-4">
             <div class="flex items-center gap-2">
                 <span class="noro-label noro-label-inline">Console</span>
                 <span
@@ -73,7 +73,7 @@ watch(
 
         <div
             ref="view"
-            class="noro-scroll h-96 overflow-y-auto rounded-[var(--noro-r-sm)] bg-[var(--noro-bg-deep)] p-3 font-mono text-xs leading-5"
+            class="noro-scroll flex-1 min-h-0 overflow-y-auto rounded-[var(--noro-r-sm)] bg-[var(--noro-bg-deep)] p-3 font-mono text-xs leading-5"
             @scroll="onScroll"
         >
             <p
@@ -91,7 +91,7 @@ watch(
             </p>
         </div>
 
-        <form class="flex gap-2" @submit.prevent="submit">
+        <form class="flex shrink-0 gap-2" @submit.prevent="submit">
             <input
                 v-model="input"
                 class="noro-input flex-1 font-mono"
