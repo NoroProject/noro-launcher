@@ -73,9 +73,6 @@ const buildEditor = useAdminBuildEditor(
             >
                 Refresh
             </AtomButton>
-            <AtomButton icon="i-lucide-plus" variant="primary" @click="showCreateBuild = true">
-                New build
-            </AtomButton>
         </template>
 
         <EmptyState v-if="!server" icon="i-lucide-search-x" title="Server not found" />
