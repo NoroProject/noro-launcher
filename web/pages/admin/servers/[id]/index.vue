@@ -166,7 +166,7 @@ const buildEditor = useAdminBuildEditor(
                 <ServerInstalledModsPanel
                     :server-id="id"
                     :build-id="selectedBuildId"
-                    :files="buildEditor.filesData.data.value"
+                    :files="buildEditor.filesData.data.value || []"
                     :busy="buildEditor.busy.value"
                     @remove="buildEditor.removeFile"
                     @upload="(file) => { buildEditor.fileUpload.value = file; buildEditor.uploadBuildFile(); }"

@@ -49,7 +49,7 @@ export function useAdminServerBase() {
   watch(
     () => route.query.tab,
     (t) => {
-      if (t && ["server", "build", "instances", "client"].includes(t as string)) {
+      if (t && ["server", "mods", "build", "instances", "client"].includes(t as string)) {
         activeTab.value = t as ServerSettingsTab;
       }
     },
