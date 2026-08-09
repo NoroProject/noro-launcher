@@ -13,14 +13,13 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  # Каждая архитектура собирается на своём железе. Раньше обе платформы шли на
-  # x86-раннере, то есть arm64 компилировался под QEMU, — Rust в эмуляции давал
-  # почти два часа на прогон. Нативно это минуты, ценой одного self-hosted
-  # раннера с меткой `noro-arm64`.
+  # Всё собирается нативно на self-hosted `noro-arm64` — прод arm64, и платные
+  # минуты GitHub-hosted раннеров не тратятся. Раньше матрица держала ещё amd64
+  # на `ubuntu-latest`; образов под эту платформу больше нет, и если она снова
+  # понадобится, вернуть её придётся вместе со счётом за минуты.
   #
-  # Каждый job пушит образ по digest, без тега: тег ставится один раз в `merge`,
-  # когда обе половины готовы. Иначе `latest` успевал бы побывать
-  # одноплатформенным между пушами.
+  # Сборка пушит образ по digest, без тега: тег ставится один раз в `merge`.
+  # Иначе `latest` успевал бы побывать промежуточным между пушами.
   build:
     permissions:
       contents: read
@@ -29,13 +28,15 @@ jobs:
       fail-fast: false
       matrix:
         image: [noro-master, noro-web]
-        platform: [amd64, arm64]
+        # Только arm64: прод и так arm64, а amd64 собирался на GitHub-hosted
+        # раннере и выбирал платные минуты. Self-hosted `noro-arm64` бесплатен.
+        platform: [arm64]
         include:
           - image: noro-master
             file: ./Dockerfile.master
           - image: noro-web
             file: ./Dockerfile.web
-    runs-on: ${{ matrix.platform == 'arm64' && 'noro-arm64' || 'ubuntu-latest' }}
+    runs-on: noro-arm64
 
     steps:
       - name: Checkout repository
@@ -89,10 +90,12 @@ jobs:
           retention-days: 1
 
   # Склейка мультиарх-манифеста из готовых digest'ов. Только здесь появляются
-  # `latest`, `sha-…` и теги релиза — сразу указывающие на обе архитектуры.
+  # `latest`, `sha-…` и теги релиза.
   merge:
     needs: build
-    runs-on: ubuntu-latest
+    # Тоже на self-hosted: job лёгкий, но на GitHub-hosted он всё равно тратил
+    # платные минуты.
+    runs-on: noro-arm64
     permissions:
       contents: read
       packages: write
