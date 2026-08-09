@@ -104,7 +104,7 @@ const TABS = ["versions", "about", "gallery"] as const;
                 <div v-else-if="!versions.length" class="py-8 text-center text-sm text-[var(--noro-muted)]">
                     No matching versions.
                 </div>
-                <div v-else class="noro-scroll flex-1 min-h-0 grid content-start gap-2 overflow-y-auto pr-1.5">
+                <div v-else class="noro-scroll flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1.5 w-full">
                     <ModsVersionRow
                         v-for="version in versions"
                         :key="version.id"
