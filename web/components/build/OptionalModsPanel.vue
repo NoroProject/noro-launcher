@@ -59,14 +59,18 @@ function setFiles(mod: OptionalMod, value: string) {
                 <div
                     v-for="(mod, index) in optionalMods"
                     :key="index"
-                    class="group relative flex flex-col rounded-xl border border-[var(--noro-border)] bg-black/20 p-5 transition-all hover:border-[var(--noro-magenta)]/50 hover:bg-black/30"
+                    class="group flex flex-col rounded-xl border border-[var(--noro-border)] bg-black/20 p-5 transition-all hover:border-[var(--noro-magenta)]/50 hover:bg-black/30"
                 >
-                    <!-- Floating Actions -->
-                    <div class="absolute right-4 top-4 flex gap-2">
-                        <AtomButton variant="danger"
+                    <div class="flex items-center justify-between border-b border-[var(--noro-border)]/30 pb-3 mb-4">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <UIcon name="i-lucide-box" class="size-4 text-[var(--noro-magenta)] shrink-0" />
+                            <span class="font-bold text-sm text-[var(--noro-text)] truncate">{{ mod.name || 'Untitled Optional Mod' }}</span>
+                            <UBadge v-if="mod.category" color="neutral" variant="subtle" size="xs" class="shrink-0">{{ mod.category }}</UBadge>
+                        </div>
+                        <AtomButton
+                            variant="danger"
                             icon="i-lucide-trash-2"
                             size="sm"
-                            class="opacity-0 transition-opacity group-hover:opacity-100"
                             @click="$emit('delete', index)"
                         />
                     </div>

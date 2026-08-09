@@ -251,29 +251,33 @@ const buildEditor = useAdminBuildEditor(
             <!-- TAB 4: Client Defaults & Settings -->
             <template v-else-if="activeTab === 'client'">
                 <div class="grid gap-5 xl:grid-cols-[1fr_390px]">
-                    <ServerSettingsForm
-                        :form="form"
-                        active-tab="client"
-                        :minecraft="minecraft"
-                        :modloaders="modloaders"
-                        :loading-minecraft="loading"
-                        :saving="saving"
-                        :deleting="deleting"
-                        @save="save"
-                        @remove="remove"
-                    />
+                    <div class="grid gap-5 content-start">
+                        <ServerSettingsForm
+                            :form="form"
+                            active-tab="client"
+                            :minecraft="minecraft"
+                            :modloaders="modloaders"
+                            :loading-minecraft="loading"
+                            :saving="saving"
+                            :deleting="deleting"
+                            @save="save"
+                            @remove="remove"
+                        />
+
+                        <BuildOptionalModsPanel
+                            v-if="selectedBuildId"
+                            :optional-mods="buildEditor.optionalData.data.value"
+                            :busy="buildEditor.busy.value"
+                            @save="buildEditor.saveOptional"
+                            @delete="buildEditor.deleteOptional"
+                        />
+                    </div>
 
                     <div v-if="selectedBuildId" class="grid gap-4 content-start">
                         <BuildRecommendedSettingsPanel
                             :form="buildEditor.recommendedForm"
                             :busy="buildEditor.busy.value"
                             @save="buildEditor.saveRecommended"
-                        />
-                        <BuildOptionalModsPanel
-                            :optional-mods="buildEditor.optionalData.data.value"
-                            :busy="buildEditor.busy.value"
-                            @save="buildEditor.saveOptional"
-                            @delete="buildEditor.deleteOptional"
                         />
                         <BuildPathsPanel
                             :paths-form="buildEditor.pathsForm"
