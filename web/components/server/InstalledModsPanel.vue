@@ -15,6 +15,8 @@ const emit = defineEmits<{
 
 const search = ref("");
 const dropActive = ref(false);
+const viewMode = ref<"grid" | "list">("grid");
+const modIcons = ref<Record<string, string>>({});
 
 function fileSizeDisplay(bytes: number) {
     if (!bytes) return "0 B";
@@ -22,6 +24,10 @@ function fileSizeDisplay(bytes: number) {
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+function cleanModName(path: string) {
+    return path.replace(/^mods\//, "").replace(/\.jar$/i, "");
 }
 
 const mods = computed(() => {
@@ -43,6 +49,48 @@ const catalogUrl = computed(() => {
     if (!props.buildId) return `/admin/mods?server=${props.serverId}`;
     return `/admin/mods?server=${props.serverId}&build=${props.buildId}`;
 });
+
+async function fetchModrinthIcons() {
+    const sha1List = mods.value
+        .map((m) => m.sha1)
+        .filter((hash) => hash && !modIcons.value[hash]);
+
+    if (!sha1List.length) return;
+
+    try {
+        const res = await $fetch<Record<string, { project_id: string }>>(
+            "https://api.modrinth.com/v2/version_files",
+            {
+                method: "POST",
+                body: { hashes: sha1List.slice(0, 100), algorithm: "sha1" },
+            },
+        );
+
+        const projectIds = Array.from(
+            new Set(Object.values(res).map((v) => v.project_id)),
+        ).filter(Boolean);
+
+        if (projectIds.length) {
+            const projects = await $fetch<Array<{ id: string; icon_url?: string }>>(
+                `https://api.modrinth.com/v2/projects?ids=${JSON.stringify(projectIds)}`,
+            );
+
+            const projMap = new Map(projects.map((p) => [p.id, p.icon_url]));
+            for (const [hash, info] of Object.entries(res)) {
+                const icon = projMap.get(info.project_id);
+                if (icon) modIcons.value[hash] = icon;
+            }
+        }
+    } catch {
+        // Fallback to default icons
+    }
+}
+
+watch(
+    () => mods.value.map((m) => m.sha1).join(","),
+    () => fetchModrinthIcons(),
+    { immediate: true },
+);
 
 function handleFileSelect(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -86,16 +134,51 @@ function handleDrop(e: DragEvent) {
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <input
-                    v-model="search"
-                    type="text"
-                    placeholder="Search mods..."
-                    class="noro-input-sm w-44 md:w-56 text-xs"
-                />
+                <!-- Polished Search Input -->
+                <div class="relative flex items-center">
+                    <UIcon name="i-lucide-search" class="absolute left-3 size-4 text-[var(--noro-muted)] pointer-events-none" />
+                    <input
+                        v-model="search"
+                        type="text"
+                        placeholder="Search mods..."
+                        class="noro-input-sm !pl-9 !pr-8 w-44 md:w-56 text-xs rounded-lg"
+                    />
+                    <button
+                        v-if="search"
+                        type="button"
+                        class="absolute right-2 text-[var(--noro-muted)] hover:text-[var(--noro-text)]"
+                        @click="search = ''"
+                    >
+                        <UIcon name="i-lucide-x" class="size-3.5" />
+                    </button>
+                </div>
 
+                <!-- View Mode Switcher -->
+                <div class="flex items-center rounded-lg border border-[var(--noro-border)] bg-black/30 p-0.5">
+                    <button
+                        type="button"
+                        class="p-1.5 rounded transition-colors"
+                        :class="viewMode === 'grid' ? 'bg-[var(--noro-cream)]/20 text-[var(--noro-cream)]' : 'text-[var(--noro-muted)] hover:text-[var(--noro-text)]'"
+                        title="Grid view"
+                        @click="viewMode = 'grid'"
+                    >
+                        <UIcon name="i-lucide-layout-grid" class="size-4" />
+                    </button>
+                    <button
+                        type="button"
+                        class="p-1.5 rounded transition-colors"
+                        :class="viewMode === 'list' ? 'bg-[var(--noro-cream)]/20 text-[var(--noro-cream)]' : 'text-[var(--noro-muted)] hover:text-[var(--noro-text)]'"
+                        title="List view"
+                        @click="viewMode = 'list'"
+                    >
+                        <UIcon name="i-lucide-list" class="size-4" />
+                    </button>
+                </div>
+
+                <!-- Upload JAR Button -->
                 <label class="noro-btn noro-btn-dark !min-h-[36px] !px-3 cursor-pointer text-xs uppercase font-bold flex items-center gap-1.5 rounded-lg border border-[var(--noro-border)]">
                     <UIcon name="i-lucide-upload" class="size-4" />
-                    <span>Upload .jar</span>
+                    <span>Upload JAR</span>
                     <input
                         type="file"
                         accept=".jar"
@@ -104,6 +187,7 @@ function handleDrop(e: DragEvent) {
                     />
                 </label>
 
+                <!-- Mod Catalog Button -->
                 <AtomButton
                     :to="catalogUrl"
                     variant="primary"
@@ -115,7 +199,7 @@ function handleDrop(e: DragEvent) {
             </div>
         </div>
 
-        <!-- Mods List / Grid -->
+        <!-- Mods List / Grid Content -->
         <div v-if="!buildId" class="py-12 text-center text-xs text-[var(--noro-muted)]">
             Select or create a build version above to manage installed mods.
         </div>
@@ -126,7 +210,7 @@ function handleDrop(e: DragEvent) {
             </div>
             <h3 class="font-bold text-sm text-[var(--noro-text)]">No Mods Installed</h3>
             <p class="text-xs text-[var(--noro-muted)] max-w-sm mx-auto mt-1 mb-4">
-                Browse Modrinth catalog to add compatible mods or drag & drop custom .jar files here.
+                Browse Modrinth catalog to add compatible mods or drag & drop custom jar files here.
             </p>
             <div class="flex justify-center gap-2">
                 <AtomButton :to="catalogUrl" variant="primary" icon="i-lucide-compass" size="sm">
@@ -139,19 +223,21 @@ function handleDrop(e: DragEvent) {
             No mods matching "{{ search }}"
         </div>
 
-        <div v-else class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <!-- Grid View -->
+        <div v-else-if="viewMode === 'grid'" class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             <div
                 v-for="mod in filteredMods"
                 :key="mod.id"
-                class="group flex items-center justify-between gap-3 p-3 bg-[var(--noro-bg-subtle)] rounded-lg border border-[var(--noro-border)] hover:border-[var(--noro-cream)]/40 transition-all min-w-0"
+                class="group flex items-center justify-between gap-3 p-3 bg-[var(--noro-bg-subtle)] rounded-xl border border-[var(--noro-border)] hover:border-[var(--noro-cream)]/40 transition-all min-w-0"
             >
                 <div class="flex items-center gap-3 min-w-0">
-                    <div class="grid size-9 shrink-0 place-items-center rounded bg-black/40 text-[var(--noro-cream)]">
-                        <UIcon name="i-lucide-package" class="size-5" />
+                    <div class="grid size-10 shrink-0 place-items-center rounded-lg bg-black/40 overflow-hidden border border-[var(--noro-border)]">
+                        <img v-if="modIcons[mod.sha1]" :src="modIcons[mod.sha1]" alt="" class="size-full object-cover" />
+                        <UIcon v-else name="i-lucide-package" class="size-5 text-[var(--noro-cream)]" />
                     </div>
                     <div class="min-w-0">
                         <span class="font-bold text-xs text-[var(--noro-text)] truncate block font-mono">
-                            {{ mod.path.replace(/^mods\//, '') }}
+                            {{ cleanModName(mod.path) }}
                         </span>
                         <div class="flex items-center gap-2 text-[10px] text-[var(--noro-muted)] mt-0.5">
                             <span>{{ fileSizeDisplay(mod.size) }}</span>
@@ -170,6 +256,46 @@ function handleDrop(e: DragEvent) {
                     class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                     @click="emit('remove', mod.id)"
                 />
+            </div>
+        </div>
+
+        <!-- List View -->
+        <div v-else class="flex flex-col divide-y divide-[var(--noro-border)]/40 rounded-xl border border-[var(--noro-border)] bg-black/20 overflow-hidden">
+            <div
+                v-for="mod in filteredMods"
+                :key="mod.id"
+                class="group flex items-center justify-between gap-4 px-4 py-3 hover:bg-black/40 transition-colors"
+            >
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <div class="grid size-9 shrink-0 place-items-center rounded-lg bg-black/40 overflow-hidden border border-[var(--noro-border)]">
+                        <img v-if="modIcons[mod.sha1]" :src="modIcons[mod.sha1]" alt="" class="size-full object-cover" />
+                        <UIcon v-else name="i-lucide-package" class="size-4 text-[var(--noro-cream)]" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-xs text-[var(--noro-text)] truncate font-mono">
+                                {{ mod.path }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-6 shrink-0">
+                    <span class="text-xs text-[var(--noro-muted)] font-mono">{{ fileSizeDisplay(mod.size) }}</span>
+                    <UTooltip :text="mod.sha1">
+                        <span class="text-[10px] text-[var(--noro-muted)] font-mono opacity-70">
+                            {{ mod.sha1.slice(0, 8) }}
+                        </span>
+                    </UTooltip>
+                    <AtomButton
+                        variant="danger"
+                        icon="i-lucide-trash-2"
+                        size="sm"
+                        :disabled="busy === `delete-file-${mod.id}`"
+                        class="opacity-0 group-hover:opacity-100 transition-opacity"
+                        @click="emit('remove', mod.id)"
+                    />
+                </div>
             </div>
         </div>
     </div>
