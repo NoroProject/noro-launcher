@@ -65,7 +65,7 @@ function setFiles(mod: OptionalMod, value: string) {
                 <div
                     v-for="(mod, index) in optionalMods"
                     :key="index"
-                    class="group flex flex-col rounded-xl border border-[var(--noro-border)] bg-black/20 transition-all hover:border-[var(--noro-magenta)]/50 overflow-hidden"
+                    class="group flex flex-col rounded-xl border border-[var(--noro-border)] bg-black/20 transition-all hover:border-[var(--noro-cream)]/40 overflow-hidden"
                 >
                     <!-- Collapsed Header / Summary Bar -->
                     <div
