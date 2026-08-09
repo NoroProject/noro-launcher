@@ -21,6 +21,17 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         });
     }
 
+    // Автоматически подгружаем иконки через безопасный reqwest loader
+    let icon_urls: Vec<String> = ui
+        .mod_catalog_hits
+        .iter()
+        .filter_map(|h| h.icon_url.clone())
+        .chain(ui.mod_catalog_selected.iter().filter_map(|s| s.icon_url.clone()))
+        .collect();
+    for url in icon_urls {
+        ui.ensure_optional_mod_icon_loaded(Some(url), cx);
+    }
+
     div()
         .size_full()
         .relative()
@@ -122,7 +133,7 @@ fn mod_catalog_grid(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement
                 } else {
                     let items: Vec<AnyElement> = hits
                         .into_iter()
-                        .map(|hit| mod_card(hit, server_id, cx))
+                        .map(|hit| mod_card(ui, hit, server_id, cx))
                         .collect();
                     div()
                         .flex()
@@ -199,7 +210,7 @@ fn search_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-fn mod_card(hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let hit_clone = hit.clone();
     let hit_for_req = hit.clone();
     let project_id_str = hit.project_id.clone();
@@ -221,7 +232,7 @@ fn mod_card(hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             this.mod_catalog_selected = Some(hit_clone.clone());
             cx.notify();
         }))
-        .child(mod_avatar(&hit.icon_url))
+        .child(mod_avatar(ui, &hit.icon_url))
         .child(
             div()
                 .flex_1()
@@ -283,7 +294,7 @@ fn mod_card(hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-fn mod_avatar(icon_url: &Option<String>) -> AnyElement {
+fn mod_avatar(ui: &LauncherUI, icon_url: &Option<String>) -> AnyElement {
     let outer = div()
         .size(px(44.))
         .rounded(px(R_SM))
@@ -294,21 +305,22 @@ fn mod_avatar(icon_url: &Option<String>) -> AnyElement {
         .justify_center();
 
     if let Some(ref url) = icon_url {
-        outer
-            .child(img(url.clone()).size_full().object_fit(ObjectFit::Cover))
-            .into_any_element()
-    } else {
-        outer
-            .bg(rgba(0xffffff15))
-            .border_1()
-            .border_color(rgb(BORDER))
-            .child(ic("box", 20., TEXT_MUTED))
-            .into_any_element()
+        if let Some(img_data) = ui.optional_mod_icons.get(url).cloned() {
+            return outer
+                .child(img(img_data).size_full().object_fit(ObjectFit::Cover))
+                .into_any_element();
+        }
     }
+    outer
+        .bg(rgba(0xffffff15))
+        .border_1()
+        .border_color(rgb(BORDER))
+        .child(ic("box", 20., TEXT_MUTED))
+        .into_any_element()
 }
 
 fn mod_detail_view(
-    _ui: &LauncherUI,
+    ui: &LauncherUI,
     server_id: Uuid,
     hit: CatalogHitInfo,
     cx: &mut Cx,
@@ -329,7 +341,7 @@ fn mod_detail_view(
                 .flex()
                 .items_start()
                 .gap(px(24.))
-                .child(mod_avatar(&hit.icon_url))
+                .child(mod_avatar(ui, &hit.icon_url))
                 .child(
                     div()
                         .flex_1()
