@@ -40,6 +40,15 @@ pub enum MessageToBackend {
         server_id: Uuid,
         enabled: Vec<String>,
     },
+    SuggestOptionalMod {
+        server_id: Uuid,
+        build_id: Option<Uuid>,
+        provider: String,
+        project_id: String,
+        title: String,
+        icon_url: Option<String>,
+        description: Option<String>,
+    },
 
     // --- Настройки ---
     SetMemory {

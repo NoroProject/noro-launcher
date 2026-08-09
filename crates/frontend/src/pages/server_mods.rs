@@ -35,13 +35,13 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .flex()
                 .flex_col()
                 .gap(px(16.))
-                .child(page_header(&mods))
+                .child(page_header(server_id, &mods, cx))
                 .child(mod_list(ui, server_id, &mods, cx)),
         )
         .into_any_element()
 }
 
-fn page_header(mods: &[OptionalModInfo]) -> AnyElement {
+fn page_header(server_id: Uuid, mods: &[OptionalModInfo], cx: &mut Cx) -> AnyElement {
     let enabled = mods.iter().filter(|m| m.enabled).count();
     div()
         .flex()
@@ -64,6 +64,15 @@ fn page_header(mods: &[OptionalModInfo]) -> AnyElement {
                 .text_color(rgb(TEXT_MUTED))
                 .child(format!("{enabled} / {} active", mods.len())),
         )
+        .child(crate::components::btn(
+            "mods-suggest-btn",
+            "+ Suggest Mod",
+            false,
+            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                this.page = crate::state::Page::ServerModCatalog(server_id);
+                cx.notify();
+            }),
+        ))
         .into_any_element()
 }
 

@@ -3,9 +3,9 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, build_routes, capes, catalog, cores, game_servers, launcher, mod_install, news,
-    permission_nodes, roles, servers, stats, tokens, users, versions, wrapper, wrapper_backups,
-    wrapper_fs,
+    agents, build_routes, capes, catalog, cores, game_servers, launcher, mod_install,
+    mod_suggestions, news, permission_nodes, roles, servers, stats, tokens, users, versions,
+    wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -37,6 +37,10 @@ fn catalog_router() -> Router<AppState> {
             get(catalog::versions),
         )
         .route("/api/admin/mods/install", post(mod_install::install))
+        .route("/api/mod_suggestions", post(mod_suggestions::create_suggestion))
+        .route("/api/admin/mod_suggestions", get(mod_suggestions::list_suggestions))
+        .route("/api/admin/mod_suggestions/{id}/approve", post(mod_suggestions::approve_suggestion))
+        .route("/api/admin/mod_suggestions/{id}/reject", post(mod_suggestions::reject_suggestion))
 }
 
 fn users_router() -> Router<AppState> {

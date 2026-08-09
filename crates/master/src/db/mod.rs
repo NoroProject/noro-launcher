@@ -3,6 +3,7 @@
 
 pub mod capes;
 pub mod game_servers;
+pub mod mod_suggestions;
 pub mod models;
 pub mod queries;
 
@@ -12,6 +13,7 @@ use sqlx::PgPool;
 
 pub use capes::*;
 pub use game_servers::*;
+pub use mod_suggestions::*;
 pub use queries::*;
 
 /// Подключиться к БД и применить миграции.

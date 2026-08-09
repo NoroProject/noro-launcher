@@ -7,6 +7,7 @@ pub mod cores;
 pub mod game_servers;
 pub mod launcher;
 pub mod mod_install;
+pub mod mod_suggestions;
 pub mod news;
 pub mod permission_nodes;
 pub mod roles;

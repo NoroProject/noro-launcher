@@ -178,3 +178,18 @@ pub struct BaseBuildFileRow {
     /// Платформа файла ("windows-x86_64"); NULL — нужен всем.
     pub platform: Option<String>,
 }
+
+#[derive(Debug, Clone, FromRow, Serialize)]
+pub struct ModSuggestionRow {
+    pub id: Uuid,
+    pub server_id: Uuid,
+    pub build_id: Option<Uuid>,
+    pub provider: String,
+    pub project_id: String,
+    pub title: String,
+    pub icon_url: Option<String>,
+    pub description: Option<String>,
+    pub suggested_by: Uuid,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}

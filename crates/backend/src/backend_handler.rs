@@ -99,6 +99,60 @@ impl BackendState {
                     .send(ClientWsMsg::SetOptionalMods { server_id, enabled });
             }
 
+            MessageToBackend::SuggestOptionalMod {
+                server_id,
+                build_id,
+                provider,
+                project_id,
+                title,
+                icon_url,
+                description,
+            } => {
+                let ctx = self.ctx.clone();
+                tokio::spawn(async move {
+                    let master_url = ctx.config.get().master_url;
+
+                    let client = reqwest::Client::new();
+                    let res = client
+                        .post(format!("{master_url}/api/mod_suggestions"))
+                        .json(&serde_json::json!({
+                            "server_id": server_id,
+                            "build_id": build_id,
+                            "provider": provider,
+                            "project_id": project_id,
+                            "title": title,
+                            "icon_url": icon_url,
+                            "description": description,
+                        }))
+                        .send()
+                        .await;
+
+                    match res {
+                        Ok(res) if res.status().is_success() => {
+                            ctx.send(MessageToFrontend::AddNotification {
+                                key: "Mod request submitted to admin!".into(),
+                                args: std::collections::BTreeMap::new(),
+                                level: schema::NotifLevel::Info,
+                            });
+                        }
+                        Ok(res) => {
+                            ctx.send(MessageToFrontend::AddNotification {
+                                key: format!("Failed to submit request ({})", res.status()),
+                                args: std::collections::BTreeMap::new(),
+                                level: schema::NotifLevel::Error,
+                            });
+                        }
+                        Err(e) => {
+                            ctx.send(MessageToFrontend::AddNotification {
+                                key: format!("Network error: {e}"),
+                                args: std::collections::BTreeMap::new(),
+                                level: schema::NotifLevel::Error,
+                            });
+                        }
+                    }
+                });
+            }
+
             MessageToBackend::SetMemory { min_mb, max_mb } => {
                 self.ctx.config.update(|c| {
                     c.memory_min_mb = min_mb;

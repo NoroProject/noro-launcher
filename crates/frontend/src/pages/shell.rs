@@ -1,4 +1,7 @@
-use super::{game, news, news_detail, profile, server_mods, server_settings, settings, sidebar};
+use super::{
+    game, news, news_detail, profile, server_mod_catalog, server_mods, server_settings, settings,
+    sidebar,
+};
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
 use gpui::{div, prelude::*, rgb, AnyElement};
@@ -29,6 +32,7 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
                     Page::Profile => profile::page(ui, cx),
                     Page::Settings => settings::page(ui, cx),
                     Page::ServerMods(id) => server_mods::page(ui, id, cx),
+                    Page::ServerModCatalog(id) => server_mod_catalog::page(ui, id, cx),
                     Page::ServerSettings(id) => server_settings::page(ui, id, cx),
                     Page::Login | Page::Servers | Page::ServerDetail(_) => game::page(ui, cx),
                 }),

@@ -15,19 +15,15 @@ use serde::{Deserialize, Serialize};
 
 pub async fn search(
     State(state): State<AppState>,
-    admin: AdminAuth,
     Query(q): Query<SearchQuery>,
 ) -> AppResult<Json<SearchPage>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
     Ok(Json(catalog::search(&state, &q).await?))
 }
 
 pub async fn project(
     State(state): State<AppState>,
-    admin: AdminAuth,
     Path((provider, id)): Path<(String, String)>,
 ) -> AppResult<Json<ModProject>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
     let provider = catalog::provider_of(&provider)?;
     Ok(Json(catalog::project(&state, provider, &id).await?))
 }
@@ -41,11 +37,9 @@ pub struct VersionQuery {
 
 pub async fn versions(
     State(state): State<AppState>,
-    admin: AdminAuth,
     Path((provider, id)): Path<(String, String)>,
     Query(q): Query<VersionQuery>,
 ) -> AppResult<Json<Vec<ModVersion>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
     let provider = catalog::provider_of(&provider)?;
     let versions =
         catalog::versions(&state, provider, &id, q.mc.as_deref(), q.loader.as_deref()).await?;

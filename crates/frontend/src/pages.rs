@@ -15,6 +15,7 @@ mod profile;
 mod profile_asset;
 mod profile_skin;
 mod profile_user;
+mod server_mod_catalog;
 mod server_mods;
 mod server_settings;
 mod settings;

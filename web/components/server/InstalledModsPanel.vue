@@ -42,6 +42,9 @@ const filteredMods = computed(() => {
     return mods.value.filter((m) => m.path.toLowerCase().includes(q));
 });
 
+const serverIdRef = computed(() => props.serverId);
+const { suggestions, approve, reject } = useModSuggestions(serverIdRef);
+
 const catalogUrl = computed(() => {
     if (!props.buildId) return `/admin/mods?server=${props.serverId}`;
     return `/admin/mods?server=${props.serverId}&build=${props.buildId}`;
@@ -80,6 +83,39 @@ function handleDrop(e: DragEvent) {
         @dragleave.prevent="dropActive = false"
         @drop.prevent="handleDrop"
     >
+        <!-- Pending Mod Suggestions from Launcher Players -->
+        <div v-if="suggestions.length" class="rounded-lg border border-[var(--noro-amber)]/40 bg-[var(--noro-amber)]/10 p-4 mb-2">
+            <h3 class="flex items-center gap-2 font-bold text-sm text-[var(--noro-amber)] mb-3">
+                <UIcon name="i-lucide-sparkles" class="size-4" />
+                Requested Optional Mods from Players ({{ suggestions.length }})
+            </h3>
+            <div class="grid gap-2.5">
+                <div
+                    v-for="item in suggestions"
+                    :key="item.id"
+                    class="flex items-center justify-between gap-3 rounded bg-[var(--noro-panel)] p-3 border border-[var(--noro-border)]"
+                >
+                    <div class="flex items-center gap-3 min-w-0">
+                        <img v-if="item.icon_url" :src="item.icon_url" class="size-9 rounded object-cover shrink-0" alt="">
+                        <div v-else class="size-9 rounded bg-[var(--noro-input)] flex items-center justify-center shrink-0">
+                            <UIcon name="i-lucide-box" class="size-5 text-[var(--noro-muted)]" />
+                        </div>
+                        <div class="min-w-0">
+                            <div class="font-bold text-sm text-[var(--noro-text)] truncate">{{ item.title }}</div>
+                            <div class="text-xs text-[var(--noro-muted)] truncate">{{ item.description || item.provider }}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <AtomButton variant="primary" size="sm" icon="i-lucide-check" @click="approve(item.id)">
+                            Approve
+                        </AtomButton>
+                        <AtomButton variant="dark" size="sm" icon="i-lucide-x" @click="reject(item.id)">
+                            Reject
+                        </AtomButton>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Header & Action Bar -->
         <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--noro-border)] pb-4">
             <div class="flex items-center gap-3">
