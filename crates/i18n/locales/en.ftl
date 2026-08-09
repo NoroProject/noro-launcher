@@ -65,6 +65,7 @@ notif-no-published-build = This server has no published build
 notif-update-failed = Update failed: { $reason }
 notif-skin-upload-failed = Skin upload failed: { $reason }
 notif-sign-in-to-upload = Sign in required to upload skin
+notif-sign-in-to-suggest = Sign in required to request a mod
 notif-already-running = Game is already running
 
 ## Auth failures

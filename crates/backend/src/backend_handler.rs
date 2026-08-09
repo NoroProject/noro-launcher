@@ -108,13 +108,22 @@ impl BackendState {
                 icon_url,
                 description,
             } => {
+                let Some(token) = self.access_token.clone() else {
+                    self.ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-sign-in-to-suggest".into(),
+                        args: std::collections::BTreeMap::new(),
+                        level: schema::NotifLevel::Error,
+                    });
+                    return;
+                };
                 let ctx = self.ctx.clone();
+                let http = self.ctx.http.clone();
                 tokio::spawn(async move {
                     let master_url = ctx.config.get().master_url;
 
-                    let client = reqwest::Client::new();
-                    let res = client
+                    let res = http
                         .post(format!("{master_url}/api/mod_suggestions"))
+                        .bearer_auth(&token)
                         .json(&serde_json::json!({
                             "server_id": server_id,
                             "build_id": build_id,

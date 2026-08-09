@@ -46,15 +46,12 @@ function setFiles(mod: OptionalMod, value: string) {
             </div>
 
             <div class="flex items-center gap-4">
-                <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[var(--noro-muted)] hover:text-[var(--noro-text)] transition-colors">
-                    <input
-                        type="checkbox"
-                        :checked="allowSuggestions"
-                        class="rounded border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-cyan)] focus:ring-0"
-                        @change="$emit('update:allowSuggestions', ($event.target as HTMLInputElement).checked)"
-                    />
-                    Allow Mod Suggestions
-                </label>
+                <AtomToggle
+                    :model-value="allowSuggestions"
+                    label="Allow Mod Suggestions"
+                    :loading="busy === 'optional-toggle'"
+                    @update:model-value="$emit('update:allowSuggestions', $event)"
+                />
 
                 <AtomButton
                     v-if="optionalMods?.length"

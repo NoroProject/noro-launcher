@@ -37,6 +37,7 @@ const importFile = ref<File | null>(null);
 const importKind = ref<PackImportKind>("mrpack");
 const busy = ref<string | null>(null);
 const message = ref<string | null>(null);
+const messageError = ref(false);
 const showFileManager = ref(false);
 const pathsForm = reactive({ unmanaged: "", userManaged: "" });
 const recommendedForm = reactive({
@@ -72,9 +73,15 @@ function lines(value: string) {
 async function run(name: string, action: () => Promise<void>) {
     busy.value = name;
     message.value = null;
+    messageError.value = false;
     try {
         await action();
         message.value = "Done";
+    } catch (e) {
+        // Провал обязан быть виден: иначе тумблер откатится к серверному
+        // значению молча и это выглядит как «не сохраняется без причины».
+        messageError.value = true;
+        message.value = e instanceof Error ? e.message : String(e);
     } finally {
         busy.value = null;
     }
@@ -197,6 +204,7 @@ async function importPack() {
                         if (prog.done) {
                             if (importTimer) clearInterval(importTimer);
                             if (prog.error) {
+                                messageError.value = true;
                                 message.value = `Error: ${prog.error}`;
                                 reject(new Error(prog.error));
                             } else {
@@ -304,9 +312,9 @@ async function toggleAllowSuggestions(allow: boolean) {
         <UAlert
             v-if="message"
             class="mb-5"
-            color="success"
+            :color="messageError ? 'error' : 'success'"
             variant="subtle"
-            icon="i-lucide-check"
+            :icon="messageError ? 'i-lucide-circle-alert' : 'i-lucide-check'"
             :description="message"
         />
 

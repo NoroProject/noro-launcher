@@ -56,9 +56,13 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
+/// Логотип в свёрнутом сайдбаре, он же кнопка раскрытия. Угловой бэйдж заменён
+/// на подмену по наведению: логотип гаснет, а иконка встаёт на его место в том
+/// же размере — на 40 px значок в углу всё равно нечитаем.
 pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
     div()
         .id("collapsed-logo-toggle")
+        .group("collapsed-logo")
         .size(px(40.))
         .rounded(px(R_SM))
         .flex()
@@ -73,25 +77,27 @@ pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
         .child(
             div()
                 .relative()
-                .size(px(28.))
+                .size(px(24.))
                 .flex()
                 .items_center()
                 .justify_center()
-                .child(img("logo.png").size(px(24.)))
+                .child(
+                    img("logo.png")
+                        .size(px(24.))
+                        .group_hover("collapsed-logo", |s| s.opacity(0.2)),
+                )
                 .child(
                     div()
                         .absolute()
-                        .top(px(-2.))
-                        .right(px(-2.))
-                        .size(px(14.))
-                        .rounded_full()
-                        .bg(rgb(SIDEBAR))
-                        .border_1()
-                        .border_color(rgba((CTA << 8) | 0x80))
+                        .top_0()
+                        .left_0()
+                        .size(px(24.))
                         .flex()
                         .items_center()
                         .justify_center()
-                        .child(ic("panel-left-open", 9., CTA)),
+                        .opacity(0.)
+                        .group_hover("collapsed-logo", |s| s.opacity(1.))
+                        .child(ic("panel-left-open", 20., CTA)),
                 ),
         )
         .into_any_element()

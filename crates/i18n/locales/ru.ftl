@@ -67,6 +67,7 @@ notif-no-published-build = У сервера нет опубликованной
 notif-update-failed = Не удалось обновиться: { $reason }
 notif-skin-upload-failed = Не удалось загрузить скин: { $reason }
 notif-sign-in-to-upload = Для загрузки скина нужно войти
+notif-sign-in-to-suggest = Для заявки на мод нужно войти
 notif-already-running = Игра уже запущена
 
 ## Отказы авторизации
