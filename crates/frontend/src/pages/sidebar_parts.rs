@@ -59,28 +59,18 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
 pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
     div()
         .id("collapsed-logo-toggle")
-        .size(px(40.))
+        .size(px(44.))
         .rounded(px(R_SM))
         .flex()
         .items_center()
         .justify_center()
         .cursor_pointer()
-        .bg(rgba(0xffffff05))
-        .border_1()
-        .border_color(rgb(BORDER))
-        .hover(|d| d.bg(rgba((CTA << 8) | 0x20)).border_color(rgba((CTA << 8) | 0x80)))
+        .hover(|d| d.bg(rgba((CTA << 8) | 0x20)))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.sidebar_collapsed = false;
             cx.notify();
         }))
-        .child(
-            div()
-                .size(px(26.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(img("logo.png").size_full()),
-        )
+        .child(img("logo.png").size(px(28.)).flex_shrink_0())
         .into_any_element()
 }
 
