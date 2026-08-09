@@ -3,20 +3,40 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, build_routes, capes, cores, game_servers, launcher, news, permission_nodes, roles,
-    servers, stats, tokens, users, versions,
+    agents, build_routes, capes, catalog, cores, game_servers, launcher, mod_install, news,
+    permission_nodes, roles, servers, stats, tokens, users, versions, wrapper, wrapper_backups,
+    wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/agents", get(agents::list))
         .route("/api/admin/permission-nodes", get(permission_nodes::list))
+        .merge(catalog_router())
         .merge(users_router())
         .merge(roles_router())
         .merge(content_router())
         .merge(servers_router())
         .merge(build_routes::router())
         .merge(system_router())
+}
+
+/// Каталог модов и установка. Не под `/builds/{id}`: тот же поиск нужен и без
+/// сборки — в глобальном браузере и при заливке мода прямо на игровой сервер.
+fn catalog_router() -> Router<AppState> {
+    Router::new()
+        .route("/api/admin/catalog/search", get(catalog::search))
+        .route("/api/admin/catalog/categories", get(catalog::categories))
+        .route("/api/admin/catalog/providers", get(catalog::providers))
+        .route(
+            "/api/admin/catalog/{provider}/project/{id}",
+            get(catalog::project),
+        )
+        .route(
+            "/api/admin/catalog/{provider}/project/{id}/versions",
+            get(catalog::versions),
+        )
+        .route("/api/admin/mods/install", post(mod_install::install))
 }
 
 fn users_router() -> Router<AppState> {
@@ -98,6 +118,58 @@ fn servers_router() -> Router<AppState> {
         .route(
             "/api/admin/servers/{id}/game-servers/{gs_id}/token",
             post(game_servers::rotate_token),
+        )
+        .merge(wrapper_router())
+}
+
+/// Управление игровой машиной. Адресуется id игрового сервера, без сервера-пака
+/// в пути: враппер отвечает за конкретный инстанс, и знать про пак ему незачем.
+fn wrapper_router() -> Router<AppState> {
+    Router::new()
+        .route("/api/admin/game-servers/{id}/wrapper", get(wrapper::status))
+        .route(
+            "/api/admin/game-servers/{id}/wrapper/power",
+            post(wrapper::power),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/wrapper/command",
+            post(wrapper::command),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/wrapper/console",
+            get(wrapper::console),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/wrapper/console/stream",
+            get(wrapper::console_stream),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/fs",
+            get(wrapper_fs::list).delete(wrapper_fs::delete),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/fs/file",
+            get(wrapper_fs::read).put(wrapper_fs::write),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/fs/mkdir",
+            post(wrapper_fs::mkdir),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/fs/apply",
+            post(wrapper_fs::apply),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/backups",
+            get(wrapper_backups::list).post(wrapper_backups::create),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/backups/{name}",
+            delete(wrapper_backups::delete),
+        )
+        .route(
+            "/api/admin/game-servers/{id}/backups/{name}/restore",
+            post(wrapper_backups::restore),
         )
 }
 

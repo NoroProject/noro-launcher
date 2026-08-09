@@ -21,7 +21,7 @@ const saving = ref(false)
 async function loadContent() {
   loading.value = true
   try {
-  const res = await auth.request(`/api/admin/builds/${props.buildId}/files/content?path=${encodeURIComponent(props.filePath)}`)
+  const res = await auth.request<{ content: string }>(`/api/admin/builds/${props.buildId}/files/content?path=${encodeURIComponent(props.filePath)}`)
   content.value = res.content
   } catch (err) {
     console.error(err)

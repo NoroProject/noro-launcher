@@ -35,6 +35,10 @@ pub const PERM_ADMIN_BUILDS: &str = "noro.admin.builds";
 pub const PERM_ADMIN_NEWS: &str = "noro.admin.news";
 pub const PERM_ADMIN_ROLES: &str = "noro.admin.roles";
 pub const PERM_ADMIN_LAUNCHER: &str = "noro.admin.launcher";
+/// Управление игровой машиной через ServerWrapper: файлы, конфиги, консоль,
+/// питание, бэкапы. Отдельно от `noro.admin.servers` намеренно — запись файла
+/// плюс рестарт это фактически рут на сервере, а не правка карточки в админке.
+pub const PERM_ADMIN_WRAPPER: &str = "noro.admin.wrapper";
 
 pub const PERM_MOD_USERS_BAN: &str = "noro.mod.users.ban";
 

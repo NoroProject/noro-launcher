@@ -64,14 +64,6 @@ export async function useBuildEditor() {
       busy.value = null;
     }
   }
-  const modActions = useBuildModActions(
-    auth,
-    buildId,
-    build,
-    filesData.refresh,
-    run,
-  );
-
   async function publish() {
     await run("publish", async () => {
       await auth.request(`/api/admin/builds/${buildId.value}/publish`, {
@@ -251,6 +243,5 @@ export async function useBuildEditor() {
     saveOptional,
     addOptional,
     deleteOptional,
-    ...modActions,
   };
 }

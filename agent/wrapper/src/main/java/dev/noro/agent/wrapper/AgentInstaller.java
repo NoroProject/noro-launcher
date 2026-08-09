@@ -8,10 +8,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.HexFormat;
 import org.slf4j.Logger;
 
 /**
@@ -47,13 +44,13 @@ public final class AgentInstaller {
         }
 
         Path target = detected.platform().installDir(config.serverDir()).resolve(FILE_NAME);
-        if (Files.isRegularFile(target) && descriptor.sha1().equalsIgnoreCase(sha1(Files.readAllBytes(target)))) {
+        if (Files.isRegularFile(target) && descriptor.sha1().equalsIgnoreCase(Sha1.of(Files.readAllBytes(target)))) {
             log.info("Agent is up to date ({})", descriptor.sha1());
             return target;
         }
 
         byte[] jar = download(descriptor.url());
-        String actual = sha1(jar);
+        String actual = Sha1.of(jar);
         if (!descriptor.sha1().equalsIgnoreCase(actual)) {
             // Подпись покрывает sha1, поэтому расхождение здесь — либо битая
             // закачка, либо подмена содержимого по дороге.
@@ -99,13 +96,5 @@ public final class AgentInstaller {
             throw new IOException("cannot download agent: HTTP " + response.statusCode());
         }
         return response.body();
-    }
-
-    private static String sha1(byte[] data) throws IOException {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(data));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IOException("SHA-1 unavailable", e);
-        }
     }
 }

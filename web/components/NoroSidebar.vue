@@ -14,6 +14,7 @@ const adminNavGroups = [
         items: [
             { label: "Dashboard", to: "/admin", icon: "i-lucide-layout-dashboard" },
             { label: "Servers", to: "/admin/servers", icon: "i-lucide-server" },
+            { label: "Mods", to: "/admin/mods", icon: "i-lucide-library-big" },
             { label: "Users", to: "/admin/users", icon: "i-lucide-users" },
             { label: "Capes", to: "/admin/capes", icon: "i-lucide-flag" },
             { label: "Roles", to: "/admin/roles", icon: "i-lucide-shield" },

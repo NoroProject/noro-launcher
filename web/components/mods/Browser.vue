@@ -1,0 +1,162 @@
+<script setup lang="ts">
+import type { ModHit, ModSource, ModVersion } from "~/types/catalog";
+
+/**
+ * Браузер каталога модов: фасеты, выдача, карточка проекта.
+ *
+ * Один компонент на два входа — глобальный `/admin/mods` и страницу сборки.
+ * Разница только в контексте: он подставляет версию игры с загрузчиком в
+ * фильтры и заранее отмечает сборку целью установки.
+ */
+const props = defineProps<{
+    serverId?: string;
+    buildId?: string;
+    /** Пришли со страницы игрового сервера — он и будет целью по умолчанию. */
+    gameServerId?: string;
+    mc?: string;
+    loader?: string;
+}>();
+
+const notify = useNotify();
+const versions = useVersionOptions();
+const catalog = useModCatalog(() => ({ mc: props.mc, loader: props.loader }));
+const detail = useModProject();
+
+const pickerOpen = ref(false);
+const pending = ref<{ source: ModSource; name: string; hit: ModHit } | null>(null);
+
+function sourceFor(version: ModVersion): ModSource {
+    return version.provider === "modrinth"
+        ? { kind: "modrinth", version_id: version.id }
+        : {
+              kind: "curseforge",
+              project_id: Number(version.project_id),
+              file_id: Number(version.id),
+          };
+}
+
+function startInstall(hit: ModHit, version: ModVersion) {
+    pending.value = { source: sourceFor(version), name: hit.title, hit };
+    pickerOpen.value = true;
+}
+
+/** Установка прямо из карточки: берём последнюю совместимую версию сами. */
+async function quickInstall(hit: ModHit) {
+    const version = await detail.fetchLatest(hit, catalog.filters.mc, catalog.filters.loader);
+    if (!version) {
+        notify.fail(new Error("No installable version matches these filters"), hit.title);
+        await detail.open(hit, catalog.filters.mc, catalog.filters.loader);
+        return;
+    }
+    startInstall(hit, version);
+}
+
+const hasContext = computed(() => Boolean(catalog.filters.mc || catalog.filters.loader));
+
+onMounted(async () => {
+    await Promise.all([catalog.loadProviders(), versions.loadMinecraft().catch(() => {})]);
+    await Promise.all([catalog.loadCategories(), catalog.search()]);
+});
+</script>
+
+<template>
+    <div
+        class="grid items-start gap-5"
+        :class="detail.hit.value ? 'xl:grid-cols-[248px_1fr_400px]' : 'xl:grid-cols-[248px_1fr]'"
+    >
+        <ModsFacets
+            :filters="catalog.filters"
+            :categories="catalog.categories.value"
+            :providers="catalog.providers.value"
+            :mc-versions="versions.minecraft.value"
+            @toggle-category="catalog.toggleCategory"
+            @reset="catalog.resetFilters"
+        />
+
+        <div class="grid content-start gap-4">
+            <ModsSearchBar
+                v-model="catalog.filters.q"
+                v-model:sort="catalog.filters.sort"
+                :total="catalog.total.value"
+                :loading="catalog.loading.value"
+            />
+
+            <UAlert
+                v-if="catalog.failed.value.length"
+                color="warning"
+                variant="subtle"
+                icon="i-lucide-triangle-alert"
+                :description="`No answer from: ${catalog.failed.value.join(', ')}`"
+            />
+            <UAlert
+                v-if="catalog.error.value"
+                color="error"
+                variant="subtle"
+                icon="i-lucide-circle-alert"
+                :description="catalog.error.value"
+            />
+
+            <div v-if="catalog.hits.value.length" class="grid gap-3">
+                <ModsHitCard
+                    v-for="hit in catalog.hits.value"
+                    :key="`${hit.provider}:${hit.project_id}`"
+                    :hit="hit"
+                    :selected="detail.hit.value?.project_id === hit.project_id"
+                    @select="detail.open(hit, catalog.filters.mc, catalog.filters.loader)"
+                    @install="quickInstall(hit)"
+                />
+            </div>
+            <EmptyState
+                v-else-if="!catalog.loading.value"
+                icon="i-lucide-package-search"
+                title="Nothing found"
+                text="Loosen the filters or try another term."
+            />
+
+            <nav v-if="catalog.pageCount.value > 1" class="flex items-center justify-center gap-4">
+                <AtomButton
+                    variant="secondary"
+                    size="sm"
+                    icon="i-lucide-chevron-left"
+                    :disabled="catalog.page.value === 0"
+                    @click="catalog.goToPage(catalog.page.value - 1)"
+                />
+                <span class="text-xs text-[var(--noro-muted)]">
+                    {{ catalog.page.value + 1 }} / {{ catalog.pageCount.value }}
+                </span>
+                <AtomButton
+                    variant="secondary"
+                    size="sm"
+                    icon="i-lucide-chevron-right"
+                    :disabled="catalog.page.value + 1 >= catalog.pageCount.value"
+                    @click="catalog.goToPage(catalog.page.value + 1)"
+                />
+            </nav>
+        </div>
+
+        <ModsProjectPanel
+            v-if="detail.hit.value"
+            v-model:compatible-only="detail.compatibleOnly.value"
+            :hit="detail.hit.value"
+            :project="detail.project.value"
+            :versions="detail.versions.value"
+            :loading="detail.loading.value"
+            :loading-versions="detail.loadingVersions.value"
+            :has-context="hasContext"
+            class="xl:sticky xl:top-4"
+            @close="detail.close"
+            @install="version => startInstall(detail.hit.value!, version)"
+        />
+
+        <ModsTargetPicker
+            v-model="pickerOpen"
+            :source="pending?.source ?? null"
+            :mod-name="pending?.name ?? ''"
+            :icon-url="pending?.hit.icon_url"
+            :author="pending?.hit.author"
+            :server-id="serverId"
+            :build-id="buildId"
+            :game-server-id="gameServerId"
+        />
+    </div>
+</template>

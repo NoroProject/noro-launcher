@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { GameServer, GameServerForm } from "~/types/game-server";
 
-const props = defineProps<{ item: GameServer; busy: boolean }>();
+const props = defineProps<{ item: GameServer; busy: boolean; manageTo: string }>();
 const emit = defineEmits<{
     rotate: [];
     remove: [];
@@ -61,6 +61,9 @@ function save() {
                     <div class="text-xs text-[var(--noro-muted)]">{{ lastSeen }}</div>
                 </div>
                 <div class="flex items-center gap-1">
+                    <UTooltip v-if="!isProxy" text="Control: console, files, mods">
+                        <AtomButton icon="i-lucide-sliders-horizontal" variant="ghost" :to="manageTo" />
+                    </UTooltip>
                     <UTooltip text="Edit">
                         <AtomButton icon="i-lucide-pencil" variant="ghost" @click="editing = true" />
                     </UTooltip>

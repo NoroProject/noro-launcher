@@ -30,6 +30,7 @@ services:
       NORO_LAUNCHER_REPO: /app/launcher-repo
       CURSEFORGE_API_KEY: ${CURSEFORGE_API_KEY}
       NORO_SIGNING_KEY: ${NORO_SIGNING_KEY}
+      NORO_FILES_CDN_URL: https://noro-cdn.${DOMAIN}/files
     volumes:
       - noro-data:/app/data
       - ./launcher-repo:/app/launcher-repo
@@ -43,6 +44,10 @@ services:
       - traefik.http.routers.noro-master.entrypoints=websecure
       - traefik.http.routers.noro-master.tls.certresolver=le
       - traefik.http.services.noro-master.loadbalancer.server.port=8080
+      - traefik.http.routers.noro-cdn.rule=Host(`noro-cdn.${DOMAIN}`)
+      - traefik.http.routers.noro-cdn.entrypoints=web,websecure
+      - traefik.http.routers.noro-cdn.tls=true
+      - traefik.http.routers.noro-cdn.service=noro-master
     restart: unless-stopped
     networks:
       - internal

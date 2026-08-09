@@ -73,7 +73,7 @@ async fn resume_continues_the_hash_across_the_join() {
     let data = payload();
     let dir = tempdir();
     let dest = dir.join("artifact.jar");
-    let part = dest.with_extension("part");
+    let part = part_path(&dest);
     // Половина уже на диске от прошлой, оборванной попытки.
     tokio::fs::write(&part, &data[..15_000]).await.unwrap();
 
@@ -103,7 +103,7 @@ async fn a_200_response_replaces_the_partial_instead_of_appending() {
     let data = payload();
     let dir = tempdir();
     let dest = dir.join("artifact.jar");
-    let part = dest.with_extension("part");
+    let part = part_path(&dest);
     tokio::fs::write(&part, &data[..15_000]).await.unwrap();
 
     // Origin без поддержки Range: пришлёт файл целиком.
@@ -149,8 +149,19 @@ async fn a_wrong_hash_removes_the_partial_so_a_retry_starts_clean() {
     assert!(err.to_string().contains("SHA1 mismatch"), "{err}");
     assert!(!dest.exists(), "битый файл не должен доехать до dest");
     assert!(
-        !dest.with_extension("part").exists(),
+        !part_path(&dest).exists(),
         "остаток надо снести, иначе повтор зациклится на мусоре"
+    );
+}
+
+/// Соседи по имени качаются параллельно; общий `.part` означал бы, что они
+/// пишут друг поверх друга, а в dest уедет смесь с «сошедшимся» хешем.
+#[tokio::test]
+async fn neighbours_with_different_extensions_do_not_share_a_partial() {
+    let dir = tempdir();
+    assert_ne!(
+        part_path(&dir.join("SPE_Idol.json")),
+        part_path(&dir.join("SPE_Idol.ogg"))
     );
 }
 

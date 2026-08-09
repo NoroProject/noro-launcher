@@ -104,6 +104,10 @@ fn builtin() -> Vec<Suggestion> {
         (schema::PERM_ADMIN_NEWS, "News"),
         (schema::PERM_ADMIN_ROLES, "Roles"),
         (schema::PERM_ADMIN_LAUNCHER, "Launcher builds"),
+        (
+            schema::PERM_ADMIN_WRAPPER,
+            "Game server control: files, console, power",
+        ),
         (schema::PERM_MOD_USERS_BAN, "Ban players"),
         (schema::PERM_LAUNCHER_BETA, "Launcher beta channel"),
     ]

@@ -7,12 +7,21 @@ use anyhow::{bail, Context, Result};
 use futures_util::StreamExt;
 use reqwest::StatusCode;
 use sha1::{Digest, Sha1};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Отчёт о записанных байтах. Знаковый: при сбросе негодного остатка прогресс
 /// откатывается назад, иначе шкала уехала бы за 100%.
 pub type BytesFn<'a> = &'a (dyn Fn(i64) + Send + Sync);
+
+/// Имя временного файла. Суффиксом, а не через `with_extension`: тот заменяет
+/// расширение, и соседи вроде `emotes/x.json` и `emotes/x.ogg` получали общий
+/// `emotes/x.part` — качаясь параллельно, они писали друг поверх друга.
+pub fn part_path(dest: &Path) -> PathBuf {
+    let mut p = dest.as_os_str().to_owned();
+    p.push(".part");
+    PathBuf::from(p)
+}
 
 /// Скачать `url` в `dest`. Незавершённая загрузка живёт в соседнем `.part`,
 /// поэтому обрыв связи стоит только недокачанного хвоста, а не всего файла.
@@ -26,7 +35,7 @@ pub async fn fetch_to_file(
     if let Some(parent) = dest.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
-    let part = dest.with_extension("part");
+    let part = part_path(dest);
     let mut have = tokio::fs::metadata(&part)
         .await
         .map(|m| m.len())

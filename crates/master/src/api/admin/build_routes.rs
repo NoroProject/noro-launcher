@@ -61,23 +61,6 @@ pub fn router() -> Router<AppState> {
             post(builds::move_files),
         )
         .route(
-            "/api/admin/builds/{id}/mods/search",
-            get(builds::search_mods),
-        )
-        .route(
-            "/api/admin/builds/{id}/mods/modrinth-versions",
-            get(builds::modrinth_project_versions),
-        )
-        .route(
-            "/api/admin/builds/{id}/mods/add-modrinth",
-            post(builds::add_modrinth),
-        )
-        .route(
-            "/api/admin/builds/{id}/mods/add-curseforge",
-            post(builds::add_curseforge),
-        )
-        .route("/api/admin/builds/{id}/mods/add-url", post(builds::add_url))
-        .route(
             "/api/admin/builds/{id}/optional-mods",
             get(builds::get_optional).put(builds::set_optional),
         )

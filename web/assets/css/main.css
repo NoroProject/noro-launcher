@@ -4,6 +4,7 @@
 @import "./surfaces.css";
 @import "./controls.css";
 @import "./file-manager.css";
+@import "./markdown.css";
 
 /* Те же шрифты, что и в лаунчере: сайт и приложение должны читаться как один
    продукт. Monocraft — открытая реализация майнкрафтовского шрифта с полной

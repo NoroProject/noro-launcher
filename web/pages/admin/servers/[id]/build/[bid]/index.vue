@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BuildFileRow, BuildRow, OptionalMod, OptionalAddConfig } from "~/types/api";
+import type { BuildFileRow, BuildRow, OptionalMod } from "~/types/api";
 import type { ImportProgress, PackImportKind } from "~/types/server-settings";
 
 const route = useRoute();
@@ -78,27 +78,6 @@ async function run(name: string, action: () => Promise<void>) {
     } finally {
         busy.value = null;
     }
-}
-
-const { addDirectUrl, addCurseForgeFile } = useBuildModActions(
-    auth,
-    buildId,
-    build,
-    filesData.refresh,
-    run,
-);
-
-async function handleAddModrinth(versionId: string, optional: OptionalAddConfig | null) {
-    await run("modrinth-add", async () => {
-        const result = await auth.request<{ path: string }>(
-            `/api/admin/builds/${buildId.value}/mods/add-modrinth`,
-            { method: "POST", body: { version_id: versionId, optional } },
-        );
-        await filesData.refresh();
-        if (optional && result?.path) {
-            await optionalData.refresh();
-        }
-    });
 }
 
 async function publish() {
@@ -334,7 +313,7 @@ function deleteOptional(index: number) {
             <UProgress
                 :value="importProgress.current"
                 :max="importProgress.total || 1"
-                color="blue"
+                color="info"
                 size="sm"
             />
             <div v-if="importProgress.warnings.length > 0" class="mt-4 pt-4 border-t border-noro-border/50">
@@ -378,7 +357,7 @@ function deleteOptional(index: number) {
                     Would you like to apply these settings to your build?
                 </p>
             </div>
-            <AtomButton variant="primary" size="sm" @click="applyPackVersions" :loading="pendingAction === 'apply-versions'">
+            <AtomButton variant="primary" size="sm" @click="applyPackVersions" :loading="busy === 'apply-versions'">
                 Apply Versions
             </AtomButton>
         </div>
@@ -431,12 +410,8 @@ function deleteOptional(index: number) {
                     :busy="busy"
                     @upload="uploadBuildFile"
                 />
-                <BuildModsPanel
-                    :build-id="buildId"
-                    :busy="busy"
-                    @add-modrinth="handleAddModrinth"
-                    @add-curse-forge="(p, f) => addCurseForgeFile(p, f)"
-                    @add-url="(u) => addDirectUrl(u)"
+                <BuildModCatalogPanel
+                    :to="`/admin/servers/${serverId}/build/${buildId}/mods`"
                 />
             </aside>
         </div>

@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Properties;
 
 /**
@@ -24,7 +25,13 @@ public record WrapperConfig(
         List<String> jvmArgs,
         List<String> serverArgs,
         String platformOverride,
-        String mcVersionOverride) {
+        String mcVersionOverride,
+        boolean autostart,
+        boolean restartOnCrash) {
+
+    /** Версия из манифеста jar'а; при запуске из классов её нет. */
+    public static final String VERSION =
+            Objects.requireNonNullElse(WrapperConfig.class.getPackage().getImplementationVersion(), "dev");
 
     public static WrapperConfig load(Path file) {
         Properties props = new Properties();
@@ -48,7 +55,17 @@ public record WrapperConfig(
                 words(props.getProperty("jvm-args", "-Xmx4G")),
                 words(props.getProperty("server-args", "nogui")),
                 props.getProperty("platform"),
-                props.getProperty("mc-version"));
+                props.getProperty("mc-version"),
+                // По умолчанию враппер ведёт себя как раньше: поднимает сервер
+                // сразу. Кому нужен «стоит и ждёт команды из админки» — ставит
+                // autostart=false осознанно.
+                flag(props, "autostart", true),
+                flag(props, "restart-on-crash", true));
+    }
+
+    private static boolean flag(Properties props, String key, boolean fallback) {
+        String raw = props.getProperty(key);
+        return raw == null || raw.isBlank() ? fallback : Boolean.parseBoolean(raw.strip());
     }
 
     /** Путь к jar сервера — он же вход для определения платформы. */

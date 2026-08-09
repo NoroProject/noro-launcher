@@ -1,6 +1,6 @@
 use super::common::progress_label;
-use crate::components::{progress_bar, stage_row};
 use crate::components::{mascot, Mood};
+use crate::components::{progress_bar, stage_row};
 use crate::state::SyncUiState;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};

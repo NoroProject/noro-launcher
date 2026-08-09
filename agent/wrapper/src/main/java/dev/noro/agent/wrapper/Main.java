@@ -1,11 +1,10 @@
 package dev.noro.agent.wrapper;
 
-import dev.noro.agent.core.AgentConfig;
-import dev.noro.agent.core.HeartbeatTask;
-import dev.noro.agent.core.MasterClient;
-import dev.noro.agent.core.ServerStatus;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,8 +12,11 @@ import org.slf4j.LoggerFactory;
  * ServerWrapper: установщик и супервизор.
  *
  * <p>Ставит агент под платформу, прокидывает authlib-injector, держит секрет и
- * отчитывается о живости, пока сервер грузится. Авторизацию он не делает и
+ * управляет процессом сервера по командам мастера. Авторизацию он не делает и
  * делать не должен — она на мастере, и там ей место.
+ *
+ * <p>Живёт дольше сервера: без этого мод, поставленный из админки, применить
+ * нечем, а на упавшем сервере панель управления мертва.
  */
 public final class Main {
 
@@ -34,36 +36,58 @@ public final class Main {
         PermissionHandlerConfig.ensure(config, detected.platform(), LOG);
 
         String javaagent = new AuthlibInjector(config, LOG).jvmArg();
+        Supervisor supervisor = new Supervisor(config, javaagent, LOG);
 
-        // Сервер грузится минуты, а мастер считает его мёртвым через 90 секунд.
-        // Без этого heartbeat карточка в лаунчере всё это время серая.
-        HeartbeatTask boot = bootHeartbeat(config, detected);
-        boot.start();
+        ServerPaths paths = new ServerPaths(config.serverDir(), configFile);
+        ControlOps ops = new ControlOps(
+                supervisor,
+                new ServerFiles(paths),
+                new ServerMods(paths, LOG),
+                new ServerBackups(paths, LOG));
+        ControlLink link = new ControlLink(config, detected, supervisor, ops, LOG);
+        link.start();
 
-        int code = new ServerProcess(config, javaagent, LOG).run(boot::close);
-        boot.close();
-        System.exit(code);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            link.close();
+            supervisor.shutdown();
+        }));
+
+        if (config.autostart()) {
+            supervisor.start();
+        } else {
+            LOG.info("autostart=false — waiting for a start command from the master");
+        }
+
+        pipeConsole(supervisor);
     }
 
-    private static HeartbeatTask bootHeartbeat(WrapperConfig config, PlatformDetect.Detected detected) {
-        AgentConfig agentConfig =
-                new AgentConfig(config.masterUrl(), config.secret(), Duration.ofSeconds(30), true);
-        ServerStatus starting = new ServerStatus() {
-            @Override
-            public int online() {
-                return 0;
+    /**
+     * Консоль администратора на самой машине должна доходить до сервера, иначе
+     * это не супервизор. Заодно это и то, что держит процесс живым.
+     */
+    private static void pipeConsole(Supervisor supervisor) {
+        try (var console = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = console.readLine()) != null) {
+                try {
+                    supervisor.command(line);
+                } catch (RuntimeException e) {
+                    LOG.warn("{}", e.getMessage());
+                }
             }
+        } catch (IOException ignored) {
+            // stdin закрыли — враппер запущен как служба, ждём дальше.
+        }
+        // Под systemd stdin закрыт сразу; спать здесь честнее, чем выйти и
+        // унести с собой канал управления.
+        parkForever();
+    }
 
-            @Override
-            public int maxPlayers() {
-                return 0;
-            }
-
-            @Override
-            public String version() {
-                return detected.platform().id() + " " + detected.mcVersion() + " (starting)";
-            }
-        };
-        return new HeartbeatTask(new MasterClient(agentConfig), starting, agentConfig, LOG);
+    private static void parkForever() {
+        try {
+            Thread.currentThread().join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

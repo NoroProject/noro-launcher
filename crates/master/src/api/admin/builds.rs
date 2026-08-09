@@ -12,13 +12,13 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-fn broadcast_builds_changed(state: &AppState, server_id: Uuid) {
+pub(super) fn broadcast_builds_changed(state: &AppState, server_id: Uuid) {
     state
         .ws
         .broadcast(&schema::ServerWsMsg::BuildsChanged { server_id });
 }
 
-async fn build_server_id(state: &AppState, id: Uuid) -> AppResult<Uuid> {
+pub(super) async fn build_server_id(state: &AppState, id: Uuid) -> AppResult<Uuid> {
     let build = crate::db::get_build(&state.db, id)
         .await?
         .ok_or_else(|| AppError::NotFound("сборка".into()))?;
@@ -595,88 +595,11 @@ pub async fn import_progress(
     }
 }
 
-// --- Поиск и добавление модов ---
+// --- Опциональные моды ---
 
-#[derive(Deserialize)]
-pub struct ModSearchQuery {
-    pub q: String,
-    pub mc: Option<String>,
-    pub loader: Option<String>,
-}
-
-/// Поиск модов на Modrinth.
-pub async fn search_mods(
-    State(state): State<AppState>,
-    admin: AdminAuth,
-    Query(q): Query<ModSearchQuery>,
-) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
-    let mut facets: Vec<String> = vec![r#"["project_type:mod"]"#.to_string()];
-    if let Some(mc) = &q.mc {
-        facets.push(format!(r#"["versions:{mc}"]"#));
-    }
-    if let Some(loader) = &q.loader {
-        facets.push(format!(r#"["categories:{loader}"]"#));
-    }
-    let facets_str = format!("[{}]", facets.join(","));
-    let url = format!(
-        "https://api.modrinth.com/v2/search?query={}&facets={}&limit=30",
-        urlencoding::encode(&q.q),
-        urlencoding::encode(&facets_str)
-    );
-    let resp: Value = state
-        .http()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?;
-    Ok(Json(resp))
-}
-
-#[derive(Deserialize)]
-pub struct ProjectVersionsQuery {
-    pub project_id: String,
-}
-
-/// Список версий Modrinth-проекта, совместимых с версией и загрузчиком сборки.
-pub async fn modrinth_project_versions(
-    State(state): State<AppState>,
-    admin: AdminAuth,
-    Path(id): Path<Uuid>,
-    Query(q): Query<ProjectVersionsQuery>,
-) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
-    let build = crate::db::get_build(&state.db, id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("сборка".into()))?;
-    let mc = urlencoding::encode(&build.mc_version);
-    let loader = urlencoding::encode(&build.modloader);
-    let url = format!(
-        "https://api.modrinth.com/v2/project/{}/version?game_versions=%5B%22{}%22%5D&loaders=%5B%22{}%22%5D",
-        q.project_id, mc, loader
-    );
-    let resp: Value = state
-        .http()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?;
-    Ok(Json(resp))
-}
-
-#[derive(Deserialize)]
-pub struct AddModrinthReq {
-    pub version_id: String,
-    pub optional: Option<OptionalModDraft>,
-}
-
-#[derive(Deserialize)]
+/// Заготовка карточки опционального мода: приходит из админки вместе с
+/// установкой, потому что имя и категорию задаёт человек, а не Modrinth.
+#[derive(Deserialize, Clone)]
 pub struct OptionalModDraft {
     pub name: String,
     pub description: String,
@@ -688,90 +611,7 @@ pub struct OptionalModDraft {
     pub author: Option<String>,
 }
 
-/// Добавить мод с Modrinth по version_id.
-pub async fn add_modrinth(
-    State(state): State<AppState>,
-    admin: AdminAuth,
-    Path(id): Path<Uuid>,
-    Json(req): Json<AddModrinthReq>,
-) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
-    let url = format!("https://api.modrinth.com/v2/version/{}", req.version_id);
-    let version: Value = state
-        .http()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?;
-    let project = modrinth_project(&state, &version).await.ok();
-
-    let file = version["files"]
-        .as_array()
-        .and_then(|a| {
-            a.iter()
-                .find(|f| f["primary"].as_bool() == Some(true))
-                .or_else(|| a.first())
-        })
-        .ok_or_else(|| AppError::BadRequest("у версии нет файлов".into()))?;
-    let download_url = file["url"].as_str().unwrap_or_default();
-    let filename = file["filename"].as_str().unwrap_or("mod.jar");
-    let sha1 = file["hashes"]["sha1"].as_str();
-
-    let stored = state
-        .files
-        .put_url(state.http(), download_url, sha1)
-        .await
-        .map_err(AppError::Other)?;
-    let path = format!("mods/{filename}");
-    crate::db::upsert_build_file(
-        &state.db,
-        id,
-        &path,
-        &stored.sha1,
-        stored.size as i64,
-        "both",
-        "mod",
-    )
-    .await?;
-    if let Some(optional) = req.optional {
-        let icon_url = project
-            .as_ref()
-            .and_then(|p| p["icon_url"].as_str())
-            .map(String::from)
-            .or_else(|| optional.icon_url.clone());
-        let author = project
-            .as_ref()
-            .and_then(|p| p["title"].as_str())
-            .map(String::from)
-            .or_else(|| optional.author.clone());
-        let new_mod = optional_from_draft(optional, path.clone(), icon_url, author);
-        append_optional_mod(&state, id, new_mod).await?;
-    }
-    let server_id = build_server_id(&state, id).await?;
-    broadcast_builds_changed(&state, server_id);
-    Ok(Json(json!({ "path": path, "sha1": stored.sha1 })))
-}
-
-async fn modrinth_project(state: &AppState, version: &Value) -> AppResult<Value> {
-    let project_id = version["project_id"]
-        .as_str()
-        .ok_or_else(|| AppError::BadRequest("Modrinth version has no project_id".into()))?;
-    let url = format!("https://api.modrinth.com/v2/project/{project_id}");
-    state
-        .http()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.into()))
-}
-
-fn optional_from_draft(
+pub(super) fn optional_from_draft(
     draft: OptionalModDraft,
     path: String,
     icon_url: Option<String>,
@@ -793,7 +633,11 @@ fn optional_from_draft(
     }
 }
 
-async fn append_optional_mod(state: &AppState, id: Uuid, new_mod: OptionalMod) -> AppResult<()> {
+pub(super) async fn append_optional_mod(
+    state: &AppState,
+    id: Uuid,
+    new_mod: OptionalMod,
+) -> AppResult<()> {
     let build = crate::db::get_build(&state.db, id)
         .await?
         .ok_or_else(|| AppError::NotFound("сборка".into()))?;
@@ -808,133 +652,6 @@ async fn append_optional_mod(state: &AppState, id: Uuid, new_mod: OptionalMod) -
         .await?;
     Ok(())
 }
-
-#[derive(Deserialize)]
-pub struct AddCurseForgeReq {
-    pub project_id: u64,
-    pub file_id: u64,
-}
-
-/// Добавить мод с CurseForge по project_id/file_id.
-pub async fn add_curseforge(
-    State(state): State<AppState>,
-    admin: AdminAuth,
-    Path(id): Path<Uuid>,
-    Json(req): Json<AddCurseForgeReq>,
-) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
-    let api_key = state
-        .config
-        .curseforge_api_key
-        .as_ref()
-        .ok_or_else(|| AppError::BadRequest("CURSEFORGE_API_KEY не задан".into()))?;
-
-    let meta_url = format!(
-        "https://api.curseforge.com/v1/mods/{}/files/{}",
-        req.project_id, req.file_id
-    );
-    let meta: Value = state
-        .http()
-        .get(&meta_url)
-        .header("x-api-key", api_key)
-        .send()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?
-        .error_for_status()
-        .map_err(|e| AppError::Other(e.into()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?;
-
-    let filename = meta["data"]["fileName"].as_str().unwrap_or("mod.jar");
-    let sha1 = meta["data"]["hashes"].as_array().and_then(|hashes| {
-        hashes
-            .iter()
-            .find(|h| h["algo"].as_i64() == Some(1))
-            .and_then(|h| h["value"].as_str())
-    });
-
-    let dl_url = format!(
-        "https://api.curseforge.com/v1/mods/{}/files/{}/download-url",
-        req.project_id, req.file_id
-    );
-    let dl: Value = state
-        .http()
-        .get(&dl_url)
-        .header("x-api-key", api_key)
-        .send()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?
-        .error_for_status()
-        .map_err(|e| AppError::Other(e.into()))?
-        .json()
-        .await
-        .map_err(|e| AppError::Other(e.into()))?;
-    let download_url = dl["data"]
-        .as_str()
-        .ok_or_else(|| AppError::BadRequest("CurseForge не вернул download-url".into()))?;
-
-    let stored = state
-        .files
-        .put_url(state.http(), download_url, sha1)
-        .await
-        .map_err(AppError::Other)?;
-    let path = format!("mods/{filename}");
-    crate::db::upsert_build_file(
-        &state.db,
-        id,
-        &path,
-        &stored.sha1,
-        stored.size as i64,
-        "both",
-        "mod",
-    )
-    .await?;
-    let server_id = build_server_id(&state, id).await?;
-    broadcast_builds_changed(&state, server_id);
-    Ok(Json(json!({ "path": path, "sha1": stored.sha1 })))
-}
-
-#[derive(Deserialize)]
-pub struct AddUrlReq {
-    pub url: String,
-    pub filename: Option<String>,
-}
-
-/// Добавить мод по прямой ссылке.
-pub async fn add_url(
-    State(state): State<AppState>,
-    admin: AdminAuth,
-    Path(id): Path<Uuid>,
-    Json(req): Json<AddUrlReq>,
-) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
-    let stored = state
-        .files
-        .put_url(state.http(), &req.url, None)
-        .await
-        .map_err(AppError::Other)?;
-    let filename = req
-        .filename
-        .or_else(|| req.url.rsplit('/').next().map(String::from))
-        .unwrap_or_else(|| "mod.jar".into());
-    let path = format!("mods/{filename}");
-    crate::db::upsert_build_file(
-        &state.db,
-        id,
-        &path,
-        &stored.sha1,
-        stored.size as i64,
-        "both",
-        "mod",
-    )
-    .await?;
-    let server_id = build_server_id(&state, id).await?;
-    broadcast_builds_changed(&state, server_id);
-    Ok(Json(json!({ "path": path, "sha1": stored.sha1 })))
-}
-
-// --- Опциональные моды ---
 
 pub async fn get_optional(
     State(state): State<AppState>,

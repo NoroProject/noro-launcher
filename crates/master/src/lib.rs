@@ -3,6 +3,7 @@
 
 pub mod api;
 pub mod build_importer;
+pub mod catalog;
 pub mod config;
 pub mod dav;
 pub mod db;
@@ -13,6 +14,7 @@ pub mod manifest;
 pub mod mojang_bootstrap;
 pub mod signing;
 pub mod state;
+pub mod wrapper;
 pub mod ws;
 
 use anyhow::Result;
@@ -53,6 +55,8 @@ pub async fn run() -> Result<()> {
         config: Arc::new(config.clone()),
         http,
         import_jobs: Arc::new(dashmap::DashMap::new()),
+        catalog: catalog::HttpCache::default(),
+        wrappers: wrapper::WrapperHub::default(),
     };
 
     // Фоновый опрос GitHub (если настроен).
@@ -148,7 +152,10 @@ fn router(state: AppState) -> Router {
         .route("/api/agent/heartbeat", post(agent::heartbeat))
         .route("/api/agent/artifact", get(agent_artifact::artifact))
         .route("/api/agent/pubkey", get(agent_artifact::pubkey))
-        .route("/api/agent/nodes", post(agent_nodes::report));
+        .route("/api/agent/nodes", post(agent_nodes::report))
+        // Канал управления враппером. Живёт рядом с остальным агентским API:
+        // авторизация та же — секрет игрового сервера.
+        .route("/api/agent/ws", get(wrapper::session::ws_handler));
 
     let admin_api = api::admin::router().route(
         "/api/admin/locales/{locale}",

@@ -6,7 +6,7 @@ const props = defineProps<{
   busy: string | null
 }>()
 
-defineEmits<{ deploy: [id: string], deployMany: [ids: string[]] }>()
+defineEmits<{ deploy: [id: string], deployMany: [ids: string[], kind: string] }>()
 
 /**
  * Одна версия даёт десять строк: пять платформ, и у каждой две разновидности —
@@ -20,13 +20,18 @@ const groups = computed(() => {
     list.push(version)
     map.set(version.version, list)
   }
+  // Выкаченное деплоить незачем — кнопки группы двигают только остальное.
+  const pending = (items: LauncherVersionRow[], kind: string) =>
+    items.filter(i => i.kind === kind && !i.is_current).map(i => i.id)
   return [...map].map(([version, items]) => ({
     version,
     items: [...items].sort(
       (a, b) => a.platform.localeCompare(b.platform) || a.kind.localeCompare(b.kind)
     ),
-    // Выкаченное деплоить незачем — кнопка группы двигает только остальное.
-    pending: items.filter(i => !i.is_current).map(i => i.id),
+    // Порознь: core едет каждый релиз, а установщик обычно остаётся на старом —
+    // общая кнопка «выкатить всё» сбрасывала его репутацию у SmartScreen.
+    core: pending(items, 'core'),
+    bootstrapper: pending(items, 'bootstrapper'),
   }))
 })
 
@@ -66,17 +71,27 @@ function toggle(version: string) {
                 {{ group.items.length }} builds
               </span>
             </button>
-            <!-- Деплой всей версии разом: платформ пять, и раскликивать их по
-                 одной ради одного релиза — то ещё занятие. -->
+            <!-- Пять платформ одного вида разом: раскликивать их по одной ради
+                 одного релиза — то ещё занятие. -->
             <AtomButton
-              v-if="group.pending.length"
+              v-if="group.core.length"
               variant="secondary"
               size="sm"
               icon="i-lucide-send"
-              :loading="busy === 'deploy-all'"
-              @click="$emit('deployMany', group.pending)"
+              :loading="busy === 'deploy-core'"
+              @click="$emit('deployMany', group.core, 'core')"
             >
-              Deploy all
+              Deploy core
+            </AtomButton>
+            <AtomButton
+              v-if="group.bootstrapper.length"
+              variant="dark"
+              size="sm"
+              icon="i-lucide-send"
+              :loading="busy === 'deploy-bootstrapper'"
+              @click="$emit('deployMany', group.bootstrapper, 'bootstrapper')"
+            >
+              Deploy bootstrap
             </AtomButton>
           </div>
         </th>

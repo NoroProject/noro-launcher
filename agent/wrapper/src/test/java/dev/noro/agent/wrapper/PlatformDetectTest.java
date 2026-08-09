@@ -91,7 +91,9 @@ class PlatformDetectTest {
                 List.of(),
                 List.of(),
                 platform,
-                mcVersion);
+                mcVersion,
+                true,
+                true);
     }
 
     private void writeJar(String name, Map<String, String> entries) throws IOException {

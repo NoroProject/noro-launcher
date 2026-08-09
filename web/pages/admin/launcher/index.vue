@@ -43,9 +43,9 @@ async function buildLauncher() {
   }
 }
 
-/** Вся версия разом: пять платформ в двух видах — по одной их не наклацаешь. */
-async function deployAll(ids: string[]) {
-  busy.value = 'deploy-all'
+/** Пять платформ одного вида разом: по одной их не наклацаешь. */
+async function deployAll(ids: string[], kind: string) {
+  busy.value = `deploy-${kind}`
   try {
     // Последовательно: мастер на каждый деплой рассылает лаунчерам обновление,
     // и параллельный залп сделал бы порядок рассылки случайным.
