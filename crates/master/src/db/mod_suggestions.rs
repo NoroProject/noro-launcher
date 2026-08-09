@@ -44,10 +44,13 @@ pub async fn list_mod_suggestions(
     let rows = if let Some(st) = status {
         sqlx::query_as::<_, ModSuggestionRow>(
             r#"
-            SELECT id, server_id, build_id, provider, project_id, title, icon_url, description, suggested_by, status, created_at
-            FROM mod_suggestions
-            WHERE server_id = $1 AND status = $2
-            ORDER BY created_at DESC
+            SELECT s.id, s.server_id, s.build_id, s.provider, s.project_id, s.title,
+                   s.icon_url, s.description, s.suggested_by, u.mc_username AS suggested_by_name,
+                   s.status, s.created_at
+            FROM mod_suggestions s
+            LEFT JOIN users u ON u.id = s.suggested_by
+            WHERE s.server_id = $1 AND s.status = $2
+            ORDER BY s.created_at DESC
             "#,
         )
         .bind(server_id)
@@ -57,10 +60,13 @@ pub async fn list_mod_suggestions(
     } else {
         sqlx::query_as::<_, ModSuggestionRow>(
             r#"
-            SELECT id, server_id, build_id, provider, project_id, title, icon_url, description, suggested_by, status, created_at
-            FROM mod_suggestions
-            WHERE server_id = $1
-            ORDER BY created_at DESC
+            SELECT s.id, s.server_id, s.build_id, s.provider, s.project_id, s.title,
+                   s.icon_url, s.description, s.suggested_by, u.mc_username AS suggested_by_name,
+                   s.status, s.created_at
+            FROM mod_suggestions s
+            LEFT JOIN users u ON u.id = s.suggested_by
+            WHERE s.server_id = $1
+            ORDER BY s.created_at DESC
             "#,
         )
         .bind(server_id)

@@ -88,7 +88,7 @@ function handleDrop(e: DragEvent) {
 
 <template>
     <div
-        class="noro-panel flex flex-col gap-4 p-5"
+        class="noro-panel flex min-w-0 flex-col gap-4 p-5"
         :class="{ 'ring-2 ring-[var(--noro-cream)] bg-black/40': dropActive }"
         @dragover.prevent="dropActive = true"
         @dragleave.prevent="dropActive = false"
@@ -104,15 +104,20 @@ function handleDrop(e: DragEvent) {
                 <div
                     v-for="item in suggestions"
                     :key="item.id"
-                    class="flex items-center justify-between gap-3 rounded bg-[var(--noro-panel)] p-3 border border-[var(--noro-border)]"
+                    class="flex min-w-0 items-center justify-between gap-3 rounded bg-[var(--noro-panel)] p-3 border border-[var(--noro-border)]"
                 >
-                    <div class="flex items-center gap-3 min-w-0">
+                    <div class="flex min-w-0 flex-1 items-center gap-3">
                         <img v-if="item.icon_url" :src="item.icon_url" class="size-9 rounded object-cover shrink-0" alt="">
                         <div v-else class="size-9 rounded bg-[var(--noro-input)] flex items-center justify-center shrink-0">
                             <UIcon name="i-lucide-box" class="size-5 text-[var(--noro-muted)]" />
                         </div>
                         <div class="min-w-0">
-                            <div class="font-bold text-sm text-[var(--noro-text)] truncate">{{ item.title }}</div>
+                            <div class="flex min-w-0 items-center gap-2">
+                                <span class="truncate font-bold text-sm text-[var(--noro-text)]">{{ item.title }}</span>
+                                <span class="shrink-0 rounded bg-[var(--noro-input)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--noro-blue)]">
+                                    {{ item.suggested_by_name || "unknown" }}
+                                </span>
+                            </div>
                             <div class="text-xs text-[var(--noro-muted)] truncate">{{ item.description || item.provider }}</div>
                         </div>
                     </div>

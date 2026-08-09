@@ -8,6 +8,7 @@ export function useModSuggestions(serverId: Ref<string | undefined>) {
             description: string | null;
             provider: string;
             project_id: string;
+            suggested_by_name: string | null;
             status: string;
             created_at: string;
         }>

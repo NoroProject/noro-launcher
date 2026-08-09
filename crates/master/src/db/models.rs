@@ -196,6 +196,10 @@ pub struct ModSuggestionRow {
     pub icon_url: Option<String>,
     pub description: Option<String>,
     pub suggested_by: Uuid,
+    /// Ник игрока из users. Заполняет только список заявок — остальным запросам
+    /// имя не нужно, поэтому поле необязательное.
+    #[sqlx(default)]
+    pub suggested_by_name: Option<String>,
     pub status: String,
     pub created_at: DateTime<Utc>,
 }
