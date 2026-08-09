@@ -54,6 +54,11 @@ export function useAdminServerBase() {
       }
     },
   );
+  watch(activeTab, (t) => {
+    if (route.query.tab !== t) {
+      navigateTo({ query: { ...route.query, tab: t } }, { replace: true });
+    }
+  });
   const versions = useVersionOptions();
   
   const serversData = useAsyncData(

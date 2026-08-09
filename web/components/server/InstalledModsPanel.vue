@@ -16,7 +16,16 @@ const emit = defineEmits<{
 const search = ref("");
 const dropActive = ref(false);
 
+function fileSizeDisplay(bytes: number) {
+    if (!bytes) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
 const mods = computed(() => {
+    if (!Array.isArray(props.files)) return [];
     return props.files.filter((f) => {
         const isJar = f.path.toLowerCase().endsWith(".jar");
         const inMods = f.path.toLowerCase().startsWith("mods/");
