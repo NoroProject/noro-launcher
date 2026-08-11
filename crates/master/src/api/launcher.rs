@@ -158,9 +158,12 @@ async fn handle_client_msg(
 
         ClientWsMsg::RequestServerList => {
             let rows = crate::db::list_servers(&state.db, true).await?;
-            let is_admin = match *authed_user {
-                Some(uid) => {
-                    let p = crate::db::load_profile(&state.db, uid).await?;
+            let user_profile = match *authed_user {
+                Some(uid) => crate::db::load_profile(&state.db, uid).await.ok(),
+                None => None,
+            };
+            let is_admin = match &user_profile {
+                Some(p) => {
                     p.has_permission(schema::PERM_ADMIN_SERVERS)
                         || p.has_permission(schema::PERM_ADMIN_ALL)
                         || p.has_permission(schema::PERM_SUPERADMIN)
@@ -171,7 +174,13 @@ async fn handle_client_msg(
             for s in &rows {
                 let entry = crate::db::server_entry(&state.db, s).await?;
                 if is_admin || entry.current_build_id.is_some() {
-                    servers.push(entry);
+                    let can_join = match &user_profile {
+                        Some(p) => p.can_join_server(&s.id, s.limited),
+                        None => !s.limited,
+                    };
+                    if is_admin || can_join {
+                        servers.push(entry);
+                    }
                 }
             }
             let _ = tx.send(ServerWsMsg::ServerList { servers });

@@ -2,13 +2,15 @@
 import type { UserProfile } from '~/types/api'
 
 const auth = useAuth()
-
 const notify = useNotify()
 await auth.loadMe()
 
 const username = ref(auth.user.value?.username || '')
 const saving = ref(false)
 const saved = ref(false)
+
+const passkeys = ref<any[]>([])
+const loadingPasskeys = ref(false)
 
 const initials = computed(() => (auth.user.value?.username || 'N').slice(0, 1).toUpperCase())
 const roles = computed(() => auth.user.value?.roles || [])
@@ -41,17 +43,74 @@ async function saveUsername() {
     saving.value = false
   }
 }
+
+async function loadPasskeys() {
+  loadingPasskeys.value = true
+  try {
+    passkeys.value = await auth.request<any[]>('/api/me/passkeys')
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loadingPasskeys.value = false
+  }
+}
+
+async function addPasskey() {
+  try {
+    const opts = await auth.request<any>('/api/me/passkeys/register/options', { method: 'POST' })
+    const challengeBytes = new Uint8Array(opts.challenge.match(/.{1,2}/g).map((byte: string) => parseInt(byte, 16)))
+
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge: challengeBytes,
+        rp: opts.rp,
+        user: {
+          id: new TextEncoder().encode(opts.user.id),
+          name: opts.user.name,
+          displayName: opts.user.displayName,
+        },
+        pubKeyCredParams: opts.pubKeyCredParams,
+        authenticatorSelection: opts.authenticatorSelection,
+        timeout: opts.timeout,
+      }
+    }) as PublicKeyCredential
+
+    if (credential) {
+      const rawId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
+      await auth.request('/api/me/passkeys/register/verify', {
+        method: 'POST',
+        body: {
+          challenge: opts.challenge,
+          name: navigator.userAgent.includes('Mac') ? 'Touch ID / Mac Passkey' : 'Passkey',
+          credential_id: credential.id,
+          public_key: rawId,
+        }
+      })
+      notify.ok()
+      await loadPasskeys()
+    }
+  } catch (e) {
+    notify.fail(e, 'Failed to register Passkey')
+  }
+}
+
+async function removePasskey(id: string) {
+  try {
+    await auth.request(`/api/me/passkeys/${id}`, { method: 'DELETE' })
+    notify.ok()
+    await loadPasskeys()
+  } catch (e) {
+    notify.fail(e)
+  }
+}
+
+onMounted(() => loadPasskeys())
 </script>
 
 <template>
-  <!--
-    Страница отвечает на два вопроса: кто я и что мне доступно.
-    Убраны карточки Skin/Session/Home — они повторяли пункты сайдбара, и
-    плитки-счётчики: «Roles 2» дублировало заголовок списка ролей, а
-    «Access keys 0» — пустое состояние блока прав.
-  -->
   <NoroShell title="CABINET" subtitle="Profile and access">
     <div class="grid gap-4">
+      <!-- Profile & Username -->
       <section class="noro-panel p-6">
         <div class="flex flex-wrap items-center gap-4">
           <img
@@ -105,11 +164,59 @@ async function saveUsername() {
         />
       </section>
 
+      <!-- Passkeys (WebAuthn) -->
+      <section class="noro-panel p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
+              <UIcon name="i-lucide-key-round" class="size-4 text-[var(--noro-blue)]" />
+              Ключи доступа Passkeys (WebAuthn)
+            </h2>
+            <p class="text-xs text-[var(--noro-muted)]">Беспарольный вход через Touch ID, Face ID или аппаратные ключи безопасности</p>
+          </div>
+          <AtomButton variant="secondary" icon="i-lucide-plus" @click="addPasskey">
+            Добавить Passkey
+          </AtomButton>
+        </div>
+
+        <div v-if="passkeys.length" class="grid gap-2">
+          <div
+            v-for="pk in passkeys"
+            :key="pk.id"
+            class="flex items-center justify-between rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg)] p-3 text-xs"
+          >
+            <div class="flex items-center gap-3">
+              <UIcon name="i-lucide-fingerprint" class="size-5 text-[var(--noro-blue)]" />
+              <div>
+                <div class="font-bold text-[var(--noro-text)]">{{ pk.name }}</div>
+                <div class="text-[10px] text-[var(--noro-muted)]">Создан {{ new Date(pk.created_at).toLocaleDateString() }}</div>
+              </div>
+            </div>
+            <button
+              class="rounded p-1 text-[var(--noro-muted)] hover:bg-red-500/20 hover:text-red-400 transition"
+              title="Удалить"
+              @click="removePasskey(pk.id)"
+            >
+              <UIcon name="i-lucide-trash-2" class="size-4" />
+            </button>
+          </div>
+        </div>
+
+        <EmptyState
+          v-else
+          icon="i-lucide-shield-off"
+          title="Нет привязанных ключей Passkey"
+          text="Добавьте ключ Touch ID или Face ID для быстрой авторизации без Discord"
+        />
+      </section>
+
+      <!-- Launcher Download -->
       <section class="noro-panel p-6">
         <h2 class="mb-4 font-bold text-[var(--noro-text)]">Launcher</h2>
         <LauncherDownload compact />
       </section>
 
+      <!-- Roles & Permissions -->
       <section class="grid gap-4 xl:grid-cols-2">
         <div class="noro-panel p-6">
           <h2 class="noro-label mb-4">Roles &mdash; {{ roles.length }}</h2>

@@ -18,7 +18,7 @@ pub mod wrapper;
 pub mod ws;
 
 use anyhow::Result;
-use axum::routing::{get, post, put};
+use axum::routing::{delete, get, post, put};
 use axum::Router;
 use config::Config;
 use state::AppState;
@@ -123,6 +123,8 @@ fn router(state: AppState) -> Router {
             "/auth/launcher/exchange",
             post(auth::discord::launcher_exchange),
         )
+        .route("/auth/passkeys/login/options", post(auth::passkeys::login_options))
+        .route("/auth/passkeys/login/verify", post(auth::passkeys::login_verify))
         .route("/auth/refresh", post(auth::discord::refresh))
         .route("/auth/logout", get(auth::discord::logout))
         .route("/auth/me", get(cabinet::me));
@@ -150,6 +152,11 @@ fn router(state: AppState) -> Router {
             "/api/me/skin",
             post(cabinet::upload_skin).delete(cabinet::delete_skin),
         )
+        .route("/api/me/skin/from-username", post(cabinet::upload_skin_from_username))
+        .route("/api/me/passkeys/register/options", post(auth::passkeys::register_options))
+        .route("/api/me/passkeys/register/verify", post(auth::passkeys::register_verify))
+        .route("/api/me/passkeys", get(auth::passkeys::list_passkeys))
+        .route("/api/me/passkeys/{id}", delete(auth::passkeys::delete_passkey))
         .route("/api/capes", get(cabinet::list_capes))
         .route("/api/me/cape", put(cabinet::set_cape));
 

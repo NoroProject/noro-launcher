@@ -105,6 +105,55 @@ pub async fn delete_skin(
     Ok(Json(profile))
 }
 
+#[derive(Deserialize)]
+pub struct SkinFromUsernameReq {
+    pub username: String,
+}
+
+/// Установка скина по нику игрока Minecraft.
+pub async fn upload_skin_from_username(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(req): Json<SkinFromUsernameReq>,
+) -> AppResult<Json<UserProfile>> {
+    let username = req.username.trim();
+    if username.is_empty() {
+        return Err(AppError::BadRequest("Username is required".into()));
+    }
+    let url = format!("https://minotar.net/skin/{username}");
+    let resp = state
+        .http
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Failed to fetch skin: {e}")))?;
+
+    if !resp.status().is_success() {
+        return Err(AppError::BadRequest("Skin for player not found".into()));
+    }
+
+    let data = resp.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+    if data.len() < 8 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
+        return Err(AppError::BadRequest("Downloaded skin is not a valid PNG".into()));
+    }
+
+    let stored = state
+        .files
+        .put_bytes(&data)
+        .await
+        .map_err(AppError::Other)?;
+    let skin_url = state.config.file_url(&stored.sha1);
+    crate::db::set_skin(&state.db, user.user_id, Some(&skin_url)).await?;
+    let profile = crate::db::load_profile(&state.db, user.user_id).await?;
+    state.ws.send_to_user(
+        user.user_id,
+        &schema::ServerWsMsg::PermissionsUpdated {
+            user: profile.clone(),
+        },
+    );
+    Ok(Json(profile))
+}
+
 pub async fn list_capes(
     State(state): State<AppState>,
     user: AuthUser,

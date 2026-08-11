@@ -21,9 +21,13 @@ const dragging = ref(false)
 const input = ref<HTMLInputElement | null>(null)
 const capeSaving = ref(false)
 
-const savedSkins = ref<SavedSkin[]>([])
+const usernameInput = ref('')
+const loadingUsername = ref(false)
 
-// Default official Minecraft standard presets
+const savedSkins = ref<SavedSkin[]>([])
+const editingSkinId = ref<string | null>(null)
+const editNameInput = ref('')
+
 const masterUrl = useRuntimeConfig().public.masterUrl
 const STANDARD_PRESETS = [
   { id: 'steve', name: 'Steve', url: `${masterUrl}/api/textures/presets/steve.png` },
@@ -79,8 +83,6 @@ function accept(next: File | null) {
 function onPick(event: Event) {
   const el = event.target as HTMLInputElement
   accept(el.files?.[0] || null)
-  // Иначе повторный выбор того же файла не даст события change, и попытка
-  // перезалить скин после ошибки выглядит как «ничего не происходит».
   el.value = ''
 }
 
@@ -113,6 +115,36 @@ async function uploadSkinFile(f: File) {
     console.error(err)
   } finally {
     uploading.value = false
+  }
+}
+
+async function uploadSkinByUsername() {
+  const name = usernameInput.value.trim()
+  if (!name) return
+  loadingUsername.value = true
+  error.value = null
+  message.value = null
+  try {
+    const updated = await auth.request<UserProfile>('/api/me/skin/from-username', {
+      method: 'POST',
+      body: { username: name }
+    })
+    auth.user.value = updated
+    message.value = `Skin imported from player '${name}'!`
+    usernameInput.value = ''
+
+    if (updated.skin_url) {
+      savedSkins.value.unshift({
+        id: String(Date.now()),
+        name: name,
+        url: updated.skin_url
+      })
+      saveSkinsToStorage()
+    }
+  } catch (err) {
+    error.value = humanError(err)
+  } finally {
+    loadingUsername.value = false
   }
 }
 
@@ -150,6 +182,20 @@ async function applySavedSkin(skin: SavedSkin) {
   } finally {
     uploading.value = false
   }
+}
+
+function startRename(skin: SavedSkin, ev: Event) {
+  ev.stopPropagation()
+  editingSkinId.value = skin.id
+  editNameInput.value = skin.name
+}
+
+function commitRename(skin: SavedSkin) {
+  if (editNameInput.value.trim()) {
+    skin.name = editNameInput.value.trim()
+    saveSkinsToStorage()
+  }
+  editingSkinId.value = null
 }
 
 function deleteSavedSkin(id: string) {
@@ -203,9 +249,8 @@ async function selectCape(capeId: string | null) {
 
         <SkinPreview3D :skin-url="currentSkinUrl" :cape-url="currentCapeUrl" />
 
-        <div class="flex flex-wrap gap-2 pt-2 border-t border-[var(--noro-border)]">
+        <div v-if="currentSkinUrl" class="pt-2 border-t border-[var(--noro-border)]">
           <AtomButton
-            v-if="currentSkinUrl"
             variant="ghost"
             icon="i-lucide-rotate-ccw"
             class="w-full justify-center text-xs text-[var(--noro-danger)]"
@@ -222,31 +267,56 @@ async function selectCape(capeId: string | null) {
         <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
         <UAlert v-else-if="message" color="success" variant="subtle" icon="i-lucide-check" :description="message" />
 
-        <!-- 1. Saved Custom Skins (Сохранённые скины) -->
+        <!-- Import by Minecraft Username -->
+        <section class="noro-panel p-5 space-y-3">
+          <h2 class="text-sm font-bold text-[var(--noro-text)] flex items-center gap-2">
+            <UIcon name="i-lucide-user-search" class="size-4 text-[var(--noro-blue)]" />
+            Загрузить скин по нику игрока
+          </h2>
+          <div class="flex gap-2">
+            <input
+              v-model="usernameInput"
+              type="text"
+              placeholder="Введите ник Minecraft (например Notch)"
+              class="flex-1 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg)] px-3 py-2 text-xs text-[var(--noro-text)] focus:border-[var(--noro-blue)] focus:outline-none"
+              @keydown.enter="uploadSkinByUsername"
+            />
+            <AtomButton
+              variant="primary"
+              icon="i-lucide-download"
+              :disabled="loadingUsername || !usernameInput.trim()"
+              @click="uploadSkinByUsername"
+            >
+              Загрузить
+            </AtomButton>
+          </div>
+        </section>
+
+        <!-- 1. Saved Custom Skins (Сохранённые скины & Пресеты) -->
         <section class="noro-panel p-5 space-y-4">
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
                 <UIcon name="i-lucide-bookmark" class="size-4 text-[var(--noro-cream)]" />
-                Сохранённые скины
+                Ваши скины и пресеты
               </h2>
-              <p class="text-xs text-[var(--noro-muted)]">Загружайте свои скины или выбирайте из вашей коллекции</p>
+              <p class="text-xs text-[var(--noro-muted)]">Кликните на карточку с плюсом, чтобы выбрать файл и создать пресет</p>
             </div>
           </div>
 
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            <!-- Add Skin Dropzone Card -->
+            <!-- Add Skin Dropzone Tile Card (+) -->
             <label
-              class="group relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-[var(--noro-border)] bg-[var(--noro-input)] p-3 text-center transition hover:border-[var(--noro-cream)] hover:bg-[var(--noro-panel)]"
+              class="group relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--noro-blue)]/50 bg-[var(--noro-blue)]/5 p-4 text-center transition hover:border-[var(--noro-blue)] hover:bg-[var(--noro-blue)]/10 shadow-sm"
               @dragover.prevent="dragging = true"
               @dragleave.prevent="dragging = false"
               @drop.prevent="onDrop"
             >
-              <UIcon name="i-lucide-plus" class="size-8 text-[var(--noro-muted)] group-hover:text-[var(--noro-cream)] group-hover:scale-110 transition-transform" />
-              <span class="mt-2 text-xs font-bold text-[var(--noro-text)]">Добавить скин</span>
-              <span class="text-[10px] text-[var(--noro-muted)]">Перетащите сюда</span>
-              <!-- Инпут обязан лежать внутри label: без этого клик по зоне не
-                   открывает диалог, и «загрузка не работает». -->
+              <div class="flex size-12 items-center justify-center rounded-full bg-[var(--noro-blue)]/20 text-[var(--noro-blue)] group-hover:scale-110 transition-transform">
+                <UIcon name="i-lucide-plus" class="size-7" />
+              </div>
+              <span class="mt-3 text-xs font-bold text-[var(--noro-text)]">Новый скин</span>
+              <span class="text-[10px] text-[var(--noro-muted)]">Загрузить файл .PNG</span>
               <input ref="input" type="file" accept="image/png" class="hidden" @change="onPick">
             </label>
 
@@ -254,24 +324,49 @@ async function selectCape(capeId: string | null) {
             <div
               v-for="skin in savedSkins"
               :key="skin.id"
-              class="group relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-between overflow-hidden rounded-lg border p-2.5 transition hover:scale-105"
+              class="group relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-between overflow-hidden rounded-xl border p-3 transition hover:scale-105"
               :class="currentSkinUrl === skin.url
                 ? 'border-2 border-[var(--noro-cream)] bg-[var(--noro-input)] shadow-lg'
                 : 'border-[var(--noro-border)] bg-[var(--noro-bg-deep)] hover:border-[var(--noro-cream)]/50'"
               @click="applySavedSkin(skin)"
             >
-              <button
-                type="button"
-                class="absolute right-1.5 top-1.5 z-10 hidden size-6 place-items-center rounded bg-black/60 text-white hover:bg-red-600 group-hover:grid"
-                @click.stop="deleteSavedSkin(skin.id)"
-              >
-                <UIcon name="i-lucide-x" class="size-3.5" />
-              </button>
+              <div class="absolute right-1.5 top-1.5 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                <button
+                  type="button"
+                  class="size-6 place-items-center rounded bg-black/60 text-white hover:bg-[var(--noro-blue)] flex items-center justify-center"
+                  title="Переименовать"
+                  @click.stop="startRename(skin, $event)"
+                >
+                  <UIcon name="i-lucide-pencil" class="size-3" />
+                </button>
+                <button
+                  type="button"
+                  class="size-6 place-items-center rounded bg-black/60 text-white hover:bg-red-600 flex items-center justify-center"
+                  title="Удалить"
+                  @click.stop="deleteSavedSkin(skin.id)"
+                >
+                  <UIcon name="i-lucide-x" class="size-3" />
+                </button>
+              </div>
 
-              <span class="w-full truncate text-center text-xs font-bold text-[var(--noro-text)]">{{ skin.name }}</span>
+              <!-- Name or Rename input -->
+              <template v-if="editingSkinId === skin.id">
+                <input
+                  v-model="editNameInput"
+                  type="text"
+                  class="w-full rounded border border-[var(--noro-blue)] bg-black px-1.5 py-0.5 text-center text-xs font-bold text-white focus:outline-none"
+                  @click.stop
+                  @keydown.enter.stop="commitRename(skin)"
+                  @blur="commitRename(skin)"
+                />
+              </template>
+              <template v-else>
+                <span class="w-full truncate text-center text-xs font-bold text-[var(--noro-text)]">{{ skin.name }}</span>
+              </template>
+
               <SkinCard3D :skin-url="skin.url" :width="100" :height="125" />
-              <UBadge v-if="currentSkinUrl === skin.url" color="primary" variant="subtle" class="text-[10px]">Активен</UBadge>
-              <span v-else class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-text)]">Выбрать</span>
+              <UBadge v-if="currentSkinUrl === skin.url" color="primary" variant="subtle" class="text-[10px]">Надет</UBadge>
+              <span v-else class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-text)] font-semibold">Надеть</span>
             </div>
           </div>
         </section>
@@ -281,16 +376,16 @@ async function selectCape(capeId: string | null) {
           <div>
             <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
               <UIcon name="i-lucide-sparkles" class="size-4 text-[var(--noro-cream)]" />
-              Стандартные скины Minecraft
+              Официальные скины Minecraft
             </h2>
-            <p class="text-xs text-[var(--noro-muted)]">Официальные скины персонажей Minecraft</p>
+            <p class="text-xs text-[var(--noro-muted)]">Стандартные персонажи Mojang</p>
           </div>
 
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             <div
               v-for="preset in STANDARD_PRESETS"
               :key="preset.name"
-              class="group relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-between overflow-hidden rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] p-2.5 transition hover:border-[var(--noro-cream)] hover:scale-105"
+              class="group relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-between overflow-hidden rounded-xl border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] p-2.5 transition hover:border-[var(--noro-cream)] hover:scale-105"
               @click="applyPresetSkin(preset)"
             >
               <span class="text-xs font-bold text-[var(--noro-text)]">{{ preset.name }}</span>
@@ -316,7 +411,7 @@ async function selectCape(capeId: string | null) {
           <div v-if="capes.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             <!-- Option 0: Disable Cape -->
             <div
-              class="group relative flex aspect-[10/16] cursor-pointer flex-col items-center justify-center rounded-lg border text-center transition hover:scale-105"
+              class="group relative flex aspect-[10/16] cursor-pointer flex-col items-center justify-center rounded-xl border text-center transition hover:scale-105"
               :class="!currentCapeUrl
                 ? 'border-2 border-[var(--noro-cream)] bg-[var(--noro-input)] shadow-lg'
                 : 'border-[var(--noro-border)] bg-[var(--noro-bg-deep)] hover:border-[var(--noro-cream)]/50'"
@@ -330,7 +425,7 @@ async function selectCape(capeId: string | null) {
             <div
               v-for="cape in capes"
               :key="cape.id"
-              class="group relative flex aspect-[10/16] cursor-pointer flex-col items-center justify-between overflow-hidden rounded-lg border p-2 transition hover:scale-105"
+              class="group relative flex aspect-[10/16] cursor-pointer flex-col items-center justify-between overflow-hidden rounded-xl border p-2 transition hover:scale-105"
               :class="currentCapeUrl === cape.url
                 ? 'border-2 border-[var(--noro-cream)] bg-[var(--noro-input)] shadow-xl'
                 : 'border-[var(--noro-border)] bg-[var(--noro-bg-deep)] hover:border-[var(--noro-cream)]/50'"

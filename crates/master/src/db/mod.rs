@@ -5,6 +5,7 @@ pub mod capes;
 pub mod game_servers;
 pub mod mod_suggestions;
 pub mod models;
+pub mod passkeys;
 pub mod queries;
 
 use anyhow::Result;
@@ -14,6 +15,7 @@ use sqlx::PgPool;
 pub use capes::*;
 pub use game_servers::*;
 pub use mod_suggestions::*;
+pub use passkeys::*;
 pub use queries::*;
 
 /// Подключиться к БД и применить миграции.

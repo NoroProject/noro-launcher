@@ -1,11 +1,47 @@
 <script setup lang="ts">
 const route = useRoute()
 const auth = useAuth()
+const notify = useNotify()
+
 const busy = ref(false)
 const message = ref<string | null>(null)
 
 const next = computed(() => String(route.query.next || '/cabinet'))
 const loginHref = computed(() => auth.discordLoginUrl(`/login?next=${encodeURIComponent(next.value)}`))
+
+async function loginWithPasskey() {
+  busy.value = true
+  message.value = null
+  try {
+    const opts = await auth.request<any>('/auth/passkeys/login/options', { method: 'POST' })
+    const challengeBytes = new Uint8Array(opts.challenge.match(/.{1,2}/g).map((byte: string) => parseInt(byte, 16)))
+
+    const credential = await navigator.credentials.get({
+      publicKey: {
+        challenge: challengeBytes,
+        timeout: opts.timeout,
+        userVerification: opts.userVerification,
+      }
+    }) as PublicKeyCredential
+
+    if (credential) {
+      const res = await auth.request<any>('/auth/passkeys/login/verify', {
+        method: 'POST',
+        body: {
+          challenge: opts.challenge,
+          credential_id: credential.id,
+        }
+      })
+      auth.token.value = res.access_token
+      auth.user.value = res.user
+      await navigateTo(next.value)
+    }
+  } catch (e) {
+    message.value = humanError(e)
+  } finally {
+    busy.value = false
+  }
+}
 
 onMounted(async () => {
   const access = route.query.access_token
@@ -34,7 +70,7 @@ onMounted(async () => {
       <section class="p-8 md:p-12">
         <div class="mb-12 flex items-center gap-3">
           <div class="grid size-12 place-items-center rounded-lg">
-              <img src="/icon.png"/>
+            <img src="/icon.png" />
           </div>
           <div class="text-xs font-black uppercase tracking-wider text-[var(--noro-muted)]">Secure login</div>
         </div>
@@ -52,10 +88,21 @@ onMounted(async () => {
           class="my-5"
         />
 
-        <NuxtLink :to="loginHref" class="noro-cta mt-8 w-full px-6 py-4 text-center">
-          {{ busy || auth.loading.value ? 'WAITING...' : 'SIGN IN WITH DISCORD' }}
-        </NuxtLink>
+        <div class="mt-8 space-y-3">
+          <NuxtLink :to="loginHref" class="noro-cta block w-full px-6 py-4 text-center font-bold">
+            {{ busy || auth.loading.value ? 'WAITING...' : 'SIGN IN WITH DISCORD' }}
+          </NuxtLink>
 
+          <button
+            type="button"
+            class="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg)] py-3 text-xs font-bold text-[var(--noro-text)] hover:border-[var(--noro-blue)] hover:text-[var(--noro-blue)] transition"
+            :disabled="busy"
+            @click="loginWithPasskey"
+          >
+            <UIcon name="i-lucide-key-round" class="size-4 text-[var(--noro-blue)]" />
+            SIGN IN WITH PASSKEY
+          </button>
+        </div>
       </section>
 
       <section class="relative hidden min-h-[520px] overflow-hidden bg-[var(--noro-bg-deep)] md:block">

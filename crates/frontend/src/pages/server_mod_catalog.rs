@@ -449,6 +449,39 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
     let hit_for_req = hit.clone();
     let project_id_str = hit.project_id.clone();
 
+    let is_installed = ui
+        .optional_mods
+        .get(&server_id)
+        .map(|mods| mods.iter().any(|m| m.name.eq_ignore_ascii_case(&hit.title)))
+        .unwrap_or(false);
+    let is_pending = ui.suggested_mods.contains(&hit.project_id);
+
+    let action_btn: AnyElement = if is_installed {
+        crate::components::badge("Installed", CTA).into_any_element()
+    } else if is_pending {
+        crate::components::badge("Pending", WARNING).into_any_element()
+    } else {
+        btn(
+            SharedString::from(format!("btn-req-{project_id_str}")),
+            "Suggest",
+            true,
+            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                this.suggested_mods.insert(hit_for_req.project_id.clone());
+                this.backend.send(MessageToBackend::SuggestOptionalMod {
+                    server_id,
+                    build_id: None,
+                    provider: hit_for_req.provider.clone(),
+                    project_id: hit_for_req.project_id.clone(),
+                    title: hit_for_req.title.clone(),
+                    icon_url: hit_for_req.icon_url.clone(),
+                    description: Some(hit_for_req.description.clone()),
+                });
+                cx.notify();
+            }),
+        )
+        .into_any_element()
+    };
+
     div()
         .id(SharedString::from(format!("mod-card-{project_id_str}")))
         .h(px(72.))
@@ -517,22 +550,7 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
                         .child(hit.description.clone()),
                 ),
         )
-        .child(btn(
-            SharedString::from(format!("btn-req-{project_id_str}")),
-            "Request",
-            true,
-            cx.listener(move |this, _e: &ClickEvent, _w, _cx| {
-                this.backend.send(MessageToBackend::SuggestOptionalMod {
-                    server_id,
-                    build_id: None,
-                    provider: hit_for_req.provider.clone(),
-                    project_id: hit_for_req.project_id.clone(),
-                    title: hit_for_req.title.clone(),
-                    icon_url: hit_for_req.icon_url.clone(),
-                    description: Some(hit_for_req.description.clone()),
-                });
-            }),
-        ))
+        .child(action_btn)
         .into_any_element()
 }
 
