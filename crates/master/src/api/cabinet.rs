@@ -77,9 +77,14 @@ pub async fn upload_skin(
                 .map_err(AppError::Other)?;
             let url = state.config.file_url(&stored.sha1);
             crate::db::set_skin(&state.db, user.user_id, Some(&url)).await?;
-            return Ok(Json(
-                crate::db::load_profile(&state.db, user.user_id).await?,
-            ));
+            let profile = crate::db::load_profile(&state.db, user.user_id).await?;
+            state.ws.send_to_user(
+                user.user_id,
+                &schema::ServerWsMsg::PermissionsUpdated {
+                    user: profile.clone(),
+                },
+            );
+            return Ok(Json(profile));
         }
     }
     Err(AppError::BadRequest("missing skin field".into()))
@@ -90,9 +95,14 @@ pub async fn delete_skin(
     user: AuthUser,
 ) -> AppResult<Json<UserProfile>> {
     crate::db::set_skin(&state.db, user.user_id, None).await?;
-    Ok(Json(
-        crate::db::load_profile(&state.db, user.user_id).await?,
-    ))
+    let profile = crate::db::load_profile(&state.db, user.user_id).await?;
+    state.ws.send_to_user(
+        user.user_id,
+        &schema::ServerWsMsg::PermissionsUpdated {
+            user: profile.clone(),
+        },
+    );
+    Ok(Json(profile))
 }
 
 pub async fn list_capes(
@@ -130,7 +140,12 @@ pub async fn set_cape(
         None => None,
     };
     crate::db::set_user_cape(&state.db, user.user_id, cape_url.as_deref()).await?;
-    Ok(Json(
-        crate::db::load_profile(&state.db, user.user_id).await?,
-    ))
+    let profile = crate::db::load_profile(&state.db, user.user_id).await?;
+    state.ws.send_to_user(
+        user.user_id,
+        &schema::ServerWsMsg::PermissionsUpdated {
+            user: profile.clone(),
+        },
+    );
+    Ok(Json(profile))
 }

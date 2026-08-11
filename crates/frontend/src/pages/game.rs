@@ -34,7 +34,7 @@ pub fn page(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(tabs(ui, cx))
         .child(game_status::info_block(&server))
         .when(sync.syncing || sync.failed.is_some(), |d| {
-            d.child(game_sync::sync_overlay(server.id, &sync))
+            d.child(game_sync::sync_overlay(server.id, &sync, cx))
         })
         .child(game_bar::bottom_bar(ui, &server, &sync, locked, cx))
         .into_any_element()

@@ -59,7 +59,7 @@ fn left_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(discord_slot())
         .child(login_action(ui.logging_in, cx))
         .child(login_checks())
-        .when_some(ui.login_error.clone(), |d, e| d.child(error_panel(e)))
+        .when_some(ui.login_error.clone(), |d, e| d.child(error_panel(e, cx)))
         .child(div().flex_1())
         .child(version_badge())
         .into_any_element()
@@ -157,14 +157,34 @@ fn check_line(label: impl Into<gpui::SharedString>, checked: bool) -> AnyElement
         .into_any_element()
 }
 
-fn error_panel(text: String) -> AnyElement {
+fn error_panel(text: String, cx: &mut Cx) -> AnyElement {
     div()
         .mt(px(24.))
-        .p(px(12.))
+        .p(px(16.))
+        .rounded(px(R_SM))
         .bg(rgb(BG_CARD))
         .border_1()
         .border_color(rgb(ERROR))
-        .text_color(rgb(ERROR))
-        .child(text)
+        .flex()
+        .flex_col()
+        .gap(px(12.))
+        .child(
+            div()
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(14.))
+                .text_color(rgb(ERROR))
+                .child(text),
+        )
+        .child(
+            cta_button(
+                "login-retry-btn",
+                Some("rotate-ccw"),
+                t("retry"),
+                cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                    this.start_login();
+                    cx.notify();
+                }),
+            ),
+        )
         .into_any_element()
 }

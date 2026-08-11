@@ -37,22 +37,35 @@ pub async fn root(State(state): State<AppState>) -> Json<Value> {
                 "homepage": state.config.public_url,
             }
         },
-        "skinDomains": [
-            host_of(&state.config.public_url),
-            ".noro.gg"
-        ],
+        "skinDomains": skin_domains(&state.config),
         "signaturePublicKey": ""
     }))
 }
 
-fn host_of(url: &str) -> String {
-    url.split("://")
-        .nth(1)
-        .unwrap_or(url)
-        .split('/')
-        .next()
-        .unwrap_or(url)
-        .to_string()
+fn skin_domains(config: &crate::config::Config) -> Vec<String> {
+    let mut domains = Vec::new();
+    let mut add_url = |url: &str| {
+        let host_and_port = url.split("://").nth(1).unwrap_or(url).split('/').next().unwrap_or(url);
+        let pure_host = host_and_port.split(':').next().unwrap_or(host_and_port);
+        if !pure_host.is_empty() && !domains.contains(&pure_host.to_string()) {
+            domains.push(pure_host.to_string());
+        }
+        if host_and_port != pure_host && !domains.contains(&host_and_port.to_string()) {
+            domains.push(host_and_port.to_string());
+        }
+    };
+
+    add_url(&config.public_url);
+    if let Some(cdn) = &config.files_cdn_url {
+        add_url(cdn);
+    }
+    if let Some(s3) = &config.s3 {
+        add_url(&s3.public_url);
+    }
+    if !domains.iter().any(|d| d == ".noro.gg") {
+        domains.push(".noro.gg".to_string());
+    }
+    domains
 }
 
 // --- authserver (legacy, для совместимости) ---

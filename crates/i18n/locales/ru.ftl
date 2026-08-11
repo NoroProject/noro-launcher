@@ -59,6 +59,7 @@ sync-files-left = { $count ->
 error-game-exited = Игра завершилась с ошибкой
 error-sign-in-cancelled = Вход отменён
 error-background-failed = Не удалось загрузить фон сервера: { $reason }
+retry = ПОВТОРИТЬ
 
 ## Уведомления от мастера
 notif-server-error = Ошибка сервера: { $reason }

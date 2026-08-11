@@ -52,6 +52,10 @@ fn users_router() -> Router<AppState> {
         .route("/api/admin/users/{id}/cape", put(users::set_cape))
         .route("/api/admin/users/{id}/capes", get(users::get_capes).put(users::set_granted_capes))
         .route(
+            "/api/admin/users/{id}/skin",
+            post(users::upload_skin_for_user).delete(users::delete_skin_for_user),
+        )
+        .route(
             "/api/admin/users/{id}/roles/{role_id}",
             post(users::add_role).delete(users::remove_role),
         )

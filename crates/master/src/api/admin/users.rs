@@ -3,7 +3,7 @@
 use crate::api::auth::AdminAuth;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
 use schema::{UserProfile, PERM_ADMIN_USERS, PERM_MOD_USERS_BAN};
 use serde::Deserialize;
@@ -172,6 +172,52 @@ pub async fn set_granted_capes(
         None => None,
     };
     crate::db::set_user_cape(&state.db, id, active_cape_url.as_deref()).await?;
+    notify_user(&state, id).await
+}
+
+pub async fn upload_skin_for_user(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    mut multipart: Multipart,
+) -> AppResult<Json<UserProfile>> {
+    admin.require(PERM_ADMIN_USERS)?;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?
+    {
+        if field.name() == Some("skin") {
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
+            if data.len() < 8 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
+                return Err(AppError::BadRequest("PNG expected".into()));
+            }
+            if data.len() > 256 * 1024 {
+                return Err(AppError::BadRequest("skin is too large".into()));
+            }
+            let stored = state
+                .files
+                .put_bytes(&data)
+                .await
+                .map_err(AppError::Other)?;
+            let url = state.config.file_url(&stored.sha1);
+            crate::db::set_skin(&state.db, id, Some(&url)).await?;
+            return notify_user(&state, id).await;
+        }
+    }
+    Err(AppError::BadRequest("missing skin field".into()))
+}
+
+pub async fn delete_skin_for_user(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<UserProfile>> {
+    admin.require(PERM_ADMIN_USERS)?;
+    crate::db::set_skin(&state.db, id, None).await?;
     notify_user(&state, id).await
 }
 

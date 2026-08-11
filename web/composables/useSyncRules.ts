@@ -37,12 +37,14 @@ export function useSyncRules(buildId: string) {
   const loaded = ref(false)
 
   async function load() {
-    const build = await auth.request<{
+    const res = await auth.request<{
+      build?: { unmanaged_paths?: string[]; user_managed_paths?: string[] }
       unmanaged_paths?: string[]
       user_managed_paths?: string[]
     }>(`/api/admin/builds/${buildId}`)
-    ignored.value = build.unmanaged_paths || []
-    user.value = build.user_managed_paths || []
+    const target = res.build || res
+    ignored.value = target.unmanaged_paths || []
+    user.value = target.user_managed_paths || []
     loaded.value = true
   }
 

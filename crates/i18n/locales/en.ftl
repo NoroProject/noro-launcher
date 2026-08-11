@@ -57,6 +57,7 @@ sync-files-left = { $count ->
 error-game-exited = Game exited with an error
 error-sign-in-cancelled = Sign in cancelled
 error-background-failed = Server background failed to load: { $reason }
+retry = RETRY
 
 ## Notifications from the master
 notif-server-error = Server error: { $reason }

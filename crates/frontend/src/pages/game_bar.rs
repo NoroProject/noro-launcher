@@ -138,6 +138,18 @@ fn play_button(
     if sync.running {
         return stop_button(server_id, cx);
     }
+    if sync.failed.is_some() {
+        return cta_button(
+            "retry-game",
+            Some("rotate-ccw"),
+            t("retry"),
+            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                this.launch(server_id);
+                cx.notify();
+            }),
+        )
+        .into_any_element();
+    }
     // Действие одно и то же — синхронизация с последующим запуском, но называть
     // его «играть», когда на диске пусто или лежит прошлая версия, — врать.
     let (icon, label) = match build {

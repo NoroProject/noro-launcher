@@ -1,13 +1,12 @@
-use super::common::progress_label;
-use crate::components::{mascot, Mood};
-use crate::components::{progress_bar, stage_row};
+use super::common::{progress_label, Cx};
+use crate::components::{cta_button, mascot, progress_bar, stage_row, Mood};
 use crate::state::SyncUiState;
 use crate::theme::*;
-use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
+use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight};
 use i18n::t;
 use uuid::Uuid;
 
-pub fn sync_overlay(_server_id: Uuid, sync: &SyncUiState) -> AnyElement {
+pub fn sync_overlay(server_id: Uuid, sync: &SyncUiState, cx: &mut Cx) -> AnyElement {
     div()
         .absolute()
         .left(px(32.))
@@ -89,11 +88,30 @@ pub fn sync_overlay(_server_id: Uuid, sync: &SyncUiState) -> AnyElement {
                 .when_some(sync.failed.clone(), |d, e| {
                     d.child(
                         div()
-                            .mt(px(4.))
-                            .text_sm()
-                            .font_family(FONT_PIXEL_ALT)
-                            .text_color(rgb(ERROR))
-                            .child(format!("Error: {e}")),
+                            .mt(px(8.))
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .gap(px(16.))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .text_sm()
+                                    .font_family(FONT_PIXEL_ALT)
+                                    .text_color(rgb(ERROR))
+                                    .child(format!("Error: {e}")),
+                            )
+                            .child(
+                                cta_button(
+                                    "sync-retry-btn",
+                                    Some("rotate-ccw"),
+                                    t("retry"),
+                                    cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                                        this.launch(server_id);
+                                        cx.notify();
+                                    }),
+                                ),
+                            ),
                     )
                 }),
         )
