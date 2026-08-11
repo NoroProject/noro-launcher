@@ -47,18 +47,26 @@ pub async fn serve_file(
     let etag = format!("\"{sha1}\"");
     let filename = download.name.as_deref().and_then(safe_filename);
 
+    let mut magic = [0u8; 8];
+    let content_type = if total >= 8 && file.read_exact(&mut magic).await.is_ok() && &magic[0..8] == b"\x89PNG\r\n\x1a\n" {
+        "image/png"
+    } else {
+        "application/octet-stream"
+    };
+    let _ = file.seek(std::io::SeekFrom::Start(0)).await;
+
     // Совпавший ETag на content-addressed URL не может быть протухшим.
     if header_has(&headers, header::IF_NONE_MATCH, &etag) {
-        return base(&etag, total)
+        return base(&etag, content_type)
             .status(StatusCode::NOT_MODIFIED)
             .body(Body::empty())
             .unwrap();
     }
 
-    let base = |etag: &str, total: u64| with_name(base(etag, total), filename.as_deref());
+    let base = |etag: &str| with_name(base(etag, content_type), filename.as_deref());
 
     match wanted(&headers, &etag, total) {
-        Wanted::Unsatisfiable => base(&etag, total)
+        Wanted::Unsatisfiable => base(&etag)
             .status(StatusCode::RANGE_NOT_SATISFIABLE)
             .header(header::CONTENT_RANGE, format!("bytes */{total}"))
             .body(Body::empty())
@@ -66,7 +74,7 @@ pub async fn serve_file(
 
         Wanted::Whole => {
             let stream = ReaderStream::new(file);
-            base(&etag, total)
+            base(&etag)
                 .header(header::CONTENT_LENGTH, total)
                 .body(Body::from_stream(stream))
                 .unwrap()
@@ -78,7 +86,7 @@ pub async fn serve_file(
             }
             let len = end - start + 1;
             let stream = ReaderStream::new(file.take(len));
-            base(&etag, total)
+            base(&etag)
                 .status(StatusCode::PARTIAL_CONTENT)
                 .header(header::CONTENT_LENGTH, len)
                 .header(
@@ -116,9 +124,9 @@ fn with_name(
 }
 
 /// Заголовки, общие для всех ответов: кеш, валидатор, поддержка Range.
-fn base(etag: &str, _total: u64) -> axum::http::response::Builder {
+fn base(etag: &str, content_type: &str) -> axum::http::response::Builder {
     Response::builder()
-        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(header::CONTENT_TYPE, content_type)
         .header(header::CACHE_CONTROL, IMMUTABLE)
         .header(header::ETAG, etag)
         .header(header::ACCEPT_RANGES, "bytes")
