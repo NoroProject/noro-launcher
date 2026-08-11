@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS builds (
     assets_index_name  TEXT NOT NULL DEFAULT '',
     published          BOOLEAN NOT NULL DEFAULT FALSE,
     optional_mods      JSONB NOT NULL DEFAULT '[]',
-    unmanaged_paths    JSONB NOT NULL DEFAULT '["saves/","screenshots/","options.txt","logs/","crash-reports/"]',
+    unmanaged_paths    JSONB NOT NULL DEFAULT '["saves/","screenshots/","options.txt","optionsof.txt","options-shaders.txt","logs/","crash-reports/","usercache.json","xaerominimap/","xaeroworldmap/","journeymap/","voxelmap/","mapwriter/","schematics/","replays/","baritone/","essential/"]',
     user_managed_paths JSONB NOT NULL DEFAULT '[]',
     manifest_signature BYTEA,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
