@@ -14,6 +14,7 @@ const emit = defineEmits<{
   back: []
   'set-view': [mode: 'list' | 'grid']
   'new-folder': []
+  'open-rules': []
   // Событие идёт наверх вместе с input: выбранные файлы лежат в нём, а открыть
   // диалог второй раз уже нельзя — жест пользователя израсходован на первый.
   upload: [event: Event]
@@ -70,6 +71,9 @@ const emit = defineEmits<{
     <div class="w-px h-5 bg-[var(--noro-border-soft)]" />
 
     <!-- Actions -->
+    <button class="fm-icon-btn" title="Sync Rules" @click="emit('open-rules')">
+      <UIcon name="i-lucide-route" class="size-4" />
+    </button>
     <button class="fm-icon-btn" title="New folder" @click="emit('new-folder')">
       <UIcon name="i-lucide-folder-plus" class="size-4" />
     </button>

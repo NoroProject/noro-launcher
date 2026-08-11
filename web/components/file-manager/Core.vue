@@ -39,6 +39,20 @@ const editorFilePath = ref('')
 
 // ─── Правила синхронизации ───
 const rules = useSyncRules(props.buildId)
+const rulesModalOpen = ref(false)
+
+async function saveRulesModal(ignored: string[], user: string[]) {
+  rules.ignored.value = ignored
+  rules.user.value = user
+  try {
+    await rules.save()
+    rulesModalOpen.value = false
+    notify.success('Sync rules saved')
+  } catch (e) {
+    notify.fail(e, 'Failed to save sync rules')
+    await rules.load()
+  }
+}
 
 /** Клик по метке меняет режим и сразу сохраняет — как chmod, без «применить». */
 /** Выбор режима из контекстного меню — без перебора по кругу. */
@@ -392,6 +406,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       @navigate="currentPath = $event; selected = new Set()"
       @back="goBack"
       @set-view="viewMode = $event"
+      @open-rules="rulesModalOpen = true"
       @new-folder="createFolder"
       @upload="uploadFiles"
       @refresh="loadFiles"
@@ -438,7 +453,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
     <!-- Status bar -->
     <div class="flex items-center justify-between px-3 py-1.5 border-t border-[var(--noro-border-soft)] text-xs text-[var(--noro-muted)]">
       <span>{{ currentItems.length }} items</span>
-      <span v-if="selected.size">{{ selected.size }} selected</span>
+      <div class="flex items-center gap-3">
+        <button class="hover:text-[var(--noro-text)] transition flex items-center gap-1 font-mono" @click="rulesModalOpen = true">
+          <UIcon name="i-lucide-route" class="size-3.5 text-[var(--noro-blue)]" />
+          {{ rules.count.value }} rules
+        </button>
+        <span v-if="selected.size">{{ selected.size }} selected</span>
+      </div>
     </div>
 
     <!-- Drop overlay -->
@@ -476,6 +497,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       :file-path="editorFilePath"
       @close="editorVisible = false"
       @saved="editorVisible = false"
+    />
+
+    <!-- Sync Rules Modal -->
+    <FileManagerSyncRulesModal
+      v-model:open="rulesModalOpen"
+      :ignored="rules.ignored.value"
+      :user="rules.user.value"
+      :saving="rules.saving.value"
+      @save="saveRulesModal"
     />
   </div>
 </template>
