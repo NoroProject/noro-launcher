@@ -151,6 +151,8 @@ pub async fn join(
         .await?
         .ok_or_else(|| AppError::Forbidden("сессия истекла".into()))?;
 
+    tracing::info!(user = %row.mc_username, server_id = %req.server_id, "yggdrasil join");
+
     // Бан проверяется здесь, а не только в REST-миддлваре: Yggdrasil — это
     // отдельный путь входа, и без этой проверки забаненный игрок с ещё живой
     // сессией спокойно заходил на сервер.
@@ -192,6 +194,7 @@ pub async fn has_joined(
     State(state): State<AppState>,
     Query(q): Query<HasJoinedQuery>,
 ) -> Result<Json<Value>, StatusCode> {
+    tracing::info!(username = %q.username, server_id = %q.server_id, "yggdrasil hasJoined request");
     let row = sqlx::query_as::<_, crate::db::models::UserRow>(
         // banned = FALSE и здесь: бан может прилететь между join и hasJoined,
         // а это последний рубеж перед тем, как сервер впустит игрока.
@@ -206,25 +209,46 @@ pub async fn has_joined(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match row {
-        Some(u) => Ok(Json(profile_json(&state, &u))),
-        None => Err(StatusCode::NO_CONTENT),
+        Some(u) => {
+            tracing::info!(username = %q.username, "yggdrasil hasJoined SUCCESS");
+            Ok(Json(profile_json(&state, &u)))
+        }
+        None => {
+            tracing::warn!(username = %q.username, server_id = %q.server_id, "yggdrasil hasJoined NOT FOUND / EXPIRED");
+            Err(StatusCode::NO_CONTENT)
+        }
     }
 }
 
-/// Профиль по UUID (с текстурами).
+/// Профиль по UUID или нику (с текстурами).
 pub async fn profile(
     State(state): State<AppState>,
-    Path(uuid): Path<String>,
+    Path(uuid_or_name): Path<String>,
 ) -> Result<Json<Value>, StatusCode> {
-    let parsed = parse_uuid_loose(&uuid).ok_or(StatusCode::BAD_REQUEST)?;
-    let u =
+    tracing::info!(query = %uuid_or_name, "yggdrasil profile query");
+    let u = if let Some(parsed) = parse_uuid_loose(&uuid_or_name) {
         sqlx::query_as::<_, crate::db::models::UserRow>("SELECT * FROM users WHERE mc_uuid = $1")
             .bind(parsed)
             .fetch_optional(&state.db)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .ok_or(StatusCode::NO_CONTENT)?;
-    Ok(Json(profile_json(&state, &u)))
+    } else {
+        None
+    };
+
+    let user_row = match u {
+        Some(row) => row,
+        None => sqlx::query_as::<_, crate::db::models::UserRow>(
+            "SELECT * FROM users WHERE LOWER(mc_username) = LOWER($1) OR REPLACE(mc_uuid::text, '-', '') = $1",
+        )
+        .bind(&uuid_or_name)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NO_CONTENT)?,
+    };
+
+    Ok(Json(profile_json(&state, &user_row)))
 }
 
 #[derive(Deserialize)]
