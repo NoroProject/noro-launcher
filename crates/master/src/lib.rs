@@ -125,6 +125,8 @@ fn router(state: AppState) -> Router {
         )
         .route("/auth/passkeys/login/options", post(auth::passkeys::login_options))
         .route("/auth/passkeys/login/verify", post(auth::passkeys::login_verify))
+        .route("/api/auth/passkeys/login/options", post(auth::passkeys::login_options))
+        .route("/api/auth/passkeys/login/verify", post(auth::passkeys::login_verify))
         .route("/auth/refresh", post(auth::discord::refresh))
         .route("/auth/logout", get(auth::discord::logout))
         .route("/auth/me", get(cabinet::me));
