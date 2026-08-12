@@ -27,6 +27,8 @@ pub struct RenderQuery {
     pub discord: Option<String>,
     pub scale: Option<u32>,
     pub overlay: Option<bool>,
+    pub yaw: Option<f32>,
+    pub pitch: Option<f32>,
 }
 
 pub async fn default_skin() -> Response {
@@ -53,14 +55,16 @@ pub async fn render_endpoint(State(state): State<AppState>, Query(q): Query<Rend
 
     let scale = q.scale.unwrap_or(10).clamp(1, 64);
     let overlay = q.overlay.unwrap_or(true);
-    let mode = q.mode.as_deref().unwrap_or("body");
+    let mode = q.mode.as_deref().unwrap_or("bust");
+    let yaw = q.yaw.unwrap_or(-25.0);
+    let pitch = q.pitch.unwrap_or(12.0);
 
     let bytes = match mode {
-        "head" | "avatar" => skin_render::render_head(&skin, scale, overlay),
-        "cube" | "3dhead" | "3d-head" => skin_render::render_cube_head(&skin, scale, overlay),
-        "bust" | "upper" => skin_render::render_bust(&skin, scale, overlay),
+        "flat-head" | "flat_head" => skin_render::render_head(&skin, scale, overlay),
+        "flat-bust" | "flat_bust" => skin_render::render_bust(&skin, scale, overlay),
+        "flat-body" | "flat_body" => skin_render::render_body(&skin, scale, overlay),
         "cape" => skin_render::render_cape(&skin, scale),
-        _ => skin_render::render_body(&skin, scale, overlay),
+        _ => super::skin_render_3d::render_3d(&skin, scale, overlay, mode, yaw, pitch),
     };
 
     (

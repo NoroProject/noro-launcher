@@ -9,5 +9,6 @@ pub mod file_serve;
 pub mod launcher;
 pub mod range;
 pub mod skin_render;
+pub mod skin_render_3d;
 pub mod textures;
 pub mod translations;

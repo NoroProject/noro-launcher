@@ -522,7 +522,7 @@ impl LauncherUI {
         let presets = ["steve", "alex", "ari", "zuri", "efe", "makena", "kai", "sunny"];
         for preset in presets {
             let name = preset.to_string();
-            let url = format!("{}/api/textures/renders?preset={}&mode=bust&scale=5", master_url.trim_end_matches('/'), name);
+            let url = format!("{}/api/textures/renders?preset={}&mode=bust&scale=5&yaw=-25&pitch=12", master_url.trim_end_matches('/'), name);
             cx.spawn(async move |this, cx| {
                 if let Ok(img) = crate::image_loader::load_image_from_url(url).await {
                     let _ = this.update(cx, |this, cx| {
@@ -832,7 +832,7 @@ impl LauncherUI {
                         }
                     }).detach();
 
-                    let render_url = format!("{}/api/textures/renders/body?url={}&scale=6", master_url.trim_end_matches('/'), urlencoding::encode(&url));
+                    let render_url = format!("{}/api/textures/renders/body?url={}&scale=6&yaw=-25&pitch=12", master_url.trim_end_matches('/'), urlencoding::encode(&url));
                     let id_render = id.clone();
                     cx.spawn(async move |this, cx| {
                         if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await {
