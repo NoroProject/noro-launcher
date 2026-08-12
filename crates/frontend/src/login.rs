@@ -51,14 +51,13 @@ fn left_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .flex_shrink_0()
         .flex()
         .flex_col()
-        .px(px(80.))
+        .px(px(64.))
         .pt(px(40.))
-        .pb(px(56.))
+        .pb(px(40.))
         .child(tiny_atom_logo())
         .child(title())
-        .child(discord_slot())
+        .child(subtitle())
         .child(login_action(ui.logging_in, cx))
-        .child(login_checks())
         .when_some(ui.login_error.clone(), |d, e| d.child(error_panel(e, cx)))
         .child(div().flex_1())
         .child(version_badge())
@@ -67,38 +66,31 @@ fn left_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 
 fn title() -> AnyElement {
     div()
-        .mt(px(96.))
+        .mt(px(48.))
         .font_family(FONT_PIXEL_ALT)
-        .text_size(px(36.))
-        .line_height(px(44.))
+        .text_size(px(32.))
+        .line_height(px(40.))
+        .font_weight(FontWeight::BOLD)
         .text_color(rgb(CTA))
-        .child(t("login-title"))
+        .child("АВТОРИЗАЦИЯ")
         .into_any_element()
 }
 
-fn discord_slot() -> AnyElement {
+fn subtitle() -> AnyElement {
     div()
-        .mt(px(52.))
+        .mt(px(8.))
         .mb(px(32.))
-        .h(px(64.))
-        .w_full()
-        .flex()
-        .items_center()
-        .px(px(28.))
-        .bg(rgb(BG_INPUT))
-        .border_1()
-        .border_color(rgb(0x0a1424))
-        .text_color(rgb(TEXT_MUTED))
         .font_family(FONT_PIXEL_ALT)
-        .text_size(px(20.))
-        .child(t("login-subtitle"))
+        .text_size(px(13.))
+        .text_color(rgb(TEXT_MUTED))
+        .child("Выберите способ входа в профиль игрока Noro Network:")
         .into_any_element()
 }
 
 fn login_action(logging_in: bool, cx: &mut Cx) -> AnyElement {
     if logging_in {
         return div()
-            .h(px(56.))
+            .h(px(52.))
             .w_full()
             .flex()
             .items_center()
@@ -106,54 +98,37 @@ fn login_action(logging_in: bool, cx: &mut Cx) -> AnyElement {
             .bg(rgb(BG_CARD))
             .border_2()
             .border_color(rgb(BORDER))
+            .rounded(px(R_SM))
             .font_family(FONT_PIXEL_ALT)
-            .text_size(px(18.))
+            .text_size(px(15.))
             .text_color(rgb(TEXT_SECONDARY))
             .child(t("login-waiting"))
             .into_any_element();
     }
 
-    cta_button(
-        "discord-login",
-        Some("user"),
-        t("login-sign-in"),
-        cx.listener(|this, _e: &ClickEvent, _w, cx| {
-            this.start_login();
-            cx.notify();
-        }),
-    )
-    .into_any_element()
-}
-
-fn login_checks() -> AnyElement {
     div()
-        .mt(px(40.))
         .flex()
         .flex_col()
-        .gap(px(16.))
-        .child(check_line(t("login-save-session"), true))
-        .child(check_line(t("login-auto-login"), false))
-        .into_any_element()
-}
-
-fn check_line(label: impl Into<gpui::SharedString>, checked: bool) -> AnyElement {
-    let label = label.into();
-    div()
-        .flex()
-        .items_center()
         .gap(px(12.))
-        .text_color(rgb(TEXT_SECONDARY))
-        .font_family(FONT_PIXEL_ALT)
-        .text_size(px(16.))
-        .font_weight(FontWeight::BOLD)
-        .child(
-            div()
-                .size(px(20.))
-                .border_2()
-                .border_color(rgb(CTA))
-                .bg(rgb(if checked { CTA } else { BG_WINDOW })),
-        )
-        .child(label)
+        .w_full()
+        .child(cta_button(
+            "discord-login",
+            Some("user"),
+            "Войти через Discord",
+            cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                this.start_login();
+                cx.notify();
+            }),
+        ))
+        .child(cta_button(
+            "passkey-login",
+            Some("key-round"),
+            "Войти через Passkey",
+            cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                this.start_login();
+                cx.notify();
+            }),
+        ))
         .into_any_element()
 }
 
@@ -175,16 +150,14 @@ fn error_panel(text: String, cx: &mut Cx) -> AnyElement {
                 .text_color(rgb(ERROR))
                 .child(text),
         )
-        .child(
-            cta_button(
-                "login-retry-btn",
-                Some("rotate-ccw"),
-                t("retry"),
-                cx.listener(|this, _e: &ClickEvent, _w, cx| {
-                    this.start_login();
-                    cx.notify();
-                }),
-            ),
-        )
+        .child(cta_button(
+            "login-retry-btn",
+            Some("rotate-ccw"),
+            t("retry"),
+            cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                this.start_login();
+                cx.notify();
+            }),
+        ))
         .into_any_element()
 }
