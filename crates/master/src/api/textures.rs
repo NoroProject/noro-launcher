@@ -29,6 +29,7 @@ pub struct RenderQuery {
     pub overlay: Option<bool>,
     pub yaw: Option<f32>,
     pub pitch: Option<f32>,
+    pub sway: Option<f32>,
 }
 
 pub async fn default_skin() -> Response {
@@ -58,13 +59,14 @@ pub async fn render_endpoint(State(state): State<AppState>, Query(q): Query<Rend
     let mode = q.mode.as_deref().unwrap_or("bust");
     let yaw = q.yaw.unwrap_or(-25.0);
     let pitch = q.pitch.unwrap_or(12.0);
+    let sway = q.sway.unwrap_or(0.0);
 
     let bytes = match mode {
         "flat-head" | "flat_head" => skin_render::render_head(&skin, scale, overlay),
         "flat-bust" | "flat_bust" => skin_render::render_bust(&skin, scale, overlay),
         "flat-body" | "flat_body" => skin_render::render_body(&skin, scale, overlay),
         "cape" => skin_render::render_cape(&skin, scale),
-        _ => super::skin_render_3d::render_3d(&skin, scale, overlay, mode, yaw, pitch),
+        _ => super::skin_render_3d::render_3d(&skin, scale, overlay, mode, yaw, pitch, sway),
     };
 
     (

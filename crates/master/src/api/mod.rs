@@ -10,5 +10,7 @@ pub mod launcher;
 pub mod range;
 pub mod skin_render;
 pub mod skin_render_3d;
+pub mod skin_render_math;
+pub mod skin_render_parts;
 pub mod textures;
 pub mod translations;
