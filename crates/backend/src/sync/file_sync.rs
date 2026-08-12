@@ -251,8 +251,10 @@ async fn clean_extra(
     let mut protected: Vec<String> = Vec::new();
     protected.extend(manifest.unmanaged_paths.iter().cloned());
     protected.extend(manifest.user_managed_paths.iter().cloned());
-    // Служебные пути лаунчера.
+    // Служебные внутренние пути лаунчера.
     protected.push(".natives/".to_string());
+    protected.push(".noro-build".to_string());
+    protected.push(".noro-servers".to_string());
 
     let root = instance_dir.to_path_buf();
     let to_delete = tokio::task::spawn_blocking(move || {
@@ -286,42 +288,9 @@ async fn clean_extra(
     Ok(())
 }
 
-pub const DEFAULT_PROTECTED_PATHS: &[&str] = &[
-    "saves/",
-    "screenshots/",
-    "options.txt",
-    "optionsof.txt",
-    "optionsshaders.txt",
-    "logs/",
-    "crash-reports/",
-    "xaero*",
-    "config/xaero*",
-    "xaerominimap*",
-    "xaeroworldmap*",
-    "command_history.txt",
-    "usernamecache.json",
-    "usercache.json",
-    ".bobby/",
-    ".natives/",
-    ".mixin.out/",
-    ".forge_classpath",
-    ".noro-build",
-    ".noro-servers",
-    ".pg-native/",
-    ".probe/",
-    ".sable/",
-];
-
-/// Защищён ли относительный путь одним из префиксов (директория с '/' или маска '*').
+/// Защищён ли относительный путь одним из префиксов из манифеста мастера (директория с '/', точный путь или маска '*').
 pub fn is_protected(rel: &str, protected: &[String]) -> bool {
     let rel_lower = rel.to_lowercase();
-
-    for &p in DEFAULT_PROTECTED_PATHS {
-        if match_path_pattern(&rel_lower, &p.to_lowercase()) {
-            return true;
-        }
-    }
-
     protected
         .iter()
         .any(|p| match_path_pattern(&rel_lower, &p.to_lowercase()))
