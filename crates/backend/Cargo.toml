@@ -40,6 +40,7 @@ urlencoding = { workspace = true }
 walkdir = { workspace = true }
 zip = { workspace = true }
 fastnbt = { workspace = true }
+discord-rich-presence = { workspace = true }
 futures = { workspace = true }
 
 # Каждой ОС — свой системный сейф. Общая строка с одним лишь apple-native

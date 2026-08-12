@@ -1,6 +1,5 @@
 //! Обработка сообщений: MessageToBackend (от frontend) и ServerWsMsg (от мастера).
 
-use std::ffi::OsStr;
 use std::path::PathBuf;
 
 use crate::auth::{discord_oauth, token_store};
@@ -204,6 +203,13 @@ impl BackendState {
             }
 
             MessageToBackend::OpenServer { server_id } => {
+                if let Some(srv) = self.servers.iter().find(|s| s.id == server_id) {
+                    if self.ctx.running.lock().is_empty() {
+                        self.ctx.rpc.update(crate::discord_rpc::DiscordRpcState::Launcher {
+                            server_name: Some(srv.name.clone()),
+                        });
+                    }
+                }
                 if let Some(manifest) = self.manifests.get(&server_id).cloned() {
                     self.send_server_recommendation(server_id, &manifest);
                     self.send_optional_mods(server_id, &manifest);
@@ -218,6 +224,11 @@ impl BackendState {
                 server_id,
                 modal_action,
             } => {
+                if let Some(srv) = self.servers.iter().find(|s| s.id == server_id) {
+                    self.ctx.rpc.update(crate::discord_rpc::DiscordRpcState::GameLoading {
+                        server_name: srv.name.clone(),
+                    });
+                }
                 self.launch_server(server_id, modal_action).await;
             }
 
@@ -458,7 +469,7 @@ impl BackendState {
 
             MessageToBackend::OpenServerClientFolder { server_id } => {
                 let client_path: PathBuf = self.ctx.dirs.instance(&server_id);
-                let open_result = open::that(client_path);
+                let _ = open::that(client_path);
             }
 
             MessageToBackend::SetLocale { code } => {

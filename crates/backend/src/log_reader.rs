@@ -58,6 +58,7 @@ pub async fn spawn_log_reader<R>(
     server_id: Uuid,
     frontend: bridge::FrontendHandle,
     is_stderr: bool,
+    rpc_info: Option<(crate::discord_rpc::DiscordRpc, String, u64, Option<u32>, Option<u32>)>,
 ) where
     R: AsyncRead + Unpin + Send + 'static,
 {
@@ -79,6 +80,23 @@ pub async fn spawn_log_reader<R>(
 
                     let redacted = redact(&line);
                     let (level, clean_text) = classify_log(&redacted, is_stderr);
+
+                    if let Some((ref rpc, ref server_name, start_ts, online_cur, online_max)) = rpc_info {
+                        let lower = clean_text.to_lowercase();
+                        if lower.contains("connecting to ") || lower.contains("joining world") {
+                            rpc.update(crate::discord_rpc::DiscordRpcState::GamePlaying {
+                                server_name: server_name.clone(),
+                                online_current: online_cur,
+                                online_max,
+                                start_timestamp: start_ts,
+                            });
+                        } else if lower.contains("titlescreen") || lower.contains("disconnecting from") {
+                            rpc.update(crate::discord_rpc::DiscordRpcState::GameMenu {
+                                server_name: server_name.clone(),
+                                start_timestamp: start_ts,
+                            });
+                        }
+                    }
 
                     frontend.send(MessageToFrontend::GameLog {
                         server_id,
