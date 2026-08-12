@@ -1,4 +1,4 @@
--- Таблица ключей доступа Passkeys (WebAuthn)
+-- Таблица ключей доступа s (WebAuthn)
 CREATE TABLE IF NOT EXISTS passkeys (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

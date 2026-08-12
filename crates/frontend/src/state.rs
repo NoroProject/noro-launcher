@@ -803,6 +803,31 @@ impl LauncherUI {
                     }).detach();
                 }
             }
+            MessageToFrontend::SkinPresetsList { presets } => {
+                self.custom_presets.clear();
+                for p in presets {
+                    let id = p.id;
+                    let name = p.name;
+                    let url = p.skin_url;
+                    let preset_struct = SavedSkinPreset {
+                        id: id.clone(),
+                        name: name.clone(),
+                        bytes: Vec::new(),
+                        preview: None,
+                    };
+                    self.custom_presets.push(preset_struct);
+                    cx.spawn(async move |this, cx| {
+                        if let Ok((_, bytes)) = crate::image_loader::load_image_and_bytes(url).await {
+                            let _ = this.update(cx, |this, cx| {
+                                if let Some(found) = this.custom_presets.iter_mut().find(|cp| cp.id == id) {
+                                    found.bytes = bytes;
+                                }
+                                cx.notify();
+                            });
+                        }
+                    }).detach();
+                }
+            }
             MessageToFrontend::ConnectionState { online } => {
                 self.online = online;
             }

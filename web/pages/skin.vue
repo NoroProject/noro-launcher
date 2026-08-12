@@ -48,22 +48,11 @@ const { data: capes } = await useAsyncData('user-capes-list', () =>
 const currentSkinUrl = computed(() => auth.user.value?.skin_url)
 const currentCapeUrl = computed(() => auth.user.value?.cape_url)
 
-onMounted(() => {
-  try {
-    const raw = localStorage.getItem('noro_saved_skins')
-    if (raw) savedSkins.value = JSON.parse(raw)
-  } catch (e) {
-    console.error(e)
-  }
-})
+const { data: serverPresets, refresh: refreshPresets } = await useAsyncData('user-skin-presets', () =>
+  auth.request<SavedSkin[]>('/api/me/skin-presets'), { default: () => [] }
+)
 
-function saveSkinsToStorage() {
-  try {
-    localStorage.setItem('noro_saved_skins', JSON.stringify(savedSkins.value))
-  } catch (e) {
-    console.error(e)
-  }
-}
+const savedSkins = computed(() => serverPresets.value || [])
 
 function accept(next: File | null) {
   error.value = null
@@ -100,15 +89,14 @@ async function uploadSkinFile(f: File) {
     message.value = 'Skin updated successfully'
 
     if (updated.skin_url) {
-      const exists = savedSkins.value.some(s => s.url === updated.skin_url)
-      if (!exists) {
-        savedSkins.value.unshift({
-          id: String(Date.now()),
+      await auth.request('/api/me/skin-presets', {
+        method: 'POST',
+        body: {
           name: f.name.replace(/\.png$/i, ''),
-          url: updated.skin_url
-        })
-        saveSkinsToStorage()
-      }
+          skin_url: updated.skin_url
+        }
+      })
+      await refreshPresets()
     }
   } catch (err) {
     error.value = humanError(err)
@@ -134,12 +122,14 @@ async function uploadSkinByUsername() {
     usernameInput.value = ''
 
     if (updated.skin_url) {
-      savedSkins.value.unshift({
-        id: String(Date.now()),
-        name: name,
-        url: updated.skin_url
+      await auth.request('/api/me/skin-presets', {
+        method: 'POST',
+        body: {
+          name: name,
+          skin_url: updated.skin_url
+        }
       })
-      saveSkinsToStorage()
+      await refreshPresets()
     }
   } catch (err) {
     error.value = humanError(err)
@@ -190,17 +180,28 @@ function startRename(skin: SavedSkin, ev: Event) {
   editNameInput.value = skin.name
 }
 
-function commitRename(skin: SavedSkin) {
+async function commitRename(skin: SavedSkin) {
   if (editNameInput.value.trim()) {
-    skin.name = editNameInput.value.trim()
-    saveSkinsToStorage()
+    try {
+      await auth.request(`/api/me/skin-presets/${skin.id}`, {
+        method: 'PUT',
+        body: { name: editNameInput.value.trim() }
+      })
+      await refreshPresets()
+    } catch (e) {
+      console.error(e)
+    }
   }
   editingSkinId.value = null
 }
 
-function deleteSavedSkin(id: string) {
-  savedSkins.value = savedSkins.value.filter(s => s.id !== id)
-  saveSkinsToStorage()
+async function deleteSavedSkin(id: string) {
+  try {
+    await auth.request(`/api/me/skin-presets/${id}`, { method: 'DELETE' })
+    await refreshPresets()
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 async function resetSkin() {
@@ -325,7 +326,7 @@ async function selectCape(capeId: string | null) {
               v-for="skin in savedSkins"
               :key="skin.id"
               class="group relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-between overflow-hidden rounded-xl border p-3 transition hover:scale-105"
-              :class="currentSkinUrl === skin.url
+              :class="currentSkinUrl === skin.skin_url
                 ? 'border-2 border-[var(--noro-cream)] bg-[var(--noro-input)] shadow-lg'
                 : 'border-[var(--noro-border)] bg-[var(--noro-bg-deep)] hover:border-[var(--noro-cream)]/50'"
               @click="applySavedSkin(skin)"
@@ -364,8 +365,8 @@ async function selectCape(capeId: string | null) {
                 <span class="w-full truncate text-center text-xs font-bold text-[var(--noro-text)]">{{ skin.name }}</span>
               </template>
 
-              <SkinCard3D :skin-url="skin.url" :width="100" :height="125" />
-              <UBadge v-if="currentSkinUrl === skin.url" color="primary" variant="subtle" class="text-[10px]">Надет</UBadge>
+              <SkinCard3D :skin-url="skin.skin_url" :width="100" :height="125" />
+              <UBadge v-if="currentSkinUrl === skin.skin_url" color="primary" variant="subtle" class="text-[10px]">Надет</UBadge>
               <span v-else class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-text)] font-semibold">Надеть</span>
             </div>
           </div>

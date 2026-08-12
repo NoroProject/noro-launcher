@@ -184,7 +184,19 @@ fn router(state: AppState) -> Router {
             delete(auth::passkeys::delete_passkey).options(|| async {}),
         )
         .route("/api/capes", get(cabinet::list_capes))
-        .route("/api/me/cape", put(cabinet::set_cape));
+        .route("/api/me/cape", put(cabinet::set_cape))
+        .route(
+            "/api/me/skin-presets",
+            get(cabinet::list_skin_presets)
+                .post(cabinet::create_skin_preset)
+                .options(|| async {}),
+        )
+        .route(
+            "/api/me/skin-presets/{id}",
+            put(cabinet::rename_skin_preset)
+                .delete(cabinet::delete_skin_preset)
+                .options(|| async {}),
+        );
 
     // Агенты игровых серверов.
     let agent_api = Router::new()

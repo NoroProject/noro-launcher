@@ -144,6 +144,15 @@ pub async fn upload_skin_from_username(
         .map_err(AppError::Other)?;
     let skin_url = state.config.file_url(&stored.sha1);
     crate::db::set_skin(&state.db, user.user_id, Some(&skin_url)).await?;
+    let _ = sqlx::query(
+        "INSERT INTO user_skin_presets (user_id, name, skin_url) VALUES ($1, $2, $3)",
+    )
+    .bind(user.user_id)
+    .bind(username)
+    .bind(&skin_url)
+    .execute(&state.db)
+    .await;
+
     let profile = crate::db::load_profile(&state.db, user.user_id).await?;
     state.ws.send_to_user(
         user.user_id,
@@ -197,4 +206,91 @@ pub async fn set_cape(
         },
     );
     Ok(Json(profile))
+}
+
+#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+pub struct SkinPresetItem {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub skin_url: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct CreateSkinPresetReq {
+    pub name: String,
+    pub skin_url: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct RenameSkinPresetReq {
+    pub name: String,
+}
+
+pub async fn list_skin_presets(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Vec<SkinPresetItem>>> {
+    let rows = sqlx::query_as::<_, SkinPresetItem>(
+        "SELECT id, name, skin_url FROM user_skin_presets WHERE user_id = $1 ORDER BY created_at DESC",
+    )
+    .bind(user.user_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| AppError::Other(e.into()))?;
+
+    Ok(Json(rows))
+}
+
+pub async fn create_skin_preset(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(req): Json<CreateSkinPresetReq>,
+) -> AppResult<Json<SkinPresetItem>> {
+    let row = sqlx::query_as::<_, SkinPresetItem>(
+        "INSERT INTO user_skin_presets (user_id, name, skin_url) VALUES ($1, $2, $3) RETURNING id, name, skin_url",
+    )
+    .bind(user.user_id)
+    .bind(&req.name)
+    .bind(&req.skin_url)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|e| AppError::Other(e.into()))?;
+
+    Ok(Json(row))
+}
+
+pub async fn rename_skin_preset(
+    State(state): State<AppState>,
+    user: AuthUser,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Json(req): Json<RenameSkinPresetReq>,
+) -> AppResult<Json<()>> {
+    sqlx::query(
+        "UPDATE user_skin_presets SET name = $1 WHERE id = $2 AND user_id = $3",
+    )
+    .bind(&req.name)
+    .bind(id)
+    .bind(user.user_id)
+    .execute(&state.db)
+    .await
+    .map_err(|e| AppError::Other(e.into()))?;
+
+    Ok(Json(()))
+}
+
+pub async fn delete_skin_preset(
+    State(state): State<AppState>,
+    user: AuthUser,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+) -> AppResult<Json<()>> {
+    sqlx::query(
+        "DELETE FROM user_skin_presets WHERE id = $1 AND user_id = $2",
+    )
+    .bind(id)
+    .bind(user.user_id)
+    .execute(&state.db)
+    .await
+    .map_err(|e| AppError::Other(e.into()))?;
+
+    Ok(Json(()))
 }

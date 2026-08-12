@@ -261,6 +261,13 @@ pub enum BuildState {
     Ready,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ServerSkinPresetItem {
+    pub id: String,
+    pub name: String,
+    pub skin_url: String,
+}
+
 /// Backend → Frontend.
 #[derive(Debug)]
 pub enum MessageToFrontend {
@@ -369,6 +376,9 @@ pub enum MessageToFrontend {
     },
     CapesList {
         capes: Vec<schema::CapeRow>,
+    },
+    SkinPresetsList {
+        presets: Vec<ServerSkinPresetItem>,
     },
 
     /// Соединение с мастером установлено/потеряно — для индикатора в UI.
