@@ -13,7 +13,7 @@ const PREVIEW_W: f32 = crate::skin::PREVIEW_W as f32;
 const PREVIEW_H: f32 = crate::skin::PREVIEW_H as f32;
 
 pub fn skin_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    panel().p(px(16.)).w(px(PREVIEW_W + 32.)).flex().flex_col().gap(px(10.))
+    panel().p(px(16.)).w(px(PREVIEW_W + 32.)).h_full().flex_1().flex().flex_col().gap(px(10.))
         .child(preview_box(ui, cx))
         .when(is_grabbable(ui), |d| d.child(drag_hint()))
         .into_any_element()
@@ -55,6 +55,25 @@ fn header_row() -> AnyElement {
         .into_any_element()
 }
 
+fn is_preset_active(ui: &LauncherUI, id: &str) -> bool {
+    let lower_id = id.to_lowercase();
+    if let Some(url) = &ui.skin_url {
+        let lower_url = url.to_lowercase();
+        if lower_url.contains(&format!("/presets/{}.png", lower_id)) || lower_url.contains(&format!("preset={}", lower_id)) {
+            return true;
+        }
+    }
+    if let Some(user) = &ui.user {
+        if let Some(url) = &user.skin_url {
+            let lower_url = url.to_lowercase();
+            if lower_url.contains(&format!("/presets/{}.png", lower_id)) || lower_url.contains(&format!("preset={}", lower_id)) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn custom_preset_card(ui: &LauncherUI, preset: &crate::state::SavedSkinPreset, cx: &mut Cx) -> AnyElement {
     let bytes = preset.bytes.clone();
     let id = preset.id.clone();
@@ -86,16 +105,23 @@ fn custom_preset_card(ui: &LauncherUI, preset: &crate::state::SavedSkinPreset, c
 }
 
 fn standard_preset_card(ui: &LauncherUI, name: &'static str, id: &'static str, cx: &mut Cx) -> AnyElement {
+    let is_active = is_preset_active(ui, id);
+    let border_clr = if is_active { CTA_HOV } else { BORDER };
+
     let img_el = if let Some(loaded_img) = ui.preset_images.get(id) {
         img(loaded_img.clone()).w(px(72.)).h(px(85.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
     } else {
-        div().w(px(72.)).h(px(85.)).flex().items_center().justify_center().child(ic("user", 24., TEXT_MUTED)).into_any_element()
+        div().w(px(72.)).h(px(85.)).flex().items_center().justify_center().child(ic("user", 24., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
     };
 
-    div().id(id).w(px(112.)).p(px(6.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(BORDER)).hover(|s| s.bg(rgb(BG_INPUT)).border_color(rgb(CTA))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
+    div().id(id).w(px(112.)).p(px(6.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
         .child(img_el)
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child(name))
-        .child(div().px(px(12.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).border_1().border_color(rgb(BORDER)).font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child("Надеть"))
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY })).child(name))
+        .child(if is_active {
+            div().px(px(12.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(CTA)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("Текущий").into_any_element()
+        } else {
+            div().px(px(12.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).border_1().border_color(rgb(BORDER)).font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child("Надеть").into_any_element()
+        })
         .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| apply_preset(this, id, cx)))
         .into_any_element()
 }
@@ -118,7 +144,7 @@ fn is_grabbable(ui: &LauncherUI) -> bool {
 }
 
 fn preview_box(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    div().id("skin-preview-area").w(px(PREVIEW_W)).h(px(PREVIEW_H)).bg(rgb(BG_INPUT)).rounded(px(R_SM)).border_1().border_color(rgb(BORDER)).overflow_hidden().flex().items_center().justify_center()
+    div().id("skin-preview-area").w(px(PREVIEW_W)).flex_1().min_h(px(PREVIEW_H)).bg(rgb(BG_INPUT)).rounded(px(R_SM)).border_1().border_color(rgb(BORDER)).overflow_hidden().flex().items_center().justify_center()
         .when(is_grabbable(ui), |d| d.cursor(CursorStyle::OpenHand).on_mouse_down(MouseButton::Left, cx.listener(skin_drag::on_grab)))
         .child(preview_content(ui))
         .into_any_element()
