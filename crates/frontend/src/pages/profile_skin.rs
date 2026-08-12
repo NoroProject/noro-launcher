@@ -39,7 +39,7 @@ pub fn skin_presets_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 }
 
 fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
-    div().id("add-preset-tile").flex_1().min_w(px(96.)).max_w(px(130.)).h(px(132.)).p(px(4.))
+    div().id("add-preset-tile").w(gpui::relative(0.315)).h(px(132.)).p(px(4.))
         .bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(CTA))
         .hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer()
         .flex().flex_col().items_center().justify_center().gap(px(4.))
@@ -51,7 +51,7 @@ fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
 }
 
 fn import_username_tile_card(cx: &mut Cx) -> AnyElement {
-    div().id("import-username-tile").flex_1().min_w(px(96.)).max_w(px(130.)).h(px(132.)).p(px(4.))
+    div().id("import-username-tile").w(gpui::relative(0.315)).h(px(132.)).p(px(4.))
         .bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(CTA))
         .hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer()
         .flex().flex_col().items_center().justify_center().gap(px(4.))
@@ -100,7 +100,7 @@ fn custom_preset_card(ui: &LauncherUI, preset: &crate::state::SavedSkinPreset, c
     let border_clr = if is_active { CTA_HOV } else { BORDER };
     let edit_preset_id = id.clone();
 
-    div().id(SharedString::from(id.clone())).flex_1().min_w(px(96.)).max_w(px(130.)).p(px(4.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
+    div().id(SharedString::from(id.clone())).w(gpui::relative(0.315)).p(px(4.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
         .child(div().w(px(64.)).h(px(78.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })))
         .child(div().w_full().truncate().text_center().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY })).child(name.clone()))
         .child(div().flex().gap(px(2.))
@@ -127,7 +127,7 @@ fn standard_preset_card(ui: &LauncherUI, name: &'static str, id: &'static str, c
         div().w(px(64.)).h(px(78.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
     };
 
-    div().id(id).flex_1().min_w(px(96.)).max_w(px(130.)).p(px(4.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
+    div().id(id).w(gpui::relative(0.315)).p(px(4.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
         .child(img_el)
         .child(div().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY })).child(name))
         .child(if is_active {
