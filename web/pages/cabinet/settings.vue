@@ -20,7 +20,7 @@ const sessionRows = computed(() => [
       <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">Cabinet</AtomButton>
     </template>
 
-    <div class="mx-auto grid w-full max-w-2xl gap-4">
+    <div class="grid gap-4">
       <section class="noro-panel p-6">
         <h2 class="noro-label mb-4">Account</h2>
         <div class="grid gap-2 text-sm">

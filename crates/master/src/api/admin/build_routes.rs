@@ -69,4 +69,8 @@ pub fn router() -> Router<AppState> {
             "/api/admin/builds/{id}/allow-suggestions",
             put(builds::set_allow_suggestions),
         )
+        .route(
+            "/api/admin/builds/{id}/installed-mods",
+            get(builds::list_installed_mods),
+        )
 }

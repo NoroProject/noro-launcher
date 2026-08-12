@@ -100,3 +100,13 @@ export interface InstallResult {
   path: string | null;
   error: string | null;
 }
+
+export interface InstalledModInfo {
+  file_id: string;
+  path: string;
+  sha1: string;
+  size: number;
+  mod_id?: string | null;
+  name?: string | null;
+  version?: string | null;
+}

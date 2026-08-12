@@ -1,3 +1,4 @@
+pub mod biometrics;
 pub mod discord_oauth;
 pub mod token_store;
 

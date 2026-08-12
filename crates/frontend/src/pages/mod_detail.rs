@@ -46,6 +46,36 @@ pub fn view(ui: &mut LauncherUI, server_id: Uuid, hit: CatalogHitInfo, cx: &mut 
 
 fn header(ui: &LauncherUI, server_id: Uuid, hit: &CatalogHitInfo, cx: &mut Cx) -> AnyElement {
     let for_request = hit.clone();
+    let is_installed = super::mod_icon::is_mod_installed(ui, server_id, &hit.title);
+    let is_pending = ui.suggested_mods.contains(&hit.project_id);
+
+    let action_btn: AnyElement = if is_installed {
+        crate::components::badge("Installed", CTA).into_any_element()
+    } else if is_pending {
+        crate::components::badge("Pending", WARNING).into_any_element()
+    } else {
+        btn(
+            "request-detail-btn",
+            "Suggest Mod for Assembly",
+            true,
+            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                let build_id = this.server(&server_id).and_then(|s| s.current_build_id);
+                this.suggested_mods.insert(for_request.project_id.clone());
+                this.backend.send(MessageToBackend::SuggestOptionalMod {
+                    server_id,
+                    build_id,
+                    provider: for_request.provider.clone(),
+                    project_id: for_request.project_id.clone(),
+                    title: for_request.title.clone(),
+                    icon_url: for_request.icon_url.clone(),
+                    description: Some(for_request.description.clone()),
+                });
+                cx.notify();
+            }),
+        )
+        .into_any_element()
+    };
+
     div()
         .flex()
         .items_start()
@@ -78,22 +108,7 @@ fn header(ui: &LauncherUI, server_id: Uuid, hit: &CatalogHitInfo, cx: &mut Cx) -
                         )),
                 ),
         )
-        .child(btn(
-            "request-detail-btn",
-            "Request Mod for Assembly",
-            true,
-            cx.listener(move |this, _e: &ClickEvent, _w, _cx| {
-                this.backend.send(MessageToBackend::SuggestOptionalMod {
-                    server_id,
-                    build_id: None,
-                    provider: for_request.provider.clone(),
-                    project_id: for_request.project_id.clone(),
-                    title: for_request.title.clone(),
-                    icon_url: for_request.icon_url.clone(),
-                    description: Some(for_request.description.clone()),
-                });
-            }),
-        ))
+        .child(action_btn)
         .into_any_element()
 }
 

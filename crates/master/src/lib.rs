@@ -132,6 +132,14 @@ fn router(state: AppState) -> Router {
             post(auth::passkeys::login_verify).options(|| async {}),
         )
         .route(
+            "/auth/passkeys/launcher",
+            get(auth::passkeys::passkey_launcher_page),
+        )
+        .route(
+            "/auth/passkeys/launcher/verify",
+            post(auth::passkeys::passkey_launcher_verify).options(|| async {}),
+        )
+        .route(
             "/api/auth/passkeys/login/options",
             post(auth::passkeys::login_options).options(|| async {}),
         )
@@ -197,7 +205,21 @@ fn router(state: AppState) -> Router {
             put(cabinet::rename_skin_preset)
                 .delete(cabinet::delete_skin_preset)
                 .options(|| async {}),
+        )
+        .route(
+            "/api/me/authorized-apps",
+            get(auth::oauth2_provider::list_authorized_apps).options(|| async {}),
+        )
+        .route(
+            "/api/me/authorized-apps/{app_id}",
+            delete(auth::oauth2_provider::revoke_authorized_app).options(|| async {}),
         );
+
+    // Полноценный OAuth 2.0 Провайдер
+    let oauth2_provider_api = Router::new()
+        .route("/oauth2/authorize", get(auth::oauth2_provider::authorize_page))
+        .route("/oauth2/authorize/accept", post(auth::oauth2_provider::accept_authorize))
+        .route("/oauth2/token", post(auth::oauth2_provider::token_endpoint));
 
     // Агенты игровых серверов.
     let agent_api = Router::new()
@@ -220,6 +242,7 @@ fn router(state: AppState) -> Router {
         .merge(discord)
         .merge(launcher_api)
         .merge(cabinet_api)
+        .merge(oauth2_provider_api)
         .merge(agent_api)
         .merge(admin_api)
         .layer(axum::extract::DefaultBodyLimit::disable())

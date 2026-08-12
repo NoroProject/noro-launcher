@@ -62,8 +62,8 @@ const buildEditor = useAdminBuildEditor(
         subtitle="Server profile & assembly control surface"
     >
         <template #actions>
-            <AtomButton to="/admin/servers" icon="i-lucide-arrow-left" variant="dark">
-                Servers
+            <AtomButton to="/admin/clients" icon="i-lucide-arrow-left" variant="dark">
+                Clients
             </AtomButton>
             <AtomButton
                 icon="i-lucide-refresh-cw"

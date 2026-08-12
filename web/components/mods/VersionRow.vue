@@ -1,12 +1,22 @@
 <script setup lang="ts">
-import type { ModVersion } from "~/types/catalog";
+import type { InstalledModInfo, ModVersion } from "~/types/catalog";
 
-const props = defineProps<{ version: ModVersion }>();
+const props = defineProps<{
+    version: ModVersion;
+    installedMod?: InstalledModInfo | null;
+}>();
 defineEmits<{ install: [] }>();
 
 const requires = computed(
     () => props.version.dependencies.filter((d) => d.kind === "required").length,
 );
+
+const isCurrent = computed(() => {
+    if (!props.installedMod?.version) return false;
+    const v1 = props.version.version_number.trim().toLowerCase();
+    const v2 = props.installedMod.version.trim().toLowerCase();
+    return v1 === v2 || v1.includes(v2) || v2.includes(v1);
+});
 </script>
 
 <template>
@@ -30,14 +40,26 @@ const requires = computed(
                 </span>
             </div>
         </div>
-        <AtomButton
-            variant="primary"
+        <UBadge
+            v-if="isCurrent"
+            color="success"
+            variant="subtle"
             size="sm"
-            icon="i-lucide-download"
+            class="shrink-0"
+        >
+            Current
+        </UBadge>
+        <AtomButton
+            v-else
+            :variant="installedMod ? 'secondary' : 'primary'"
+            size="sm"
+            :icon="installedMod ? 'i-lucide-refresh-cw' : 'i-lucide-download'"
             :disabled="!version.downloadable"
-            :title="version.downloadable ? 'Install this version' : 'Author blocked third-party downloads'"
+            :title="installedMod ? 'Update or Reinstall to this version' : 'Install this version'"
             class="shrink-0"
             @click="$emit('install')"
-        />
+        >
+            {{ installedMod ? 'Update' : '' }}
+        </AtomButton>
     </div>
 </template>

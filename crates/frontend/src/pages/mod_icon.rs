@@ -115,3 +115,43 @@ fn fallback_icon(m: &OptionalModInfo) -> &'static str {
 fn has_any(text: &str, words: &[&str]) -> bool {
     words.iter().any(|word| text.contains(word))
 }
+
+pub fn is_mod_installed(ui: &LauncherUI, server_id: uuid::Uuid, hit_title: &str) -> bool {
+    let clean_title = hit_title
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect::<String>()
+        .to_lowercase();
+    if clean_title.is_empty() {
+        return false;
+    }
+
+    if let Some(mods) = ui.optional_mods.get(&server_id) {
+        if mods.iter().any(|m| {
+            let clean_name = m
+                .name
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+                .to_lowercase();
+            !clean_name.is_empty() && (clean_title.contains(&clean_name) || clean_name.contains(&clean_title))
+        }) {
+            return true;
+        }
+    }
+
+    if let Some(files) = ui.installed_files.get(&server_id) {
+        if files.iter().any(|f| {
+            let clean_file = f
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+                .to_lowercase();
+            clean_file.contains(&clean_title)
+        }) {
+            return true;
+        }
+    }
+
+    false
+}

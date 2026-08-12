@@ -449,11 +449,7 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
     let hit_for_req = hit.clone();
     let project_id_str = hit.project_id.clone();
 
-    let is_installed = ui
-        .optional_mods
-        .get(&server_id)
-        .map(|mods| mods.iter().any(|m| m.name.eq_ignore_ascii_case(&hit.title)))
-        .unwrap_or(false);
+    let is_installed = super::mod_icon::is_mod_installed(ui, server_id, &hit.title);
     let is_pending = ui.suggested_mods.contains(&hit.project_id);
 
     let action_btn: AnyElement = if is_installed {
@@ -466,10 +462,11 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
             "Suggest",
             true,
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                let build_id = this.server(&server_id).and_then(|s| s.current_build_id);
                 this.suggested_mods.insert(hit_for_req.project_id.clone());
                 this.backend.send(MessageToBackend::SuggestOptionalMod {
                     server_id,
-                    build_id: None,
+                    build_id,
                     provider: hit_for_req.provider.clone(),
                     project_id: hit_for_req.project_id.clone(),
                     title: hit_for_req.title.clone(),
@@ -490,64 +487,73 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
         .bg(rgba(0xffffff0a))
         .border_1()
         .border_color(rgb(BORDER))
-        .hover(|s| s.bg(rgba(0xffffff15)))
-        .cursor_pointer()
         .flex()
         .items_center()
         .gap(px(16.))
-        .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-            this.mod_catalog_selected = Some(hit_clone.clone());
-            this.mod_project = None;
-            this.mod_detail_gallery = false;
-            this.backend.send(MessageToBackend::RequestModProject {
-                provider: hit_clone.provider.clone(),
-                project_id: hit_clone.project_id.clone(),
-            });
-            cx.notify();
-        }))
-        .child(mod_avatar(ui, &hit.icon_url))
         .child(
             div()
+                .id(SharedString::from(format!("mod-card-info-{project_id_str}")))
                 .flex_1()
                 .min_w_0()
                 .flex()
-                .flex_col()
-                .gap(px(2.))
+                .items_center()
+                .gap(px(16.))
+                .cursor_pointer()
+                .hover(|s| s.bg(rgba(0xffffff05)))
+                .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.mod_catalog_selected = Some(hit_clone.clone());
+                    this.mod_project = None;
+                    this.mod_detail_gallery = false;
+                    this.backend.send(MessageToBackend::RequestModProject {
+                        provider: hit_clone.provider.clone(),
+                        project_id: hit_clone.project_id.clone(),
+                    });
+                    cx.notify();
+                }))
+                .child(mod_avatar(ui, &hit.icon_url))
                 .child(
                     div()
+                        .flex_1()
+                        .min_w_0()
                         .flex()
-                        .items_center()
-                        .gap(px(8.))
+                        .flex_col()
+                        .gap(px(2.))
                         .child(
                             div()
-                                .flex_1()
-                                .min_w_0()
-                                .font_family(FONT_PIXEL_ALT)
-                                .text_size(px(14.))
-                                .font_weight(FontWeight::BOLD)
-                                .text_color(rgb(TEXT_PRIMARY))
-                                .child(hit.title.clone()),
+                                .flex()
+                                .items_center()
+                                .gap(px(8.))
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .font_family(FONT_PIXEL_ALT)
+                                        .text_size(px(14.))
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(rgb(TEXT_PRIMARY))
+                                        .child(hit.title.clone()),
+                                )
+                                .child(
+                                    div()
+                                        .flex_shrink_0()
+                                        .px(px(6.))
+                                        .py(px(1.))
+                                        .rounded(px(R_SM))
+                                        .bg(rgba(0x0f203688))
+                                        .font_family(FONT_PIXEL_ALT)
+                                        .text_size(px(9.))
+                                        .text_color(rgb(CTA))
+                                        .child(hit.provider.to_uppercase()),
+                                ),
                         )
                         .child(
                             div()
-                                .flex_shrink_0()
-                                .px(px(6.))
-                                .py(px(1.))
-                                .rounded(px(R_SM))
-                                .bg(rgba(0x0f203688))
+                                .truncate()
                                 .font_family(FONT_PIXEL_ALT)
-                                .text_size(px(9.))
-                                .text_color(rgb(CTA))
-                                .child(hit.provider.to_uppercase()),
+                                .text_size(px(11.))
+                                .text_color(rgb(TEXT_MUTED))
+                                .child(hit.description.clone()),
                         ),
-                )
-                .child(
-                    div()
-                        .truncate()
-                        .font_family(FONT_PIXEL_ALT)
-                        .text_size(px(11.))
-                        .text_color(rgb(TEXT_MUTED))
-                        .child(hit.description.clone()),
                 ),
         )
         .child(action_btn)

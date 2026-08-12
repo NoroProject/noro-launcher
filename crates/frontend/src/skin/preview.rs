@@ -13,8 +13,9 @@ use std::sync::Arc;
 /// Preview size in logical px — matches the card in the profile page.
 pub const PREVIEW_W: u32 = 280;
 pub const PREVIEW_H: u32 = 340;
-/// Skins are pixel art, so render above the layout size and let GPUI downscale.
-const SUPERSAMPLE: u32 = 2;
+/// High performance scaling factor for silky smooth 60 FPS animation.
+const SUPERSAMPLE_W: u32 = 350;
+const SUPERSAMPLE_H: u32 = 425;
 
 /// Slight downward tilt, so the figure is seen a bit from above.
 const IDLE_PITCH: f64 = 6.0;
@@ -37,13 +38,15 @@ pub fn render_view(
     let mut canvas = render_rgba(
         skin_png,
         cape_png,
-        PREVIEW_W * SUPERSAMPLE,
-        PREVIEW_H * SUPERSAMPLE,
+        SUPERSAMPLE_W,
+        SUPERSAMPLE_H,
         &view,
     )?;
     // GPUI грузит текстуры как BGRA.
     for pixel in canvas.chunks_exact_mut(4) {
-        pixel.swap(0, 2);
+        let r = pixel[0];
+        pixel[0] = pixel[2];
+        pixel[2] = r;
     }
     Some(Arc::new(RenderImage::new(vec![Frame::new(canvas)])))
 }

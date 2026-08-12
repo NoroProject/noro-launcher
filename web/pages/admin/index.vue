@@ -65,7 +65,7 @@ const fileStoreGb = computed(() => {
       <section class="noro-panel p-5">
         <h2 class="mb-4 font-bold text-[var(--noro-text)]">Quick actions</h2>
         <div class="grid gap-2">
-          <QuickAction to="/admin/servers" icon="i-lucide-plus" label="Create server" primary />
+          <QuickAction to="/admin/clients" icon="i-lucide-plus" label="Create client" primary />
           <QuickAction to="/admin/news" icon="i-lucide-newspaper" label="Publish news" />
           <QuickAction to="/admin/launcher" icon="i-lucide-rocket" label="Deploy launcher" />
         </div>

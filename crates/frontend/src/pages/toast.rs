@@ -26,6 +26,9 @@ pub fn toast_overlay(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let (icon, color, title_key) = style(toast.level);
 
     div()
+        .id("toast-container")
+        .occlude()
+        .on_click(|_, _, _| {})
         .absolute()
         .bottom(px(24.))
         .right(px(24.))

@@ -59,7 +59,7 @@ fn default_locale() -> String {
 
 fn default_master_url() -> String {
     option_env!("NORO_MASTER_URL")
-        .unwrap_or("http://127.0.0.1:8080")
+        .unwrap_or("https://api.noro.dalynkaa.dev")
         .to_string()
 }
 

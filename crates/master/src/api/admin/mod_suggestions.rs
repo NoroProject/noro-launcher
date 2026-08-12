@@ -26,10 +26,18 @@ pub async fn create_suggestion(
     user: AuthUser,
     Json(req): Json<CreateSuggestionReq>,
 ) -> AppResult<Json<ModSuggestionRow>> {
+    let build_id = match req.build_id {
+        Some(bid) => Some(bid),
+        None => crate::db::list_builds(&state.db, req.server_id)
+            .await
+            .ok()
+            .and_then(|builds| builds.first().map(|b| b.id)),
+    };
+
     let row = crate::db::create_mod_suggestion(
         &state.db,
         req.server_id,
-        req.build_id,
+        build_id,
         &req.provider,
         &req.project_id,
         &req.title,
@@ -74,7 +82,15 @@ pub async fn approve_suggestion(
         return Ok(Json(json!({ "ok": true, "already_approved": true })));
     }
 
-    if let Some(bid) = suggestion.build_id {
+    let build_id = match suggestion.build_id {
+        Some(bid) => Some(bid),
+        None => crate::db::list_builds(&state.db, suggestion.server_id)
+            .await
+            .ok()
+            .and_then(|builds| builds.first().map(|b| b.id)),
+    };
+
+    if let Some(bid) = build_id {
         if let Some(build) = crate::db::get_build(&state.db, bid).await? {
             let mut opts: Vec<OptionalMod> = serde_json::from_value(build.optional_mods.clone()).unwrap_or_default();
 
@@ -133,9 +149,16 @@ pub async fn accept_suggestion(
         return Ok(Json(json!({ "ok": true, "already_approved": true })));
     }
 
-    let bid = suggestion
-        .build_id
-        .ok_or_else(|| AppError::BadRequest("у заявки нет build_id".into()))?;
+    let bid = match suggestion.build_id {
+        Some(bid) => bid,
+        None => {
+            let builds = crate::db::list_builds(&state.db, suggestion.server_id).await?;
+            builds
+                .first()
+                .map(|b| b.id)
+                .ok_or_else(|| AppError::BadRequest("у сервера нет доступных сборок".into()))?
+        }
+    };
     let build = crate::db::get_build(&state.db, bid)
         .await?
         .ok_or_else(|| AppError::NotFound("сборка".into()))?;

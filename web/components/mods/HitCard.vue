@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { ModHit } from "~/types/catalog";
+import type { InstalledModInfo, ModHit } from "~/types/catalog";
 
 const props = defineProps<{
     hit: ModHit;
     selected?: boolean;
+    installedMod?: InstalledModInfo | null;
 }>();
 
 defineEmits<{ select: []; install: [] }>();
@@ -56,14 +57,26 @@ const sideLabel = computed(() => {
                 </p>
             </div>
 
-            <AtomButton
-                variant="primary"
-                size="sm"
-                icon="i-lucide-download"
-                class="shrink-0"
-                aria-label="Install"
-                @click.stop="$emit('install')"
-            />
+            <div class="flex items-center gap-2 shrink-0">
+                <UBadge
+                    v-if="installedMod"
+                    color="success"
+                    variant="subtle"
+                    size="md"
+                    class="font-mono text-xs"
+                >
+                    ✓ Installed {{ installedMod.version ? `v${installedMod.version}` : '' }}
+                </UBadge>
+                <AtomButton
+                    :variant="installedMod ? 'secondary' : 'primary'"
+                    size="sm"
+                    :icon="installedMod ? 'i-lucide-refresh-cw' : 'i-lucide-download'"
+                    class="shrink-0"
+                    :aria-label="installedMod ? 'Reinstall or Update' : 'Install'"
+                    :title="installedMod ? 'Reinstall or Update' : 'Install'"
+                    @click.stop="$emit('install')"
+                />
+            </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-4 text-xs text-[var(--noro-muted)]">

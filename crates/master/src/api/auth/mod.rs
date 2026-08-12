@@ -1,6 +1,7 @@
 pub mod agent_auth;
 pub mod discord;
 pub mod middleware;
+pub mod oauth2_provider;
 pub mod passkeys;
 pub mod yggdrasil;
 

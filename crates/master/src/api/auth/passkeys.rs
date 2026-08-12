@@ -172,3 +172,122 @@ pub async fn login_verify(
         "user": user_profile
     })))
 }
+
+use axum::extract::Query;
+use axum::response::Html;
+
+#[derive(Deserialize)]
+pub struct PasskeyLauncherQuery {
+    pub port: u16,
+}
+
+pub async fn passkey_launcher_page(
+    Query(q): Query<PasskeyLauncherQuery>,
+) -> Html<String> {
+    let port = q.port;
+    let html = format!(
+        r#"<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Passkey — Noro Launcher</title>
+    <style>
+        body {{ font-family: system-ui, -apple-system, sans-serif; background: #0b1626; color: #dbe6ff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+        .card {{ background: #132238; padding: 32px; border-radius: 12px; text-align: center; max-width: 400px; border: 1px solid #1f3554; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }}
+        h2 {{ color: #e85aa5; margin-bottom: 12px; }}
+        p {{ color: #8ba2c7; font-size: 14px; line-height: 1.5; }}
+        .btn {{ margin-top: 20px; padding: 12px 24px; background: #e85aa5; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; display: inline-block; }}
+        .btn:hover {{ background: #f07ab8; }}
+        .status {{ margin-top: 16px; font-size: 13px; color: #f59e0b; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🔐 Passkey Авторизация</h2>
+        <p>Подтвердите отпечаток Touch ID или Windows Hello для входа в лаунчер.</p>
+        <div id="status" class="status">Ожидание Touch ID / Windows Hello...</div>
+        <button id="retry-btn" class="btn" style="display:none;" onclick="startPasskey()">Повторить сканирование</button>
+    </div>
+    <script>
+        async function startPasskey() {{
+            const statusEl = document.getElementById('status');
+            const retryBtn = document.getElementById('retry-btn');
+            statusEl.innerText = "Сканирование отпечатка...";
+            retryBtn.style.display = "none";
+            try {{
+                const optRes = await fetch('/auth/passkeys/login/options', {{ method: 'POST' }});
+                const options = await optRes.json();
+                
+                const publicKeyOpts = {{
+                    challenge: new TextEncoder().encode(options.challenge),
+                    userVerification: 'preferred',
+                    timeout: 60000
+                }};
+
+                const host = window.location.hostname;
+                if (options.rpId && options.rpId !== 'localhost' && options.rpId !== '127.0.0.1' && !/^\d+\.\d+\.\d+\.\d+$/.test(options.rpId)) {{
+                    publicKeyOpts.rpId = options.rpId;
+                }} else if (host && host !== '127.0.0.1' && host !== 'localhost' && !/^\d+\.\d+\.\d+\.\d+$/.test(host)) {{
+                    publicKeyOpts.rpId = host;
+                }}
+
+                const credential = await navigator.credentials.get({{
+                    publicKey: publicKeyOpts
+                }});
+                
+                const credId = credential.id;
+                const verifyRes = await fetch('/auth/passkeys/launcher/verify?port={port}', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{
+                        challenge: options.challenge,
+                        credential_id: credId
+                    }})
+                }});
+                
+                if (verifyRes.ok) {{
+                    const data = await verifyRes.json();
+                    statusEl.innerText = "Авторизация успешна! Возврат в лаунчер...";
+                    window.location.href = data.redirect;
+                }} else {{
+                    const err = await verifyRes.text();
+                    statusEl.innerText = "Ошибка: " + err;
+                    retryBtn.style.display = "inline-block";
+                }}
+            }} catch(e) {{
+                statusEl.innerText = "Ошибка или отмена: " + e.message;
+                retryBtn.style.display = "inline-block";
+            }}
+        }}
+        window.addEventListener('DOMContentLoaded', startPasskey);
+    </script>
+</body>
+</html>"#
+    );
+    Html(html)
+}
+
+pub async fn passkey_launcher_verify(
+    State(state): State<AppState>,
+    Query(q): Query<PasskeyLauncherQuery>,
+    Json(req): Json<LoginVerifyReq>,
+) -> AppResult<Json<Value>> {
+    let valid_challenge = crate::db::verify_and_consume_challenge(&state.db, &req.challenge)
+        .await?
+        .is_some();
+
+    if !valid_challenge {
+        return Err(AppError::BadRequest("Срок действия испытания истёк".into()));
+    }
+
+    let passkey = crate::db::get_passkey_by_credential_id(&state.db, &req.credential_id)
+        .await?
+        .ok_or_else(|| AppError::Unauthorized("Passkey не найден".into()))?;
+
+    let session = crate::db::create_session(&state.db, passkey.user_id, "launcher", chrono::Duration::days(30)).await?;
+    let code = crate::db::create_launcher_code(&state.db, passkey.user_id, &session).await?;
+
+    Ok(Json(json!({
+        "redirect": format!("http://127.0.0.1:{}/callback?code={}", q.port, code)
+    })))
+}

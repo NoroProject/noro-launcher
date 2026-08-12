@@ -38,14 +38,29 @@ pub fn skin_presets_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 }
 
 fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
-    div().id("add-preset-tile").w(gpui::relative(0.315)).h(px(132.)).p(px(4.))
-        .bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(CTA))
-        .hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer()
-        .flex().flex_col().items_center().justify_center().gap(px(4.))
-        .child(div().w(px(32.)).h(px(32.)).rounded_full().bg(rgb(BG_INPUT)).flex().items_center().justify_center().child(ic("plus", 18., CTA)))
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("Новый скин"))
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(8.)).text_color(rgb(TEXT_MUTED)).child("Загрузить .PNG"))
+    div().id("add-preset-tile").w(gpui::relative(0.315)).p(px(4.))
+        .bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(BORDER))
+        .hover(|s| s.bg(rgb(BG_INPUT)).border_color(rgb(CTA))).cursor_pointer()
+        .flex().flex_col().items_center().gap(px(4.))
         .on_click(cx.listener(on_upload_click))
+        .child(
+            div().w(px(72.)).h(px(96.)).flex().flex_col().items_center().justify_center().gap(px(6.))
+                .child(div().w(px(32.)).h(px(32.)).rounded_full().bg(rgb(BG_INPUT)).flex().items_center().justify_center().child(ic("plus", 18., CTA)))
+                .child(div().font_family(FONT_PIXEL_ALT).text_size(px(8.)).text_color(rgb(TEXT_MUTED)).child("Загрузить .PNG"))
+        )
+        .child(
+            div().w_full().px(px(4.)).truncate().text_center()
+                .font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD)
+                .text_color(rgb(CTA))
+                .child("Новый скин")
+        )
+        .child(
+            div().w_full().py(px(3.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).border_1().border_color(rgb(BORDER))
+                .hover(|s| s.bg(rgb(BG_CARD)))
+                .flex().items_center().justify_center()
+                .font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY))
+                .child("Загрузить")
+        )
         .into_any_element()
 }
 
@@ -87,11 +102,12 @@ fn custom_preset_card(ui: &LauncherUI, preset: &crate::state::SavedSkinPreset, c
     let border_clr = if is_active { CTA_HOV } else { BORDER };
     let edit_preset_id = id.clone();
     let apply_bytes = bytes.clone();
+    let card_apply_bytes = bytes.clone();
 
     let img_el = if let Some(loaded_img) = ui.preset_images.get(&id) {
-        img(loaded_img.clone()).w(px(64.)).h(px(64.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
+        img(loaded_img.clone()).w(px(72.)).h(px(96.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
     } else {
-        div().w(px(64.)).h(px(64.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
+        div().w(px(72.)).h(px(96.)).flex().items_center().justify_center().child(ic("user", 24., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
     };
 
     let edit_preset_id_del = id.clone();
@@ -107,6 +123,12 @@ fn custom_preset_card(ui: &LauncherUI, preset: &crate::state::SavedSkinPreset, c
         .hover(|s| s.bg(rgb(BG_INPUT)))
         .cursor_pointer()
         .flex().flex_col().items_center().gap(px(4.))
+        .on_click(cx.listener(move |this, _, _, cx| {
+            if !card_apply_bytes.is_empty() {
+                this.upload_skin(card_apply_bytes.clone());
+                cx.notify();
+            }
+        }))
         .child(
             div()
                 .absolute()
@@ -156,9 +178,9 @@ fn standard_preset_card(ui: &LauncherUI, name: &'static str, id: &'static str, c
     let border_clr = if is_active { CTA_HOV } else { BORDER };
 
     let img_el = if let Some(loaded_img) = ui.preset_images.get(id) {
-        img(loaded_img.clone()).w(px(64.)).h(px(64.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
+        img(loaded_img.clone()).w(px(72.)).h(px(96.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
     } else {
-        div().w(px(64.)).h(px(64.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
+        div().w(px(72.)).h(px(96.)).flex().items_center().justify_center().child(ic("user", 24., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
     };
 
     div().id(id).w(gpui::relative(0.315)).p(px(4.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
@@ -202,8 +224,8 @@ fn drag_hint() -> AnyElement {
 }
 
 fn preview_content(ui: &LauncherUI) -> AnyElement {
-    if ui.skin_loading || ui.skin_uploading { return placeholder(t("profile-skin-loading")); }
     if let Some(p) = &ui.skin_preview { return img(p.clone()).w(px(PREVIEW_W)).h(px(PREVIEW_H)).into_any_element(); }
+    if ui.skin_loading || ui.skin_uploading { return placeholder(t("profile-skin-loading")); }
     if let Some(s) = &ui.skin_image { return img(s.clone()).w(px(PREVIEW_W)).h(px(PREVIEW_H)).into_any_element(); }
     placeholder(t("profile-no-skin"))
 }

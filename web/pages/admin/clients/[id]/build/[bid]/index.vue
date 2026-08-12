@@ -140,7 +140,7 @@ async function deleteBuild() {
         await auth.request(`/api/admin/builds/${buildId.value}`, {
             method: "DELETE",
         });
-        await navigateTo(`/admin/servers/${serverId.value}`);
+        await navigateTo(`/admin/clients/${serverId.value}`);
     });
 }
 
@@ -303,7 +303,7 @@ async function toggleAllowSuggestions(allow: boolean) {
             <AtomButton
               variant="dark"
               icon="i-lucide-arrow-left"
-              :to="`/admin/servers/${serverId}`"
+              :to="`/admin/clients/${serverId}`"
             >
               Back
             </AtomButton>
@@ -430,7 +430,7 @@ async function toggleAllowSuggestions(allow: boolean) {
                     @upload="uploadBuildFile"
                 />
                 <BuildModCatalogPanel
-                    :to="`/admin/servers/${serverId}/build/${buildId}/mods`"
+                    :to="`/admin/clients/${serverId}/build/${buildId}/mods`"
                 />
             </aside>
         </div>

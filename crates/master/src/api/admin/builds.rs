@@ -8,7 +8,7 @@ use crate::state::AppState;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
 use schema::{OptionalMod, PERM_ADMIN_BUILDS};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -849,4 +849,43 @@ pub async fn set_paths(
     let server_id = build_server_id(&state, id).await?;
     broadcast_builds_changed(&state, server_id);
     Ok(Json(json!({ "ok": true })))
+}
+
+#[derive(Serialize)]
+pub struct InstalledModItem {
+    pub file_id: Uuid,
+    pub path: String,
+    pub sha1: String,
+    pub size: i64,
+    pub mod_id: Option<String>,
+    pub name: Option<String>,
+    pub version: Option<String>,
+}
+
+pub async fn list_installed_mods(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Vec<InstalledModItem>>> {
+    admin.require(PERM_ADMIN_BUILDS)?;
+    let files = crate::db::build_files(&state.db, id).await?;
+    let mut result = Vec::new();
+
+    for f in files {
+        if f.path.starts_with("mods/") || f.kind == "mod" {
+            let path = state.files.path_for(&f.sha1);
+            let meta = backend::mod_icon::extract_jar_metadata(&path);
+            result.push(InstalledModItem {
+                file_id: f.id,
+                path: f.path,
+                sha1: f.sha1,
+                size: f.size,
+                mod_id: meta.as_ref().and_then(|m| m.mod_id.clone()),
+                name: meta.as_ref().and_then(|m| m.name.clone()),
+                version: meta.as_ref().and_then(|m| m.version.clone()),
+            });
+        }
+    }
+
+    Ok(Json(result))
 }

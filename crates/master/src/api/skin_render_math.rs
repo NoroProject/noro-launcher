@@ -1,4 +1,4 @@
-//! 3D математика, геометрия и растеризация скинов (по мотивам PandoraLauncher).
+//! 3D математика, геометрия и высокоточная растеризация скинов (по мотивам PandoraLauncher).
 
 use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
 
@@ -40,7 +40,7 @@ pub struct Quad {
     pub is_overlay: bool,
 }
 
-pub fn rasterize_quad(
+pub fn rasterize_quad_highres(
     quad: &Quad,
     mat: &Mat3,
     skin: &DynamicImage,
@@ -51,6 +51,7 @@ pub fn rasterize_quad(
     cx: f64,
     cy: f64,
     center_y: f64,
+    res_mult: f64,
 ) {
     let light = V3::new(0.3, 0.8, 0.5);
     let trans_norm = mat.transform(quad.normal);
@@ -69,15 +70,17 @@ pub fn rasterize_quad(
     let min_y = tv.iter().map(|v| v.y).fold(f64::INFINITY, f64::min);
     let max_y = tv.iter().map(|v| v.y).fold(f64::NEG_INFINITY, f64::max);
 
-    let sx_min = (cx + min_x - 1.0).floor().max(0.0) as u32;
-    let sx_max = (cx + max_x + 1.0).ceil().min(cw as f64 - 1.0) as u32;
-    let sy_min = (cy - (max_y - center_y) - 1.0).floor().max(0.0) as u32;
-    let sy_max = (cy - (min_y - center_y) + 1.0).ceil().min(ch as f64 - 1.0) as u32;
+    let sx_min = ((cx + min_x * res_mult) - 2.0).floor().max(0.0) as u32;
+    let sx_max = ((cx + max_x * res_mult) + 2.0).ceil().min(cw as f64 - 1.0) as u32;
+    let sy_min = ((cy - (max_y - center_y) * res_mult) - 2.0).floor().max(0.0) as u32;
+    let sy_max = ((cy - (min_y - center_y) * res_mult) + 2.0).ceil().min(ch as f64 - 1.0) as u32;
+
+    let z_bias = if quad.is_overlay { 0.08 } else { 0.0 };
 
     for py in sy_min..=sy_max {
         for px in sx_min..=sx_max {
-            let wx = px as f64 - cx;
-            let wy = cy - py as f64 + center_y;
+            let wx = (px as f64 - cx) / res_mult;
+            let wy = (cy - py as f64) / res_mult + center_y;
 
             if let Some((u, v, z_depth)) = sample_barycentric(wx, wy, &tv, &quad.uvs) {
                 let skin_x = u.floor().max(0.0) as u32;
@@ -88,8 +91,9 @@ pub fn rasterize_quad(
                 if col[3] == 0 { continue; }
 
                 let idx = (py * cw + px) as usize;
-                if z_depth > z_buf[idx] {
-                    z_buf[idx] = z_depth;
+                let effective_z = z_depth + z_bias;
+                if effective_z > z_buf[idx] {
+                    z_buf[idx] = effective_z;
                     let r = (col[0] as f64 * shade).clamp(0.0, 255.0) as u8;
                     let g = (col[1] as f64 * shade).clamp(0.0, 255.0) as u8;
                     let b = (col[2] as f64 * shade).clamp(0.0, 255.0) as u8;

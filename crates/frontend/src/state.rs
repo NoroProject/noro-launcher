@@ -175,6 +175,9 @@ pub struct LauncherUI {
     pub mod_catalog_limit: u32,
     pub startup_checking: bool,
     pub login_error: Option<String>,
+    pub login_mode_key: bool,
+    pub login_key_input: String,
+    pub login_key_focus: Option<gpui::FocusHandle>,
 
     pub servers: Vec<ServerEntry>,
     pub news: Vec<NewsItem>,
@@ -183,6 +186,7 @@ pub struct LauncherUI {
     pub build_state: HashMap<Uuid, bridge::BuildState>,
     pub logs: HashMap<Uuid, Vec<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
+    pub installed_files: HashMap<Uuid, Vec<String>>,
     pub allow_mod_suggestions: HashMap<Uuid, bool>,
     pub suggested_mods: HashSet<String>,
     pub background_images: HashMap<Uuid, Arc<Image>>,
@@ -277,12 +281,16 @@ impl LauncherUI {
             mod_catalog_limit: 20,
             startup_checking: true,
             login_error: None,
+            login_mode_key: false,
+            login_key_input: String::new(),
+            login_key_focus: None,
             servers: Vec::new(),
             news: Vec::new(),
             sync: HashMap::new(),
             build_state: HashMap::new(),
             logs: HashMap::new(),
             optional_mods: HashMap::new(),
+            installed_files: HashMap::new(),
             allow_mod_suggestions: HashMap::new(),
             suggested_mods: HashSet::new(),
             background_images: HashMap::new(),
@@ -517,12 +525,12 @@ impl LauncherUI {
     }
 
     pub fn load_preset_renders(&mut self, cx: &mut Context<Self>) {
-        if !self.preset_images.is_empty() { return; }
+        if self.preset_images.contains_key("steve") { return; }
         let master_url = self.config.master_url.clone();
-        let presets = ["steve", "alex", "ari", "zuri", "efe", "makena", "kai", "sunny"];
+        let presets = ["steve", "alex", "ari", "zuri", "efe", "makena", "kai", "sunny", "noor"];
         for preset in presets {
             let name = preset.to_string();
-            let url = format!("{}/api/textures/renders?preset={}&mode=bust&scale=5&yaw=-25&pitch=12", master_url.trim_end_matches('/'), name);
+            let url = format!("{}/api/textures/renders/bust?preset={}&scale=8&yaw=-25&pitch=12", master_url.trim_end_matches('/'), name);
             cx.spawn(async move |this, cx| {
                 if let Ok(img) = crate::image_loader::load_image_from_url(url).await {
                     let _ = this.update(cx, |this, cx| {
@@ -603,6 +611,7 @@ impl LauncherUI {
                     master_url,
                 };
                 self.server_settings = server_settings.into_iter().collect();
+                self.load_preset_renders(cx);
                 if self.user.is_none() {
                     self.startup_checking = false;
                 }
@@ -620,10 +629,12 @@ impl LauncherUI {
                 server_id,
                 mods,
                 allow_suggestions,
+                installed_files,
             } => {
                 self.optional_mods.insert(server_id, mods);
                 self.allow_mod_suggestions
                     .insert(server_id, allow_suggestions);
+                self.installed_files.insert(server_id, installed_files);
             }
             MessageToFrontend::ServerClientRecommendation {
                 server_id,
@@ -832,7 +843,7 @@ impl LauncherUI {
                         }
                     }).detach();
 
-                    let render_url = format!("{}/api/textures/renders/bust?url={}&scale=6&yaw=-25&pitch=12", master_url.trim_end_matches('/'), urlencoding::encode(&url));
+                    let render_url = format!("{}/api/textures/renders/bust?url={}&scale=8&yaw=-25&pitch=12", master_url.trim_end_matches('/'), urlencoding::encode(&url));
                     let id_render = id.clone();
                     cx.spawn(async move |this, cx| {
                         if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await {
@@ -869,6 +880,37 @@ impl LauncherUI {
         });
     }
 
+    pub fn start_oauth2_login(&mut self) {
+        self.logging_in = true;
+        self.login_error = None;
+        let modal = bridge::ModalAction::new("OAuth2 sign in");
+        self.backend.send(MessageToBackend::StartOAuth2Login {
+            modal_action: modal,
+        });
+    }
+
+    pub fn start_key_login(&mut self, key: String) {
+        if key.trim().is_empty() {
+            return;
+        }
+        self.logging_in = true;
+        self.login_error = None;
+        let modal = bridge::ModalAction::new("Key sign in");
+        self.backend.send(MessageToBackend::StartKeyLogin {
+            key: key.trim().to_string(),
+            modal_action: modal,
+        });
+    }
+
+    pub fn start_biometric_login(&mut self) {
+        self.logging_in = true;
+        self.login_error = None;
+        let modal = bridge::ModalAction::new("Biometric sign in");
+        self.backend.send(MessageToBackend::StartBiometricLogin {
+            modal_action: modal,
+        });
+    }
+
     pub fn logout(&mut self) {
         self.backend.send(MessageToBackend::Logout);
     }
@@ -877,8 +919,7 @@ impl LauncherUI {
         if self.skin_uploading {
             return;
         }
-        // Отдельный флаг: skin_loading занят скачиванием текстуры, и держать его
-        // здесь означало бы заблокировать загрузку только что залитого скина.
+        self.skin_bytes = Some(bytes.clone());
         self.skin_uploading = true;
         self.backend.send(MessageToBackend::UploadSkin { bytes });
     }

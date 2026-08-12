@@ -102,7 +102,7 @@ export function useAdminServerBase() {
     deleting.value = true;
     try {
       await auth.request(`/api/admin/servers/${id.value}`, { method: "DELETE" });
-      await navigateTo("/admin/servers");
+      await navigateTo("/admin/clients");
       notify.ok()
     } catch (e) {
       notify.fail(e)

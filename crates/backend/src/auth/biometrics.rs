@@ -1,0 +1,71 @@
+//! Native biometric authentication (Touch ID on macOS, Windows Hello on Windows).
+
+use anyhow::{anyhow, Result};
+use std::process::Command;
+
+pub fn authenticate_biometrics(reason: &str) -> Result<bool> {
+    #[cfg(target_os = "macos")]
+    {
+        authenticate_macos_touch_id(reason)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        authenticate_windows_hello(reason)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        Err(anyhow!("Biometrics not supported on this OS"))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn authenticate_macos_touch_id(reason: &str) -> Result<bool> {
+    let script = format!(
+        r#"import LocalAuthentication
+import Foundation
+let context = LAContext()
+var error: NSError?
+if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {{
+    let semaphore = DispatchSemaphore(value: 0)
+    var success = false
+    context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "{}") {{ result, _ in
+        success = result
+        semaphore.signal()
+    }}
+    _ = semaphore.wait(timeout: .now() + 60)
+    if success {{ exit(0) }} else {{ exit(1) }}
+}} else {{
+    exit(2)
+}}"#,
+        reason.replace('"', "\\\"")
+    );
+
+    let output = Command::new("swift")
+        .arg("-e")
+        .arg(&script)
+        .output()?;
+
+    if output.status.code() == Some(0) {
+        Ok(true)
+    } else if output.status.code() == Some(1) {
+        Ok(false)
+    } else {
+        Err(anyhow!("Touch ID is not available or disabled on this device"))
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn authenticate_windows_hello(_reason: &str) -> Result<bool> {
+    let script = r#"[Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType=WindowsRuntime]
+$asyncOp = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("Авторизация в Noro Launcher")
+$task = [System.Threading.Tasks.Task]::Run({ $asyncOp.GetResults() })
+$task.Wait()
+if ($task.Result -eq [Windows.Security.Credentials.UI.UserConsentVerificationResult]::Verified) { exit 0 } else { exit 1 }"#;
+
+    let output = Command::new("powershell")
+        .arg("-Command")
+        .arg(script)
+        .output()?;
+
+    Ok(output.status.code() == Some(0))
+}

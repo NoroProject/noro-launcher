@@ -4,6 +4,77 @@ use std::io::{Read, Seek};
 use std::path::Path;
 use zip::ZipArchive;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct ModMetadata {
+    pub mod_id: Option<String>,
+    pub name: Option<String>,
+    pub version: Option<String>,
+}
+
+/// Try to extract mod metadata (ID, title, version) from a JAR file.
+pub fn extract_jar_metadata(jar_path: &Path) -> Option<ModMetadata> {
+    let file = std::fs::File::open(jar_path).ok()?;
+    let mut zip = ZipArchive::new(file).ok()?;
+
+    if let Some((_, json_bytes)) = read_entry(&mut zip, "fabric.mod.json") {
+        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&json_bytes) {
+            let mod_id = json.get("id").and_then(|v| v.as_str()).map(String::from);
+            let name = json.get("name").and_then(|v| v.as_str()).map(String::from);
+            let version = json.get("version").and_then(|v| v.as_str()).map(String::from);
+            if mod_id.is_some() || name.is_some() || version.is_some() {
+                return Some(ModMetadata { mod_id, name, version });
+            }
+        }
+    }
+
+    if let Some((_, json_bytes)) = read_entry(&mut zip, "quilt.mod.json") {
+        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&json_bytes) {
+            let meta = json.pointer("/quilt_loader/metadata");
+            let mod_id = meta.and_then(|m| m.get("id")).and_then(|v| v.as_str()).map(String::from);
+            let name = meta.and_then(|m| m.get("name")).and_then(|v| v.as_str()).map(String::from);
+            let version = meta.and_then(|m| m.get("version")).and_then(|v| v.as_str()).map(String::from);
+            if mod_id.is_some() || name.is_some() || version.is_some() {
+                return Some(ModMetadata { mod_id, name, version });
+            }
+        }
+    }
+
+    for entry in &["META-INF/neoforge.mods.toml", "META-INF/mods.toml"] {
+        if let Some((_, toml_bytes)) = read_entry(&mut zip, entry) {
+            if let Ok(content) = std::str::from_utf8(&toml_bytes) {
+                let mut mod_id = None;
+                let mut name = None;
+                let mut version = None;
+
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("modId") && mod_id.is_none() {
+                        if let Some(val) = trimmed.splitn(2, '=').nth(1) {
+                            mod_id = Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
+                        }
+                    } else if trimmed.starts_with("displayName") && name.is_none() {
+                        if let Some(val) = trimmed.splitn(2, '=').nth(1) {
+                            name = Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
+                        }
+                    } else if trimmed.starts_with("version") && version.is_none() {
+                        if let Some(val) = trimmed.splitn(2, '=').nth(1) {
+                            let v = val.trim().trim_matches('"').trim_matches('\'').to_string();
+                            if v != "${file.jarVersion}" {
+                                version = Some(v);
+                            }
+                        }
+                    }
+                }
+                if mod_id.is_some() || name.is_some() || version.is_some() {
+                    return Some(ModMetadata { mod_id, name, version });
+                }
+            }
+        }
+    }
+
+    None
+}
+
 /// Try to extract a mod icon from a local JAR file.
 /// Returns a `data:image/...;base64,...` URL on success.
 pub fn extract_jar_icon(jar_path: &Path) -> Option<String> {

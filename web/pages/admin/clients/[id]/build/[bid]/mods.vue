@@ -27,7 +27,7 @@ const build = computed(() => data.value?.build);
             <AtomButton
                 variant="dark"
                 icon="i-lucide-arrow-left"
-                :to="`/admin/servers/${serverId}/build/${buildId}`"
+                :to="`/admin/clients/${serverId}/build/${buildId}`"
             >
                 Build
             </AtomButton>

@@ -5,6 +5,7 @@ const auth = useAuth();
 const cabinetNav = [
     { label: "Cabinet", to: "/cabinet", icon: "i-lucide-user" },
     { label: "Skin", to: "/skin", icon: "i-lucide-shirt" },
+    { label: "Apps", to: "/cabinet/authorized-apps", icon: "i-lucide-shield-check" },
     { label: "Settings", to: "/cabinet/settings", icon: "i-lucide-settings" },
 ];
 
@@ -13,7 +14,7 @@ const adminNavGroups = [
         label: "Management",
         items: [
             { label: "Dashboard", to: "/admin", icon: "i-lucide-layout-dashboard" },
-            { label: "Servers", to: "/admin/servers", icon: "i-lucide-server" },
+            { label: "Clients", to: "/admin/clients", icon: "i-lucide-server" },
             { label: "Mods", to: "/admin/mods", icon: "i-lucide-library-big" },
             { label: "Users", to: "/admin/users", icon: "i-lucide-users" },
             { label: "Capes", to: "/admin/capes", icon: "i-lucide-flag" },

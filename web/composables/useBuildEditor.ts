@@ -87,7 +87,7 @@ export async function useBuildEditor() {
       await auth.request(`/api/admin/builds/${buildId.value}`, {
         method: "DELETE",
       });
-      await navigateTo(`/admin/servers/${serverId.value}/builds`);
+      await navigateTo(`/admin/clients/${serverId.value}`);
     });
   }
 

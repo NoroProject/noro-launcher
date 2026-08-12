@@ -187,7 +187,7 @@ async function createServer() {
                             <AtomButton
                               variant="dark"
                               icon="i-lucide-settings-2"
-                              :to="`/admin/servers/${server.id}`"
+                              :to="`/admin/clients/${server.id}`"
                               class="!min-h-9 !min-w-9 !px-2"
                             >
 

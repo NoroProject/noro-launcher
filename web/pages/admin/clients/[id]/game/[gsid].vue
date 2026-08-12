@@ -39,7 +39,7 @@ const TABS = [
         :subtitle="server ? `${server.mc_host}:${server.mc_port}` : 'control surface'"
     >
         <template #actions>
-            <AtomButton variant="dark" icon="i-lucide-arrow-left" :to="`/admin/servers/${serverId}`">
+            <AtomButton variant="dark" icon="i-lucide-arrow-left" :to="`/admin/clients/${serverId}`">
                 Pack
             </AtomButton>
         </template>

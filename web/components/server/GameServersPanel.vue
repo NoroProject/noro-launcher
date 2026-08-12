@@ -96,7 +96,7 @@ onMounted(gs.load);
                     :key="item.id"
                     :item="item"
                     :busy="gs.busyId.value === item.id"
-                    :manage-to="`/admin/servers/${serverId}/game/${item.id}`"
+                    :manage-to="`/admin/clients/${serverId}/game/${item.id}`"
                     @rotate="gs.rotate(item)"
                     @remove="gs.remove(item.id)"
                     @save="next => gs.update(item.id, next)"

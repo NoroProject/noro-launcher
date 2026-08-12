@@ -92,7 +92,7 @@ const _: () = {
 
 /// Адрес мастера. В release он обязателен — см. проверку выше.
 pub fn master_url() -> &'static str {
-    option_env!("NORO_MASTER_URL").unwrap_or("http://127.0.0.1:8080")
+    option_env!("NORO_MASTER_URL").unwrap_or("https://api.noro.dalynkaa.dev")
 }
 
 #[cfg(test)]

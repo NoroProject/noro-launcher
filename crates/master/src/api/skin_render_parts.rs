@@ -1,4 +1,4 @@
-//! Построение полигональной модели персонажа Minecraft (по образцу PandoraLauncher).
+//! Построение полигональной модели персонажа Minecraft с идеальным UV-маппингом (по образцу PandoraLauncher).
 
 use super::skin_render_math::{Mat3, Quad, V3};
 
@@ -16,16 +16,19 @@ pub struct BodyPart {
 pub fn build_quads(parts: &[BodyPart]) -> Vec<Quad> {
     let mut quads = Vec::new();
     for p in parts {
+        let tex_w = p.max.x - p.min.x;
+        let tex_h = p.max.y - p.min.y;
+        let tex_d = p.max.z - p.min.z;
+
         let inf = if p.is_overlay { 0.25 } else { 0.0 };
         let min = V3::new(p.min.x - inf, p.min.y - inf, p.min.z - inf);
         let max = V3::new(p.max.x + inf, p.max.y + inf, p.max.z + inf);
 
-        let w = max.x - min.x;
-        let h = max.y - min.y;
-        let d = max.z - min.z;
-
         let tx = p.tx;
         let ty = p.ty;
+        let w = tex_w;
+        let h = tex_h;
+        let d = tex_d;
 
         let local_quads = [
             // Front (+Z)
@@ -45,14 +48,14 @@ pub fn build_quads(parts: &[BodyPart]) -> Vec<Quad> {
             // Right (+X)
             Quad {
                 verts: [V3::new(max.x, max.y, max.z), V3::new(max.x, max.y, min.z), V3::new(max.x, min.y, min.z), V3::new(max.x, min.y, max.z)],
-                uvs: [(tx, ty + d), (tx + d, ty + d), (tx + d, ty + d + h), (tx, ty + d + h)],
+                uvs: [(tx + d, ty + d), (tx, ty + d), (tx, ty + d + h), (tx + d, ty + d + h)],
                 normal: V3::new(1.0, 0.0, 0.0),
                 is_overlay: p.is_overlay,
             },
             // Left (-X)
             Quad {
                 verts: [V3::new(min.x, max.y, min.z), V3::new(min.x, max.y, max.z), V3::new(min.x, min.y, max.z), V3::new(min.x, min.y, min.z)],
-                uvs: [(tx + d + w, ty + d), (tx + 2.0*d + w, ty + d), (tx + 2.0*d + w, ty + d + h), (tx + d + w, ty + d + h)],
+                uvs: [(tx + 2.0*d + w, ty + d), (tx + d + w, ty + d), (tx + d + w, ty + d + h), (tx + 2.0*d + w, ty + d + h)],
                 normal: V3::new(-1.0, 0.0, 0.0),
                 is_overlay: p.is_overlay,
             },

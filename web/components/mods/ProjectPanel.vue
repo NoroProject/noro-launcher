@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ModHit, ModProject, ModVersion } from "~/types/catalog";
+import type { InstalledModInfo, ModHit, ModProject, ModVersion } from "~/types/catalog";
 
 /** Панель проекта: версии, описание, галерея. Правая колонка браузера. */
 defineProps<{
@@ -10,6 +10,7 @@ defineProps<{
     loadingVersions?: boolean;
     compatibleOnly: boolean;
     hasContext: boolean;
+    installedMod?: InstalledModInfo | null;
 }>();
 
 const emit = defineEmits<{
@@ -109,6 +110,7 @@ const TABS = ["versions", "about", "gallery"] as const;
                         v-for="version in versions"
                         :key="version.id"
                         :version="version"
+                        :installed-mod="installedMod"
                         @install="emit('install', version)"
                     />
                 </div>

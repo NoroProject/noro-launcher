@@ -52,8 +52,18 @@ pub struct ModProjectInfo {
 /// Frontend → Backend.
 #[derive(Debug)]
 pub enum MessageToBackend {
-    // --- Авторизация (Discord OAuth через браузер) ---
+    // --- Авторизация (Discord OAuth / Ключ доступа) ---
     StartDiscordLogin {
+        modal_action: ModalAction,
+    },
+    StartOAuth2Login {
+        modal_action: ModalAction,
+    },
+    StartKeyLogin {
+        key: String,
+        modal_action: ModalAction,
+    },
+    StartBiometricLogin {
         modal_action: ModalAction,
     },
     Logout,
@@ -313,6 +323,7 @@ pub enum MessageToFrontend {
         server_id: Uuid,
         mods: Vec<OptionalModInfo>,
         allow_suggestions: bool,
+        installed_files: Vec<String>,
     },
     ServerClientRecommendation {
         server_id: Uuid,

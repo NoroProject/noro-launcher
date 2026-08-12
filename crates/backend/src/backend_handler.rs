@@ -44,6 +44,143 @@ impl BackendState {
                 });
             }
 
+            MessageToBackend::StartOAuth2Login { modal_action } => {
+                let master_url = self.ctx.config.get().master_url;
+                let internal = self.ctx.internal.clone();
+                let modal = modal_action.clone();
+                modal.set_stage("Waiting for Web OAuth2 sign in...");
+                tokio::spawn(async move {
+                    let cancelled = {
+                        let m = modal.clone();
+                        move || m.is_cancelled()
+                    };
+                    match discord_oauth::login_oauth2(&master_url, cancelled).await {
+                        Ok(res) => {
+                            let _ = internal.send(InternalEvent::LoginCompleted {
+                                auth: res.auth,
+                                user: res.user,
+                            });
+                        }
+                        Err(e) => {
+                            let kind = if e.to_string().contains("cancel") {
+                                LoginErrorKind::Cancelled
+                            } else {
+                                LoginErrorKind::Network(e.to_string())
+                            };
+                            let _ = internal.send(InternalEvent::LoginFailed { kind });
+                        }
+                    }
+                });
+            }
+
+            MessageToBackend::StartKeyLogin { key, modal_action } => {
+                let master = self.ctx.config.get().master_url;
+                let http = self.ctx.http.clone();
+                let internal = self.ctx.internal.clone();
+                modal_action.set_stage("Checking authorization key...");
+
+                tokio::spawn(async move {
+                    let base = master.trim_end_matches('/');
+                    let res = http
+                        .get(format!("{base}/api/me"))
+                        .header("Authorization", format!("Bearer {key}"))
+                        .send()
+                        .await;
+
+                    match res {
+                        Ok(r) if r.status().is_success() => {
+                            if let Ok(profile) = r.json::<schema::UserProfile>().await {
+                                modal_action.finish();
+                                let auth = token_store::StoredAuth {
+                                    access_token: key,
+                                    refresh_token: String::new(),
+                                };
+                                let _ = internal.send(InternalEvent::LoginCompleted {
+                                    auth,
+                                    user: profile,
+                                });
+                                return;
+                            }
+                        }
+                        Ok(r) => {
+                            let txt = r.text().await.unwrap_or_default();
+                            modal_action.fail(txt.clone());
+                            let _ = internal.send(InternalEvent::LoginFailed {
+                                kind: bridge::LoginErrorKind::Rejected(if txt.is_empty() { "Invalid access key".into() } else { txt }),
+                            });
+                        }
+                        Err(e) => {
+                            modal_action.fail(e.to_string());
+                            let _ = internal.send(InternalEvent::LoginFailed {
+                                kind: bridge::LoginErrorKind::Network(e.to_string()),
+                            });
+                        }
+                    }
+                });
+            }
+
+            MessageToBackend::StartBiometricLogin { modal_action } => {
+                let master = self.ctx.config.get().master_url;
+                let http = self.ctx.http.clone();
+                let internal = self.ctx.internal.clone();
+                let modal = modal_action.clone();
+                modal.set_stage("Waiting for biometric authentication...");
+
+                tokio::spawn(async move {
+                    // 1. Попытка нативного Touch ID / Windows Hello из системного Keyring
+                    if let Ok(true) = crate::auth::biometrics::authenticate_biometrics("Авторизация в Noro Launcher") {
+                        if let Some(stored) = token_store::load() {
+                            let key = stored.access_token.clone();
+                            let base = master.trim_end_matches('/');
+                            let res = http
+                                .get(format!("{base}/api/me"))
+                                .header("Authorization", format!("Bearer {key}"))
+                                .send()
+                                .await;
+
+                            if let Ok(r) = res {
+                                if r.status().is_success() {
+                                    if let Ok(profile) = r.json::<schema::UserProfile>().await {
+                                        modal.finish();
+                                        let auth = token_store::StoredAuth {
+                                            access_token: key,
+                                            refresh_token: stored.refresh_token,
+                                        };
+                                        let _ = internal.send(InternalEvent::LoginCompleted { auth, user: profile });
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Если токена в Keyring нет — запускаем вход через Web Passkeys / OAuth в браузере
+                    modal.set_stage("Waiting for Passkey sign in in browser...");
+                    let cancelled = {
+                        let m = modal.clone();
+                        move || m.is_cancelled()
+                    };
+                    match crate::auth::discord_oauth::login_passkey(&master, cancelled).await {
+                        Ok(res) => {
+                            modal.finish();
+                            let _ = internal.send(InternalEvent::LoginCompleted {
+                                auth: res.auth,
+                                user: res.user,
+                            });
+                        }
+                        Err(e) => {
+                            let kind = if e.to_string().contains("cancel") {
+                                bridge::LoginErrorKind::Cancelled
+                            } else {
+                                bridge::LoginErrorKind::Network(e.to_string())
+                            };
+                            modal.fail(e.to_string());
+                            let _ = internal.send(InternalEvent::LoginFailed { kind });
+                        }
+                    }
+                });
+            }
+
             MessageToBackend::Logout => {
                 let _ = token_store::clear();
                 self.access_token = None;
@@ -598,10 +735,16 @@ impl BackendState {
                 }
             })
             .collect();
+        let installed_files = manifest
+            .verified_files
+            .iter()
+            .map(|f| f.path.clone())
+            .collect();
         self.ctx.send(MessageToFrontend::OptionalMods {
             server_id,
             mods,
             allow_suggestions: manifest.allow_optional_mod_suggestions,
+            installed_files,
         });
     }
 

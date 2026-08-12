@@ -8,8 +8,8 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
     public: {
-      masterUrl: process.env.NUXT_PUBLIC_MASTER_URL || 'http://localhost:8080',
-      webUrl: process.env.NUXT_PUBLIC_WEB_URL || 'http://localhost:3000'
+      masterUrl: process.env.NUXT_PUBLIC_MASTER_URL || 'https://api.noro.dalynkaa.dev',
+      webUrl: process.env.NUXT_PUBLIC_WEB_URL || 'https://noro.dalynkaa.dev'
     }
   },
   app: {
