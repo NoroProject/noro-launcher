@@ -50,6 +50,7 @@ pub struct Ctx {
     pub optional: Persistent<OptionalModsSelection>,
     pub running: Arc<Mutex<HashMap<Uuid, RunningGame>>>,
     pub internal: UnboundedSender<InternalEvent>,
+    pub rpc: crate::discord_rpc::DiscordRpc,
 }
 
 impl Ctx {
@@ -138,6 +139,9 @@ async fn run(
 
     tracing::info!("используется мастер-сервер: {}", config.get().master_url);
 
+    let rpc = crate::discord_rpc::spawn_discord_rpc();
+    rpc.update(crate::discord_rpc::DiscordRpcState::Launcher { server_name: None });
+
     let ctx = Ctx {
         frontend: tx_frontend,
         ws,
@@ -147,6 +151,7 @@ async fn run(
         optional,
         running: Arc::new(Mutex::new(HashMap::new())),
         internal: internal_tx,
+        rpc,
     };
 
     let mut state = BackendState {
@@ -526,6 +531,9 @@ pub fn spawn_sync_and_launch(
             .config
             .get()
             .launch_config_for_server(&server_id, &manifest.recommended_client_settings);
+        let server_name = server.as_ref().map(|s| s.name.clone()).unwrap_or_else(|| "Minecraft".into());
+        let online = server.as_ref().and_then(|s| s.online);
+        let max_online = server.as_ref().and_then(|s| s.max_online);
         match game_runner::launch(
             &ctx.http,
             &launch_config,
@@ -538,7 +546,7 @@ pub fn spawn_sync_and_launch(
         .await
         {
             Ok(child) => {
-                run_game_process(ctx, server_id, child).await;
+                run_game_process(ctx, server_id, server_name, online, max_online, child).await;
             }
             Err(e) => {
                 ctx.send(MessageToFrontend::SyncFailed {
@@ -551,8 +559,20 @@ pub fn spawn_sync_and_launch(
 }
 
 /// Управлять запущенным процессом: логи, ожидание, kill.
-async fn run_game_process(ctx: Ctx, server_id: Uuid, mut child: tokio::process::Child) {
+async fn run_game_process(
+    ctx: Ctx,
+    server_id: Uuid,
+    server_name: String,
+    online: Option<u32>,
+    max_online: Option<u32>,
+    mut child: tokio::process::Child,
+) {
     let started = Instant::now();
+    let start_timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
     let (kill_tx, mut kill_rx) = mpsc::unbounded_channel::<()>();
     ctx.running.lock().insert(
         server_id,
@@ -561,6 +581,11 @@ async fn run_game_process(ctx: Ctx, server_id: Uuid, mut child: tokio::process::
             kill: kill_tx,
         },
     );
+
+    ctx.rpc.update(crate::discord_rpc::DiscordRpcState::GameMenu {
+        server_name: server_name.clone(),
+        start_timestamp,
+    });
 
     ctx.send(MessageToFrontend::GameStarted { server_id });
     ctx.ws.send(ClientWsMsg::ReportGameStart { server_id });
@@ -572,6 +597,13 @@ async fn run_game_process(ctx: Ctx, server_id: Uuid, mut child: tokio::process::
             server_id,
             ctx.frontend.clone(),
             false,
+            Some((
+                ctx.rpc.clone(),
+                server_name.clone(),
+                start_timestamp,
+                online,
+                max_online,
+            )),
         ));
     }
     if let Some(stderr) = child.stderr.take() {
@@ -580,6 +612,7 @@ async fn run_game_process(ctx: Ctx, server_id: Uuid, mut child: tokio::process::
             server_id,
             ctx.frontend.clone(),
             true,
+            None,
         ));
     }
 
@@ -600,4 +633,8 @@ async fn run_game_process(ctx: Ctx, server_id: Uuid, mut child: tokio::process::
         playtime_secs: playtime,
     });
     ctx.send(MessageToFrontend::GameStopped { server_id, exit_ok });
+
+    ctx.rpc.update(crate::discord_rpc::DiscordRpcState::Launcher {
+        server_name: Some(server_name),
+    });
 }

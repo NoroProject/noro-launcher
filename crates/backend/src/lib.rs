@@ -6,6 +6,7 @@ pub mod auth;
 pub mod backend;
 pub mod backend_handler;
 pub mod config;
+pub mod discord_rpc;
 pub mod directories;
 pub mod game_runner;
 pub mod log_reader;

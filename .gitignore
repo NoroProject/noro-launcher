@@ -23,12 +23,13 @@ web/.turbo
 web/coverage
 
 # java-агенты
-agent/.gradle
+agent/**/.gradle/
 # Одним правилом на любую глубину: у версионных сборок каталог лежит в
 # agent/mod/versions/<mc>-<loader>/build, и прежние agent/build + agent/*/build
 # до него не доставали — 1138 артефактов оказались в индексе.
 agent/**/build/
-agent/*/bin
+agent/**/bin/
+*.class
 agent/**/run
 agent/**/.classpath
 agent/**/.project

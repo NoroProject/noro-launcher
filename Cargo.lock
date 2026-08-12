@@ -19,7 +19,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "admin_cli"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -33,7 +33,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
+ "uuid 1.23.2",
 ]
 
 [[package]]
@@ -638,13 +638,14 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "anyhow",
  "base64",
  "bridge",
  "chrono",
  "dirs 5.0.1",
+ "discord-rich-presence",
  "ed25519-dalek",
  "fastnbt",
  "futures",
@@ -669,7 +670,7 @@ dependencies = [
  "tracing",
  "url",
  "urlencoding",
- "uuid",
+ "uuid 1.23.2",
  "walkdir",
  "zip",
 ]
@@ -833,13 +834,13 @@ dependencies = [
 
 [[package]]
 name = "bridge"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "parking_lot",
  "schema",
  "serde",
  "tokio",
- "uuid",
+ "uuid 1.23.2",
 ]
 
 [[package]]
@@ -1735,6 +1736,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "discord-rich-presence"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a75db747ecd252c01bfecaf709b07fcb4c634adf0edb5fed47bc9c3052e7076b"
+dependencies = [
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_repr",
+ "uuid 0.8.2",
+]
+
+[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2273,7 +2287,7 @@ dependencies = [
 
 [[package]]
 name = "frontend"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "base64",
  "bridge",
@@ -2291,7 +2305,7 @@ dependencies = [
  "tokio",
  "tracing",
  "urlencoding",
- "uuid",
+ "uuid 1.23.2",
 ]
 
 [[package]]
@@ -2699,7 +2713,7 @@ dependencies = [
  "url",
  "usvg",
  "util_macros",
- "uuid",
+ "uuid 1.23.2",
  "waker-fn",
  "web-time",
  "windows 0.61.3",
@@ -2735,7 +2749,7 @@ dependencies = [
  "swash",
  "url",
  "util",
- "uuid",
+ "uuid 1.23.2",
 ]
 
 [[package]]
@@ -2777,7 +2791,7 @@ dependencies = [
  "smallvec",
  "strum",
  "util",
- "uuid",
+ "uuid 1.23.2",
  "zed-font-kit",
 ]
 
@@ -2840,7 +2854,7 @@ dependencies = [
  "parking_lot",
  "raw-window-handle",
  "smallvec",
- "uuid",
+ "uuid 1.23.2",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm_thread",
@@ -2893,7 +2907,7 @@ dependencies = [
  "raw-window-handle",
  "smallvec",
  "util",
- "uuid",
+ "uuid 1.23.2",
  "windows 0.61.3",
  "windows-core 0.61.2",
  "windows-numerics 0.2.0",
@@ -3950,7 +3964,7 @@ dependencies = [
 
 [[package]]
 name = "master"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "anyhow",
  "argon2",
@@ -3991,7 +4005,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "urlencoding",
- "uuid",
+ "uuid 1.23.2",
  "walkdir",
  "zip",
 ]
@@ -4264,7 +4278,7 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
 name = "noro_core"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "anyhow",
  "backend",
@@ -4282,7 +4296,7 @@ dependencies = [
 
 [[package]]
 name = "noro_launcher"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -5731,12 +5745,12 @@ dependencies = [
 
 [[package]]
 name = "schema"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "chrono",
  "serde",
  "serde_json",
- "uuid",
+ "uuid 1.23.2",
 ]
 
 [[package]]
@@ -6289,7 +6303,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "url",
- "uuid",
+ "uuid 1.23.2",
  "webpki-roots 0.26.11",
 ]
 
@@ -6371,7 +6385,7 @@ dependencies = [
  "stringprep",
  "thiserror 2.0.18",
  "tracing",
- "uuid",
+ "uuid 1.23.2",
  "whoami",
 ]
 
@@ -6410,7 +6424,7 @@ dependencies = [
  "stringprep",
  "thiserror 2.0.18",
  "tracing",
- "uuid",
+ "uuid 1.23.2",
  "whoami",
 ]
 
@@ -6437,7 +6451,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "url",
- "uuid",
+ "uuid 1.23.2",
 ]
 
 [[package]]
@@ -7526,6 +7540,15 @@ dependencies = [
  "perf",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom 0.2.17",
 ]
 
 [[package]]
@@ -8848,7 +8871,7 @@ dependencies = [
  "serde_repr",
  "tracing",
  "uds_windows",
- "uuid",
+ "uuid 1.23.2",
  "windows-sys 0.61.2",
  "winnow 1.0.3",
  "zbus_macros",
