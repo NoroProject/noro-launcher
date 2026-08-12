@@ -267,31 +267,6 @@ async function selectCape(capeId: string | null) {
         <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
         <UAlert v-else-if="message" color="success" variant="subtle" icon="i-lucide-check" :description="message" />
 
-        <!-- Import by Minecraft Username -->
-        <section class="noro-panel p-5 space-y-3">
-          <h2 class="text-sm font-bold text-[var(--noro-text)] flex items-center gap-2">
-            <UIcon name="i-lucide-user-search" class="size-4 text-[var(--noro-blue)]" />
-            Загрузить скин по нику игрока
-          </h2>
-          <div class="flex gap-2">
-            <input
-              v-model="usernameInput"
-              type="text"
-              placeholder="Введите ник Minecraft (например Notch)"
-              class="flex-1 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg)] px-3 py-2 text-xs text-[var(--noro-text)] focus:border-[var(--noro-blue)] focus:outline-none"
-              @keydown.enter="uploadSkinByUsername"
-            />
-            <AtomButton
-              variant="primary"
-              icon="i-lucide-download"
-              :disabled="loadingUsername || !usernameInput.trim()"
-              @click="uploadSkinByUsername"
-            >
-              Загрузить
-            </AtomButton>
-          </div>
-        </section>
-
         <!-- 1. Saved Custom Skins (Сохранённые скины & Пресеты) -->
         <section class="noro-panel p-5 space-y-4">
           <div class="flex items-center justify-between">

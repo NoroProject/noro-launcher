@@ -13,7 +13,7 @@ pub mod serial;
 pub use handle::{create_pair, BackendHandle, BackendReceiver, FrontendHandle, FrontendReceiver};
 pub use message::{
     BuildState, CatalogHitInfo, ClientSettingsState, GameLogLevel, LoginErrorKind, MessageToBackend,
-    MessageToFrontend, ModProjectInfo, OptionalModInfo, SyncStage,
+    MessageToFrontend, ModProjectInfo, OptionalModInfo, ServerSkinPresetItem, SyncStage,
 };
 pub use modal_action::{ModalAction, ModalProgress};
 pub use quit::{QuitCoordinator, QuitHandler};

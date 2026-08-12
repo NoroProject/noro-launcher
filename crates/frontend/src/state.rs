@@ -544,6 +544,7 @@ impl LauncherUI {
                 self.startup_checking = false;
                 self.login_error = None;
                 self.backend.send(MessageToBackend::RequestCapesList);
+                self.backend.send(MessageToBackend::RequestSkinPresetsList);
                 if self.page == Page::Login {
                     self.page = Page::Servers;
                 }

@@ -102,6 +102,7 @@ fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(sub_tab_button("tab-presets", "ПРЕСЕТЫ", current == ProfileTab::Skins, |this, cx| {
             this.profile_tab = ProfileTab::Skins;
             this.load_preset_renders(cx);
+            this.backend.send(bridge::MessageToBackend::RequestSkinPresetsList);
             cx.notify();
         }, cx))
         .into_any_element()

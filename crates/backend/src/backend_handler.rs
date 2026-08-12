@@ -410,6 +410,20 @@ impl BackendState {
                 }
             }
 
+            MessageToBackend::RequestSkinPresetsList => {
+                if let Some(token) = &self.access_token {
+                    let master = self.ctx.config.get().master_url.clone();
+                    let http = self.ctx.http.clone();
+                    let t = token.clone();
+                    let ctx = self.ctx.clone();
+                    tokio::spawn(async move {
+                        if let Ok(presets) = fetch_skin_presets_from_master(&http, &master, &t).await {
+                            ctx.send(MessageToFrontend::SkinPresetsList { presets });
+                        }
+                    });
+                }
+            }
+
             MessageToBackend::SelectCape { cape_id } => {
                 if let Some(token) = &self.access_token {
                     let master = self.ctx.config.get().master_url.clone();
@@ -611,6 +625,17 @@ impl BackendState {
             ServerWsMsg::AuthOk { user } => {
                 self.user = Some(user.clone());
                 self.ctx.send(MessageToFrontend::LoginSuccess { user });
+                if let Some(token) = &self.access_token {
+                    let master = self.ctx.config.get().master_url.clone();
+                    let http = self.ctx.http.clone();
+                    let t = token.clone();
+                    let ctx = self.ctx.clone();
+                    tokio::spawn(async move {
+                        if let Ok(presets) = fetch_skin_presets_from_master(&http, &master, &t).await {
+                            ctx.send(MessageToFrontend::SkinPresetsList { presets });
+                        }
+                    });
+                }
             }
             ServerWsMsg::AuthFail { reason } => {
                 tracing::warn!("auth fail: {reason}");
@@ -760,6 +785,29 @@ async fn select_cape_on_master(
         return Err(format!("HTTP {} {}", status, txt));
     }
     res.json::<schema::UserProfile>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+async fn fetch_skin_presets_from_master(
+    http: &reqwest::Client,
+    master: &str,
+    token: &str,
+) -> Result<Vec<bridge::ServerSkinPresetItem>, String> {
+    let base = master.trim_end_matches('/');
+    let url = format!("{}/api/me/skin-presets", base);
+    let res = http
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let txt = res.text().await.unwrap_or_default();
+        return Err(format!("HTTP {} {}", status, txt));
+    }
+    res.json::<Vec<bridge::ServerSkinPresetItem>>()
         .await
         .map_err(|e| e.to_string())
 }

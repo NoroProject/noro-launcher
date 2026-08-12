@@ -144,6 +144,7 @@ pub enum MessageToBackend {
     },
 
     RequestCapesList,
+    RequestSkinPresetsList,
     SelectCape {
         cape_id: Option<Uuid>,
     },

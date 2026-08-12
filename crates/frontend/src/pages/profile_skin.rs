@@ -31,7 +31,6 @@ pub fn skin_presets_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(div().id("skin-presets-scroll").flex_1().min_h_0().overflow_y_scroll().pb(px(12.))
             .child(div().flex().flex_wrap().gap(px(8.)).px(px(2.))
                 .child(add_preset_tile_card(cx))
-                .child(import_username_tile_card(cx))
                 .children(ui.custom_presets.iter().map(|p| custom_preset_card(ui, p, cx)))
                 .children(presets.into_iter().map(|(name, id)| standard_preset_card(ui, name, id, cx)))
             ))
@@ -47,18 +46,6 @@ fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
         .child(div().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("Новый скин"))
         .child(div().font_family(FONT_PIXEL_ALT).text_size(px(8.)).text_color(rgb(TEXT_MUTED)).child("Загрузить .PNG"))
         .on_click(cx.listener(on_upload_click))
-        .into_any_element()
-}
-
-fn import_username_tile_card(cx: &mut Cx) -> AnyElement {
-    div().id("import-username-tile").w(gpui::relative(0.315)).h(px(132.)).p(px(4.))
-        .bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(CTA))
-        .hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer()
-        .flex().flex_col().items_center().justify_center().gap(px(4.))
-        .child(div().w(px(32.)).h(px(32.)).rounded_full().bg(rgb(BG_INPUT)).flex().items_center().justify_center().child(ic("user", 18., CTA)))
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("По нику"))
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(8.)).text_color(rgb(TEXT_MUTED)).child("Импорт скина"))
-        .on_click(cx.listener(on_import_by_username_click))
         .into_any_element()
 }
 
@@ -226,41 +213,4 @@ fn on_upload_click(this: &mut LauncherUI, _e: &gpui::ClickEvent, _w: &mut gpui::
     }
     this.toast = Some(crate::state::Toast { text: t("profile-skin-invalid"), level: schema::NotifLevel::Warning });
     cx.notify();
-}
-
-fn on_import_by_username_click(this: &mut LauncherUI, _e: &gpui::ClickEvent, _w: &mut gpui::Window, cx: &mut gpui::Context<LauncherUI>) {
-    let script = r#"text returned of (display dialog "Введите ник игрока Minecraft:" default answer "Dalynkaa" with title "Импорт скина по нику")"#;
-    if let Ok(output) = std::process::Command::new("osascript").arg("-e").arg(script).output() {
-        if output.status.success() {
-            let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !name.is_empty() {
-                import_skin_by_username(this, name, cx);
-            }
-        }
-    }
-}
-
-fn import_skin_by_username(this: &mut LauncherUI, username: String, cx: &mut gpui::Context<LauncherUI>) {
-    let clean = username.trim().to_string();
-    if clean.is_empty() { return; }
-    let url = format!("https://minotar.net/skin/{}", clean);
-
-    cx.spawn(async move |this, cx| {
-        let loaded = crate::image_loader::load_image_and_bytes(url).await;
-        let _ = this.update(cx, |this, cx| {
-            if let Ok((_, bytes)) = loaded {
-                this.upload_skin(bytes.clone());
-                let preset = crate::state::SavedSkinPreset {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    name: clean,
-                    bytes,
-                    preview: this.skin_preview.clone(),
-                };
-                this.custom_presets.push(preset);
-            } else {
-                this.toast = Some(crate::state::Toast { text: "Не удалось скачать скин по нику".into(), level: schema::NotifLevel::Warning });
-            }
-            cx.notify();
-        });
-    }).detach();
 }
