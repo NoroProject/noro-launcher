@@ -89,9 +89,9 @@ fn custom_preset_card(ui: &LauncherUI, preset: &crate::state::SavedSkinPreset, c
     let apply_bytes = bytes.clone();
 
     let img_el = if let Some(loaded_img) = ui.preset_images.get(&id) {
-        img(loaded_img.clone()).w(px(64.)).h(px(78.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
+        img(loaded_img.clone()).w(px(64.)).h(px(64.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
     } else {
-        div().w(px(64.)).h(px(78.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
+        div().w(px(64.)).h(px(64.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
     };
 
     let edit_preset_id_del = id.clone();
@@ -156,9 +156,9 @@ fn standard_preset_card(ui: &LauncherUI, name: &'static str, id: &'static str, c
     let border_clr = if is_active { CTA_HOV } else { BORDER };
 
     let img_el = if let Some(loaded_img) = ui.preset_images.get(id) {
-        img(loaded_img.clone()).w(px(64.)).h(px(78.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
+        img(loaded_img.clone()).w(px(64.)).h(px(64.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
     } else {
-        div().w(px(64.)).h(px(78.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
+        div().w(px(64.)).h(px(64.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
     };
 
     div().id(id).w(gpui::relative(0.315)).p(px(4.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))

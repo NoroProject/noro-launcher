@@ -28,7 +28,7 @@ pub fn render_3d(
     let (cw, ch, center_y) = if is_head_only {
         (22, 22, 0.0)
     } else if is_bust {
-        (24, 26, 4.0)
+        (22, 22, 5.5)
     } else {
         (26, 38, 2.0)
     };
@@ -51,20 +51,22 @@ pub fn render_3d(
     }
 
     if !is_head_only {
-        parts.push(BodyPart { min: V3::new(-4.0, -6.0, -2.0), max: V3::new(4.0, 6.0, 2.0), pivot: V3::new(0.0, 0.0, 0.0), tx: 16.0, ty: 16.0, is_slim: false, is_overlay: false, rot: (0.0, 0.0) });
+        let torso_min_y = if is_bust { 0.0 } else { -6.0 };
+        parts.push(BodyPart { min: V3::new(-4.0, torso_min_y, -2.0), max: V3::new(4.0, 6.0, 2.0), pivot: V3::new(0.0, 0.0, 0.0), tx: 16.0, ty: 16.0, is_slim: false, is_overlay: false, rot: (0.0, 0.0) });
         if overlay {
-            parts.push(BodyPart { min: V3::new(-4.0, -6.0, -2.0), max: V3::new(4.0, 6.0, 2.0), pivot: V3::new(0.0, 0.0, 0.0), tx: 16.0, ty: 32.0, is_slim: false, is_overlay: true, rot: (0.0, 0.0) });
+            parts.push(BodyPart { min: V3::new(-4.0, torso_min_y, -2.0), max: V3::new(4.0, 6.0, 2.0), pivot: V3::new(0.0, 0.0, 0.0), tx: 16.0, ty: 32.0, is_slim: false, is_overlay: true, rot: (0.0, 0.0) });
         }
 
-        parts.push(BodyPart { min: V3::new(arm_r_x, -6.0, -2.0), max: V3::new(-4.0, 6.0, 2.0), pivot: V3::new(-4.0, 4.0, 0.0), tx: 40.0, ty: 16.0, is_slim, is_overlay: false, rot: (r_arm_pitch, 0.0) });
+        let arm_min_y = if is_bust { 0.0 } else { -6.0 };
+        parts.push(BodyPart { min: V3::new(arm_r_x, arm_min_y, -2.0), max: V3::new(-4.0, 6.0, 2.0), pivot: V3::new(-4.0, 4.0, 0.0), tx: 40.0, ty: 16.0, is_slim, is_overlay: false, rot: (r_arm_pitch, 0.0) });
         if overlay {
-            parts.push(BodyPart { min: V3::new(arm_r_x, -6.0, -2.0), max: V3::new(-4.0, 6.0, 2.0), pivot: V3::new(-4.0, 4.0, 0.0), tx: 40.0, ty: 32.0, is_slim, is_overlay: true, rot: (r_arm_pitch, 0.0) });
+            parts.push(BodyPart { min: V3::new(arm_r_x, arm_min_y, -2.0), max: V3::new(-4.0, 6.0, 2.0), pivot: V3::new(-4.0, 4.0, 0.0), tx: 40.0, ty: 32.0, is_slim, is_overlay: true, rot: (r_arm_pitch, 0.0) });
         }
 
         let (l_tx, l_ty_ov) = if !is_legacy { (32.0, 48.0) } else { (40.0, 32.0) };
-        parts.push(BodyPart { min: V3::new(4.0, -6.0, -2.0), max: V3::new(4.0 + arm_w, 6.0, 2.0), pivot: V3::new(4.0, 4.0, 0.0), tx: l_tx, ty: 48.0, is_slim, is_overlay: false, rot: (l_arm_pitch, 0.0) });
+        parts.push(BodyPart { min: V3::new(4.0, arm_min_y, -2.0), max: V3::new(4.0 + arm_w, 6.0, 2.0), pivot: V3::new(4.0, 4.0, 0.0), tx: l_tx, ty: 48.0, is_slim, is_overlay: false, rot: (l_arm_pitch, 0.0) });
         if overlay && !is_legacy {
-            parts.push(BodyPart { min: V3::new(4.0, -6.0, -2.0), max: V3::new(4.0 + arm_w, 6.0, 2.0), pivot: V3::new(4.0, 4.0, 0.0), tx: 48.0, ty: l_ty_ov, is_slim, is_overlay: true, rot: (l_arm_pitch, 0.0) });
+            parts.push(BodyPart { min: V3::new(4.0, arm_min_y, -2.0), max: V3::new(4.0 + arm_w, 6.0, 2.0), pivot: V3::new(4.0, 4.0, 0.0), tx: 48.0, ty: l_ty_ov, is_slim, is_overlay: true, rot: (l_arm_pitch, 0.0) });
         }
 
         if !is_bust {
