@@ -286,15 +286,56 @@ async fn clean_extra(
     Ok(())
 }
 
-/// Защищён ли относительный путь одним из префиксов (директория с '/' или точный файл).
-fn is_protected(rel: &str, protected: &[String]) -> bool {
-    protected.iter().any(|p| {
-        if let Some(dir) = p.strip_suffix('/') {
-            rel == dir || rel.starts_with(&format!("{dir}/"))
-        } else {
-            rel == p
+pub const DEFAULT_PROTECTED_PATHS: &[&str] = &[
+    "saves/",
+    "screenshots/",
+    "options.txt",
+    "optionsof.txt",
+    "optionsshaders.txt",
+    "logs/",
+    "crash-reports/",
+    "xaero*",
+    "config/xaero*",
+    "xaerominimap*",
+    "xaeroworldmap*",
+    "command_history.txt",
+    "usernamecache.json",
+    "usercache.json",
+    ".bobby/",
+    ".natives/",
+    ".mixin.out/",
+    ".forge_classpath",
+    ".noro-build",
+    ".noro-servers",
+    ".pg-native/",
+    ".probe/",
+    ".sable/",
+];
+
+/// Защищён ли относительный путь одним из префиксов (директория с '/' или маска '*').
+pub fn is_protected(rel: &str, protected: &[String]) -> bool {
+    let rel_lower = rel.to_lowercase();
+
+    for &p in DEFAULT_PROTECTED_PATHS {
+        if match_path_pattern(&rel_lower, &p.to_lowercase()) {
+            return true;
         }
-    })
+    }
+
+    protected
+        .iter()
+        .any(|p| match_path_pattern(&rel_lower, &p.to_lowercase()))
+}
+
+fn match_path_pattern(rel: &str, pattern: &str) -> bool {
+    if pattern.ends_with('*') {
+        let prefix = pattern.trim_end_matches('*');
+        rel.starts_with(prefix)
+    } else if let Some(dir) = pattern.strip_suffix('/') {
+        rel == dir || rel.starts_with(&format!("{dir}/"))
+    } else {
+        rel == pattern
+    }
 }
 
 /// Найти исполняемый java-бинарник среди файлов манифеста.
