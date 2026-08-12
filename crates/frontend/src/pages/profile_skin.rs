@@ -13,7 +13,7 @@ const PREVIEW_W: f32 = crate::skin::PREVIEW_W as f32;
 const PREVIEW_H: f32 = crate::skin::PREVIEW_H as f32;
 
 pub fn skin_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    panel().p(px(16.)).w(px(PREVIEW_W + 32.)).h_full().flex_1().flex().flex_col().gap(px(10.))
+    panel().p(px(12.)).w(px(220.)).h_full().flex_1().flex().flex_col().gap(px(10.))
         .child(preview_box(ui, cx))
         .when(is_grabbable(ui), |d| d.child(drag_hint()))
         .into_any_element()
@@ -157,7 +157,7 @@ fn is_grabbable(ui: &LauncherUI) -> bool {
 }
 
 fn preview_box(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    div().id("skin-preview-area").w(px(PREVIEW_W)).flex_1().min_h(px(PREVIEW_H)).bg(rgb(BG_INPUT)).rounded(px(R_SM)).border_1().border_color(rgb(BORDER)).overflow_hidden().flex().items_center().justify_center()
+    div().id("skin-preview-area").w_full().flex_1().min_h(px(PREVIEW_H)).bg(rgb(BG_INPUT)).rounded(px(R_SM)).border_1().border_color(rgb(BORDER)).overflow_hidden().flex().items_center().justify_center()
         .when(is_grabbable(ui), |d| d.cursor(CursorStyle::OpenHand).on_mouse_down(MouseButton::Left, cx.listener(skin_drag::on_grab)))
         .child(preview_content(ui))
         .into_any_element()
