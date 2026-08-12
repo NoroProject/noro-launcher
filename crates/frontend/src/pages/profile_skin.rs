@@ -39,25 +39,25 @@ pub fn skin_presets_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 }
 
 fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
-    div().id("add-preset-tile").w(px(112.)).h(px(140.)).p(px(6.))
+    div().id("add-preset-tile").w(px(96.)).h(px(132.)).p(px(4.))
         .bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(CTA))
         .hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer()
         .flex().flex_col().items_center().justify_center().gap(px(4.))
-        .child(div().w(px(36.)).h(px(36.)).rounded_full().bg(rgb(BG_INPUT)).flex().items_center().justify_center().child(ic("plus", 20., CTA)))
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("Новый скин"))
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(9.)).text_color(rgb(TEXT_MUTED)).child("Загрузить .PNG"))
+        .child(div().w(px(32.)).h(px(32.)).rounded_full().bg(rgb(BG_INPUT)).flex().items_center().justify_center().child(ic("plus", 18., CTA)))
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("Новый скин"))
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(8.)).text_color(rgb(TEXT_MUTED)).child("Загрузить .PNG"))
         .on_click(cx.listener(on_upload_click))
         .into_any_element()
 }
 
 fn import_username_tile_card(cx: &mut Cx) -> AnyElement {
-    div().id("import-username-tile").w(px(112.)).h(px(140.)).p(px(6.))
+    div().id("import-username-tile").w(px(96.)).h(px(132.)).p(px(4.))
         .bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(CTA))
         .hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer()
         .flex().flex_col().items_center().justify_center().gap(px(4.))
-        .child(div().w(px(36.)).h(px(36.)).rounded_full().bg(rgb(BG_INPUT)).flex().items_center().justify_center().child(ic("user", 20., CTA)))
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("По нику"))
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(9.)).text_color(rgb(TEXT_MUTED)).child("Импорт скина"))
+        .child(div().w(px(32.)).h(px(32.)).rounded_full().bg(rgb(BG_INPUT)).flex().items_center().justify_center().child(ic("user", 18., CTA)))
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("По нику"))
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(8.)).text_color(rgb(TEXT_MUTED)).child("Импорт скина"))
         .on_click(cx.listener(on_import_by_username_click))
         .into_any_element()
 }
@@ -100,19 +100,19 @@ fn custom_preset_card(ui: &LauncherUI, preset: &crate::state::SavedSkinPreset, c
     let border_clr = if is_active { CTA_HOV } else { BORDER };
     let edit_preset_id = id.clone();
 
-    div().id(SharedString::from(id.clone())).w(px(112.)).p(px(6.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
-        .child(div().w(px(72.)).h(px(85.)).flex().items_center().justify_center().child(ic("user", 24., if is_active { CTA } else { TEXT_MUTED })))
-        .child(div().w_full().truncate().text_center().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY })).child(name.clone()))
-        .child(div().flex().gap(px(4.))
+    div().id(SharedString::from(id.clone())).w(px(96.)).p(px(4.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
+        .child(div().w(px(64.)).h(px(78.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })))
+        .child(div().w_full().truncate().text_center().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY })).child(name.clone()))
+        .child(div().flex().gap(px(2.))
             .child(if is_active {
-                div().px(px(6.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(CTA)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("Текущий").into_any_element()
+                div().px(px(4.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(CTA)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("Текущий").into_any_element()
             } else {
-                div().id(apply_id).px(px(6.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child("Надеть")
+                div().id(apply_id).px(px(4.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child("Надеть")
                     .on_click(cx.listener(move |this, _, _, cx| { this.upload_skin(bytes.clone()); cx.notify(); })).into_any_element()
             })
-            .child(div().id(edit_id).px(px(4.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).text_color(rgb(TEXT_MUTED)).child("✏️")
+            .child(div().id(edit_id).px(px(3.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).text_color(rgb(TEXT_MUTED)).child("✏️")
                 .on_click(cx.listener(move |this, _, _, cx| { prompt_rename_preset(this, edit_preset_id.clone(), name.clone(), cx); })))
-            .child(div().id(del_id).px(px(4.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).text_color(rgb(TEXT_MUTED)).child("✕")
+            .child(div().id(del_id).px(px(3.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).text_color(rgb(TEXT_MUTED)).child("✕")
                 .on_click(cx.listener(move |this, _, _, cx| { this.custom_presets.retain(|p| p.id != id); cx.notify(); }))))
         .into_any_element()
 }
@@ -122,18 +122,18 @@ fn standard_preset_card(ui: &LauncherUI, name: &'static str, id: &'static str, c
     let border_clr = if is_active { CTA_HOV } else { BORDER };
 
     let img_el = if let Some(loaded_img) = ui.preset_images.get(id) {
-        img(loaded_img.clone()).w(px(72.)).h(px(85.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
+        img(loaded_img.clone()).w(px(64.)).h(px(78.)).object_fit(gpui::ObjectFit::Contain).into_any_element()
     } else {
-        div().w(px(72.)).h(px(85.)).flex().items_center().justify_center().child(ic("user", 24., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
+        div().w(px(64.)).h(px(78.)).flex().items_center().justify_center().child(ic("user", 22., if is_active { CTA } else { TEXT_MUTED })).into_any_element()
     };
 
-    div().id(id).w(px(112.)).p(px(6.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
+    div().id(id).w(px(96.)).p(px(4.)).bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(border_clr)).hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer().flex().flex_col().items_center().gap(px(4.))
         .child(img_el)
-        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY })).child(name))
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY })).child(name))
         .child(if is_active {
-            div().px(px(12.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(CTA)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("Текущий").into_any_element()
+            div().px(px(8.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(CTA)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("Текущий").into_any_element()
         } else {
-            div().px(px(12.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).border_1().border_color(rgb(BORDER)).font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child("Надеть").into_any_element()
+            div().px(px(8.)).py(px(2.)).rounded(px(R_SM)).bg(rgb(BG_INPUT)).border_1().border_color(rgb(BORDER)).font_family(FONT_PIXEL_ALT).text_size(px(9.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(TEXT_PRIMARY)).child("Надеть").into_any_element()
         })
         .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| apply_preset(this, id, cx)))
         .into_any_element()
