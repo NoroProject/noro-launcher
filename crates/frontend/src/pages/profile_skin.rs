@@ -16,7 +16,6 @@ pub fn skin_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     panel().p(px(16.)).w(px(PREVIEW_W + 32.)).flex().flex_col().gap(px(10.))
         .child(preview_box(ui, cx))
         .when(is_grabbable(ui), |d| d.child(drag_hint()))
-        .child(upload_button(cx))
         .into_any_element()
 }
 
@@ -31,9 +30,22 @@ pub fn skin_presets_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(header_row(ui, cx))
         .child(div().id("skin-presets-scroll").flex_1().min_h_0().overflow_y_scroll().pb(px(12.))
             .child(div().flex().flex_wrap().gap(px(8.)).px(px(2.))
+                .child(add_preset_tile_card(cx))
                 .children(ui.custom_presets.iter().map(|p| custom_preset_card(p, cx)))
                 .children(presets.into_iter().map(|(name, id)| standard_preset_card(ui, name, id, cx)))
             ))
+        .into_any_element()
+}
+
+fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
+    div().id("add-preset-tile").w(px(112.)).h(px(140.)).p(px(6.))
+        .bg(rgb(BG_CARD)).rounded(px(R_SM)).border_1().border_color(rgb(CTA))
+        .hover(|s| s.bg(rgb(BG_INPUT))).cursor_pointer()
+        .flex().flex_col().items_center().justify_center().gap(px(4.))
+        .child(div().w(px(36.)).h(px(36.)).rounded_full().bg(rgb(BG_INPUT)).flex().items_center().justify_center().child(ic("plus", 20., CTA)))
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(11.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("Новый скин"))
+        .child(div().font_family(FONT_PIXEL_ALT).text_size(px(9.)).text_color(rgb(TEXT_MUTED)).child("Загрузить .PNG"))
+        .on_click(cx.listener(on_upload_click))
         .into_any_element()
 }
 
@@ -42,7 +54,7 @@ fn header_row(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(div().font_family(FONT_PIXEL_ALT).text_size(px(13.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(CTA)).child("Пресеты скинов"))
         .when(ui.skin_bytes.is_some(), |d| d.child(
             div().id("save-skin-btn").cursor_pointer().px(px(8.)).py(px(4.)).rounded(px(R_SM)).bg(rgb(CTA)).hover(|s| s.bg(rgb(CTA_HOV)))
-                .font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("+ СОХРАНИТЬ СКИН")
+                .font_family(FONT_PIXEL_ALT).text_size(px(10.)).font_weight(gpui::FontWeight::BOLD).text_color(rgb(ON_CTA)).child("+ СОХРАНИТЬ В ПРЕСЕТЫ")
                 .on_click(cx.listener(|this, _, _, cx| { this.save_current_skin_preset(); cx.notify(); }))
         )).into_any_element()
 }
@@ -118,9 +130,7 @@ fn placeholder(text: impl Into<gpui::SharedString>) -> AnyElement {
     div().size_full().flex().items_center().justify_center().font_family(FONT_PIXEL_ALT).text_size(px(13.)).text_color(rgb(TEXT_MUTED)).child(text.into()).into_any_element()
 }
 
-fn upload_button(cx: &mut Cx) -> AnyElement {
-    btn("upload-skin", t("profile-upload-skin"), true, cx.listener(on_upload_click)).into_any_element()
-}
+
 
 fn on_upload_click(this: &mut LauncherUI, _e: &gpui::ClickEvent, _w: &mut gpui::Window, cx: &mut gpui::Context<LauncherUI>) {
     let script = "POSIX path of (choose file of type {\"public.png\"} with prompt \"Select Minecraft skin PNG\")";
