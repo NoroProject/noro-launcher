@@ -71,7 +71,7 @@ fn right_column(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let user = ui.user.as_ref().expect("user in profile");
 
     div()
-        .flex_1()
+        .w(gpui::relative(0.6))
         .min_w_0()
         .min_h_0()
         .h_full()

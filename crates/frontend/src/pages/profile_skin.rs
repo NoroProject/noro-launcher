@@ -13,7 +13,7 @@ const PREVIEW_W: f32 = crate::skin::PREVIEW_W as f32;
 const PREVIEW_H: f32 = crate::skin::PREVIEW_H as f32;
 
 pub fn skin_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    panel().p(px(10.)).w(px(168.)).h_full().flex_1().flex().flex_col().gap(px(8.))
+    panel().p(px(12.)).w(gpui::relative(0.4)).h_full().flex().flex_col().gap(px(10.))
         .child(preview_box(ui, cx))
         .when(is_grabbable(ui), |d| d.child(drag_hint()))
         .into_any_element()
