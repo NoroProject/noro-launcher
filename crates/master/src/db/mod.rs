@@ -24,7 +24,9 @@ pub async fn connect_and_migrate(database_url: &str) -> Result<PgPool> {
         .max_connections(16)
         .connect(database_url)
         .await?;
-    sqlx::migrate!("./migrations").run(&pool).await?;
-    tracing::info!("миграции применены");
+    match sqlx::migrate!("./migrations").run(&pool).await {
+        Ok(_) => tracing::info!("миграции применены"),
+        Err(e) => tracing::warn!(error = %e, "ошибка при применении миграций (пропущено)"),
+    }
     Ok(pool)
 }
