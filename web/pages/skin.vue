@@ -24,7 +24,6 @@ const capeSaving = ref(false)
 const usernameInput = ref('')
 const loadingUsername = ref(false)
 
-const savedSkins = ref<SavedSkin[]>([])
 const editingSkinId = ref<string | null>(null)
 const editNameInput = ref('')
 
