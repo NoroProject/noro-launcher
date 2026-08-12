@@ -21,6 +21,25 @@ pub struct ChallengeOptionsRes {
     pub user: Option<Value>,
 }
 
+fn get_rp_id(public_url: &str) -> String {
+    let host = public_url
+        .split("://")
+        .nth(1)
+        .unwrap_or(public_url)
+        .split('/')
+        .next()
+        .unwrap_or("localhost")
+        .split(':')
+        .next()
+        .unwrap_or("localhost");
+
+    if let Some(stripped) = host.strip_prefix("api.") {
+        stripped.to_string()
+    } else {
+        host.to_string()
+    }
+}
+
 /// Генерация опций для регистрации Passkey в кабинете
 pub async fn register_options(
     State(state): State<AppState>,
@@ -30,15 +49,7 @@ pub async fn register_options(
     crate::db::save_challenge(&state.db, &challenge, Some(user.user_id)).await?;
 
     let u = crate::db::load_profile(&state.db, user.user_id).await?;
-    let domain = state
-        .config
-        .public_url
-        .split("://")
-        .nth(1)
-        .unwrap_or(&state.config.public_url)
-        .split(':')
-        .next()
-        .unwrap_or("localhost");
+    let domain = get_rp_id(&state.config.public_url);
 
     Ok(Json(json!({
         "challenge": challenge,
@@ -120,15 +131,7 @@ pub async fn login_options(State(state): State<AppState>) -> AppResult<Json<Valu
     let challenge = random_challenge();
     crate::db::save_challenge(&state.db, &challenge, None).await?;
 
-    let domain = state
-        .config
-        .public_url
-        .split("://")
-        .nth(1)
-        .unwrap_or(&state.config.public_url)
-        .split(':')
-        .next()
-        .unwrap_or("localhost");
+    let domain = get_rp_id(&state.config.public_url);
 
     Ok(Json(json!({
         "challenge": challenge,
