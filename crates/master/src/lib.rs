@@ -153,6 +153,7 @@ fn router(state: AppState) -> Router {
         .route("/api/textures/presets/{name}", get(textures::preset_skin_endpoint))
         .route("/api/textures/renders", get(textures::render_endpoint))
         .route("/api/textures/renders/head", get(textures::render_head_endpoint))
+        .route("/api/textures/renders/bust", get(textures::render_bust_endpoint))
         .route("/api/textures/renders/body", get(textures::render_body_endpoint))
         .route("/api/textures/renders/cape", get(textures::render_cape_endpoint))
         .route("/api/launcher/locales", get(translations::list))

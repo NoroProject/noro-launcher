@@ -81,6 +81,11 @@ pub async fn render_head_endpoint(state: State<AppState>, Query(mut q): Query<Re
     render_endpoint(state, Query(q)).await
 }
 
+pub async fn render_bust_endpoint(state: State<AppState>, Query(mut q): Query<RenderQuery>) -> Response {
+    q.mode = Some("bust".into());
+    render_endpoint(state, Query(q)).await
+}
+
 pub async fn render_body_endpoint(state: State<AppState>, Query(mut q): Query<RenderQuery>) -> Response {
     q.mode = Some("body".into());
     render_endpoint(state, Query(q)).await
