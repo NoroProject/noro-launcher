@@ -806,6 +806,7 @@ impl LauncherUI {
             }
             MessageToFrontend::SkinPresetsList { presets } => {
                 self.custom_presets.clear();
+                let master_url = self.config.master_url.clone();
                 for p in presets {
                     let id = p.id;
                     let name = p.name;
@@ -817,12 +818,26 @@ impl LauncherUI {
                         preview: None,
                     };
                     self.custom_presets.push(preset_struct);
+
+                    let url_bytes = url.clone();
+                    let id_bytes = id.clone();
                     cx.spawn(async move |this, cx| {
-                        if let Ok((_, bytes)) = crate::image_loader::load_image_and_bytes(url).await {
+                        if let Ok((_, bytes)) = crate::image_loader::load_image_and_bytes(url_bytes).await {
                             let _ = this.update(cx, |this, cx| {
-                                if let Some(found) = this.custom_presets.iter_mut().find(|cp| cp.id == id) {
+                                if let Some(found) = this.custom_presets.iter_mut().find(|cp| cp.id == id_bytes) {
                                     found.bytes = bytes;
                                 }
+                                cx.notify();
+                            });
+                        }
+                    }).detach();
+
+                    let render_url = format!("{}/api/textures/renders/body?url={}&scale=6", master_url.trim_end_matches('/'), urlencoding::encode(&url));
+                    let id_render = id.clone();
+                    cx.spawn(async move |this, cx| {
+                        if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await {
+                            let _ = this.update(cx, |this, cx| {
+                                this.preset_images.insert(id_render, img);
                                 cx.notify();
                             });
                         }

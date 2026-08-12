@@ -26,4 +26,5 @@ chrono = { workspace = true }
 rust-embed = "8"
 tracing = "0.1"
 image = { workspace = true }
+urlencoding = { workspace = true }
 pulldown-cmark = { version = "0.13", default-features = false }
