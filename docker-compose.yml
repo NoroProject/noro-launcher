@@ -18,7 +18,7 @@ services:
       - internal
 
   noro-master:
-    image: ghcr.io/nexbitstd/noro-master:latest
+    image: ghcr.io/sidepilotapp/noro-master:latest
     container_name: noro-master
     environment:
       NORO_BIND: 0.0.0.0:8080
@@ -30,6 +30,10 @@ services:
       NORO_LAUNCHER_REPO: /app/launcher-repo
       CURSEFORGE_API_KEY: ${CURSEFORGE_API_KEY}
       NORO_SIGNING_KEY: ${NORO_SIGNING_KEY}
+      # Без них вход через Discord молча не работает: мастер поднимается,
+      # а /auth/discord/login уходит в Discord с пустым client_id.
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
       NORO_FILES_CDN_URL: https://noro-cdn.${DOMAIN}/files
       # Из браузера в API ходит только сайт. Без этой переменной CORS открыт
       # для любого origin (см. docs/env.md).
@@ -63,7 +67,7 @@ services:
       - traefik
 
   noro-web:
-    image: ghcr.io/nexbitstd/noro-web:latest
+    image: ghcr.io/sidepilotapp/noro-web:latest
     container_name: noro-web
     environment:
       NUXT_PUBLIC_MASTER_URL: https://api.${DOMAIN}
