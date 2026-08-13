@@ -35,6 +35,10 @@ env:
   # Именно `vars`, а не `secrets`: DSN всё равно уезжает внутрь бинарника на
   # машины игроков, и прятать его от логов сборки — самообман.
   NORO_SENTRY_DSN: ${{ vars.NORO_SENTRY_DSN }}
+  # Версия для Sentry берётся из тега, а не из Cargo.toml: манифест
+  # отстаёт (launcher-v1.6.2 вышел, когда там стояло 1.6.1), и падения
+  # приписались бы предыдущему релизу.
+  NORO_RELEASE: ${{ inputs.tag || github.ref_name }}
   # На push тега inputs пустые — тег берётся из ссылки.
   TAG: ${{ inputs.tag || github.ref_name }}
 
