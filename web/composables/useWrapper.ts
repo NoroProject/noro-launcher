@@ -19,8 +19,11 @@ export function useWrapper(gameServerId: string) {
   async function load() {
     try {
       state.value = await auth.request<WrapperState>(base);
-    } catch {
-      // Сеть моргнула — прошлое состояние честнее, чем «отключён».
+    } catch (e) {
+      // Сеть моргнула — прошлое состояние честнее, чем «отключён». Тоста тут
+      // быть не должно (опрос идёт по таймеру), но и молчать нельзя: без записи
+      // в консоли залипший статус не отличить от настоящего.
+      console.error("wrapper state poll failed", e);
     }
   }
 

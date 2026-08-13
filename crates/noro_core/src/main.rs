@@ -8,17 +8,24 @@ use std::fs::OpenOptions;
 use std::path::PathBuf;
 
 fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,backend=debug,frontend=debug,bridge=debug".into()),
-        )
-        .init();
-
     let app_dir = dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(schema::launcher_dir_name());
     let _ = std::fs::create_dir_all(&app_dir);
+
+    // Отчёты о падениях — до всего остального: хук паники должен стоять раньше,
+    // чем появится первый шанс упасть. Без вшитого DSN или при отказе игрока
+    // ничего не поднимается и никуда не уходит.
+    // Путь берём у backend, а не собираем свой: иначе настройка игрока и файл,
+    // который читает лаунчер, однажды разъедутся.
+    let config = backend::persistent::Persistent::<backend::config::LauncherConfig>::load(
+        backend::LauncherDirectories::new().config_file(),
+    );
+    // Подписчик логов — первым: иначе всё, что телеметрия скажет о себе при
+    // старте, ушло бы в никуда. Слой `error!` → событие сам проверяет хаб, так
+    // что ставить его до `init` безопасно.
+    backend::telemetry::init_tracing(backend::telemetry::is_enabled(&config.get()));
+    let _sentry = backend::telemetry::init(&config.get());
 
     let lockfile_path = app_dir.join("app.lock");
     let socket_path = app_dir.join("app.sock");
@@ -93,6 +100,8 @@ fn run_primary(
     tracing::info!("frontend завершён, останавливаем backend");
     runtime.block_on(quit_coordinator.quit());
     let _ = std::fs::remove_file(lockfile_path);
+    // `exit` не вызывает деструкторы, поэтому guard сам ничего не дошлёт.
+    backend::telemetry::flush();
     std::process::exit(0);
 }
 

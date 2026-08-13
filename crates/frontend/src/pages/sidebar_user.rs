@@ -2,18 +2,21 @@ use super::common::{parse_hex, Cx};
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
 use gpui::{div, img, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight};
+use i18n::t;
 
 pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    // Профиль не загружен — так и пишем. «Player» и «@discord» выглядели как
+    // настоящие имя и хэндл, и невошедший игрок не понимал, что он невошедший.
     let username = ui
         .user
         .as_ref()
         .map(|u| u.username.clone())
-        .unwrap_or_else(|| "Player".into());
+        .unwrap_or_else(|| t("sidebar-signed-out").into());
     let discord = ui
         .user
         .as_ref()
         .map(|u| format!("@{}", u.discord_username))
-        .unwrap_or_else(|| "@discord".into());
+        .unwrap_or_else(|| t("sidebar-no-discord").into());
 
     div()
         .id("profile-card")
@@ -69,7 +72,7 @@ fn avatar(ui: &LauncherUI) -> AnyElement {
         .user
         .as_ref()
         .map(|u| u.username.clone())
-        .unwrap_or_else(|| "Player".into());
+        .unwrap_or_else(|| t("sidebar-signed-out").into());
     let color = ui
         .user
         .as_ref()

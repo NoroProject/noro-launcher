@@ -260,13 +260,12 @@ impl BackendState {
 
     /// Подключение к серверу для автоконнекта.
     pub fn server_connect(&self, server_id: &Uuid) -> Option<ServerConnect> {
+        // Нет адреса — нет автоконнекта: игра просто откроется в главном меню.
         self.servers
             .iter()
             .find(|s| &s.id == server_id)
-            .map(|s| ServerConnect {
-                host: s.mc_host.clone(),
-                port: s.mc_port,
-            })
+            .and_then(|s| Some((s.mc_host.clone()?, s.mc_port?)))
+            .map(|(host, port)| ServerConnect { host, port })
     }
 
     /// Восстановить профиль по сохранённому токену (REST /auth/me).

@@ -23,6 +23,8 @@ services:
     environment:
       NORO_BIND: 0.0.0.0:8080
       NORO_PUBLIC_URL: https://api.${DOMAIN}
+      # Куда мастер отправляет игрока за экраном согласия OAuth2.
+      NORO_WEB_URL: https://${DOMAIN}
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/noro
       NORO_DATA_DIR: /app/data
       NORO_GITHUB_REPO: ${NORO_GITHUB_REPO}
@@ -38,6 +40,9 @@ services:
       # Из браузера в API ходит только сайт. Без этой переменной CORS открыт
       # для любого origin (см. docs/env.md).
       NORO_ALLOWED_ORIGINS: https://${DOMAIN}
+      # Пусто — отчёты об ошибках никуда не уходят, мастер пишет об этом в лог.
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_ENVIRONMENT: production
     volumes:
       - noro-data:/app/data
       - ./launcher-repo:/app/launcher-repo
@@ -72,6 +77,8 @@ services:
     environment:
       NUXT_PUBLIC_MASTER_URL: https://api.${DOMAIN}
       NUXT_PUBLIC_WEB_URL: https://${DOMAIN}
+      NUXT_PUBLIC_SENTRY_DSN: ${NUXT_PUBLIC_SENTRY_DSN}
+      NUXT_PUBLIC_SENTRY_ENVIRONMENT: production
     depends_on:
       - noro-master
     labels:

@@ -80,8 +80,11 @@ fn a_rendered_frame_is_bgra_and_full_size() {
     let skin = test_skin();
     let frame = render_view(&skin, None, 0.0, 0.0).expect("frame renders");
     let size = frame.size(0);
-    assert_eq!(u32::from(size.width), PREVIEW_W * SUPERSAMPLE);
-    assert_eq!(u32::from(size.height), PREVIEW_H * SUPERSAMPLE);
+    // Кадр рендерится в размерах суперсэмплинга, а не в логических PREVIEW_*:
+    // единого множителя SUPERSAMPLE тут нет с тех пор, как ширину и высоту
+    // развели по отдельным константам.
+    assert_eq!(u32::from(size.width), SUPERSAMPLE_W);
+    assert_eq!(u32::from(size.height), SUPERSAMPLE_H);
 
     // Красная маска лица должна лежать в синем канале BGRA — если забыть своп,
     // скин поедет в неправильных цветах, а тесты растеризатора этого не увидят.

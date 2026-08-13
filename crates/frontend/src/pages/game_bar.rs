@@ -30,6 +30,11 @@ pub fn bottom_bar(
         .flex()
         .items_center()
         .child(version_block(server))
+        // Селектор — сразу за текущей версией: выбор относится к ней, а не к
+        // кнопке запуска. Когда версия одна, ничего не добавляется.
+        .children(
+            super::build_picker::build_picker(ui, server, cx).map(|p| div().ml(px(20.)).child(p)),
+        )
         .child(div().flex_1())
         .child(
             div()
@@ -80,7 +85,9 @@ fn console_button(active: bool, cx: &mut Cx) -> AnyElement {
 }
 
 fn version_block(server: &ServerEntry) -> AnyElement {
-    let version = server.current_version.as_deref().unwrap_or("draft");
+    // Прочерк, а не «draft»: сборки нет вовсе, а «draft» читался как «есть, но
+    // черновая» — и игрок ждал кнопку «играть», которой не будет.
+    let version = server.current_version.as_deref().unwrap_or("—");
     div()
         .flex()
         .items_center()

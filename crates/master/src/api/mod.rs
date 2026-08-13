@@ -15,4 +15,5 @@ pub mod skin_render_3d;
 pub mod skin_render_math;
 pub mod skin_render_parts;
 pub mod textures;
+pub mod textures_source;
 pub mod translations;

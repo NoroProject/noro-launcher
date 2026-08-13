@@ -87,6 +87,10 @@ pub struct UiConfig {
     pub memory_max_mb: u32,
     pub jvm_flags: String,
     pub show_console_on_launch: bool,
+    pub crash_reports: bool,
+    /// Вшит ли DSN в сборку. Нет — строку настройки не показываем: переключать
+    /// было бы нечего, а обещание «мы это шлём» оказалось бы ложным.
+    pub crash_reports_available: bool,
     pub master_url: String,
 }
 
@@ -97,6 +101,8 @@ impl Default for UiConfig {
             memory_max_mb: 4096,
             jvm_flags: String::new(),
             show_console_on_launch: true,
+            crash_reports: true,
+            crash_reports_available: false,
             master_url: String::new(),
         }
     }
@@ -173,6 +179,12 @@ pub struct LauncherUI {
     pub mod_catalog_total: u32,
     pub mod_catalog_offset: u32,
     pub mod_catalog_limit: u32,
+    /// Почему каталог пуст. `None` — либо ещё ищем, либо всё в порядке.
+    pub mod_catalog_error: Option<String>,
+    /// Переименование пресета скина: id и черновик имени. Правится прямо в
+    /// карточке — системного диалога ввода текста нет ни на одной платформе.
+    pub renaming_preset: Option<(String, String)>,
+    pub rename_focus: Option<gpui::FocusHandle>,
     pub startup_checking: bool,
     pub login_error: Option<String>,
     pub login_mode_key: bool,
@@ -180,6 +192,8 @@ pub struct LauncherUI {
     pub login_key_focus: Option<gpui::FocusHandle>,
 
     pub servers: Vec<ServerEntry>,
+    /// Версия, выбранная игроком по серверам. Нет записи — текущая.
+    pub selected_build: std::collections::HashMap<Uuid, Option<Uuid>>,
     pub news: Vec<NewsItem>,
     pub sync: HashMap<Uuid, SyncUiState>,
     /// Что делать со сборкой: ставить, обновлять или запускать.
@@ -279,12 +293,16 @@ impl LauncherUI {
             mod_catalog_total: 0,
             mod_catalog_offset: 0,
             mod_catalog_limit: 20,
+            mod_catalog_error: None,
+            renaming_preset: None,
+            rename_focus: None,
             startup_checking: true,
             login_error: None,
             login_mode_key: false,
             login_key_input: String::new(),
             login_key_focus: None,
             servers: Vec::new(),
+            selected_build: std::collections::HashMap::new(),
             news: Vec::new(),
             sync: HashMap::new(),
             build_state: HashMap::new(),
@@ -604,6 +622,8 @@ impl LauncherUI {
                 memory_max_mb,
                 jvm_flags,
                 show_console_on_launch,
+                crash_reports,
+                crash_reports_available,
                 master_url,
                 locale,
                 server_settings,
@@ -617,6 +637,8 @@ impl LauncherUI {
                     memory_max_mb,
                     jvm_flags,
                     show_console_on_launch,
+                    crash_reports,
+                    crash_reports_available,
                     master_url,
                 };
                 self.server_settings = server_settings.into_iter().collect();
@@ -661,6 +683,10 @@ impl LauncherUI {
                 self.mod_catalog_total = total;
                 self.mod_catalog_offset = offset;
                 self.mod_catalog_limit = limit;
+                self.mod_catalog_error = None;
+            }
+            MessageToFrontend::CatalogFailed { message } => {
+                self.mod_catalog_error = Some(message);
             }
             MessageToFrontend::ModProjectLoaded { project } => {
                 // Ответ мог прийти после того, как игрок ушёл на другой мод.
@@ -1026,6 +1052,18 @@ impl LauncherUI {
         }
     }
 
+    /// Выбрать версию сборки для сервера.
+    ///
+    /// `None` — вернуться к текущей опубликованной. Выбор хранит бэкенд: он же
+    /// перезапрашивает манифест, поэтому список файлов и модов обновится сам.
+    pub fn select_build(&mut self, server_id: Uuid, build_id: Option<Uuid>) {
+        self.selected_build.insert(server_id, build_id);
+        self.backend.send(MessageToBackend::SelectBuild {
+            server_id,
+            build_id,
+        });
+    }
+
     pub fn set_memory(&mut self, min_mb: u32, max_mb: u32) {
         self.config.memory_min_mb = min_mb;
         self.config.memory_max_mb = max_mb;
@@ -1049,6 +1087,14 @@ impl LauncherUI {
         self.config.show_console_on_launch = enabled;
         self.backend
             .send(MessageToBackend::SetShowConsoleOnLaunch { enabled });
+    }
+
+    /// Отправка отчётов о падениях. Вступает в силу со следующего запуска:
+    /// Sentry поднимается до GPUI, и снять его хук паники на ходу нельзя.
+    pub fn set_crash_reports(&mut self, enabled: bool) {
+        self.config.crash_reports = enabled;
+        self.backend
+            .send(MessageToBackend::SetCrashReports { enabled });
     }
 
     pub fn set_server_show_console_on_launch(&mut self, server_id: Uuid, enabled: bool) {

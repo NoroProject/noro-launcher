@@ -17,15 +17,20 @@ pub async fn minecraft(State(state): State<AppState>, admin: AdminAuth) -> AppRe
         "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json",
     )
     .await?;
-    let versions = manifest["versions"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v["id"].as_str().map(String::from))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+    // Пустой список здесь читался бы в админке как «у Mojang нет версий».
+    // Если манифест другой формы — это сбой источника, и говорить надо о нём.
+    let versions: Vec<String> = array(&manifest["versions"], "манифест Mojang")?
+        .iter()
+        .filter_map(|v| v["id"].as_str().map(String::from))
+        .collect();
     Ok(Json(json!({ "versions": versions })))
+}
+
+/// Массив из ответа стороннего сервиса — или ошибка с указанием, чьего.
+fn array<'a>(value: &'a Value, source: &str) -> AppResult<&'a Vec<Value>> {
+    value
+        .as_array()
+        .ok_or_else(|| AppError::Other(anyhow::anyhow!("{source} вернул ответ неожиданного вида")))
 }
 
 #[derive(Deserialize)]
@@ -59,14 +64,10 @@ pub async fn loader(
 async fn fabric_like(state: &AppState, base: &str, mc: &str) -> AppResult<Vec<String>> {
     let url = format!("{base}/versions/loader/{mc}");
     let list: Value = get_json(state, &url).await?;
-    Ok(list
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|e| e["loader"]["version"].as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default())
+    Ok(array(&list, base)?
+        .iter()
+        .filter_map(|e| e["loader"]["version"].as_str().map(String::from))
+        .collect())
 }
 
 async fn neoforge(state: &AppState, mc: &str) -> AppResult<Vec<String>> {
@@ -74,17 +75,13 @@ async fn neoforge(state: &AppState, mc: &str) -> AppResult<Vec<String>> {
     let prefix = format!("{}.", mc.strip_prefix("1.").unwrap_or(mc));
     let url = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
     let resp: Value = get_json(state, url).await?;
-    Ok(resp["versions"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str())
-                .filter(|v| v.starts_with(&prefix))
-                .map(String::from)
-                .rev()
-                .collect()
-        })
-        .unwrap_or_default())
+    Ok(array(&resp["versions"], "maven.neoforged.net")?
+        .iter()
+        .filter_map(|v| v.as_str())
+        .filter(|v| v.starts_with(&prefix))
+        .map(String::from)
+        .rev()
+        .collect())
 }
 
 async fn forge(state: &AppState, mc: &str) -> AppResult<Vec<String>> {

@@ -3,9 +3,9 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, build_routes, capes, catalog, cores, game_servers, launcher, mod_install,
-    mod_suggestions, news, permission_nodes, roles, servers, stats, storage, tokens, users,
-    versions, wrapper, wrapper_backups, wrapper_fs,
+    agents, backup, build_routes, capes, catalog, cores, game_servers, launcher, launcher_clients,
+    mod_install, mod_suggestions, news, permission_nodes, roles, servers, stats, storage, tokens,
+    users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -218,6 +218,11 @@ fn system_router() -> Router<AppState> {
         .route("/api/admin/tokens", get(tokens::list).post(tokens::create))
         .route("/api/admin/tokens/{id}", delete(tokens::delete))
         .route("/api/admin/stats", get(stats::stats))
+        .route("/api/admin/backup", get(backup::download))
+        .route(
+            "/api/admin/launcher/clients",
+            get(launcher_clients::clients),
+        )
         // Уборка хранилища: GET считает, DELETE удаляет.
         .route(
             "/api/admin/storage/orphans",

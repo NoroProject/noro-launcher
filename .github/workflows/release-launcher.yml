@@ -31,6 +31,19 @@ env:
   # см. crates/noro_launcher/src/verify.rs.
   NORO_MASTER_URL: ${{ vars.NORO_MASTER_URL }}
   NORO_SIGNING_PUBKEY: ${{ vars.NORO_SIGNING_PUBKEY }}
+  # Необязателен. Пусто — лаунчер собирается без Sentry и ничего никуда не шлёт.
+  # Именно `vars`, а не `secrets`: DSN всё равно уезжает внутрь бинарника на
+  # машины игроков, и прятать его от логов сборки — самообман.
+  NORO_SENTRY_DSN: ${{ vars.NORO_SENTRY_DSN }}
+  # Версия для Sentry берётся из тега, а не из Cargo.toml: манифест
+  # отстаёт (launcher-v1.6.2 вышел, когда там стояло 1.6.1), и падения
+  # приписались бы предыдущему релизу.
+  NORO_RELEASE: ${{ inputs.tag || github.ref_name }}
+  # Организация и регион берутся из самого org-токена, но заданы явно:
+  # так видно, куда уезжают символы, не расшифровывая токен.
+  SENTRY_ORG: dalynkaa
+  SENTRY_PROJECT: noro-launcher
+  SENTRY_URL: https://de.sentry.io
   # На push тега inputs пустые — тег берётся из ссылки.
   TAG: ${{ inputs.tag || github.ref_name }}
 
@@ -45,6 +58,27 @@ jobs:
           set -euo pipefail
           [ -n "${NORO_MASTER_URL:-}" ] || { echo "::error::переменная NORO_MASTER_URL не задана в настройках репозитория"; exit 1; }
           [ -n "${NORO_SIGNING_PUBKEY:-}" ] || { echo "::error::переменная NORO_SIGNING_PUBKEY не задана — иначе доверенным станет dev-ключ"; exit 1; }
+          # Не ошибка, но сказать надо: иначе «в Sentry пусто» будет читаться
+          # как «падений нет», а не как «мы их не собираем».
+          [ -n "${NORO_SENTRY_DSN:-}" ] || echo "::notice::NORO_SENTRY_DSN не задан — лаунчер соберётся без отчётов о падениях"
+
+      # Лаунчер сверяет свою CARGO_PKG_VERSION с тегом, который отдаёт мастер.
+      # Разъедутся — плашка «доступно обновление» висит вечно, и нажатие ставит
+      # ту же самую сборку. Так уже случилось с launcher-v1.6.2, собранным при
+      # версии 1.6.1 в манифесте.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Tag matches Cargo.toml version
+        run: |
+          set -euo pipefail
+          MANIFEST=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          EXPECTED="launcher-v$MANIFEST"
+          [ "$TAG" = "$EXPECTED" ] || {
+            echo "::error::тег $TAG не совпадает с версией в Cargo.toml ($MANIFEST). Ожидался $EXPECTED"
+            exit 1
+          }
+          echo "тег и манифест сходятся: $TAG"
 
   build:
     name: launcher ${{ matrix.target }}
@@ -54,6 +88,7 @@ jobs:
       # На уровне job, а не шага: в `if` шага его собственный env недоступен,
       # и условие «есть ли сертификат» иначе всегда ложно.
       MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
@@ -90,13 +125,51 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # release-symbols вместо release: тот же оптимизированный код плюс
+          # таблицы строк, без которых Sentry не покажет ни номер строки, ни
+          # исходник. См. [profile.release-symbols] в Cargo.toml.
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            cross build --release -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
-            cross build --release -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
+            cross build --profile release-symbols -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cross build --profile release-symbols -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
           else
-            cargo build --release -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
-            cargo build --release -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
+            cargo build --profile release-symbols -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cargo build --profile release-symbols -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
           fi
+
+      # Символы для Sentry. Без них трейс от игрока — набор адресов.
+      # Пропускается молча, если токена нет: форки и чужие прогоны должны
+      # собираться, а не падать на нашей телеметрии.
+      - name: Upload debug files to Sentry
+        if: env.SENTRY_AUTH_TOKEN != '' && env.NORO_SENTRY_DSN != ''
+        shell: bash
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          # npm, а не `curl | bash`: этот шаг бежит и на windows-раннере, где
+          # установщик из get-cli не работает.
+          npm install -g @sentry/cli@2
+          DIR="target/${{ matrix.target }}/release-symbols"
+
+          # На macOS отладочная информация по умолчанию остаётся в .o-файлах, и
+          # сам бинарник для Sentry бесполезен. dsymutil собирает её в .dSYM.
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            dsymutil "$DIR/noro-launcher-core" "$DIR/noro-launcher"
+          fi
+
+          # Что именно Sentry сможет разобрать — видно до загрузки. Не падаем:
+          # набор символов у пяти таргетов разный, и выяснять это лучше по
+          # факту первого прогона, чем ронять релиз догадкой.
+          sentry-cli debug-files check "$DIR/noro-launcher-core"* 2>&1 | head -20 \
+            || echo "::warning::в бинарнике не нашлось пригодных символов — трейсы будут без имён"
+
+          # --include-sources кладёт рядом с символами сам код, и тогда в трейсе
+          # видно строки, а не только их номера. Репозиторий приватный: это
+          # осознанная передача исходников в Sentry.
+          sentry-cli debug-files upload \
+            --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" \
+            --include-sources --wait \
+            "$DIR"
 
       # Секретов может не быть (форк, чужой прогон) — тогда подпись остаётся
       # ad-hoc, и сборка всё равно проходит.
@@ -130,7 +203,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          OUT=target/${{ matrix.target }}/release
+          OUT=target/${{ matrix.target }}/release-symbols
           case "${{ matrix.os }}" in
             windows-latest)
               cp "$OUT/noro-launcher.exe" dist/noro-launcher-${{ matrix.target }}.exe
@@ -151,6 +224,14 @@ jobs:
             *)
               cp "$OUT/noro-launcher" dist/noro-launcher-${{ matrix.target }}
               cp "$OUT/noro-launcher-core" dist/noro-launcher-core-${{ matrix.target }}
+              # На Linux отладочная информация лежит внутри ELF, а не отдельным
+              # файлом как .dSYM или .pdb. В Sentry она уже уехала шагом выше,
+              # так что игроку её тащить незачем. Не критично, если не вышло:
+              # релиз с толстым бинарником лучше, чем отсутствие релиза.
+              STRIP=$(command -v llvm-strip || command -v strip)
+              "$STRIP" --strip-debug dist/noro-launcher-${{ matrix.target }} \
+                dist/noro-launcher-core-${{ matrix.target }} \
+                || echo "::warning::не удалось срезать debug-info, бинарники уедут как есть"
               ;;
           esac
 
@@ -175,3 +256,32 @@ jobs:
         with:
           files: artifacts/*
           tag_name: ${{ env.TAG }}
+
+  sentry-release:
+    name: Sentry release
+    needs: release
+    runs-on: ubuntu-latest
+    # Без токена шаг не нужен, а без DSN — некуда: сборка без телеметрии
+    # остаётся полноценной сборкой.
+    if: vars.NORO_SENTRY_DSN != ''
+    steps:
+      # Полная история: без неё set-commits нечего связывать, и Sentry не
+      # покажет, каким изменением падение внесено.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+
+      - name: Create release and associate commits
+        shell: bash
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -n "${SENTRY_AUTH_TOKEN:-}" ] || { echo "::error::SENTRY_AUTH_TOKEN не задан в секретах"; exit 1; }
+          npm install -g @sentry/cli@2
+          # Имя релиза должно совпасть с тем, что зашито в бинарник через
+          # NORO_RELEASE, иначе падения повиснут на релизе, которого нет.
+          sentry-cli releases new "$NORO_RELEASE"
+          sentry-cli releases set-commits "$NORO_RELEASE" --auto --ignore-missing
+          sentry-cli releases finalize "$NORO_RELEASE"

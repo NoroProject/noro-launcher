@@ -101,26 +101,32 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
         add_file(f.path, f.sha1, f.size, f.side, f.kind, None);
     }
 
-    let optional_mods: Vec<OptionalMod> =
-        serde_json::from_value(build.optional_mods.clone()).unwrap_or_default();
-    let unmanaged_paths: Vec<String> =
-        serde_json::from_value(build.unmanaged_paths.clone()).unwrap_or_default();
-    let user_managed_paths: Vec<String> =
-        serde_json::from_value(build.user_managed_paths.clone()).unwrap_or_default();
+    // Всё ниже уезжает в подписанный манифест. Пустой список вместо непрочитанного
+    // JSON — это подпись под выдуманным содержимым: игрок получил бы сборку без
+    // модов или без jvm-аргументов и с валидной подписью на ней.
+    let optional_mods: Vec<OptionalMod> = serde_json::from_value(build.optional_mods.clone())
+        .context("optional_mods сборки не разобрать")?;
+    let unmanaged_paths: Vec<String> = serde_json::from_value(build.unmanaged_paths.clone())
+        .context("unmanaged_paths сборки не разобрать")?;
+    let user_managed_paths: Vec<String> = serde_json::from_value(build.user_managed_paths.clone())
+        .context("user_managed_paths сборки не разобрать")?;
 
     // Объединяем аргументы: из base_build (ванилла/лоадер) + из build (если есть кастомные)
     // Сейчас берем напрямую из base_build.
-    let jvm_args: Vec<schema::ManifestArg> =
-        serde_json::from_value(base_build.jvm_args.clone()).unwrap_or_default();
-    let game_args: Vec<schema::ManifestArg> =
-        serde_json::from_value(base_build.game_args.clone()).unwrap_or_default();
+    let jvm_args: Vec<schema::ManifestArg> = serde_json::from_value(base_build.jvm_args.clone())
+        .context("jvm_args базовой сборки не разобрать")?;
+    let game_args: Vec<schema::ManifestArg> = serde_json::from_value(base_build.game_args.clone())
+        .context("game_args базовой сборки не разобрать")?;
 
     let mut manifest = BuildManifest {
         build_id: build.id,
         server_id: build.server_id,
         version: build.version.clone(),
         mc_version: build.mc_version.clone(),
-        modloader: Modloader::from_str(&build.modloader).unwrap_or(Modloader::Vanilla),
+        // Vanilla по умолчанию означала бы «запусти без загрузчика» — игра
+        // стартует и падает без единого мода вместо внятного отказа.
+        modloader: Modloader::from_str(&build.modloader)
+            .map_err(|_| anyhow::anyhow!("неизвестный загрузчик в сборке: {}", build.modloader))?,
         modloader_version: build.modloader_version.clone(),
         main_class: base_build.main_class.clone(),
         jvm_args,

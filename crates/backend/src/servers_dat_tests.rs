@@ -17,13 +17,15 @@ fn node(name: &str, host: &str, port: u16, proxy: bool) -> GameServerEntry {
 
 fn build(nodes: Vec<GameServerEntry>) -> ServerEntry {
     ServerEntry {
+        available_builds: Vec::new(),
         id: Uuid::new_v4(),
         name: "MauMods".into(),
         description: String::new(),
         icon_url: None,
         background_url: None,
-        mc_host: nodes.first().map(|n| n.mc_host.clone()).unwrap_or_default(),
-        mc_port: nodes.first().map(|n| n.mc_port).unwrap_or(25565),
+        // Как у мастера: адреса нет, если игровых серверов нет.
+        mc_host: nodes.first().map(|n| n.mc_host.clone()),
+        mc_port: nodes.first().map(|n| n.mc_port),
         modloader: Modloader::NeoForge,
         mc_version: "1.21.1".into(),
         current_build_id: None,

@@ -57,6 +57,32 @@ pub async fn list(
         }
     }
 
+    // Узлы по сборкам: выдать тестеру превью-версию, не открывая остальные.
+    // Плюс wildcard на сервер — чтобы не перевыдавать право на каждую новую.
+    for server in crate::db::list_servers(&state.db, false).await? {
+        let builds = crate::db::list_server_builds(&state.db, server.id).await?;
+        if builds.is_empty() {
+            continue;
+        }
+        out.push(Suggestion {
+            node: format!("noro.build.{}.*", server.id),
+            source: "launcher",
+            label: Some(format!("All builds of \u{201c}{}\u{201d}", server.name)),
+        });
+        for b in builds {
+            out.push(Suggestion {
+                node: schema::perm_build_access(&server.id.to_string(), &b.id.to_string()),
+                source: "launcher",
+                label: Some(format!(
+                    "Build \u{201c}{}\u{201d} {}{}",
+                    server.name,
+                    b.version,
+                    if b.published { "" } else { " (preview)" }
+                )),
+            });
+        }
+    }
+
     out.extend(optional_mod_nodes(&state).await?);
 
     if let Some(server_id) = query.server_id {

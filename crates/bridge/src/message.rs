@@ -86,6 +86,11 @@ pub enum MessageToBackend {
         server_id: Uuid,
         enabled: Vec<String>,
     },
+    /// Выбрать версию сборки для сервера. `None` — вернуться к текущей.
+    SelectBuild {
+        server_id: uuid::Uuid,
+        build_id: Option<uuid::Uuid>,
+    },
     SuggestOptionalMod {
         server_id: Uuid,
         build_id: Option<Uuid>,
@@ -116,6 +121,10 @@ pub enum MessageToBackend {
         flags: String,
     },
     SetShowConsoleOnLaunch {
+        enabled: bool,
+    },
+    /// Игрок разрешил или запретил отправку отчётов о падениях.
+    SetCrashReports {
         enabled: bool,
     },
     SetServerMemory {
@@ -309,6 +318,9 @@ pub enum MessageToFrontend {
         memory_max_mb: u32,
         jvm_flags: String,
         show_console_on_launch: bool,
+        crash_reports: bool,
+        /// Вшит ли DSN в эту сборку. Без него переключатель показывать незачем.
+        crash_reports_available: bool,
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,
@@ -334,6 +346,11 @@ pub enum MessageToFrontend {
         total: u32,
         offset: u32,
         limit: u32,
+    },
+    /// Каталог не ответил. Раньше в этом случае не приходило ничего, и экран
+    /// навсегда оставался в состоянии «ищем моды».
+    CatalogFailed {
+        message: String,
     },
     /// Полная страница мода — ответ на `RequestModProject`.
     ModProjectLoaded {

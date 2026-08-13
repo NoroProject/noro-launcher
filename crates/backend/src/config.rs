@@ -20,9 +20,16 @@ pub struct LauncherConfig {
     pub jvm_flags: String,
     /// Открывать ли окно консоли при запуске игры.
     pub show_console_on_launch: bool,
+    /// Отправлять ли отчёты о падениях. Игрок может отказаться — см. telemetry.
+    #[serde(default = "default_crash_reports")]
+    pub crash_reports: bool,
     /// Персональные настройки клиента для конкретных серверов.
     #[serde(default)]
     pub server_settings: BTreeMap<Uuid, ServerClientSettings>,
+    /// Выбранная версия сборки по серверам. Нет записи — берётся текущая
+    /// опубликованная, то есть поведение по умолчанию не меняется.
+    #[serde(default)]
+    pub selected_build: BTreeMap<Uuid, Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,9 +49,16 @@ impl Default for LauncherConfig {
             memory_max_mb: 4096,
             jvm_flags: String::new(),
             show_console_on_launch: true,
+            crash_reports: default_crash_reports(),
             server_settings: BTreeMap::new(),
+            selected_build: BTreeMap::new(),
         }
     }
+}
+
+/// По умолчанию включено: иначе о падениях мы не узнаём вовсе.
+fn default_crash_reports() -> bool {
+    true
 }
 
 fn default_locale() -> String {
@@ -57,9 +71,12 @@ fn default_locale() -> String {
         .unwrap_or_else(|| "en".to_string())
 }
 
+/// Адрес мастера вшивается на сборке. В release он обязателен — за этим следит
+/// `noro_launcher::verify`. Здесь остаётся только dev-адрес: подставлять сюда
+/// боевой домен значило бы, что отладочная сборка молча ходит в прод.
 fn default_master_url() -> String {
     option_env!("NORO_MASTER_URL")
-        .unwrap_or("https://api.noro.dalynkaa.dev")
+        .unwrap_or("http://localhost:8080")
         .to_string()
 }
 

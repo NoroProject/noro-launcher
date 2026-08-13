@@ -12,6 +12,7 @@
   "dependencies": {
     "@iconify-json/lucide": "^1.2.64",
     "@nuxt/ui": "^3.3.7",
+    "@sentry/nuxt": "^10.70.0",
     "dompurify": "^3.4.13",
     "marked": "^18.0.7",
     "nuxt": "^3.17.0",

@@ -129,7 +129,11 @@ async fn handle_client_msg(
     tx: &mpsc::UnboundedSender<ServerWsMsg>,
 ) -> anyhow::Result<()> {
     match msg {
-        ClientWsMsg::Authenticate { access_token } => {
+        ClientWsMsg::Authenticate {
+            access_token,
+            launcher_version,
+            platform,
+        } => {
             let token = Uuid::parse_str(&access_token).ok();
             let row = match token {
                 Some(t) => crate::db::user_by_access_token(&state.db, t).await?,
@@ -141,6 +145,18 @@ async fn handle_client_msg(
                     let profile = crate::db::profile_from_row(&state.db, r).await?;
                     *authed_user = Some(user_id);
                     state.ws.authenticate(conn_id, user_id);
+                    // Не критично для входа: если запись не удалась, игрок всё
+                    // равно должен подключиться — это только статистика.
+                    if let Err(e) = crate::db::record_launcher_client(
+                        &state.db,
+                        user_id,
+                        &launcher_version,
+                        &platform,
+                    )
+                    .await
+                    {
+                        tracing::warn!(error = %e, "не удалось записать версию лаунчера");
+                    }
                     let _ = tx.send(ServerWsMsg::AuthOk { user: profile });
                 }
                 Some(_) => {
@@ -172,7 +188,17 @@ async fn handle_client_msg(
             };
             let mut servers = Vec::new();
             for s in &rows {
-                let entry = crate::db::server_entry(&state.db, s).await?;
+                let mut entry = crate::db::server_entry(&state.db, s).await?;
+                // Игрок видит только те версии, на которые у него есть право.
+                // Отдавать остальные нельзя: список сборок сам по себе говорит,
+                // что готовится к выкату.
+                entry.available_builds.retain(|b| match &user_profile {
+                    Some(p) => p.has_permission(&schema::perm_build_access(
+                        &s.id.to_string(),
+                        &b.id.to_string(),
+                    )),
+                    None => false,
+                });
                 if is_admin || entry.current_build_id.is_some() {
                     let can_join = match &user_profile {
                         Some(p) => p.can_join_server(&s.id, s.limited),
@@ -192,7 +218,10 @@ async fn handle_client_msg(
             let _ = tx.send(ServerWsMsg::News { items });
         }
 
-        ClientWsMsg::RequestBuildManifest { server_id } => {
+        ClientWsMsg::RequestBuildManifest {
+            server_id,
+            build_id,
+        } => {
             let Some(user_id) = *authed_user else {
                 let _ = tx.send(ServerWsMsg::AuthFail {
                     reason: "auth-sign-in-first".into(),
@@ -211,7 +240,28 @@ async fn handle_client_msg(
                 });
                 return Ok(());
             }
-            match crate::db::latest_published_build(&state.db, server_id).await? {
+            // Запрошенная версия отдаётся только при наличии права на неё:
+            // иначе достаточно было бы подставить чужой id в сообщение.
+            let requested = match build_id {
+                Some(id)
+                    if profile.has_permission(&schema::perm_build_access(
+                        &server_id.to_string(),
+                        &id.to_string(),
+                    )) =>
+                {
+                    crate::db::get_build(&state.db, id)
+                        .await?
+                        .filter(|b| b.server_id == server_id)
+                }
+                _ => None,
+            };
+
+            let chosen = match requested {
+                Some(b) => Some(b),
+                None => crate::db::latest_published_build(&state.db, server_id).await?,
+            };
+
+            match chosen {
                 Some(build) => {
                     let manifest = crate::manifest::build_manifest(state, &build).await?;
                     let _ = tx.send(ServerWsMsg::BuildManifest { manifest });

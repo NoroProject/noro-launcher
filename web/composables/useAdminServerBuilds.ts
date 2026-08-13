@@ -35,7 +35,12 @@ export function useAdminServerBuilds(
 
   watch(
     () => [buildForm.modloader, buildForm.mc_version],
-    ([kind, mc]) => loadLoader(kind, mc).catch(() => {}),
+    // Молчаливый catch оставлял выпадающий список версий загрузчика пустым, и
+    // это выглядело как «для этой версии MC загрузчика нет».
+    ([kind, mc]) =>
+      loadLoader(kind, mc).catch((e) =>
+        notify.fail(e, `Could not load ${kind} versions for ${mc}`),
+      ),
     { immediate: true },
   );
 

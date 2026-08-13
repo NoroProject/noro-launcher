@@ -200,7 +200,12 @@ async fn resolve_cf_file(
         .as_str()
         .ok_or_else(|| anyhow!("нет downloadUrl (мод запретил стороннее скачивание)"))?
         .to_string();
-    let filename = data["fileName"].as_str().unwrap_or("mod.jar").to_string();
+    // Имя файла попадает в mods/ сборки. «mod.jar» для каждого безымянного
+    // ответа означал бы, что второй такой мод затирает первый.
+    let filename = data["fileName"]
+        .as_str()
+        .ok_or_else(|| anyhow!("CurseForge не вернул fileName"))?
+        .to_string();
     let sha1 = data["hashes"]
         .as_array()
         .and_then(|a| a.iter().find(|h| h["algo"].as_u64() == Some(1)))

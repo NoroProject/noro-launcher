@@ -11,6 +11,23 @@ use schema::{ClientWsMsg, ServerWsMsg};
 use uuid::Uuid;
 
 impl BackendState {
+    /// Запрос манифеста с учётом выбранной игроком версии.
+    ///
+    /// Без выбора уходит `None`, и мастер отдаёт текущую опубликованную —
+    /// поведение по умолчанию не меняется.
+    fn request_manifest_msg(&self, server_id: Uuid) -> ClientWsMsg {
+        ClientWsMsg::RequestBuildManifest {
+            server_id,
+            build_id: self
+                .ctx
+                .config
+                .get()
+                .selected_build
+                .get(&server_id)
+                .copied(),
+        }
+    }
+
     /// Команда от frontend.
     pub async fn handle_to_backend(&mut self, msg: MessageToBackend) {
         match msg {
@@ -224,9 +241,7 @@ impl BackendState {
                     self.send_server_recommendation(server_id, &manifest);
                     self.send_optional_mods(server_id, &manifest);
                 } else {
-                    self.ctx
-                        .ws
-                        .send(ClientWsMsg::RequestBuildManifest { server_id });
+                    self.ctx.ws.send(self.request_manifest_msg(server_id));
                 }
             }
 
@@ -257,6 +272,26 @@ impl BackendState {
                 self.ctx
                     .ws
                     .send(ClientWsMsg::SetOptionalMods { server_id, enabled });
+            }
+
+            MessageToBackend::SelectBuild {
+                server_id,
+                build_id,
+            } => {
+                self.ctx.config.update(|c| match build_id {
+                    Some(id) => {
+                        c.selected_build.insert(server_id, id);
+                    }
+                    // Возврат к текущей версии — это отсутствие записи, а не
+                    // запомненный id: иначе выбор «залипнет» на старой сборке,
+                    // когда админ выкатит новую.
+                    None => {
+                        c.selected_build.remove(&server_id);
+                    }
+                });
+                // Манифест перезапрашивается сразу: игрок ждёт, что список
+                // файлов и модов обновится под выбранную версию.
+                self.ctx.ws.send(self.request_manifest_msg(server_id));
             }
 
             MessageToBackend::SuggestOptionalMod {
@@ -330,86 +365,30 @@ impl BackendState {
                 offset,
             } => {
                 let ctx = self.ctx.clone();
+                let http = self.ctx.http.clone();
                 tokio::spawn(async move {
                     let master_url = ctx.config.get().master_url;
-                    let mut url = format!(
-                        "{master_url}/api/admin/catalog/search?q={}&provider={}&offset={}&limit=20",
-                        urlencoding::encode(&query),
-                        urlencoding::encode(&provider),
-                        offset
-                    );
-                    if let Some(mc) = mc_version {
-                        url.push_str("&mc=");
-                        url.push_str(&urlencoding::encode(&mc));
-                    }
-                    if let Some(ldr) = loader {
-                        url.push_str("&loader=");
-                        url.push_str(&urlencoding::encode(&ldr));
-                    }
-
-                    let client = reqwest::Client::new();
-                    if let Ok(res) = client.get(&url).send().await {
-                        if let Ok(data) = res.json::<serde_json::Value>().await {
-                            let total =
-                                data.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                            let res_offset = data
-                                .get("offset")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(offset as u64)
-                                as u32;
-                            let res_limit =
-                                data.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as u32;
-
-                            let mut hits = Vec::new();
-                            if let Some(arr) = data.get("hits").and_then(|v| v.as_array()) {
-                                for h in arr {
-                                    let provider = h
-                                        .get("provider")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("modrinth")
-                                        .to_string();
-                                    let project_id = h
-                                        .get("project_id")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string();
-                                    let title = h
-                                        .get("title")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string();
-                                    let description = h
-                                        .get("description")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string();
-                                    let icon_url = h
-                                        .get("icon_url")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string());
-                                    let author = h
-                                        .get("author")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string());
-                                    let downloads =
-                                        h.get("downloads").and_then(|v| v.as_u64()).unwrap_or(0);
-
-                                    hits.push(bridge::CatalogHitInfo {
-                                        provider,
-                                        project_id,
-                                        title,
-                                        description,
-                                        icon_url,
-                                        author,
-                                        downloads,
-                                    });
-                                }
-                            }
-                            ctx.send(MessageToFrontend::CatalogSearchResults {
-                                hits,
-                                total,
-                                offset: res_offset,
-                                limit: res_limit,
+                    let page = crate::catalog_search::search(
+                        &http,
+                        &master_url,
+                        &query,
+                        &provider,
+                        mc_version.as_deref(),
+                        loader.as_deref(),
+                        offset,
+                    )
+                    .await;
+                    match page {
+                        Ok(page) => ctx.send(MessageToFrontend::CatalogSearchResults {
+                            hits: page.hits,
+                            total: page.total,
+                            offset: page.offset,
+                            limit: page.limit,
+                        }),
+                        Err(e) => {
+                            tracing::error!(error = %e, "поиск в каталоге не удался");
+                            ctx.send(MessageToFrontend::CatalogFailed {
+                                message: e.to_string(),
                             });
                         }
                     }
@@ -429,13 +408,25 @@ impl BackendState {
                         urlencoding::encode(&provider),
                         urlencoding::encode(&project_id),
                     );
-                    let Ok(res) = http.get(&url).send().await else {
-                        return;
-                    };
                     // Поля страницы совпадают с ModProjectInfo по именам, а всё
                     // лишнее из ответа мастера serde просто игнорирует.
-                    if let Ok(project) = res.json::<bridge::ModProjectInfo>().await {
-                        ctx.send(MessageToFrontend::ModProjectLoaded { project });
+                    let loaded = async {
+                        http.get(&url)
+                            .send()
+                            .await?
+                            .error_for_status()?
+                            .json::<bridge::ModProjectInfo>()
+                            .await
+                    }
+                    .await;
+                    match loaded {
+                        Ok(project) => ctx.send(MessageToFrontend::ModProjectLoaded { project }),
+                        Err(e) => {
+                            tracing::error!(error = %e, "страница мода не загрузилась");
+                            ctx.send(MessageToFrontend::CatalogFailed {
+                                message: e.to_string(),
+                            });
+                        }
                     }
                 });
             }
@@ -455,6 +446,13 @@ impl BackendState {
                 self.ctx
                     .config
                     .update(|c| c.show_console_on_launch = enabled);
+            }
+
+            MessageToBackend::SetCrashReports { enabled } => {
+                // Применится со следующего запуска: Sentry поднимается до GPUI,
+                // а снять уже установленный хук паники на ходу нельзя.
+                self.ctx.config.update(|c| c.crash_reports = enabled);
+                self.send_config_state();
             }
 
             MessageToBackend::SetServerMemory {
@@ -660,9 +658,7 @@ impl BackendState {
         if let Some(manifest) = self.manifests.get(&server_id).cloned() {
             self.begin_launch(server_id, manifest);
         } else {
-            self.ctx
-                .ws
-                .send(ClientWsMsg::RequestBuildManifest { server_id });
+            self.ctx.ws.send(self.request_manifest_msg(server_id));
         }
     }
 
@@ -713,6 +709,8 @@ impl BackendState {
             jvm_flags: c.jvm_flags,
             locale: c.locale.clone(),
             show_console_on_launch: c.show_console_on_launch,
+            crash_reports: c.crash_reports,
+            crash_reports_available: crate::telemetry::is_available(),
             master_url: c.master_url,
             server_settings,
         });
@@ -867,9 +865,7 @@ impl BackendState {
                 if self.user.is_some()
                     && (had_manifest || self.pending_launch.contains_key(&server_id))
                 {
-                    self.ctx
-                        .ws
-                        .send(ClientWsMsg::RequestBuildManifest { server_id });
+                    self.ctx.ws.send(self.request_manifest_msg(server_id));
                 }
             }
             ServerWsMsg::PermissionsUpdated { user } => {
