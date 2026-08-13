@@ -66,7 +66,7 @@ function formatDate(ts: number) {
                 :disabled="!enabled || backups.loading.value"
             />
             <AtomButton
-                variant="accent"
+                variant="primary"
                 icon="i-lucide-archive"
                 type="submit"
                 :disabled="!enabled || backups.loading.value"

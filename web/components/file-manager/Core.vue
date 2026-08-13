@@ -47,7 +47,7 @@ async function saveRulesModal(ignored: string[], user: string[]) {
   try {
     await rules.save()
     rulesModalOpen.value = false
-    notify.success('Sync rules saved')
+    notify.ok('Sync rules saved')
   } catch (e) {
     notify.fail(e, 'Failed to save sync rules')
     await rules.load()

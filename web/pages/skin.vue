@@ -7,10 +7,11 @@ await auth.loadMe()
 
 const MAX_BYTES = 256 * 1024
 
+/** Ответ `/api/me/skin-presets` — поля как в `SkinPresetItem` на мастере. */
 interface SavedSkin {
   id: string
   name: string
-  url: string
+  skin_url: string
 }
 
 const file = ref<File | null>(null)
@@ -159,7 +160,7 @@ async function applySavedSkin(skin: SavedSkin) {
   uploading.value = true
   error.value = null
   try {
-    const res = await fetch(skin.url)
+    const res = await fetch(skin.skin_url)
     const blob = await res.blob()
     const skinFile = new File([blob], `${skin.name}.png`, { type: 'image/png' })
     const updated = await auth.upload<UserProfile>('/api/me/skin', 'skin', skinFile)
@@ -267,15 +268,15 @@ async function selectCape(capeId: string | null) {
         <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
         <UAlert v-else-if="message" color="success" variant="subtle" icon="i-lucide-check" :description="message" />
 
-        <!-- 1. Saved Custom Skins (Сохранённые скины & Пресеты) -->
+        <!-- 1. Saved custom skins and presets -->
         <section class="noro-panel p-5 space-y-4">
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
                 <UIcon name="i-lucide-bookmark" class="size-4 text-[var(--noro-cream)]" />
-                Ваши скины и пресеты
+                Your skins and presets
               </h2>
-              <p class="text-xs text-[var(--noro-muted)]">Кликните на карточку с плюсом, чтобы выбрать файл и создать пресет</p>
+              <p class="text-xs text-[var(--noro-muted)]">Click the plus card to pick a file and create a preset</p>
             </div>
           </div>
 
@@ -290,8 +291,8 @@ async function selectCape(capeId: string | null) {
               <div class="flex size-12 items-center justify-center rounded-full bg-[var(--noro-blue)]/20 text-[var(--noro-blue)] group-hover:scale-110 transition-transform">
                 <UIcon name="i-lucide-plus" class="size-7" />
               </div>
-              <span class="mt-3 text-xs font-bold text-[var(--noro-text)]">Новый скин</span>
-              <span class="text-[10px] text-[var(--noro-muted)]">Загрузить файл .PNG</span>
+              <span class="mt-3 text-xs font-bold text-[var(--noro-text)]">New skin</span>
+              <span class="text-[10px] text-[var(--noro-muted)]">Upload a .PNG file</span>
               <input ref="input" type="file" accept="image/png" class="hidden" @change="onPick">
             </label>
 
@@ -309,7 +310,7 @@ async function selectCape(capeId: string | null) {
                 <button
                   type="button"
                   class="size-6 place-items-center rounded bg-black/60 text-white hover:bg-[var(--noro-blue)] flex items-center justify-center"
-                  title="Переименовать"
+                  title="Rename"
                   @click.stop="startRename(skin, $event)"
                 >
                   <UIcon name="i-lucide-pencil" class="size-3" />
@@ -317,7 +318,7 @@ async function selectCape(capeId: string | null) {
                 <button
                   type="button"
                   class="size-6 place-items-center rounded bg-black/60 text-white hover:bg-red-600 flex items-center justify-center"
-                  title="Удалить"
+                  title="Delete"
                   @click.stop="deleteSavedSkin(skin.id)"
                 >
                   <UIcon name="i-lucide-x" class="size-3" />
@@ -340,20 +341,20 @@ async function selectCape(capeId: string | null) {
               </template>
 
               <SkinCard3D :skin-url="skin.skin_url" :width="100" :height="125" />
-              <UBadge v-if="currentSkinUrl === skin.skin_url" color="primary" variant="subtle" class="text-[10px]">Надет</UBadge>
-              <span v-else class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-text)] font-semibold">Надеть</span>
+              <UBadge v-if="currentSkinUrl === skin.skin_url" color="primary" variant="subtle" class="text-[10px]">Equipped</UBadge>
+              <span v-else class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-text)] font-semibold">Equip</span>
             </div>
           </div>
         </section>
 
-        <!-- 2. Standard Presets (Стандартные скины) -->
+        <!-- 2. Standard Mojang presets -->
         <section class="noro-panel p-5 space-y-4">
           <div>
             <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
               <UIcon name="i-lucide-sparkles" class="size-4 text-[var(--noro-cream)]" />
-              Официальные скины Minecraft
+              Official Minecraft skins
             </h2>
-            <p class="text-xs text-[var(--noro-muted)]">Стандартные персонажи Mojang</p>
+            <p class="text-xs text-[var(--noro-muted)]">Standard Mojang characters</p>
           </div>
 
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -365,22 +366,22 @@ async function selectCape(capeId: string | null) {
             >
               <span class="text-xs font-bold text-[var(--noro-text)]">{{ preset.name }}</span>
               <SkinCard3D :preset="preset.id" />
-              <span class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-cream)] font-bold">Надеть</span>
+              <span class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-cream)] font-bold">Equip</span>
             </div>
           </div>
         </section>
 
-        <!-- 3. Capes Grid (Плащи) -->
+        <!-- 3. Capes grid -->
         <section class="noro-panel p-5 space-y-4">
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
                 <UIcon name="i-lucide-layers" class="size-4 text-[var(--noro-cream)]" />
-                Ваши доступные плащи
+                Your available capes
               </h2>
-              <p class="text-xs text-[var(--noro-muted)]">Выберите плащ для вашего персонажа</p>
+              <p class="text-xs text-[var(--noro-muted)]">Pick a cape for your character</p>
             </div>
-            <UBadge color="neutral" variant="subtle">{{ capes.length }} плащей</UBadge>
+            <UBadge color="neutral" variant="subtle">{{ capes.length }} capes</UBadge>
           </div>
 
           <div v-if="capes.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -393,7 +394,7 @@ async function selectCape(capeId: string | null) {
               @click="selectCape(null)"
             >
               <UIcon name="i-lucide-x" class="size-6 text-[var(--noro-muted)] group-hover:text-[var(--noro-text)]" />
-              <span class="mt-1 text-[11px] font-bold text-[var(--noro-muted)]">Без плаща</span>
+              <span class="mt-1 text-[11px] font-bold text-[var(--noro-muted)]">No cape</span>
             </div>
 
             <!-- Capes Cards -->
@@ -416,8 +417,8 @@ async function selectCape(capeId: string | null) {
           <EmptyState
             v-else
             icon="i-lucide-shield-off"
-            title="Нет доступных плащей"
-            description="У вас пока нет доступных плащей. Обратитесь к администратору для выдачи прав на плащи!"
+            title="No capes available"
+            description="You have no capes yet. Ask an administrator to grant you cape access."
           />
         </section>
       </div>

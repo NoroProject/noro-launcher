@@ -14,6 +14,11 @@ export function useNotify() {
       toast.add({ title, description, icon: 'i-lucide-check', color: 'success' })
     },
 
+    /** Нейтральное уведомление о начатом действии: скачивание, копирование. */
+    info(title: string, description?: string) {
+      toast.add({ title, description, icon: 'i-lucide-info', color: 'info' })
+    },
+
     fail(err: unknown, title = 'Failed') {
       console.error(err)
       toast.add({ title, description: describe(err), icon: 'i-lucide-triangle-alert', color: 'error' })

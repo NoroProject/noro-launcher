@@ -35,10 +35,10 @@ export function useServerBackups(gameServerId: string) {
         method: "POST",
         body: { name },
       });
-      notify.success("Snapshot created");
+      notify.ok("Snapshot created");
       await refresh();
     } catch (e) {
-      notify.error(e instanceof Error ? e.message : "Failed to create snapshot");
+      notify.fail(e, "Failed to create snapshot");
     } finally {
       loading.value = false;
     }
@@ -50,10 +50,10 @@ export function useServerBackups(gameServerId: string) {
       await auth.request(`${base}/${encodeURIComponent(name)}/restore`, {
         method: "POST",
       });
-      notify.success("Snapshot restored. Restart the server to apply changes.");
+      notify.ok("Snapshot restored. Restart the server to apply changes.");
       await refresh();
     } catch (e) {
-      notify.error(e instanceof Error ? e.message : "Failed to restore snapshot");
+      notify.fail(e, "Failed to restore snapshot");
     } finally {
       loading.value = false;
     }
@@ -65,10 +65,10 @@ export function useServerBackups(gameServerId: string) {
       await auth.request(`${base}/${encodeURIComponent(name)}`, {
         method: "DELETE",
       });
-      notify.success("Snapshot deleted");
+      notify.ok("Snapshot deleted");
       await refresh();
     } catch (e) {
-      notify.error(e instanceof Error ? e.message : "Failed to delete snapshot");
+      notify.fail(e, "Failed to delete snapshot");
     } finally {
       loading.value = false;
     }

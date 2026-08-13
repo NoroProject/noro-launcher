@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { GameServer } from "~/types/game-server";
+import type { ServerEntry } from "~/types/wrapper";
 
 /** Файловый менеджер серверной директории. */
 const props = defineProps<{
@@ -105,7 +106,7 @@ function onCtxDownload() {
 function onCtxCopyPath() {
     if (ctxEntry.value) {
         navigator.clipboard.writeText(ctxEntry.value.path);
-        notify.success("Path copied to clipboard");
+        notify.ok("Path copied to clipboard");
     }
     ctxVisible.value = false;
 }

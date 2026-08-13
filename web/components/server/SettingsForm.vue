@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import type {
-    ServerEditForm,
-    ServerSettingsTab,
-} from "~/types/server-settings";
+import type { ServerEditForm } from "~/types/server-settings";
 
 defineProps<{
     form: ServerEditForm;
-    activeTab: ServerSettingsTab;
+    /** Только те вкладки, для которых у формы есть заголовок в `copy`. */
+    activeTab: "server" | "client";
     minecraft: string[];
     modloaders: string[];
     loadingMinecraft: boolean;
