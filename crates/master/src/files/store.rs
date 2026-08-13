@@ -24,6 +24,11 @@ impl FileStore {
         }
     }
 
+    /// Корень хранилища — нужен обходу при поиске неиспользуемых объектов.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     /// Абсолютный путь к файлу по sha1.
     pub fn path_for(&self, sha1: &str) -> PathBuf {
         self.root.join(&sha1[0..2]).join(&sha1[2..4]).join(sha1)

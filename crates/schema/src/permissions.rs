@@ -40,6 +40,11 @@ pub const PERM_ADMIN_LAUNCHER: &str = "noro.admin.launcher";
 /// плюс рестарт это фактически рут на сервере, а не правка карточки в админке.
 pub const PERM_ADMIN_WRAPPER: &str = "noro.admin.wrapper";
 
+/// Уборка неиспользуемых объектов хранилища. Отдельно от остальных админских
+/// прав: операция удаляет файлы с диска, и восстановить их можно только
+/// перезаливкой сборки.
+pub const PERM_ADMIN_STORAGE: &str = "noro.admin.storage";
+
 pub const PERM_MOD_USERS_BAN: &str = "noro.mod.users.ban";
 
 pub const PERM_LAUNCHER_BETA: &str = "noro.launcher.beta";

@@ -4,8 +4,8 @@ use axum::Router;
 
 use super::{
     agents, build_routes, capes, catalog, cores, game_servers, launcher, mod_install,
-    mod_suggestions, news, permission_nodes, roles, servers, stats, tokens, users, versions,
-    wrapper, wrapper_backups, wrapper_fs,
+    mod_suggestions, news, permission_nodes, roles, servers, stats, storage, tokens, users,
+    versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -218,6 +218,11 @@ fn system_router() -> Router<AppState> {
         .route("/api/admin/tokens", get(tokens::list).post(tokens::create))
         .route("/api/admin/tokens/{id}", delete(tokens::delete))
         .route("/api/admin/stats", get(stats::stats))
+        // Уборка хранилища: GET считает, DELETE удаляет.
+        .route(
+            "/api/admin/storage/orphans",
+            get(storage::scan_orphans).delete(storage::delete_orphans),
+        )
         .route("/api/admin/versions/minecraft", get(versions::minecraft))
         .route("/api/admin/versions/loader/{kind}", get(versions::loader))
 }

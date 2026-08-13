@@ -14,6 +14,7 @@ pub mod roles;
 pub mod router;
 pub mod servers;
 pub mod stats;
+pub mod storage;
 pub mod tokens;
 pub mod users;
 pub mod versions;
