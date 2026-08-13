@@ -1,0 +1,73 @@
+# Проверка кода на каждый PR и push в master.
+#
+# До этого CI собирал только релизы и образы: ни fmt, ни clippy, ни тестов.
+# INSTRUCTIONS.md при этом утверждал, что «clippy warnings are errors in CI» —
+# такого workflow не существовало.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Новый push в ту же ветку отменяет предыдущий прогон: раннер self-hosted и
+# один, очередь из устаревших прогонов блокировала бы актуальный.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: rust fmt + clippy + test
+    runs-on: noro-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ci-rust
+
+      # Форматирование проверяется по всему воркспейсу: rustfmt не требует
+      # сборки и потому не упирается в системные зависимости GPUI.
+      - name: fmt
+        run: cargo fmt --all -- --check
+
+      # Серверная часть: она деплоится непрерывно, и регресс здесь виден не
+      # сразу. Крейты с GPUI (frontend, noro_launcher, noro_core) сюда не
+      # входят — им нужен графический стек, их собирает release-launcher.
+      - name: clippy
+        run: |
+          cargo clippy --all-targets \
+            -p schema -p i18n -p bridge -p backend -p master -p admin_cli \
+            -- -D warnings -A clippy::too_many_arguments
+
+      - name: test
+        run: cargo test -p schema -p i18n -p bridge -p backend -p master -p admin_cli
+
+  web:
+    name: web typecheck
+    runs-on: noro-arm64
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      # --frozen-lockfile: CI не должен молча подтягивать версии, которых нет
+      # в bun.lock, иначе прогон проверяет не то, что уедет в прод.
+      - name: install
+        run: bun install --frozen-lockfile
+
+      - name: typecheck
+        run: bun run typecheck
