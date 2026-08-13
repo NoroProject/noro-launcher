@@ -126,15 +126,16 @@ fn try_fabric<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Option<(String, Vec<u8
     let json: serde_json::Value = serde_json::from_slice(&json_bytes).ok()?;
     let icon_val = json.get("icon")?;
 
+    // `icon` — либо строка с путём, либо объект «размер → путь»; берём самый
+    // крупный размер. Всё остальное трактуется как отсутствие иконки.
     let icon_path = if let Some(s) = icon_val.as_str() {
         s.to_string()
-    } else if let Some(obj) = icon_val.as_object() {
+    } else {
+        let obj = icon_val.as_object()?;
         obj.keys()
             .filter_map(|k| k.parse::<u32>().ok().map(|n| (n, k.clone())))
             .max_by_key(|(n, _)| *n)
             .and_then(|(_, k)| obj[&k].as_str().map(str::to_string))?
-    } else {
-        return None;
     };
 
     read_entry(zip, &icon_path)

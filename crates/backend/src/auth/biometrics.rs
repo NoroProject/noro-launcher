@@ -1,6 +1,10 @@
 //! Native biometric authentication (Touch ID on macOS, Windows Hello on Windows).
 
 use anyhow::{anyhow, Result};
+
+// Внешний процесс зовут только macOS и Windows: на Linux импорт оставался
+// неиспользованным и валил сборку с `-D warnings`.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::process::Command;
 
 pub fn authenticate_biometrics(reason: &str) -> Result<bool> {
@@ -14,6 +18,7 @@ pub fn authenticate_biometrics(reason: &str) -> Result<bool> {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
+        let _ = reason;
         Err(anyhow!("Biometrics not supported on this OS"))
     }
 }
@@ -54,16 +59,22 @@ if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &e
 }
 
 #[cfg(target_os = "windows")]
-fn authenticate_windows_hello(_reason: &str) -> Result<bool> {
-    let script = r#"[Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType=WindowsRuntime]
-$asyncOp = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("Авторизация в Noro Launcher")
-$task = [System.Threading.Tasks.Task]::Run({ $asyncOp.GetResults() })
+fn authenticate_windows_hello(reason: &str) -> Result<bool> {
+    // Текст запроса берётся из аргумента, как и на macOS: раньше здесь была
+    // зашита русская строка, хотя интерфейс лаунчера англоязычный.
+    // Кавычки удваиваются — так PowerShell экранирует их внутри строки.
+    let script = format!(
+        r#"[Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType=WindowsRuntime]
+$asyncOp = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("{}")
+$task = [System.Threading.Tasks.Task]::Run({{ $asyncOp.GetResults() }})
 $task.Wait()
-if ($task.Result -eq [Windows.Security.Credentials.UI.UserConsentVerificationResult]::Verified) { exit 0 } else { exit 1 }"#;
+if ($task.Result -eq [Windows.Security.Credentials.UI.UserConsentVerificationResult]::Verified) {{ exit 0 }} else {{ exit 1 }}"#,
+        reason.replace('"', "\"\"")
+    );
 
     let output = Command::new("powershell")
         .arg("-Command")
-        .arg(script)
+        .arg(&script)
         .output()?;
 
     Ok(output.status.code() == Some(0))
