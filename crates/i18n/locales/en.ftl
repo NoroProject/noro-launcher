@@ -38,7 +38,21 @@ profile-upload-skin = Upload Skin
 profile-drag-to-rotate = Drag to rotate
 profile-skin-loading = Loading...
 profile-no-skin = No skin set
-profile-skin-invalid = No valid skin selected
+profile-skin-untitled = Untitled skin
+profile-skin-picker-failed = Could not open the file picker
+profile-skin-unreadable = Could not read that file
+profile-skin-not-png = That file is not a PNG image
+profile-skin-too-large = Skin file must be under 256 KB
+profile-presets-title = Skin presets
+profile-preset-new = New skin
+profile-preset-upload-png = Upload .PNG
+profile-preset-upload = Upload
+profile-preset-current = Current
+profile-preset-wear = Wear
+profile-cape-title = Choose a cape
+profile-cape-remove = Remove cape
+profile-cape-none = No cape
+profile-cape-take-off = Take off
 
 ## Sync and launch
 sync-checking = Checking files...
@@ -84,6 +98,9 @@ login-waiting = WAITING...
 login-checking = CHECKING SESSION...
 login-save-session = Save session
 login-auto-login = Auto login
+login-tagline = A Minecraft server launcher that installs mods and skins for you
+login-sign-in-discord = Sign in with Discord
+login-sign-in-passkey = Sign in on the website (Passkey)
 
 ## Game bar
 game-build = BUILD

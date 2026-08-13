@@ -175,6 +175,10 @@ pub struct LauncherUI {
     pub mod_catalog_limit: u32,
     /// Почему каталог пуст. `None` — либо ещё ищем, либо всё в порядке.
     pub mod_catalog_error: Option<String>,
+    /// Переименование пресета скина: id и черновик имени. Правится прямо в
+    /// карточке — системного диалога ввода текста нет ни на одной платформе.
+    pub renaming_preset: Option<(String, String)>,
+    pub rename_focus: Option<gpui::FocusHandle>,
     pub startup_checking: bool,
     pub login_error: Option<String>,
     pub login_mode_key: bool,
@@ -284,6 +288,8 @@ impl LauncherUI {
             mod_catalog_offset: 0,
             mod_catalog_limit: 20,
             mod_catalog_error: None,
+            renaming_preset: None,
+            rename_focus: None,
             startup_checking: true,
             login_error: None,
             login_mode_key: false,

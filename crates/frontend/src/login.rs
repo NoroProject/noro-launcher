@@ -42,7 +42,7 @@ pub fn render(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
                                 .text_size(px(13.))
                                 .line_height(px(18.))
                                 .text_color(rgb(TEXT_MUTED))
-                                .child("Лаунчер Minecraft серверов с автоматической установкой модов и скинов"),
+                                .child(t("login-tagline")),
                         ),
                 )
                 .child(auth_content(ui, cx))
@@ -117,7 +117,7 @@ fn login_buttons(logging_in: bool, cx: &mut Cx) -> AnyElement {
                         .text_size(px(14.))
                         .font_weight(FontWeight::BOLD)
                         .text_color(rgb(ON_CTA))
-                        .child("Войти через Discord"),
+                        .child(t("login-sign-in-discord")),
                 ),
         )
         .child(
@@ -146,7 +146,7 @@ fn login_buttons(logging_in: bool, cx: &mut Cx) -> AnyElement {
                         .text_size(px(14.))
                         .font_weight(FontWeight::BOLD)
                         .text_color(rgb(TEXT_PRIMARY))
-                        .child("Войти через сайт (Passkey)"),
+                        .child(t("login-sign-in-passkey")),
                 ),
         )
         .into_any_element()

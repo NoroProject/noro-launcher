@@ -1,6 +1,7 @@
 //! Skin preview card: turning figure, drag-to-rotate, presets and upload button.
 
 use super::common::{panel, Cx};
+use super::profile_skin_pick::on_upload_click;
 use super::skin_drag;
 use crate::components::btn;
 use crate::icons::ic;
@@ -120,7 +121,7 @@ fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
                         .font_family(FONT_PIXEL_ALT)
                         .text_size(px(8.))
                         .text_color(rgb(TEXT_MUTED))
-                        .child("Загрузить .PNG"),
+                        .child(t("profile-preset-upload-png")),
                 ),
         )
         .child(
@@ -133,7 +134,7 @@ fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
                 .text_size(px(10.))
                 .font_weight(gpui::FontWeight::BOLD)
                 .text_color(rgb(CTA))
-                .child("Новый скин"),
+                .child(t("profile-preset-new")),
         )
         .child(
             div()
@@ -151,7 +152,7 @@ fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
                 .text_size(px(9.))
                 .font_weight(gpui::FontWeight::BOLD)
                 .text_color(rgb(TEXT_PRIMARY))
-                .child("Загрузить"),
+                .child(t("profile-preset-upload")),
         )
         .into_any_element()
 }
@@ -167,7 +168,7 @@ fn header_row() -> AnyElement {
                 .text_size(px(13.))
                 .font_weight(gpui::FontWeight::BOLD)
                 .text_color(rgb(CTA))
-                .child("Пресеты скинов"),
+                .child(t("profile-presets-title")),
         )
         .into_any_element()
 }
@@ -273,8 +274,15 @@ fn custom_preset_card(
                         .text_size(px(9.))
                         .text_color(rgb(TEXT_MUTED))
                         .child("✏️")
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            prompt_rename_preset(this, edit_preset_id.clone(), name.clone(), cx);
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.renaming_preset =
+                                Some((edit_preset_id.clone(), name.clone()));
+                            let focus = this
+                                .rename_focus
+                                .get_or_insert_with(|| cx.focus_handle())
+                                .clone();
+                            focus.focus(window, cx);
+                            cx.notify();
                         })),
                 )
                 .child(
@@ -297,18 +305,7 @@ fn custom_preset_card(
                 ),
         )
         .child(img_el)
-        .child(
-            div()
-                .w_full()
-                .px(px(4.))
-                .truncate()
-                .text_center()
-                .font_family(FONT_PIXEL_ALT)
-                .text_size(px(10.))
-                .font_weight(gpui::FontWeight::BOLD)
-                .text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY }))
-                .child(preset.name.clone()),
-        )
+        .child(name_row(ui, preset, is_active, cx))
         .child(if is_active {
             div()
                 .w_full()
@@ -322,7 +319,7 @@ fn custom_preset_card(
                 .text_size(px(9.))
                 .font_weight(gpui::FontWeight::BOLD)
                 .text_color(rgb(ON_CTA))
-                .child("Текущий")
+                .child(t("profile-preset-current"))
                 .into_any_element()
         } else {
             div()
@@ -341,7 +338,7 @@ fn custom_preset_card(
                 .text_size(px(9.))
                 .font_weight(gpui::FontWeight::BOLD)
                 .text_color(rgb(TEXT_PRIMARY))
-                .child("Надеть")
+                .child(t("profile-preset-wear"))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.upload_skin(apply_bytes.clone());
                     cx.notify();
@@ -413,7 +410,7 @@ fn standard_preset_card(
                 .text_size(px(9.))
                 .font_weight(gpui::FontWeight::BOLD)
                 .text_color(rgb(ON_CTA))
-                .child("Текущий")
+                .child(t("profile-preset-current"))
                 .into_any_element()
         } else {
             div()
@@ -431,7 +428,7 @@ fn standard_preset_card(
                 .text_size(px(9.))
                 .font_weight(gpui::FontWeight::BOLD)
                 .text_color(rgb(TEXT_PRIMARY))
-                .child("Надеть")
+                .child(t("profile-preset-wear"))
                 .into_any_element()
         })
         .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| apply_preset(this, id, cx)))
@@ -525,73 +522,99 @@ fn placeholder(text: impl Into<gpui::SharedString>) -> AnyElement {
         .into_any_element()
 }
 
-fn prompt_rename_preset(
-    this: &mut LauncherUI,
-    preset_id: String,
-    current_name: String,
-    cx: &mut gpui::Context<LauncherUI>,
-) {
-    let script = format!(
-        r#"text returned of (display dialog "Название пресета:" default answer "{}" with title "Переименование пресета")"#,
-        current_name.replace('"', "\\\"")
-    );
-    if let Ok(output) = std::process::Command::new("osascript")
-        .arg("-e")
-        .arg(&script)
-        .output()
-    {
-        if output.status.success() {
-            let new_name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !new_name.is_empty() {
-                if let Some(preset) = this.custom_presets.iter_mut().find(|p| p.id == preset_id) {
-                    preset.name = new_name;
-                }
-                cx.notify();
-            }
-        }
-    }
+/// Имя пресета: подпись, а при переименовании — поле ввода прямо в карточке.
+///
+/// Системного диалога для ввода текста нет ни в GPUI, ни в трёх наших
+/// платформах, а прежний `osascript display dialog` работал только на macOS и
+/// вставал поперёк потока отрисовки.
+fn name_row(
+    ui: &LauncherUI,
+    preset: &crate::state::SavedSkinPreset,
+    is_active: bool,
+    cx: &mut Cx,
+) -> AnyElement {
+    let editing = ui
+        .renaming_preset
+        .as_ref()
+        .filter(|(id, _)| id == &preset.id)
+        .map(|(_, draft)| draft.clone());
+
+    let Some(draft) = editing else {
+        return div()
+            .w_full()
+            .px(px(4.))
+            .truncate()
+            .text_center()
+            .font_family(FONT_PIXEL_ALT)
+            .text_size(px(10.))
+            .font_weight(gpui::FontWeight::BOLD)
+            .text_color(rgb(if is_active { CTA } else { TEXT_PRIMARY }))
+            .child(preset.name.clone())
+            .into_any_element();
+    };
+
+    let focus = ui.rename_focus.clone().unwrap_or_else(|| cx.focus_handle());
+    div()
+        .id(SharedString::from(format!("rename-{}", preset.id)))
+        .track_focus(&focus)
+        .w_full()
+        .px(px(4.))
+        .py(px(2.))
+        .rounded(px(R_SM))
+        .bg(rgb(BG_INPUT))
+        .border_1()
+        .border_color(rgb(ACCENT))
+        .text_center()
+        .truncate()
+        .font_family(FONT_PIXEL_ALT)
+        .text_size(px(10.))
+        .text_color(rgb(TEXT_PRIMARY))
+        .cursor_text()
+        // Клик по полю не должен «надевать» скин — карточка целиком кликабельна.
+        .on_click(|_, _, cx| cx.stop_propagation())
+        .on_key_down(cx.listener(rename_key))
+        .child(if draft.is_empty() {
+            t("profile-skin-untitled")
+        } else {
+            draft
+        })
+        .into_any_element()
 }
 
-fn on_upload_click(
+/// Enter сохраняет, Escape отменяет. Пустое имя не сохраняем: карточка без
+/// подписи неотличима от соседней.
+fn rename_key(
     this: &mut LauncherUI,
-    _e: &gpui::ClickEvent,
+    event: &gpui::KeyDownEvent,
     _w: &mut gpui::Window,
     cx: &mut gpui::Context<LauncherUI>,
 ) {
-    let script = "POSIX path of (choose file of type {\"public.png\"} with prompt \"Select Minecraft skin PNG\")";
-    if let Ok(output) = std::process::Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-    {
-        if output.status.success() {
-            let p = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !p.is_empty() {
-                if let Ok(b) = std::fs::read(&p) {
-                    if b.len() > 8 && &b[0..8] == b"\x89PNG\r\n\x1a\n" && b.len() < 256 * 1024 {
-                        let filename = std::path::Path::new(&p)
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("Новый скин")
-                            .to_string();
-                        this.upload_skin(b.clone());
-                        let preset = crate::state::SavedSkinPreset {
-                            id: uuid::Uuid::new_v4().to_string(),
-                            name: filename,
-                            bytes: b,
-                            preview: this.skin_preview.clone(),
-                        };
-                        this.custom_presets.push(preset);
-                        cx.notify();
-                        return;
-                    }
+    let Some((id, draft)) = this.renaming_preset.as_mut() else {
+        return;
+    };
+    match event.keystroke.key.as_str() {
+        "escape" => this.renaming_preset = None,
+        "backspace" => {
+            draft.pop();
+        }
+        "space" => draft.push(' '),
+        "enter" => {
+            let name = draft.trim().to_string();
+            let id = id.clone();
+            if !name.is_empty() {
+                if let Some(p) = this.custom_presets.iter_mut().find(|p| p.id == id) {
+                    p.name = name;
                 }
+            }
+            this.renaming_preset = None;
+        }
+        // key_char уже учитывает раскладку и shift, а при cmd/ctrl он пустой —
+        // горячие клавиши не сыплются в имя.
+        _ => {
+            if let Some(ch) = event.keystroke.key_char.as_deref() {
+                draft.push_str(ch);
             }
         }
     }
-    this.toast = Some(crate::state::Toast {
-        text: t("profile-skin-invalid"),
-        level: schema::NotifLevel::Warning,
-    });
     cx.notify();
 }

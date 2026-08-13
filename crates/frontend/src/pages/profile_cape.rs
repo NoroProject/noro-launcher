@@ -6,6 +6,7 @@ use crate::state::LauncherUI;
 use crate::theme::*;
 use bridge::MessageToBackend;
 use gpui::{div, img, prelude::*, px, rgb, AnyElement, FontWeight, SharedString};
+use i18n::t;
 
 pub fn cape_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let user = ui.user.as_ref().expect("user in profile");
@@ -55,7 +56,7 @@ fn header_row() -> AnyElement {
                 .text_size(px(13.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(CTA))
-                .child("Выбор плаща"),
+                .child(t("profile-cape-title")),
         )
         .into_any_element()
 }
@@ -97,7 +98,7 @@ fn no_cape_card(selected: bool, cx: &mut Cx) -> AnyElement {
                         .font_family(FONT_PIXEL_ALT)
                         .text_size(px(9.))
                         .text_color(rgb(TEXT_MUTED))
-                        .child("Снять плащ"),
+                        .child(t("profile-cape-remove")),
                 ),
         )
         .child(
@@ -110,7 +111,7 @@ fn no_cape_card(selected: bool, cx: &mut Cx) -> AnyElement {
                 .text_size(px(10.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(if selected { CTA } else { TEXT_PRIMARY }))
-                .child("Без плаща"),
+                .child(t("profile-cape-none")),
         )
         .child(if selected {
             div()
@@ -125,7 +126,7 @@ fn no_cape_card(selected: bool, cx: &mut Cx) -> AnyElement {
                 .text_size(px(9.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(ON_CTA))
-                .child("Текущий")
+                .child(t("profile-preset-current"))
                 .into_any_element()
         } else {
             div()
@@ -143,7 +144,7 @@ fn no_cape_card(selected: bool, cx: &mut Cx) -> AnyElement {
                 .text_size(px(9.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(TEXT_PRIMARY))
-                .child("Снять")
+                .child(t("profile-cape-take-off"))
                 .into_any_element()
         })
         .into_any_element()
@@ -221,7 +222,7 @@ fn cape_tile_card(
                 .text_size(px(9.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(ON_CTA))
-                .child("Текущий")
+                .child(t("profile-preset-current"))
                 .into_any_element()
         } else {
             div()
@@ -239,7 +240,7 @@ fn cape_tile_card(
                 .text_size(px(9.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(TEXT_PRIMARY))
-                .child("Надеть")
+                .child(t("profile-preset-wear"))
                 .into_any_element()
         })
         .into_any_element()

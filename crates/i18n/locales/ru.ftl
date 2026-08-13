@@ -39,7 +39,21 @@ profile-upload-skin = Загрузить скин
 profile-drag-to-rotate = Тяните, чтобы повернуть
 profile-skin-loading = Загрузка...
 profile-no-skin = Скин не установлен
-profile-skin-invalid = Подходящий скин не выбран
+profile-skin-untitled = Скин без названия
+profile-skin-picker-failed = Не удалось открыть диалог выбора файла
+profile-skin-unreadable = Не удалось прочитать файл
+profile-skin-not-png = Это не PNG-изображение
+profile-skin-too-large = Файл скина должен быть меньше 256 КБ
+profile-presets-title = Пресеты скинов
+profile-preset-new = Новый скин
+profile-preset-upload-png = Загрузить .PNG
+profile-preset-upload = Загрузить
+profile-preset-current = Текущий
+profile-preset-wear = Надеть
+profile-cape-title = Выбор плаща
+profile-cape-remove = Снять плащ
+profile-cape-none = Без плаща
+profile-cape-take-off = Снять
 
 ## Синхронизация и запуск
 sync-checking = Проверка файлов...
@@ -86,6 +100,9 @@ login-waiting = ОЖИДАНИЕ...
 login-checking = ПРОВЕРКА СЕССИИ...
 login-save-session = Запомнить сессию
 login-auto-login = Входить автоматически
+login-tagline = Лаунчер Minecraft серверов с автоматической установкой модов и скинов
+login-sign-in-discord = Войти через Discord
+login-sign-in-passkey = Войти через сайт (Passkey)
 
 ## Панель игры
 game-build = СБОРКА
