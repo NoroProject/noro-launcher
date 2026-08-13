@@ -80,7 +80,8 @@ pub async fn player(
             sort_order: r.sort_order,
         })
         .collect();
-    roles.sort_by(|a, b| b.sort_order.cmp(&a.sort_order));
+    // По убыванию важности: агент берёт первую роль как основную.
+    roles.sort_by_key(|r| std::cmp::Reverse(r.sort_order));
 
     let lp_groups = roles.iter().filter_map(|r| r.lp_group.clone()).collect();
 
