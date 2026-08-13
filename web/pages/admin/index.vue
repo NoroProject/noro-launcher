@@ -59,6 +59,7 @@ const fileStoreGb = computed(() => {
             </div>
             <UIcon name="i-lucide-hard-drive" class="size-8 text-[var(--noro-blue)]" />
           </div>
+          <AdminBackupButton />
         </div>
       </section>
 

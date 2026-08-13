@@ -1,4 +1,5 @@
 pub mod agents;
+pub mod backup;
 pub mod build_routes;
 pub mod builds;
 pub mod capes;

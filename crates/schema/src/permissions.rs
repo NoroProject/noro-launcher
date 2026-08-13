@@ -45,6 +45,10 @@ pub const PERM_ADMIN_WRAPPER: &str = "noro.admin.wrapper";
 /// перезаливкой сборки.
 pub const PERM_ADMIN_STORAGE: &str = "noro.admin.storage";
 
+/// Скачивание дампа БД. Отдельное право: в дампе лежат все пользователи,
+/// их привязки и токены сессий — это самый чувствительный объект в системе.
+pub const PERM_ADMIN_BACKUP: &str = "noro.admin.backup";
+
 pub const PERM_MOD_USERS_BAN: &str = "noro.mod.users.ban";
 
 pub const PERM_LAUNCHER_BETA: &str = "noro.launcher.beta";
