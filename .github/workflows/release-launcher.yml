@@ -113,6 +113,18 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # Экшен выше добавляет таргет к stable, а rust-toolchain.toml пинит другую
+      # версию, и rustup переключается на неё при первом же вызове cargo. Таргета
+      # там нет, и сборка падает с `can't find crate for core` — но только там,
+      # где таргет не совпадает с хостом раннера, то есть на x86_64 macOS.
+      - name: Add the target to the pinned toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHANNEL=$(grep -m1 '^channel' rust-toolchain.toml | cut -d'"' -f2)
+          rustup toolchain install "$CHANNEL" --profile minimal
+          rustup target add --toolchain "$CHANNEL" ${{ matrix.target }}
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: launcher-${{ matrix.target }}
@@ -157,19 +169,19 @@ jobs:
             dsymutil "$DIR/noro-launcher-core" "$DIR/noro-launcher"
           fi
 
-          # Что именно Sentry сможет разобрать — видно до загрузки. Не падаем:
-          # набор символов у пяти таргетов разный, и выяснять это лучше по
-          # факту первого прогона, чем ронять релиз догадкой.
-          sentry-cli debug-files check "$DIR/noro-launcher-core"* 2>&1 | head -20 \
-            || echo "::warning::в бинарнике не нашлось пригодных символов — трейсы будут без имён"
-
           # --include-sources кладёт рядом с символами сам код, и тогда в трейсе
           # видно строки, а не только их номера. Репозиторий приватный: это
           # осознанная передача исходников в Sentry.
           sentry-cli debug-files upload \
             --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" \
             --include-sources --wait \
-            "$DIR"
+            "$DIR" 2>&1 | tee dif-upload.log
+
+          # Отчёт самой загрузки и есть проверка: «Found 0» означает, что для
+          # этого таргета символов не нашлось, и трейсы придут без имён. Не
+          # роняем релиз, но и молчать об этом нельзя.
+          grep -qE "Found [1-9]" dif-upload.log \
+            || echo "::warning::Sentry не нашёл символов в $DIR — трейсы этого таргета будут без имён"
 
       # Секретов может не быть (форк, чужой прогон) — тогда подпись остаётся
       # ad-hoc, и сборка всё равно проходит.
