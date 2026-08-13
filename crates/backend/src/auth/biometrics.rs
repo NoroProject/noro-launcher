@@ -58,19 +58,28 @@ if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &e
     }
 }
 
-#[cfg(target_os = "windows")]
-fn authenticate_windows_hello(reason: &str) -> Result<bool> {
-    // Текст запроса берётся из аргумента, как и на macOS: раньше здесь была
-    // зашита русская строка, хотя интерфейс лаунчера англоязычный.
+/// Сборка PowerShell-скрипта вынесена из `cfg(windows)` намеренно: под Windows
+/// этот крейт с macOS/Linux не собирается (у зависимостей C-код под MSVC), и
+/// единственная ошибкоопасная часть — экранирование — иначе осталась бы вообще
+/// без проверки. Здесь её покрывает тест на любой платформе.
+#[cfg(any(target_os = "windows", test))]
+fn windows_hello_script(reason: &str) -> String {
     // Кавычки удваиваются — так PowerShell экранирует их внутри строки.
-    let script = format!(
+    format!(
         r#"[Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType=WindowsRuntime]
 $asyncOp = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("{}")
 $task = [System.Threading.Tasks.Task]::Run({{ $asyncOp.GetResults() }})
 $task.Wait()
 if ($task.Result -eq [Windows.Security.Credentials.UI.UserConsentVerificationResult]::Verified) {{ exit 0 }} else {{ exit 1 }}"#,
         reason.replace('"', "\"\"")
-    );
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn authenticate_windows_hello(reason: &str) -> Result<bool> {
+    // Текст запроса берётся из аргумента, как и на macOS: раньше здесь была
+    // зашита русская строка, хотя интерфейс лаунчера англоязычный.
+    let script = windows_hello_script(reason);
 
     let output = Command::new("powershell")
         .arg("-Command")
@@ -78,4 +87,24 @@ if ($task.Result -eq [Windows.Security.Credentials.UI.UserConsentVerificationRes
         .output()?;
 
     Ok(output.status.code() == Some(0))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn windows_prompt_escapes_quotes_and_keeps_braces() {
+        let script = windows_hello_script(r#"Sign in to "Noro""#);
+
+        // Кавычки в тексте удвоены, а не оборвали строку PowerShell.
+        assert!(script.contains(r#"RequestVerificationAsync("Sign in to ""Noro""")"#));
+        // Блоки скрипта остались блоками: `{{`/`}}` в format! дают одну скобку.
+        assert!(script.contains("Run({ $asyncOp.GetResults() })"));
+        assert!(script.contains("{ exit 0 } else { exit 1 }"));
+        assert!(
+            !script.contains("{{"),
+            "двойные скобки не должны утечь в скрипт"
+        );
+    }
 }
