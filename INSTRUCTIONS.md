@@ -1449,6 +1449,20 @@ GPUI needs a graphics stack. They are covered by `release-launcher.yml`, so run
 wrappers and skin-render parameters, where a struct would just move the same
 list one line up.
 
+### 24.1.2 The toolchain version lives in two places
+
+`rust-toolchain.toml` pins the version, and `Dockerfile.master`'s base image
+must match it. Bump both in the same commit — otherwise rustup re-downloads the
+pinned toolchain inside every container build and the cargo-chef layer, built
+with the image's own version, stops paying for itself.
+
+The pin exists because CI runs clippy with `-D warnings`: on a floating stable,
+a new Rust release turns the build red with no change on our side.
+
+> A Homebrew-installed `rustc` ignores `rust-toolchain.toml` — only rustup
+> honours it. If `which cargo` points at `/opt/homebrew/bin`, your local lint
+> results will not match CI.
+
 ### 24.2 Web
 
 ```bash
