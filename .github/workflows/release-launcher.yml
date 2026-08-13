@@ -238,12 +238,21 @@ jobs:
               cp "$OUT/noro-launcher-core" dist/noro-launcher-core-${{ matrix.target }}
               # На Linux отладочная информация лежит внутри ELF, а не отдельным
               # файлом как .dSYM или .pdb. В Sentry она уже уехала шагом выше,
-              # так что игроку её тащить незачем. Не критично, если не вышло:
-              # релиз с толстым бинарником лучше, чем отсутствие релиза.
-              STRIP=$(command -v llvm-strip || command -v strip)
+              # так что игроку её тащить незачем: без этого шага aarch64-сборка
+              # весила 45 МБ против 17 МБ у стрипнутого x86_64.
+              #
+              # Для aarch64 нужен свой strip: раннер x86_64, и системный strip из
+              # binutils чужой ELF не берёт, а llvm-strip там не установлен.
+              if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+                sudo apt-get update -qq && sudo apt-get install -y -qq binutils-aarch64-linux-gnu
+                STRIP="aarch64-linux-gnu-strip"
+              else
+                STRIP="strip"
+              fi
+              # Падаем, а не предупреждаем: молчаливый пропуск уже один раз увёз
+              # игрокам втрое больший бинарник, и заметил это только замер.
               "$STRIP" --strip-debug dist/noro-launcher-${{ matrix.target }} \
-                dist/noro-launcher-core-${{ matrix.target }} \
-                || echo "::warning::не удалось срезать debug-info, бинарники уедут как есть"
+                dist/noro-launcher-core-${{ matrix.target }}
               ;;
           esac
 
