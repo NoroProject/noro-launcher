@@ -28,9 +28,9 @@ pub async fn minecraft(State(state): State<AppState>, admin: AdminAuth) -> AppRe
 
 /// Массив из ответа стороннего сервиса — или ошибка с указанием, чьего.
 fn array<'a>(value: &'a Value, source: &str) -> AppResult<&'a Vec<Value>> {
-    value.as_array().ok_or_else(|| {
-        AppError::Other(anyhow::anyhow!("{source} вернул ответ неожиданного вида"))
-    })
+    value
+        .as_array()
+        .ok_or_else(|| AppError::Other(anyhow::anyhow!("{source} вернул ответ неожиданного вида")))
 }
 
 #[derive(Deserialize)]

@@ -331,7 +331,7 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                                 let ldr = ldr_for_enter.clone();
                                 this.mod_catalog_offset = 0;
                                 this.mod_catalog_error = None;
-                    this.backend.send(MessageToBackend::SearchCatalog {
+                                this.backend.send(MessageToBackend::SearchCatalog {
                                     query: q,
                                     provider: prov,
                                     mc_version: mc,
@@ -387,7 +387,7 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                                 this.mod_catalog_query.clear();
                                 this.mod_catalog_offset = 0;
                                 this.mod_catalog_error = None;
-                    this.backend.send(MessageToBackend::SearchCatalog {
+                                this.backend.send(MessageToBackend::SearchCatalog {
                                     query: "".to_string(),
                                     provider: prov_clear.clone(),
                                     mc_version: mc_clear.clone(),
@@ -410,7 +410,7 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 let ldr = ldr_for_submit.clone();
                 this.mod_catalog_offset = 0;
                 this.mod_catalog_error = None;
-                    this.backend.send(MessageToBackend::SearchCatalog {
+                this.backend.send(MessageToBackend::SearchCatalog {
                     query: q,
                     provider: prov,
                     mc_version: mc,
@@ -432,7 +432,7 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                         this.mod_catalog_provider = "modrinth".to_string();
                         let q = this.mod_catalog_query.trim().to_string();
                         this.mod_catalog_error = None;
-                    this.backend.send(MessageToBackend::SearchCatalog {
+                        this.backend.send(MessageToBackend::SearchCatalog {
                             query: q,
                             provider: "modrinth".to_string(),
                             mc_version: mc_for_modrinth.clone(),
@@ -450,7 +450,7 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                         this.mod_catalog_provider = "curseforge".to_string();
                         let q = this.mod_catalog_query.trim().to_string();
                         this.mod_catalog_error = None;
-                    this.backend.send(MessageToBackend::SearchCatalog {
+                        this.backend.send(MessageToBackend::SearchCatalog {
                             query: q,
                             provider: "curseforge".to_string(),
                             mc_version: mc_for_curse.clone(),

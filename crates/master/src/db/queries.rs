@@ -753,8 +753,7 @@ pub async fn server_entry(pool: &PgPool, s: &ServerRow) -> Result<ServerEntry> {
         background_url: s.background_url.clone(),
         mc_host: entry_point.map(|g| g.mc_host.clone()),
         mc_port: entry_point.map(|g| g.mc_port),
-        modloader: client_modloader(&s.modloader)
-            .with_context(|| format!("сервер {}", s.name))?,
+        modloader: client_modloader(&s.modloader).with_context(|| format!("сервер {}", s.name))?,
         mc_version: s.mc_version.clone(),
         current_build_id: build.as_ref().map(|b| b.0),
         current_version: build.map(|b| b.1),

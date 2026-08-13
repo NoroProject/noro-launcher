@@ -32,8 +32,8 @@ pub async fn preset_skin_endpoint(Path(name): Path<String>) -> AppResult<Respons
     let clean = name.trim_end_matches(".png").to_lowercase();
     // Неизвестный пресет — 404, а не молчаливый Стив: иначе опечатка в имени
     // выглядит как рабочая ссылка и живёт в вёрстке годами.
-    let bytes = preset_bytes(&clean)
-        .ok_or_else(|| AppError::NotFound(format!("пресет скина {clean}")))?;
+    let bytes =
+        preset_bytes(&clean).ok_or_else(|| AppError::NotFound(format!("пресет скина {clean}")))?;
     Ok(png(bytes.to_vec(), "public, max-age=31536000, immutable"))
 }
 

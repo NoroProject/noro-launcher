@@ -33,7 +33,14 @@ pub fn render(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
                         .flex_col()
                         .items_center()
                         .gap(px(12.))
-                        .child(mascot(if ui.logging_in { Mood::Loading } else { Mood::Happy }, 130.))
+                        .child(mascot(
+                            if ui.logging_in {
+                                Mood::Loading
+                            } else {
+                                Mood::Happy
+                            },
+                            130.,
+                        ))
                         .child(pixel_title("NORO NETWORK", 26., CTA))
                         .child(
                             div()

@@ -40,15 +40,17 @@ pub fn on_upload_click(
             // Игрок закрыл диалог. Это решение игрока, а не ошибка: молчим.
             Ok(Ok(None)) | Err(_) => return,
             Ok(Err(e)) => {
-                report(&this, cx, format!("{}: {e}", t("profile-skin-picker-failed")));
+                report(
+                    &this,
+                    cx,
+                    format!("{}: {e}", t("profile-skin-picker-failed")),
+                );
                 return;
             }
         };
 
         // Чтение уводим с потока отрисовки: файл может лежать на сетевом диске.
-        let loaded = cx
-            .background_spawn(async move { read_skin(&path) })
-            .await;
+        let loaded = cx.background_spawn(async move { read_skin(&path) }).await;
 
         match loaded {
             Ok(skin) => {
@@ -80,8 +82,8 @@ struct Skin {
 /// Один общий «No valid skin selected» на все случаи не давал игроку понять,
 /// что делать: не тот файл, слишком большой или мы вовсе не смогли его открыть.
 fn read_skin(path: &Path) -> Result<Skin, String> {
-    let bytes = std::fs::read(path)
-        .map_err(|e| format!("{}: {e}", t("profile-skin-unreadable")))?;
+    let bytes =
+        std::fs::read(path).map_err(|e| format!("{}: {e}", t("profile-skin-unreadable")))?;
 
     if bytes.len() < PNG_MAGIC.len() || &bytes[..PNG_MAGIC.len()] != PNG_MAGIC {
         return Err(t("profile-skin-not-png"));
@@ -148,7 +150,10 @@ mod tests {
         bytes.resize(MAX_SKIN_BYTES + 1, 0);
         std::fs::write(&path, &bytes).unwrap();
 
-        assert_eq!(read_skin(&path).expect_err("слишком большой"), t("profile-skin-too-large"));
+        assert_eq!(
+            read_skin(&path).expect_err("слишком большой"),
+            t("profile-skin-too-large")
+        );
         std::fs::remove_file(&path).ok();
     }
 }

@@ -108,9 +108,8 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
         .context("optional_mods сборки не разобрать")?;
     let unmanaged_paths: Vec<String> = serde_json::from_value(build.unmanaged_paths.clone())
         .context("unmanaged_paths сборки не разобрать")?;
-    let user_managed_paths: Vec<String> =
-        serde_json::from_value(build.user_managed_paths.clone())
-            .context("user_managed_paths сборки не разобрать")?;
+    let user_managed_paths: Vec<String> = serde_json::from_value(build.user_managed_paths.clone())
+        .context("user_managed_paths сборки не разобрать")?;
 
     // Объединяем аргументы: из base_build (ванилла/лоадер) + из build (если есть кастомные)
     // Сейчас берем напрямую из base_build.

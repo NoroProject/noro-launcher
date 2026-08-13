@@ -275,8 +275,7 @@ fn custom_preset_card(
                         .text_color(rgb(TEXT_MUTED))
                         .child("✏️")
                         .on_click(cx.listener(move |this, _, window, cx| {
-                            this.renaming_preset =
-                                Some((edit_preset_id.clone(), name.clone()));
+                            this.renaming_preset = Some((edit_preset_id.clone(), name.clone()));
                             let focus = this
                                 .rename_focus
                                 .get_or_insert_with(|| cx.focus_handle())

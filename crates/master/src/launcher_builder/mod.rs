@@ -48,11 +48,9 @@ async fn run_build(state: &AppState, job_id: Uuid, _repo_name: &PathBuf, tag: &s
     )
     .await?;
 
-    let repo_str = state
-        .config
-        .github_repo
-        .as_deref()
-        .ok_or_else(|| anyhow::anyhow!("NORO_GITHUB_REPO не задан — откуда брать релиз, неизвестно"))?;
+    let repo_str = state.config.github_repo.as_deref().ok_or_else(|| {
+        anyhow::anyhow!("NORO_GITHUB_REPO не задан — откуда брать релиз, неизвестно")
+    })?;
     let url = format!("https://api.github.com/repos/{repo_str}/releases/tags/{tag}");
 
     let mut req = state.http().get(&url).header("User-Agent", "noro-master");

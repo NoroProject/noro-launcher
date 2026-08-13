@@ -22,11 +22,10 @@ const MAX_WAIT: Duration = Duration::from_secs(60 * 60);
 /// инсталляция с ненастроенным `NORO_GITHUB_REPO` молча ходила в него и
 /// раскатывала игрокам наши сборки.
 fn api(state: &AppState, path: &str) -> Result<String> {
-    let repo = state
-        .config
-        .github_repo
-        .as_deref()
-        .ok_or_else(|| anyhow!("NORO_GITHUB_REPO не задан — сборку лаунчера запускать негде"))?;
+    let repo =
+        state.config.github_repo.as_deref().ok_or_else(|| {
+            anyhow!("NORO_GITHUB_REPO не задан — сборку лаунчера запускать негде")
+        })?;
     Ok(format!("https://api.github.com/repos/{repo}/{path}"))
 }
 
