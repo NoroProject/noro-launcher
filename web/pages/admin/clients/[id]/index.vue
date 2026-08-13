@@ -293,6 +293,7 @@ const buildEditor = useAdminBuildEditor(
         <BuildCreateModal
             v-model="showCreateBuild"
             :form="buildForm"
+            :builds="builds"
             :minecraft="minecraft"
             :modloaders="modloaders"
             :loader-options="loaderOptions"

@@ -28,6 +28,8 @@ export interface BuildCreateForm {
   modloader: string;
   modloader_version: string;
   mc_version: string;
+  /** id сборки-источника; пустая строка — создать с нуля. */
+  copy_from: string;
 }
 
 export interface ServerEditorState {

@@ -80,6 +80,38 @@ pub async fn create(
     Ok(Json(json!({ "id": id })))
 }
 
+#[derive(Deserialize)]
+pub struct DuplicateReq {
+    pub version: String,
+}
+
+/// Создать новую сборку как копию существующей.
+///
+/// Копия приходит черновиком со всеми файлами и настройками оригинала: дальше
+/// достаточно заменить пару модов и опубликовать, а не собирать модпак заново.
+pub async fn duplicate(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    Json(req): Json<DuplicateReq>,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_ADMIN_BUILDS)?;
+
+    let version = req.version.trim();
+    if version.is_empty() {
+        return Err(AppError::BadRequest("версия не может быть пустой".into()));
+    }
+
+    let server_id = crate::db::build_server_id(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("сборка не найдена".into()))?;
+
+    let new_id = crate::db::duplicate_build(&state.db, id, version).await?;
+    broadcast_builds_changed(&state, server_id);
+
+    Ok(Json(json!({ "id": new_id })))
+}
+
 /// Опубликовать сборку: bootstrap артефактов + подпись манифеста.
 /// Выполняется синхронно (может занять минуты при первом скачивании ассетов/java).
 pub async fn publish(

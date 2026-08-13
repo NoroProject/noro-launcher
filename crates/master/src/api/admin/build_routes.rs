@@ -11,6 +11,7 @@ pub fn router() -> Router<AppState> {
             "/api/admin/builds/{id}",
             get(builds::get).delete(builds::delete),
         )
+        .route("/api/admin/builds/{id}/duplicate", post(builds::duplicate))
         .route("/api/admin/builds/{id}/publish", post(builds::publish))
         .route("/api/admin/builds/{id}/rebuild", post(builds::rebuild))
         .route(

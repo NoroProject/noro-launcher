@@ -1,6 +1,7 @@
 //! Слой доступа к БД. Используются runtime-проверяемые запросы (sqlx::query*),
 //! т.к. компиляция идёт без живой БД.
 
+pub mod build_copy;
 pub mod capes;
 pub mod cleanup;
 pub mod game_servers;
@@ -14,6 +15,7 @@ use anyhow::{Context, Result};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
+pub use build_copy::*;
 pub use capes::*;
 pub use game_servers::*;
 pub use mod_suggestions::*;

@@ -11,6 +11,7 @@ function createBuildForm(serverId: string): BuildCreateForm {
     modloader: "fabric",
     modloader_version: "",
     mc_version: "1.21.1",
+    copy_from: "",
   };
 }
 
@@ -41,14 +42,24 @@ export function useAdminServerBuilds(
   async function createBuild() {
     creatingBuild.value = true;
     try {
-      await auth.request("/api/admin/builds", {
-        method: "POST",
-        body: {
-          ...buildForm,
-          modloader_version: buildForm.modloader_version || null,
-        },
-      });
+      if (buildForm.copy_from) {
+        // Копия наследует загрузчик, версии, пути и весь список файлов —
+        // мастер переиспользует те же объекты FileStore, ничего не перезаливая.
+        await auth.request(
+          `/api/admin/builds/${buildForm.copy_from}/duplicate`,
+          { method: "POST", body: { version: buildForm.version } },
+        );
+      } else {
+        await auth.request("/api/admin/builds", {
+          method: "POST",
+          body: {
+            ...buildForm,
+            modloader_version: buildForm.modloader_version || null,
+          },
+        });
+      }
       buildForm.version = "";
+      buildForm.copy_from = "";
       await buildsData.refresh();
       showCreateBuild.value = false;
       notify.ok()
