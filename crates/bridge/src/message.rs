@@ -340,6 +340,11 @@ pub enum MessageToFrontend {
         offset: u32,
         limit: u32,
     },
+    /// Каталог не ответил. Раньше в этом случае не приходило ничего, и экран
+    /// навсегда оставался в состоянии «ищем моды».
+    CatalogFailed {
+        message: String,
+    },
     /// Полная страница мода — ответ на `RequestModProject`.
     ModProjectLoaded {
         project: ModProjectInfo,

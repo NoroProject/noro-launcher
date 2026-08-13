@@ -85,7 +85,9 @@ fn console_button(active: bool, cx: &mut Cx) -> AnyElement {
 }
 
 fn version_block(server: &ServerEntry) -> AnyElement {
-    let version = server.current_version.as_deref().unwrap_or("draft");
+    // Прочерк, а не «draft»: сборки нет вовсе, а «draft» читался как «есть, но
+    // черновая» — и игрок ждал кнопку «играть», которой не будет.
+    let version = server.current_version.as_deref().unwrap_or("—");
     div()
         .flex()
         .items_center()

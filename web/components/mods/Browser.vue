@@ -35,13 +35,20 @@ async function loadInstalledMods() {
             if (builds?.length) {
                 targetBuildId = builds[0].id;
             }
-        } catch {}
+        } catch (e) {
+            notify.fail(e, "Could not load builds for this server");
+            return;
+        }
     }
     if (targetBuildId) {
         try {
             const res = await auth.request<InstalledModInfo[]>(`/api/admin/builds/${targetBuildId}/installed-mods`);
             if (res) installedMods.value = res;
-        } catch {}
+        } catch (e) {
+            // Без этого списка каталог не помечает уже установленные моды, и
+            // тот же мод ставится вторым файлом. Молчать об этом нельзя.
+            notify.fail(e, "Could not load installed mods");
+        }
     }
 }
 
@@ -95,7 +102,7 @@ const hasContext = computed(() => Boolean(catalog.filters.mc || catalog.filters.
 onMounted(async () => {
     await Promise.all([
         catalog.loadProviders(),
-        versions.loadMinecraft().catch(() => {}),
+        versions.loadMinecraft().catch((e) => notify.fail(e, "Could not load Minecraft versions")),
         loadInstalledMods(),
     ]);
 
@@ -112,8 +119,10 @@ onMounted(async () => {
                 if (res?.build?.modloader && !catalog.filters.loader) {
                     catalog.filters.loader = res.build.modloader;
                 }
-            } catch {
-                // Ignore build fetch error
+            } catch (e) {
+                // Не подставив версию и загрузчик, каталог покажет моды под
+                // любую версию — и они будут выглядеть совместимыми.
+                notify.fail(e, "Could not read build settings — filters stay empty");
             }
         } else if (props.serverId) {
             try {
@@ -130,8 +139,8 @@ onMounted(async () => {
                         catalog.filters.loader = latest.modloader;
                     }
                 }
-            } catch {
-                // Ignore server builds fetch error
+            } catch (e) {
+                notify.fail(e, "Could not read server builds — filters stay empty");
             }
         }
     }

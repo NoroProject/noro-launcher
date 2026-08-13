@@ -102,8 +102,15 @@ fn read(path: &Path) -> Result<ServersDat> {
         return Ok(ServersDat::default());
     };
     // Битый или чужого формата файл не повод падать перед запуском игры:
-    // начнём список заново, потеряв разве что записи игрока.
-    Ok(fastnbt::from_bytes(&bytes).unwrap_or_default())
+    // начнём список заново, потеряв разве что записи игрока. Но молчать об этом
+    // нельзя — иначе пропавший список серверов выглядит как наша самодеятельность.
+    match fastnbt::from_bytes(&bytes) {
+        Ok(dat) => Ok(dat),
+        Err(e) => {
+            tracing::warn!(path = %path.display(), error = %e, "servers.dat не разобран, список пересоздан");
+            Ok(ServersDat::default())
+        }
+    }
 }
 
 fn as_str(value: &Value) -> Option<String> {

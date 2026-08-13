@@ -1,14 +1,21 @@
 //! Конфигурация мастер-сервера из переменных окружения.
 
+mod s3;
+
+use anyhow::{bail, Result};
+pub use s3::S3Config;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Config {
     /// Адрес для прослушивания, например "0.0.0.0:8080".
     pub bind_addr: String,
-    /// Публичный базовый URL мастера ("https://master.noro.gg"). Используется в
+    /// Публичный базовый URL мастера ("https://api.example.dev"). Используется в
     /// URL файлов, Yggdrasil-манифесте и OAuth redirect.
     pub public_url: String,
+    /// Публичный базовый URL сайта ("https://example.dev"): туда уходит игрок за
+    /// экраном согласия OAuth2.
+    pub web_url: String,
     /// Строка подключения к PostgreSQL.
     pub database_url: String,
     /// Корень данных: FileStore, ключи, временные файлы.
@@ -46,49 +53,30 @@ pub struct Config {
     pub allowed_origins: Vec<String>,
 }
 
-/// Настройки S3-совместимого хранилища (AWS S3, Cloudflare R2, MinIO).
-#[derive(Debug, Clone)]
-pub struct S3Config {
-    pub endpoint: String,
-    pub bucket: String,
-    pub region: String,
-    pub access_key: String,
-    pub secret_key: String,
-    /// Публичный URL для генерации ссылок: `{public_url}/{sha1}`.
-    pub public_url: String,
-}
-
 impl Config {
-    pub fn from_env() -> anyhow::Result<Self> {
+    pub fn from_env() -> Result<Self> {
         // .env подхватывается вызывающим (main).
-        let bind_addr = env_or("NORO_BIND", "0.0.0.0:8080");
-        let public_url = env_or("NORO_PUBLIC_URL", "http://localhost:8080");
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost/noro".to_string());
-        let data_dir = PathBuf::from(env_or("NORO_DATA_DIR", "./data"));
-
-        let discord_client_id = env_or("DISCORD_CLIENT_ID", "");
-        let discord_client_secret = env_or("DISCORD_CLIENT_SECRET", "");
-
         Ok(Self {
-            bind_addr,
-            public_url: public_url.trim_end_matches('/').to_string(),
-            database_url,
-            data_dir,
-            discord_client_id,
-            discord_client_secret,
-            curseforge_api_key: std::env::var("CURSEFORGE_API_KEY").ok(),
-            signing_key_hex: std::env::var("NORO_SIGNING_KEY")
-                .ok()
-                .filter(|s| !s.is_empty()),
-            github_repo: std::env::var("NORO_GITHUB_REPO").ok(),
-            github_token: std::env::var("GITHUB_TOKEN").ok(),
-            github_ref: std::env::var("NORO_GITHUB_REF").ok(),
-            launcher_repo_path: std::env::var("NORO_LAUNCHER_REPO").ok().map(PathBuf::from),
-            files_cdn_url: std::env::var("NORO_FILES_CDN_URL")
-                .ok()
+            bind_addr: env_or("NORO_BIND", "0.0.0.0:8080"),
+            public_url: env_required("NORO_PUBLIC_URL")?
+                .trim_end_matches('/')
+                .to_string(),
+            web_url: env_required("NORO_WEB_URL")?
+                .trim_end_matches('/')
+                .to_string(),
+            database_url: env_required("DATABASE_URL")?,
+            data_dir: PathBuf::from(env_or("NORO_DATA_DIR", "./data")),
+            discord_client_id: env_required("DISCORD_CLIENT_ID")?,
+            discord_client_secret: env_required("DISCORD_CLIENT_SECRET")?,
+            curseforge_api_key: env_opt("CURSEFORGE_API_KEY"),
+            signing_key_hex: env_opt("NORO_SIGNING_KEY"),
+            github_repo: env_opt("NORO_GITHUB_REPO"),
+            github_token: env_opt("GITHUB_TOKEN"),
+            github_ref: env_opt("NORO_GITHUB_REF"),
+            launcher_repo_path: env_opt("NORO_LAUNCHER_REPO").map(PathBuf::from),
+            files_cdn_url: env_opt("NORO_FILES_CDN_URL")
                 .map(|u| u.trim_end_matches('/').to_string()),
-            s3: S3Config::from_env(),
+            s3: S3Config::from_env()?,
             allowed_origins: env_or("NORO_ALLOWED_ORIGINS", "")
                 .split(',')
                 .map(|o| o.trim().trim_end_matches('/').to_string())
@@ -128,28 +116,27 @@ impl Config {
     }
 }
 
-fn env_or(key: &str, default: &str) -> String {
-    std::env::var(key).unwrap_or_else(|_| default.to_string())
+/// Обязательная переменная: без неё мастер не поднимается.
+///
+/// Дефолта тут быть не может. Раньше `NORO_PUBLIC_URL` молча становился
+/// `http://localhost:8080`, и прод раздавал игрокам манифесты со ссылками на
+/// localhost — ошибка всплывала у игрока, а не при старте.
+fn env_required(key: &str) -> Result<String> {
+    match env_opt(key) {
+        Some(v) => Ok(v),
+        None => bail!("переменная окружения {key} обязательна — см. .env.example"),
+    }
 }
 
-impl S3Config {
-    fn from_env() -> Option<Self> {
-        let endpoint = std::env::var("NORO_S3_ENDPOINT").ok()?;
-        let bucket = std::env::var("NORO_S3_BUCKET").ok()?;
-        let access_key = std::env::var("NORO_S3_ACCESS_KEY").ok()?;
-        let secret_key = std::env::var("NORO_S3_SECRET_KEY").ok()?;
-        let public_url = std::env::var("NORO_S3_PUBLIC_URL")
-            .unwrap_or_else(|_| format!("{endpoint}/{bucket}"))
-            .trim_end_matches('/')
-            .to_string();
-        let region = env_or("NORO_S3_REGION", "auto");
-        Some(Self {
-            endpoint,
-            bucket,
-            region,
-            access_key,
-            secret_key,
-            public_url,
-        })
-    }
+/// Опциональная переменная. Пустая строка приравнена к отсутствию: в
+/// docker-compose незаполненный `${VAR}` разворачивается именно в пустую.
+fn env_opt(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn env_or(key: &str, default: &str) -> String {
+    env_opt(key).unwrap_or_else(|| default.to_string())
 }

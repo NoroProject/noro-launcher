@@ -1,5 +1,21 @@
 type FetchOptions = Parameters<typeof $fetch>[1]
 
+/**
+ * A URL that must come from the environment.
+ *
+ * In dev an unset variable falls back to the local master/site, which is where
+ * a dev server actually runs. In a real build it throws: guessing a domain here
+ * meant every deployment without the variable silently talked to ours.
+ */
+function configured(value: unknown, name: string) {
+  const url = String(value || '').replace(/\/$/, '')
+  if (url) return url
+  if (import.meta.dev) {
+    return name === 'NUXT_PUBLIC_WEB_URL' ? 'http://localhost:3000' : 'http://localhost:8080'
+  }
+  throw new Error(`${name} is not set — this build has no server to talk to.`)
+}
+
 export function useApi() {
   const config = useRuntimeConfig()
   const token = useCookie<string | null>('noro_token', {
@@ -11,12 +27,8 @@ export function useApi() {
     secure: import.meta.client && window.location.protocol === 'https:'
   })
 
-  const masterUrl = computed(() =>
-    String(config.public.masterUrl || 'http://localhost:8080').replace(/\/$/, '')
-  )
-  const webUrl = computed(() =>
-    String(config.public.webUrl || 'http://localhost:3000').replace(/\/$/, '')
-  )
+  const masterUrl = computed(() => configured(config.public.masterUrl, 'NUXT_PUBLIC_MASTER_URL'))
+  const webUrl = computed(() => configured(config.public.webUrl, 'NUXT_PUBLIC_WEB_URL'))
 
   async function request<T>(path: string, options: FetchOptions = {}) {
     const headers = new Headers(options.headers as HeadersInit | undefined)

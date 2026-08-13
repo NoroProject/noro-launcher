@@ -218,7 +218,11 @@ async fn exchange_and_session(
     let discord_id = me["id"]
         .as_str()
         .ok_or_else(|| AppError::Unauthorized("нет Discord id".into()))?;
-    let username = me["username"].as_str().unwrap_or("player");
+    // Ник не подставляем: аккаунт создаётся один раз, и «player» остался бы с
+    // игроком навсегда — вместе с чужими такими же «player».
+    let username = me["username"]
+        .as_str()
+        .ok_or_else(|| AppError::Unauthorized("Discord не вернул имя пользователя".into()))?;
     let avatar = me["avatar"]
         .as_str()
         .map(|hash| format!("https://cdn.discordapp.com/avatars/{discord_id}/{hash}.png"));

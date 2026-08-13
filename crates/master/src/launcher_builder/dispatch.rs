@@ -16,13 +16,18 @@ const POLL_EVERY: Duration = Duration::from_secs(15);
 /// Полная матрица из пяти таргетов идёт около получаса; час — запас на очередь.
 const MAX_WAIT: Duration = Duration::from_secs(60 * 60);
 
-fn api(state: &AppState, path: &str) -> String {
+/// Репозиторий берётся только из конфига.
+///
+/// Подставлять сюда наш собственный репозиторий было прямой ошибкой: чужая
+/// инсталляция с ненастроенным `NORO_GITHUB_REPO` молча ходила в него и
+/// раскатывала игрокам наши сборки.
+fn api(state: &AppState, path: &str) -> Result<String> {
     let repo = state
         .config
         .github_repo
         .as_deref()
-        .unwrap_or("NexBitstd/NoroLauncher");
-    format!("https://api.github.com/repos/{repo}/{path}")
+        .ok_or_else(|| anyhow!("NORO_GITHUB_REPO не задан — сборку лаунчера запускать негде"))?;
+    Ok(format!("https://api.github.com/repos/{repo}/{path}"))
 }
 
 fn token(state: &AppState) -> Option<&str> {
@@ -43,7 +48,7 @@ pub async fn trigger(state: &AppState, tag: &str, job_id: Uuid) -> Result<bool> 
         .post(api(
             state,
             &format!("actions/workflows/{WORKFLOW}/dispatches"),
-        ))
+        )?)
         .header("User-Agent", "noro-master")
         .header("Accept", "application/vnd.github+json")
         .bearer_auth(tok)
@@ -71,7 +76,7 @@ pub async fn trigger(state: &AppState, tag: &str, job_id: Uuid) -> Result<bool> 
 pub async fn release_exists(state: &AppState, tag: &str) -> Result<bool> {
     let mut req = state
         .http()
-        .get(api(state, &format!("releases/tags/{tag}")))
+        .get(api(state, &format!("releases/tags/{tag}"))?)
         .header("User-Agent", "noro-master")
         .header("Accept", "application/vnd.github+json");
     if let Some(tok) = token(state) {
@@ -133,7 +138,7 @@ async fn find_run(state: &AppState, marker: &str) -> Result<Option<serde_json::V
         .get(api(
             state,
             &format!("actions/workflows/{WORKFLOW}/runs?event=workflow_dispatch&per_page=30"),
-        ))
+        )?)
         .header("User-Agent", "noro-master")
         .header("Accept", "application/vnd.github+json");
     if let Some(tok) = token(state) {

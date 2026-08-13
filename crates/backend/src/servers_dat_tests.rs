@@ -23,8 +23,9 @@ fn build(nodes: Vec<GameServerEntry>) -> ServerEntry {
         description: String::new(),
         icon_url: None,
         background_url: None,
-        mc_host: nodes.first().map(|n| n.mc_host.clone()).unwrap_or_default(),
-        mc_port: nodes.first().map(|n| n.mc_port).unwrap_or(25565),
+        // Как у мастера: адреса нет, если игровых серверов нет.
+        mc_host: nodes.first().map(|n| n.mc_host.clone()),
+        mc_port: nodes.first().map(|n| n.mc_port),
         modloader: Modloader::NeoForge,
         mc_version: "1.21.1".into(),
         current_build_id: None,

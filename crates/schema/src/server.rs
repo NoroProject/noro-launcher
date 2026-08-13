@@ -74,8 +74,14 @@ pub struct ServerEntry {
     pub background_url: Option<String>,
     /// Куда коннектиться: прокси, если он есть, иначе первый игровой сервер.
     /// Считается мастером — своего адреса у сборки больше нет.
-    pub mc_host: String,
-    pub mc_port: u16,
+    ///
+    /// `None` — игровые серверы ещё не заведены, адреса просто нет. Раньше здесь
+    /// оказывался пустой хост и порт 25565: адрес выглядел настоящим, а коннект
+    /// уходил в никуда.
+    #[serde(default)]
+    pub mc_host: Option<String>,
+    #[serde(default)]
+    pub mc_port: Option<u16>,
     pub modloader: Modloader,
     pub mc_version: String,
     /// id опубликованной сборки, если есть.

@@ -68,9 +68,6 @@ fn skin_domains(config: &crate::config::Config) -> Vec<String> {
     if let Some(s3) = &config.s3 {
         add_url(&s3.public_url);
     }
-    if !domains.iter().any(|d| d == ".noro.gg") {
-        domains.push(".noro.gg".to_string());
-    }
     domains
 }
 
@@ -321,6 +318,13 @@ mod tests {
     /// процесса, а параллельные тесты затирали бы их друг у друга.
     fn config_with(public: &str, cdn: Option<&str>) -> Config {
         std::env::set_var("NORO_PUBLIC_URL", public);
+        // Остальные обязательные переменные к текстурам отношения не имеют, но
+        // без них конфиг теперь не собирается — и это ровно то поведение,
+        // которого мы добивались.
+        std::env::set_var("NORO_WEB_URL", "https://example.dev");
+        std::env::set_var("DATABASE_URL", "postgres://localhost/noro_test");
+        std::env::set_var("DISCORD_CLIENT_ID", "test-id");
+        std::env::set_var("DISCORD_CLIENT_SECRET", "test-secret");
         match cdn {
             Some(c) => std::env::set_var("NORO_FILES_CDN_URL", c),
             None => std::env::remove_var("NORO_FILES_CDN_URL"),

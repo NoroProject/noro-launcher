@@ -20,6 +20,8 @@ sidebar-servers = { $count ->
         [one] { $count } server
        *[other] { $count } servers
     }
+sidebar-signed-out = Not signed in
+sidebar-no-discord = No Discord account
 
 ## Game
 game-no-servers = No servers

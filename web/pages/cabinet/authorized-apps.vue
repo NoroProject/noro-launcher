@@ -22,7 +22,10 @@ async function loadApps() {
   try {
     apps.value = await auth.request<AuthorizedApp[]>('/api/me/authorized-apps')
   } catch (e) {
+    // Пустой список выглядел как «доступа ни у кого нет» — ровно то, что игрок
+    // хочет увидеть, и ровно то, чего мы не проверяли.
     apps.value = []
+    notify.fail(e, 'Could not load authorized apps')
   } finally {
     loading.value = false
   }

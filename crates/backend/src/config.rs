@@ -62,9 +62,12 @@ fn default_locale() -> String {
         .unwrap_or_else(|| "en".to_string())
 }
 
+/// Адрес мастера вшивается на сборке. В release он обязателен — за этим следит
+/// `noro_launcher::verify`. Здесь остаётся только dev-адрес: подставлять сюда
+/// боевой домен значило бы, что отладочная сборка молча ходит в прод.
 fn default_master_url() -> String {
     option_env!("NORO_MASTER_URL")
-        .unwrap_or("https://api.noro.dalynkaa.dev")
+        .unwrap_or("http://localhost:8080")
         .to_string()
 }
 

@@ -21,6 +21,8 @@ sidebar-servers = { $count ->
         [few] { $count } сервера
        *[other] { $count } серверов
     }
+sidebar-signed-out = Вход не выполнен
+sidebar-no-discord = Discord не привязан
 
 ## Game
 game-no-servers = Серверов нет

@@ -9,6 +9,7 @@
 mod splash;
 mod verify;
 
+use anyhow::Context;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -229,14 +230,23 @@ async fn download_core(
     let download_url = info["url"]
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("нет url в ответе"))?;
-    let expected_sha = info["sha256"].as_str().unwrap_or_default();
     // Подпись обязательна: sha256 из этого же ответа ловит битую закачку, но не
-    // подмену — кто подменит канал, подставит и файл, и его хеш.
+    // подмену — кто подменит канал, подставит и файл, и его хеш. Пустой sha
+    // раньше просто отключал проверку ниже, и об этом никто не узнавал.
+    let expected_sha = info["sha256"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| anyhow::anyhow!("мастер не отдал sha256 лаунчера"))?;
     let signature = info["signature"]
         .as_str()
         .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| anyhow::anyhow!("мастер не отдал подпись лаунчера"))?;
-    let version = info["version"].as_str().unwrap_or("unknown");
+    // Версию запишем в файл рядом с бинарником: «unknown» там означало бы, что
+    // следующая проверка обновления сравнивает не пойми что.
+    let version = info["version"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| anyhow::anyhow!("мастер не отдал версию лаунчера"))?;
 
     say(&format!("Загрузка {version}"), 0, 0);
     let mut resp = client.get(download_url).send().await?.error_for_status()?;
@@ -259,7 +269,7 @@ async fn download_core(
     // Проверка SHA256.
     use sha2::Digest;
     let hash = hex::encode(sha2::Sha256::digest(&bytes));
-    if !expected_sha.is_empty() && !hash.eq_ignore_ascii_case(expected_sha) {
+    if !hash.eq_ignore_ascii_case(expected_sha) {
         anyhow::bail!("sha256 не совпал: ожидали {expected_sha}, получили {hash}");
     }
 
@@ -278,9 +288,10 @@ async fn download_core(
         std::fs::set_permissions(dest, perms)?;
     }
 
-    // Сохранить версию.
+    // Сохранить версию. Не записав её, лаунчер скачивал бы себя при каждом старте.
     let version_file = app_dir.join("version");
-    std::fs::write(version_file, version).ok();
+    std::fs::write(&version_file, version)
+        .with_context(|| format!("не записать {}", version_file.display()))?;
 
     say("Готово", 1, 1);
     Ok(())

@@ -74,19 +74,13 @@ pub async fn login_oauth2(master_url: &str, cancelled: impl Fn() -> bool) -> Res
 
     let csrf = random_state();
     let redirect_uri = format!("http://127.0.0.1:{port}/callback");
-    let base_web_url = std::env::var("NORO_WEB_URL")
-        .ok()
-        .or_else(|| option_env!("NORO_WEB_URL").map(String::from))
-        .unwrap_or_else(|| {
-            if master_url.contains("127.0.0.1") || master_url.contains("localhost") {
-                "http://localhost:3000".to_string()
-            } else {
-                "https://noro.dalynkaa.dev".to_string()
-            }
-        });
+    // Открываем мастер, а не сайт: `/oauth2/authorize` у мастера редиректит на
+    // свой NORO_WEB_URL. Лаунчеру больше не нужно знать адрес сайта — раньше он
+    // угадывал его по подстроке "localhost" и на любом чужом стенде уводил
+    // игрока на наш домен.
     let url = format!(
         "{}/oauth2/authorize?client_id=noro_launcher&redirect_uri={}&response_type=code&scope=profile&state={}",
-        base_web_url.trim_end_matches('/'),
+        master_url.trim_end_matches('/'),
         urlencoding::encode(&redirect_uri),
         csrf
     );

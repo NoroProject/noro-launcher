@@ -173,6 +173,8 @@ pub struct LauncherUI {
     pub mod_catalog_total: u32,
     pub mod_catalog_offset: u32,
     pub mod_catalog_limit: u32,
+    /// Почему каталог пуст. `None` — либо ещё ищем, либо всё в порядке.
+    pub mod_catalog_error: Option<String>,
     pub startup_checking: bool,
     pub login_error: Option<String>,
     pub login_mode_key: bool,
@@ -281,6 +283,7 @@ impl LauncherUI {
             mod_catalog_total: 0,
             mod_catalog_offset: 0,
             mod_catalog_limit: 20,
+            mod_catalog_error: None,
             startup_checking: true,
             login_error: None,
             login_mode_key: false,
@@ -664,6 +667,10 @@ impl LauncherUI {
                 self.mod_catalog_total = total;
                 self.mod_catalog_offset = offset;
                 self.mod_catalog_limit = limit;
+                self.mod_catalog_error = None;
+            }
+            MessageToFrontend::CatalogFailed { message } => {
+                self.mod_catalog_error = Some(message);
             }
             MessageToFrontend::ModProjectLoaded { project } => {
                 // Ответ мог прийти после того, как игрок ушёл на другой мод.

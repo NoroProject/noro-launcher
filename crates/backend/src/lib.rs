@@ -5,6 +5,7 @@
 pub mod auth;
 pub mod backend;
 pub mod backend_handler;
+pub mod catalog_search;
 pub mod config;
 pub mod directories;
 pub mod discord_rpc;

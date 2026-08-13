@@ -1,5 +1,6 @@
 export function useModSuggestions(serverId: Ref<string | undefined>) {
     const auth = useAuth();
+    const notify = useNotify();
     const suggestions = ref<
         Array<{
             id: string;
@@ -23,8 +24,11 @@ export function useModSuggestions(serverId: Ref<string | undefined>) {
                 `/api/admin/mod_suggestions?server_id=${serverId.value}&status=pending`,
             );
             suggestions.value = res || [];
-        } catch {
+        } catch (e) {
+            // Пустой список читался как «предложений нет» — и заявки игроков
+            // тихо пропадали из админки вместе с причиной.
             suggestions.value = [];
+            notify.fail(e, "Could not load mod suggestions");
         } finally {
             loading.value = false;
         }

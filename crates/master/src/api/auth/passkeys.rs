@@ -21,23 +21,29 @@ pub struct ChallengeOptionsRes {
     pub user: Option<Value>,
 }
 
-fn get_rp_id(public_url: &str) -> String {
+/// Домен, к которому браузер привяжет ключ.
+///
+/// Ошибка вместо «localhost» по умолчанию: passkey, выданный не на тот домен,
+/// не отзывается и просто перестаёт работать у игрока.
+fn get_rp_id(public_url: &str) -> AppResult<String> {
     let host = public_url
-        .split("://")
-        .nth(1)
+        .split_once("://")
+        .map(|(_, rest)| rest)
         .unwrap_or(public_url)
         .split('/')
         .next()
-        .unwrap_or("localhost")
+        .unwrap_or_default()
         .split(':')
         .next()
-        .unwrap_or("localhost");
+        .unwrap_or_default();
 
-    if let Some(stripped) = host.strip_prefix("api.") {
-        stripped.to_string()
-    } else {
-        host.to_string()
+    if host.is_empty() {
+        return Err(AppError::Other(anyhow::anyhow!(
+            "из NORO_PUBLIC_URL ({public_url}) не разобрать домен для passkey"
+        )));
     }
+
+    Ok(host.strip_prefix("api.").unwrap_or(host).to_string())
 }
 
 /// Генерация опций для регистрации Passkey в кабинете
@@ -49,7 +55,7 @@ pub async fn register_options(
     crate::db::save_challenge(&state.db, &challenge, Some(user.user_id)).await?;
 
     let u = crate::db::load_profile(&state.db, user.user_id).await?;
-    let domain = get_rp_id(&state.config.public_url);
+    let domain = get_rp_id(&state.config.public_url)?;
 
     Ok(Json(json!({
         "challenge": challenge,
@@ -133,7 +139,7 @@ pub async fn login_options(State(state): State<AppState>) -> AppResult<Json<Valu
     let challenge = random_challenge();
     crate::db::save_challenge(&state.db, &challenge, None).await?;
 
-    let domain = get_rp_id(&state.config.public_url);
+    let domain = get_rp_id(&state.config.public_url)?;
 
     Ok(Json(json!({
         "challenge": challenge,

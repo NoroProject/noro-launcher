@@ -706,6 +706,22 @@ pub async fn list_server_builds(
         .collect())
 }
 
+/// Клиентский загрузчик сервера.
+///
+/// В `servers.modloader` попадает и серверное ПО: агент и враппер знают `paper`,
+/// `spigot`, `velocity` и остальных. Клиент у них ванильный — это факт
+/// предметной области, а не подстановка на всякий случай. Всё прочее, чего мы не
+/// знаем, — ошибка данных: раньше любая опечатка тихо становилась `vanilla`, и
+/// сборка с Fabric уезжала игроку без загрузчика.
+pub fn client_modloader(raw: &str) -> Result<Modloader> {
+    match raw.to_ascii_lowercase().as_str() {
+        "paper" | "bukkit" | "spigot" | "purpur" | "folia" | "velocity" | "bungeecord" => {
+            Ok(Modloader::Vanilla)
+        }
+        other => Modloader::from_str(other).map_err(anyhow::Error::msg),
+    }
+}
+
 /// Сервер + актуальная опубликованная сборка → ServerEntry для лаунчера.
 pub async fn server_entry(pool: &PgPool, s: &ServerRow) -> Result<ServerEntry> {
     let build: Option<(Uuid, String)> = sqlx::query_as(
@@ -735,9 +751,10 @@ pub async fn server_entry(pool: &PgPool, s: &ServerRow) -> Result<ServerEntry> {
         description: s.description.clone(),
         icon_url: s.icon_url.clone(),
         background_url: s.background_url.clone(),
-        mc_host: entry_point.map(|g| g.mc_host.clone()).unwrap_or_default(),
-        mc_port: entry_point.map(|g| g.mc_port).unwrap_or(25565),
-        modloader: Modloader::from_str(&s.modloader).unwrap_or(Modloader::Vanilla),
+        mc_host: entry_point.map(|g| g.mc_host.clone()),
+        mc_port: entry_point.map(|g| g.mc_port),
+        modloader: client_modloader(&s.modloader)
+            .with_context(|| format!("сервер {}", s.name))?,
         mc_version: s.mc_version.clone(),
         current_build_id: build.as_ref().map(|b| b.0),
         current_version: build.map(|b| b.1),
@@ -1450,4 +1467,34 @@ pub async fn current_bootstrappers(pool: &PgPool) -> Result<Vec<LauncherVersionR
     )
     .fetch_all(pool)
     .await?)
+}
+
+#[cfg(test)]
+mod client_modloader_tests {
+    use super::*;
+
+    /// В `servers.modloader` живут и серверные платформы. Строгий разбор ломал
+    /// список серверов у живого `paper`-сервера — эта проверка держит границу
+    /// между «серверное ПО с ванильным клиентом» и «мы не знаем, что это».
+    #[test]
+    fn server_software_means_a_vanilla_client() {
+        for raw in ["paper", "Spigot", "purpur", "velocity", "bungeecord"] {
+            assert_eq!(client_modloader(raw).unwrap(), Modloader::Vanilla, "{raw}");
+        }
+    }
+
+    #[test]
+    fn client_loaders_pass_through() {
+        assert_eq!(client_modloader("fabric").unwrap(), Modloader::Fabric);
+        assert_eq!(client_modloader("neoforge").unwrap(), Modloader::NeoForge);
+        assert_eq!(client_modloader("vanilla").unwrap(), Modloader::Vanilla);
+    }
+
+    /// Опечатка обязана быть ошибкой, а не молчаливой ваниллой: сборка с Fabric
+    /// уехала бы игроку без загрузчика, и игра упала бы у него, а не у нас.
+    #[test]
+    fn an_unknown_value_is_an_error() {
+        assert!(client_modloader("fabrci").is_err());
+        assert!(client_modloader("").is_err());
+    }
 }

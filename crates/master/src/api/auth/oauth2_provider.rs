@@ -24,25 +24,15 @@ pub async fn authorize_page(
     State(state): State<AppState>,
     axum::extract::RawQuery(query): axum::extract::RawQuery,
 ) -> AppResult<impl IntoResponse> {
-    let web_url = std::env::var("NORO_WEB_URL").unwrap_or_else(|_| {
-        if state.config.public_url.contains("127.0.0.1")
-            || state.config.public_url.contains("localhost")
-        {
-            "http://localhost:3000".to_string()
-        } else {
-            "https://noro.dalynkaa.dev".to_string()
-        }
-    });
+    // Адрес сайта берётся из конфига. Угадывать его по подстроке "localhost" в
+    // адресе мастера было нельзя: любой прод, кроме одного, уезжал на чужой домен.
+    let web_url = &state.config.web_url;
 
     let query_str = query.unwrap_or_default();
     let target = if query_str.is_empty() {
-        format!("{}/oauth2/authorize", web_url.trim_end_matches('/'))
+        format!("{web_url}/oauth2/authorize")
     } else {
-        format!(
-            "{}/oauth2/authorize?{}",
-            web_url.trim_end_matches('/'),
-            query_str
-        )
+        format!("{web_url}/oauth2/authorize?{query_str}")
     };
 
     Ok(Redirect::temporary(&target))

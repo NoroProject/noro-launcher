@@ -23,6 +23,8 @@ services:
     environment:
       NORO_BIND: 0.0.0.0:8080
       NORO_PUBLIC_URL: https://api.${DOMAIN}
+      # Куда мастер отправляет игрока за экраном согласия OAuth2.
+      NORO_WEB_URL: https://${DOMAIN}
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/noro
       NORO_DATA_DIR: /app/data
       NORO_GITHUB_REPO: ${NORO_GITHUB_REPO}

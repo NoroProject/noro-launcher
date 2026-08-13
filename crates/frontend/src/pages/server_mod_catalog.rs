@@ -16,8 +16,10 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let mc_ver = server.map(|s| s.mc_version.clone());
     let loader = server.map(|s| s.modloader.as_str().to_string());
 
-    // Автоматически запускаем базовый поиск при первом входе, если выдача пустая
-    if ui.mod_catalog_hits.is_empty() {
+    // Автоматически запускаем базовый поиск при первом входе, если выдача пустая.
+    // После ошибки не повторяем: этот код выполняется на каждый кадр, и упавший
+    // каталог получил бы шквал запросов вместо одного.
+    if ui.mod_catalog_hits.is_empty() && ui.mod_catalog_error.is_none() {
         ui.backend.send(MessageToBackend::SearchCatalog {
             query: "".to_string(),
             provider: ui.mod_catalog_provider.clone(),
@@ -143,15 +145,22 @@ fn mod_catalog_grid(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyEle
                 .border_color(rgb(BORDER))
                 .p(px(16.))
                 .child(if hits.is_empty() {
+                    // Пустая выдача и упавший запрос выглядели одинаково —
+                    // вечным «Searching...». Теперь причина видна на экране.
+                    let (text, color) = match &ui.mod_catalog_error {
+                        Some(e) => (format!("Catalog unavailable: {e}"), ERROR),
+                        None => ("Searching compatible mods...".to_string(), TEXT_MUTED),
+                    };
                     div()
                         .size_full()
                         .flex()
                         .items_center()
                         .justify_center()
+                        .px(px(16.))
                         .font_family(FONT_PIXEL_ALT)
                         .text_size(px(14.))
-                        .text_color(rgb(TEXT_MUTED))
-                        .child("Searching compatible mods...")
+                        .text_color(rgb(color))
+                        .child(text)
                         .into_any_element()
                 } else {
                     let items: Vec<AnyElement> = hits
@@ -217,6 +226,7 @@ fn pagination_controls(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElem
                 "< Prev",
                 false,
                 cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.mod_catalog_error = None;
                     this.backend.send(MessageToBackend::SearchCatalog {
                         query: "".to_string(),
                         provider: prov_prev.clone(),
@@ -243,6 +253,7 @@ fn pagination_controls(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElem
                 "Next >",
                 false,
                 cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.mod_catalog_error = None;
                     this.backend.send(MessageToBackend::SearchCatalog {
                         query: "".to_string(),
                         provider: prov_next.clone(),
@@ -319,7 +330,8 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                                 let mc = mc_for_enter.clone();
                                 let ldr = ldr_for_enter.clone();
                                 this.mod_catalog_offset = 0;
-                                this.backend.send(MessageToBackend::SearchCatalog {
+                                this.mod_catalog_error = None;
+                    this.backend.send(MessageToBackend::SearchCatalog {
                                     query: q,
                                     provider: prov,
                                     mc_version: mc,
@@ -374,7 +386,8 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                             .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                                 this.mod_catalog_query.clear();
                                 this.mod_catalog_offset = 0;
-                                this.backend.send(MessageToBackend::SearchCatalog {
+                                this.mod_catalog_error = None;
+                    this.backend.send(MessageToBackend::SearchCatalog {
                                     query: "".to_string(),
                                     provider: prov_clear.clone(),
                                     mc_version: mc_clear.clone(),
@@ -396,7 +409,8 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 let mc = mc_for_submit.clone();
                 let ldr = ldr_for_submit.clone();
                 this.mod_catalog_offset = 0;
-                this.backend.send(MessageToBackend::SearchCatalog {
+                this.mod_catalog_error = None;
+                    this.backend.send(MessageToBackend::SearchCatalog {
                     query: q,
                     provider: prov,
                     mc_version: mc,
@@ -417,7 +431,8 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                     cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                         this.mod_catalog_provider = "modrinth".to_string();
                         let q = this.mod_catalog_query.trim().to_string();
-                        this.backend.send(MessageToBackend::SearchCatalog {
+                        this.mod_catalog_error = None;
+                    this.backend.send(MessageToBackend::SearchCatalog {
                             query: q,
                             provider: "modrinth".to_string(),
                             mc_version: mc_for_modrinth.clone(),
@@ -434,7 +449,8 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                     cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                         this.mod_catalog_provider = "curseforge".to_string();
                         let q = this.mod_catalog_query.trim().to_string();
-                        this.backend.send(MessageToBackend::SearchCatalog {
+                        this.mod_catalog_error = None;
+                    this.backend.send(MessageToBackend::SearchCatalog {
                             query: q,
                             provider: "curseforge".to_string(),
                             mc_version: mc_for_curse.clone(),

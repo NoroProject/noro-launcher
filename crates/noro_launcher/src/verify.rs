@@ -90,9 +90,10 @@ const _: () = {
     }
 };
 
-/// Адрес мастера. В release он обязателен — см. проверку выше.
+/// Адрес мастера. В release он обязателен — см. проверку выше, поэтому дефолт
+/// достаётся только debug-сборкам и указывает на локальный мастер.
 pub fn master_url() -> &'static str {
-    option_env!("NORO_MASTER_URL").unwrap_or("https://api.noro.dalynkaa.dev")
+    option_env!("NORO_MASTER_URL").unwrap_or("http://localhost:8080")
 }
 
 #[cfg(test)]

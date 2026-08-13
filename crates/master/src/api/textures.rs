@@ -1,21 +1,13 @@
 //! Встроенные текстуры, пресеты скинов и сервер рендеринга.
 
 use super::skin_render;
+use super::textures_source::{preset_bytes, resolve_skin_bytes, STEVE};
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
-
-const STEVE: &[u8] = include_bytes!("../../assets/steve.png");
-const ALEX: &[u8] = include_bytes!("../../assets/alex.png");
-const ARI: &[u8] = include_bytes!("../../assets/ari.png");
-const ZURI: &[u8] = include_bytes!("../../assets/zuri.png");
-const EFE: &[u8] = include_bytes!("../../assets/efe.png");
-const MAKENA: &[u8] = include_bytes!("../../assets/makena.png");
-const KAI: &[u8] = include_bytes!("../../assets/kai.png");
-const SUNNY: &[u8] = include_bytes!("../../assets/sunny.png");
-const NOOR: &[u8] = include_bytes!("../../assets/noor.png");
 
 #[derive(Deserialize)]
 pub struct RenderQuery {
@@ -33,38 +25,27 @@ pub struct RenderQuery {
 }
 
 pub async fn default_skin() -> Response {
-    (
-        StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, "image/png"),
-            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
-        ],
-        STEVE,
-    )
-        .into_response()
+    png(STEVE.to_vec(), "public, max-age=31536000, immutable")
 }
 
-pub async fn preset_skin_endpoint(Path(name): Path<String>) -> Response {
+pub async fn preset_skin_endpoint(Path(name): Path<String>) -> AppResult<Response> {
     let clean = name.trim_end_matches(".png").to_lowercase();
-    let bytes = get_preset_bytes(&clean);
-    (
-        StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, "image/png"),
-            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
-        ],
-        bytes,
-    )
-        .into_response()
+    // Неизвестный пресет — 404, а не молчаливый Стив: иначе опечатка в имени
+    // выглядит как рабочая ссылка и живёт в вёрстке годами.
+    let bytes = preset_bytes(&clean)
+        .ok_or_else(|| AppError::NotFound(format!("пресет скина {clean}")))?;
+    Ok(png(bytes.to_vec(), "public, max-age=31536000, immutable"))
 }
 
 pub async fn render_endpoint(
     State(state): State<AppState>,
     Query(q): Query<RenderQuery>,
-) -> Response {
-    let skin_bytes = resolve_skin_bytes(&state, &q).await;
+) -> AppResult<Response> {
+    let skin_bytes = resolve_skin_bytes(&state, &q).await?;
+    // Скачали, но это не картинка — ошибка на нашей стороне или у источника.
+    // Подменять её Стивом значит списать битую текстуру на «у игрока нет скина».
     let skin = image::load_from_memory(&skin_bytes)
-        .unwrap_or_else(|_| image::load_from_memory(STEVE).unwrap());
+        .map_err(|e| AppError::BadRequest(format!("скин не разобрать как изображение: {e}")))?;
 
     let scale = q.scale.unwrap_or(10).clamp(1, 64);
     let overlay = q.overlay.unwrap_or(true);
@@ -81,21 +62,13 @@ pub async fn render_endpoint(
         _ => super::skin_render_3d::render_3d(&skin, scale, overlay, mode, yaw, pitch, sway),
     };
 
-    (
-        StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, "image/png"),
-            (header::CACHE_CONTROL, "public, max-age=3600"),
-        ],
-        bytes,
-    )
-        .into_response()
+    Ok(png(bytes, "public, max-age=3600"))
 }
 
 pub async fn render_head_endpoint(
     state: State<AppState>,
     Query(mut q): Query<RenderQuery>,
-) -> Response {
+) -> AppResult<Response> {
     q.mode = Some("head".into());
     render_endpoint(state, Query(q)).await
 }
@@ -103,7 +76,7 @@ pub async fn render_head_endpoint(
 pub async fn render_bust_endpoint(
     state: State<AppState>,
     Query(mut q): Query<RenderQuery>,
-) -> Response {
+) -> AppResult<Response> {
     q.mode = Some("bust".into());
     render_endpoint(state, Query(q)).await
 }
@@ -111,7 +84,7 @@ pub async fn render_bust_endpoint(
 pub async fn render_body_endpoint(
     state: State<AppState>,
     Query(mut q): Query<RenderQuery>,
-) -> Response {
+) -> AppResult<Response> {
     q.mode = Some("body".into());
     render_endpoint(state, Query(q)).await
 }
@@ -119,59 +92,19 @@ pub async fn render_body_endpoint(
 pub async fn render_cape_endpoint(
     state: State<AppState>,
     Query(mut q): Query<RenderQuery>,
-) -> Response {
+) -> AppResult<Response> {
     q.mode = Some("cape".into());
     render_endpoint(state, Query(q)).await
 }
 
-async fn resolve_skin_bytes(state: &AppState, q: &RenderQuery) -> Vec<u8> {
-    if let Some(p) = &q.preset {
-        return get_preset_bytes(p).to_vec();
-    }
-    if let Some(u) = &q.url {
-        if let Ok(resp) = reqwest::get(u).await {
-            if let Ok(b) = resp.bytes().await {
-                return b.to_vec();
-            }
-        }
-    }
-    if let Some(name) = q
-        .username
-        .as_deref()
-        .or(q.uuid.as_deref())
-        .or(q.discord.as_deref())
-    {
-        if let Ok(users) = crate::db::list_users(&state.db, 500, 0).await {
-            for u in users {
-                if u.mc_username.eq_ignore_ascii_case(name)
-                    || u.mc_uuid.to_string() == name
-                    || u.discord_username.eq_ignore_ascii_case(name)
-                    || u.discord_id == name
-                {
-                    if let Some(s_url) = &u.skin_url {
-                        if let Ok(resp) = reqwest::get(s_url).await {
-                            if let Ok(b) = resp.bytes().await {
-                                return b.to_vec();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    STEVE.to_vec()
-}
-
-fn get_preset_bytes(name: &str) -> &'static [u8] {
-    match name {
-        "alex" => ALEX,
-        "ari" => ARI,
-        "zuri" => ZURI,
-        "efe" => EFE,
-        "makena" => MAKENA,
-        "kai" => KAI,
-        "sunny" => SUNNY,
-        "noor" => NOOR,
-        _ => STEVE,
-    }
+fn png(bytes: Vec<u8>, cache: &'static str) -> Response {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, cache),
+        ],
+        bytes,
+    )
+        .into_response()
 }

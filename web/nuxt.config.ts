@@ -6,10 +6,13 @@ export default defineNuxtConfig({
   },
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
+  // No fallback domain here on purpose: a build without these variables used to
+  // point at one specific production deployment, and nothing said so.
+  // `useApi` reports the missing variable instead.
   runtimeConfig: {
     public: {
-      masterUrl: process.env.NUXT_PUBLIC_MASTER_URL || 'https://api.noro.dalynkaa.dev',
-      webUrl: process.env.NUXT_PUBLIC_WEB_URL || 'https://noro.dalynkaa.dev'
+      masterUrl: process.env.NUXT_PUBLIC_MASTER_URL || '',
+      webUrl: process.env.NUXT_PUBLIC_WEB_URL || ''
     }
   },
   app: {
