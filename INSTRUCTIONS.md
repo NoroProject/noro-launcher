@@ -48,6 +48,20 @@ It replaces the official Mojang launcher with a tailored experience:
 - **Signed manifests** — every build's file list is signed with ed25519; the launcher verifies the signature before launching.
 - **Auto-update** — master tracks launcher versions per platform; the launcher self-updates from the master's file store.
 
+The master has since grown past "the launcher's backend" and now also acts as:
+
+- **An OAuth2 provider** — third-party apps log users in through Noro
+  (`/oauth2/authorize`, `/oauth2/token`), with passkeys as a second way in.
+- **A game-server control plane** — Java agents and ServerWrapper report player
+  data and online counts, and take console, file and power commands back
+  (`/api/agent/*`, see `docs/agents.md`).
+- **A file host for operators** — game-server directories are reachable over
+  WebDAV, and the in-browser file manager talks to the same tree.
+- **A mod catalog** — Modrinth and CurseForge search, resolution and import.
+
+Treat it accordingly: an outage takes down logins for other apps and operator
+access to live servers, not just the launcher.
+
 ### What the launcher does for the player
 
 1. Player opens the launcher, clicks "Sign in with Discord."
@@ -108,189 +122,45 @@ noro-launcher/
 ├── Cargo.toml               # workspace root — all [workspace.dependencies] live here
 ├── crates/
 │   ├── schema/              # Shared serde types (no tokio, no axum, no sqlx)
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── build.rs     # Build, BuildFile, OptionalMod types
-│   │       ├── launcher.rs  # LauncherVersion, LauncherConfig
-│   │       ├── news.rs      # NewsItem
-│   │       ├── permissions.rs
-│   │       ├── server.rs    # ServerEntry, ServerManifest
-│   │       ├── user.rs      # UserProfile, NotifLevel
-│   │       └── ws_protocol.rs # WS messages master ↔ backend
-│   │
+│   ├── i18n/                # Fluent bundles, locale lookup
 │   ├── bridge/              # IPC types crossing the GPUI thread boundary
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── message.rs   # MessageToBackend / MessageToFrontend enums
-│   │       ├── modal_action.rs
-│   │       ├── handle.rs    # BridgeHandle (sender side)
-│   │       ├── quit.rs
-│   │       └── serial.rs    # SyncStage, GameLogLevel, ClientSettingsState, OptionalModInfo
-│   │
-│   ├── backend/             # All launcher logic — runs in Tokio runtime
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── backend.rs   # Backend actor — owns all state, routes messages
-│   │       ├── backend_handler.rs
-│   │       ├── config.rs    # Persistent config (dirs, URLs)
-│   │       ├── directories.rs
-│   │       ├── persistent.rs # Saved state (token, settings)
-│   │       ├── updater.rs
-│   │       ├── log_reader.rs
-│   │       ├── mod_icon.rs
-│   │       ├── signing.rs   # ed25519 manifest verification
-│   │       ├── ws_client.rs # WebSocket connection to master
-│   │       ├── auth/
-│   │       │   ├── mod.rs
-│   │       │   ├── discord_oauth.rs # Local HTTP server for OAuth callback
-│   │       │   └── token_store.rs
-│   │       ├── sync/
-│   │       │   ├── mod.rs
-│   │       │   ├── file_sync.rs   # Orchestrates full sync
-│   │       │   ├── downloader.rs  # Concurrent download pool
-│   │       │   └── integrity.rs   # sha1 check
-│   │       └── game_runner/
-│   │           ├── mod.rs
-│   │           ├── args.rs        # JVM + game arg construction
-│   │           ├── authlib.rs     # authlib-injector javaagent setup
-│   │           ├── classpath.rs
-│   │           └── java.rs        # Java binary resolution
-│   │
-│   ├── frontend/            # GPUI desktop UI
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── theme.rs     # Design tokens — ONLY source of colors
-│   │       ├── icons.rs
-│   │       ├── assets.rs    # Embedded assets (fonts, images)
-│   │       ├── state.rs     # AppState (Model<T> in GPUI)
-│   │       ├── login.rs     # Login screen
-│   │       ├── pages.rs     # Page router
-│   │       ├── skin_preview.rs
-│   │       ├── skin_render.rs
-│   │       ├── image_loader.rs
-│   │       ├── console_model.rs
-│   │       ├── console_toolbar.rs
-│   │       ├── console_controls.rs
-│   │       ├── components/  # Reusable UI atoms
-│   │       │   ├── mod.rs
-│   │       │   ├── atom_art.rs      # Decorative ATOM ASCII art
-│   │       │   ├── badge.rs
-│   │       │   ├── button.rs
-│   │       │   ├── checkbox.rs
-│   │       │   ├── cta_button.rs    # Cream/CTA primary button
-│   │       │   ├── icon_button.rs
-│   │       │   ├── mod_toggle.rs
-│   │       │   ├── pixel_title.rs
-│   │       │   ├── progress.rs
-│   │       │   └── window_chrome.rs # Custom titlebar + window controls
-│   │       └── pages/       # Full screens
-│   │           ├── shell.rs          # Root layout (sidebar + content)
-│   │           ├── sidebar.rs
-│   │           ├── sidebar_server.rs
-│   │           ├── sidebar_user.rs
-│   │           ├── game.rs           # Server detail page
-│   │           ├── game_bar.rs
-│   │           ├── game_console.rs
-│   │           ├── game_status.rs
-│   │           ├── game_sync.rs
-│   │           ├── common.rs
-│   │           ├── mod_icon.rs
-│   │           ├── news.rs
-│   │           ├── optional_mods_panel.rs
-│   │           ├── profile.rs
-│   │           ├── profile_asset.rs
-│   │           ├── profile_skin.rs
-│   │           ├── server_mods.rs
-│   │           ├── server_settings.rs
-│   │           ├── settings.rs
-│   │           └── toast.rs
-│   │
-│   ├── master/              # Axum web server
-│   │   └── src/
-│   │       ├── main.rs
-│   │       ├── lib.rs
-│   │       ├── state.rs     # AppState (DB pool, config, file store)
-│   │       ├── config.rs
-│   │       ├── error.rs     # AppError → axum IntoResponse
-│   │       ├── signing.rs
-│   │       ├── manifest.rs
-│   │       ├── api/
-│   │       │   ├── mod.rs
-│   │       │   ├── launcher.rs   # Launcher-facing REST endpoints
-│   │       │   ├── cabinet.rs    # Player cabinet REST
-│   │       │   ├── auth/
-│   │       │   │   ├── mod.rs
-│   │       │   │   ├── discord.rs    # Discord OAuth callback
-│   │       │   │   ├── middleware.rs # Auth extractor
-│   │       │   │   └── yggdrasil.rs  # Minecraft session protocol
-│   │       │   └── admin/        # Admin-only routes
-│   │       │       ├── mod.rs
-│   │       │       ├── router.rs
-│   │       │       ├── users.rs
-│   │       │       ├── roles.rs
-│   │       │       ├── servers.rs
-│   │       │       ├── builds.rs
-│   │       │       ├── build_routes.rs
-│   │       │       ├── versions.rs
-│   │       │       ├── launcher.rs
-│   │       │       ├── cores.rs
-│   │       │       ├── capes.rs
-│   │       │       ├── news.rs
-│   │       │       ├── stats.rs
-│   │       │       └── tokens.rs
-│   │       ├── db/
-│   │       │   ├── mod.rs
-│   │       │   ├── models.rs    # DB row structs
-│   │       │   ├── queries.rs   # sqlx runtime queries
-│   │       │   └── capes.rs
-│   │       ├── files/
-│   │       │   ├── mod.rs
-│   │       │   ├── store.rs     # FileStore trait
-│   │       │   └── s3.rs        # S3/R2 implementation
-│   │       ├── ws/
-│   │       │   ├── mod.rs
-│   │       │   └── hub.rs       # WebSocket hub for push notifications
-│   │       ├── build_importer/
-│   │       │   ├── mod.rs
-│   │       │   ├── mrpack.rs    # Modrinth .mrpack import
-│   │       │   └── curseforge.rs
-│   │       ├── launcher_builder/
-│   │       │   ├── mod.rs
-│   │       │   └── github_watcher.rs
-│   │       └── mojang_bootstrap/
-│   │           ├── mod.rs
-│   │           ├── minecraft.rs   # Vanilla manifest fetch
-│   │           ├── fabric.rs
-│   │           ├── forge.rs
-│   │           ├── java.rs        # Adoptium JDK distribution
-│   │           ├── assets.rs      # Asset index + objects
-│   │           ├── maven.rs
-│   │           └── platform.rs    # OS/arch detection
-│   │
-│   ├── admin_cli/           # CLI tool for server-side admin tasks
-│   └── noro_launcher/       # Binary entry point — spawns tokio + GPUI
+│   ├── backend/             # Launcher logic — auth, sync, game_runner, ws_client
+│   ├── frontend/            # GPUI desktop UI — theme.rs is the only source of colors
+│   ├── master/              # Axum server (see below)
+│   ├── admin_cli/           # CLI for server-side admin tasks
+│   ├── noro_core/           # Launcher core binary — single-instance, bridges FE↔BE
+│   └── noro_launcher/       # Bootstrapper binary — self-updates and starts the core
 │
-├── web/                     # Nuxt 3 app
-│   ├── app.vue
-│   ├── app.config.ts
-│   ├── assets/css/
-│   │   ├── main.css         # CSS custom properties (--noro-* tokens)
-│   │   ├── buttons.css
-│   │   ├── surfaces.css
-│   │   ├── controls.css
-│   │   └── file-manager.css
-│   ├── components/
-│   │   ├── atom/            # Primitive UI components
-│   │   ├── build/           # Build editor panels
-│   │   ├── server/          # Server management panels
-│   │   ├── file-manager/    # In-browser file manager
-│   │   └── admin/           # Admin-specific components
-│   ├── composables/         # useXxx hooks
-│   ├── pages/               # Nuxt file-based routing
-│   └── middleware/
-│
+├── agent/                   # Java side: server agent, ServerWrapper, Paper plugin
+│                            # (Gradle; see docs/agents.md)
+├── web/                     # Nuxt 3 — landing, player cabinet, admin panel
+├── docs/                    # env.md, release.md, agents.md, wrapper-control/
 └── data/files/              # Local file store (dev) — sharded by first byte of sha1
 ```
+
+**Master modules** (`crates/master/src/`):
+
+```
+api/
+  admin/          # Admin-only routes (users, roles, servers, builds, capes, ...)
+  auth/           # discord, yggdrasil, passkeys, oauth2_provider, agent_auth, middleware
+  agent*.rs       # Game-server agent API: players, heartbeat, artifact, nodes
+  cabinet.rs      # Player cabinet: skin, cape, skin presets, authorized apps
+  health.rs       # GET /health — liveness plus a DB ping
+  rate_limit.rs   # Per-IP limiter for login endpoints
+  textures.rs, skin_render*.rs   # Skin/cape delivery and 3D renders
+catalog/          # Modrinth + CurseForge mod search and resolution
+dav/              # WebDAV access to game-server files
+wrapper/          # Control channel to ServerWrapper: console, files, power
+build_importer/   # .mrpack / CurseForge / instance zip import
+mojang_bootstrap/ # Mirrors Mojang, Fabric, Forge, Adoptium into the file store
+db/               # models, queries, migrations runner, background cleanup
+files/            # FileStore — local disk or S3/R2
+ws/               # WebSocket hub pushing to connected launchers
+```
+
+> This map is intentionally at module level. An exhaustive file list went stale
+> within weeks last time — read the directory when you need specifics.
 
 ---
 
@@ -976,12 +846,20 @@ On startup, backend restores from these and sends `ConfigState` to frontend.
 
 | Prefix | Auth | Consumers |
 |---|---|---|
-| `/auth/discord` | None | Launcher (OAuth flow), web |
-| `/auth/yggdrasil` | None (MC protocol) | Minecraft server (join/hasJoined) |
-| `/launcher/...` | Bearer token | Desktop launcher |
-| `/cabinet/...` | Bearer token | Web cabinet |
-| `/admin/...` | Bearer token + admin permission | Web admin panel |
-| `/ws` | Bearer token | Desktop launcher WebSocket |
+| `/health` | None | Orchestrator, monitoring |
+| `/auth/discord/...`, `/auth/passkeys/...` | None | Launcher (OAuth flow), web |
+| `/api/yggdrasil/...` | None (MC protocol) | Minecraft server (join/hasJoined) |
+| `/api/launcher/...`, `/files/{sha1}` | Mixed | Desktop launcher, CDN |
+| `/api/me/...`, `/api/capes` | Bearer token | Web cabinet, launcher |
+| `/oauth2/...` | Client credentials | Third-party apps signing in through Noro |
+| `/api/agent/...` | Game-server secret | Java agents, ServerWrapper |
+| `/api/admin/...` | Bearer token + permission | Web admin panel, `admin_cli` |
+| `/ws/launcher` | Bearer token | Desktop launcher WebSocket |
+| WebDAV tree | Bearer token + permission | Operator file access, Finder |
+
+An admin token does **not** authenticate `/api/agent/*`, and a game-server
+secret does not reach anything else. The secret lives on a machine other people
+operate; `server_id` is derived from the secret and never taken from the request.
 
 ### 14.3 Error Handling Pattern
 
@@ -1207,6 +1085,25 @@ Migrations are forward-only — no down migrations.
 
 If you need to undo a migration, write a new forward migration.
 
+**Two rules that are not negotiable — both have already broken production:**
+
+1. **Never reuse a version number.** sqlx applies the first file with a given
+   number, then fails on the second with `VersionMismatch` and **aborts the
+   loop** — every migration after it is skipped forever. `migration_versions_are_unique`
+   in `crates/master/src/db/migrations_tests.rs` guards this; do not delete it.
+2. **Never edit a migration that has already been applied.** sqlx stores a
+   SHA-384 of each file and refuses to continue when it stops matching. Editing
+   `0001_init.sql` to change a column default is exactly the mistake — write a
+   new migration with `ALTER TABLE ... SET DEFAULT` instead.
+
+To change a default for existing rows, a migration needs both parts: `ALTER
+COLUMN ... SET DEFAULT` for new rows and an `UPDATE` for the ones already in the
+table. See `0022_update_default_unmanaged_paths.sql`.
+
+Migration failures are fatal at startup by design (`db::connect_and_migrate`).
+Do not soften that back into a warning: a master running on a schema the code
+does not expect fails later, further away, and less obviously.
+
 ### 17.4 DB Models vs Schema Types
 
 Two separate structs:
@@ -1277,8 +1174,26 @@ Tokens carry a permission set, not full admin access.
 
 ### 18.5 CORS
 
-Admin and launcher APIs have strict CORS — only the configured frontend origins.
-The Yggdrasil endpoint has no CORS restriction (Minecraft server calls it server-side).
+Allowed browser origins come from `NORO_ALLOWED_ORIGINS` (comma-separated).
+When it is unset the master accepts any origin and logs a warning at startup —
+that is a local-development convenience, and production must set it.
+
+Yggdrasil and the agent API are unaffected either way: game servers and agents
+call them server-side and never send an `Origin` header.
+
+### 18.6 Request Limits
+
+The public surface (Yggdrasil, Discord auth, launcher, cabinet, OAuth2, agent)
+caps request bodies at 8 MiB. Admin routes and WebDAV have no cap — they carry
+build files, mods and launcher binaries, and both sit behind permission checks.
+
+Never re-apply `DefaultBodyLimit::disable()` to the whole router: it removes the
+cap from anonymous endpoints too.
+
+Login endpoints (`/auth/*`, `/oauth2/token`) are rate-limited per IP —
+60 requests/minute, see `api/rate_limit.rs`. Yggdrasil is deliberately excluded:
+the game server calls it on every player join, so a limit there would block
+players joining rather than slow an attacker down.
 
 ---
 
@@ -1505,12 +1420,34 @@ cargo run --package master
 # Run the launcher
 cargo run --package noro_launcher
 
-# Clippy (must pass)
-cargo clippy --workspace -- -D warnings
-
 # Format
 cargo fmt --all
 ```
+
+### 24.1.1 What CI actually runs
+
+`.github/workflows/ci.yml` runs on every PR and push to `master`. Reproduce it
+locally before pushing — these are the exact commands:
+
+```bash
+cargo fmt --all -- --check
+
+cargo clippy --all-targets \
+  -p schema -p i18n -p bridge -p backend -p master -p admin_cli \
+  -- -D warnings -A clippy::too_many_arguments
+
+cargo test -p schema -p i18n -p bridge -p backend -p master -p admin_cli
+
+cd web && bun run typecheck
+```
+
+`frontend`, `noro_launcher` and `noro_core` are outside the clippy/test scope:
+GPUI needs a graphics stack. They are covered by `release-launcher.yml`, so run
+`cargo check --workspace` yourself after touching them.
+
+`too_many_arguments` is allowed deliberately — the offenders are sqlx insert
+wrappers and skin-render parameters, where a struct would just move the same
+list one line up.
 
 ### 24.2 Web
 
@@ -1579,7 +1516,7 @@ Before marking any task complete, verify:
 - [ ] Read relevant GPUI source/examples before writing any GPUI UI code.
 - [ ] Every touched `.rs` file is ≤ 150 lines.
 - [ ] `cargo check --workspace` passes.
-- [ ] `cargo clippy --workspace -- -D warnings` passes.
+- [ ] The CI commands in §24.1.1 pass locally (fmt, clippy, tests).
 - [ ] `cargo fmt --all` applied.
 - [ ] No `unwrap()` in non-test, non-infallible code.
 - [ ] Errors have context messages.
@@ -1686,5 +1623,5 @@ Before marking any task complete, verify:
 
 ---
 
-*Last updated: June 2026. Maintained by the noro-launcher team.*
+*Last updated: August 2026. Maintained by the noro-launcher team.*
 *This file is the single source of truth. If CLAUDE.md or AGENTS.md conflict with this file, this file wins.*
