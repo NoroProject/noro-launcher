@@ -62,6 +62,24 @@ jobs:
           # как «падений нет», а не как «мы их не собираем».
           [ -n "${NORO_SENTRY_DSN:-}" ] || echo "::notice::NORO_SENTRY_DSN не задан — лаунчер соберётся без отчётов о падениях"
 
+      # Лаунчер сверяет свою CARGO_PKG_VERSION с тегом, который отдаёт мастер.
+      # Разъедутся — плашка «доступно обновление» висит вечно, и нажатие ставит
+      # ту же самую сборку. Так уже случилось с launcher-v1.6.2, собранным при
+      # версии 1.6.1 в манифесте.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Tag matches Cargo.toml version
+        run: |
+          set -euo pipefail
+          MANIFEST=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          EXPECTED="launcher-v$MANIFEST"
+          [ "$TAG" = "$EXPECTED" ] || {
+            echo "::error::тег $TAG не совпадает с версией в Cargo.toml ($MANIFEST). Ожидался $EXPECTED"
+            exit 1
+          }
+          echo "тег и манифест сходятся: $TAG"
+
   build:
     name: launcher ${{ matrix.target }}
     needs: guard
