@@ -107,12 +107,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # release-symbols вместо release: тот же оптимизированный код плюс
+          # таблицы строк, без которых Sentry не покажет ни номер строки, ни
+          # исходник. См. [profile.release-symbols] в Cargo.toml.
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            cross build --release -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
-            cross build --release -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
+            cross build --profile release-symbols -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cross build --profile release-symbols -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
           else
-            cargo build --release -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
-            cargo build --release -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
+            cargo build --profile release-symbols -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cargo build --profile release-symbols -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
           fi
 
       # Символы для Sentry. Без них трейс от игрока — набор адресов.
@@ -128,17 +131,26 @@ jobs:
           # npm, а не `curl | bash`: этот шаг бежит и на windows-раннере, где
           # установщик из get-cli не работает.
           npm install -g @sentry/cli@2
-          DIR="target/${{ matrix.target }}/release"
+          DIR="target/${{ matrix.target }}/release-symbols"
+
+          # На macOS отладочная информация по умолчанию остаётся в .o-файлах, и
+          # сам бинарник для Sentry бесполезен. dsymutil собирает её в .dSYM.
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            dsymutil "$DIR/noro-launcher-core" "$DIR/noro-launcher"
+          fi
+
           # Что именно Sentry сможет разобрать — видно до загрузки. Не падаем:
           # набор символов у пяти таргетов разный, и выяснять это лучше по
           # факту первого прогона, чем ронять релиз догадкой.
           sentry-cli debug-files check "$DIR/noro-launcher-core"* 2>&1 | head -20 \
             || echo "::warning::в бинарнике не нашлось пригодных символов — трейсы будут без имён"
-          # `--wait` — чтобы сборка падала здесь, а не оставляла Sentry с
-          # событиями, которые он не умеет разобрать.
+
+          # --include-sources кладёт рядом с символами сам код, и тогда в трейсе
+          # видно строки, а не только их номера. Репозиторий приватный: это
+          # осознанная передача исходников в Sentry.
           sentry-cli debug-files upload \
             --org "$SENTRY_ORG" --project "$SENTRY_PROJECT" \
-            --wait \
+            --include-sources --wait \
             "$DIR"
 
       # Секретов может не быть (форк, чужой прогон) — тогда подпись остаётся
@@ -173,7 +185,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          OUT=target/${{ matrix.target }}/release
+          OUT=target/${{ matrix.target }}/release-symbols
           case "${{ matrix.os }}" in
             windows-latest)
               cp "$OUT/noro-launcher.exe" dist/noro-launcher-${{ matrix.target }}.exe
@@ -194,6 +206,14 @@ jobs:
             *)
               cp "$OUT/noro-launcher" dist/noro-launcher-${{ matrix.target }}
               cp "$OUT/noro-launcher-core" dist/noro-launcher-core-${{ matrix.target }}
+              # На Linux отладочная информация лежит внутри ELF, а не отдельным
+              # файлом как .dSYM или .pdb. В Sentry она уже уехала шагом выше,
+              # так что игроку её тащить незачем. Не критично, если не вышло:
+              # релиз с толстым бинарником лучше, чем отсутствие релиза.
+              STRIP=$(command -v llvm-strip || command -v strip)
+              "$STRIP" --strip-debug dist/noro-launcher-${{ matrix.target }} \
+                dist/noro-launcher-core-${{ matrix.target }} \
+                || echo "::warning::не удалось срезать debug-info, бинарники уедут как есть"
               ;;
           esac
 
