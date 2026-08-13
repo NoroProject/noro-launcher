@@ -31,9 +31,18 @@ services:
       CURSEFORGE_API_KEY: ${CURSEFORGE_API_KEY}
       NORO_SIGNING_KEY: ${NORO_SIGNING_KEY}
       NORO_FILES_CDN_URL: https://noro-cdn.${DOMAIN}/files
+      # Из браузера в API ходит только сайт. Без этой переменной CORS открыт
+      # для любого origin (см. docs/env.md).
+      NORO_ALLOWED_ORIGINS: https://${DOMAIN}
     volumes:
       - noro-data:/app/data
       - ./launcher-repo:/app/launcher-repo
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy

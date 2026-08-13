@@ -2,6 +2,7 @@
 //! т.к. компиляция идёт без живой БД.
 
 pub mod capes;
+pub mod cleanup;
 pub mod game_servers;
 pub mod mod_suggestions;
 pub mod models;
@@ -9,7 +10,7 @@ pub mod oauth2;
 pub mod passkeys;
 pub mod queries;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
@@ -26,12 +27,16 @@ pub async fn connect_and_migrate(database_url: &str) -> Result<PgPool> {
         .max_connections(16)
         .connect(database_url)
         .await?;
-    match sqlx::migrate!("./migrations").run(&pool).await {
-        Ok(_) => tracing::info!("миграции применены"),
-        Err(e) => tracing::info!(error = %e, "миграции sqlx выполнены или пропущены"),
-    }
-    if let Err(e) = ensure_default_launcher_app(&pool).await {
-        tracing::error!(error = %e, "ошибка при создании таблиц OAuth2 Провайдера");
-    }
+    // Ошибку миграций нельзя проглатывать: она обрывает всю дальнейшую цепочку,
+    // и мастер поднимется на схеме, которой не соответствует код.
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .context("применение миграций")?;
+    tracing::info!("миграции применены");
     Ok(pool)
 }
+
+#[cfg(test)]
+#[path = "migrations_tests.rs"]
+mod tests;

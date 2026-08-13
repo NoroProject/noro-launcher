@@ -49,10 +49,6 @@ pub struct ServerRow {
     pub created_at: DateTime<Utc>,
 }
 
-fn default_allow_suggestions() -> bool {
-    true
-}
-
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct BuildRow {
     pub id: Uuid,
@@ -68,7 +64,7 @@ pub struct BuildRow {
     pub assets_index_name: String,
     pub published: bool,
     pub optional_mods: serde_json::Value,
-    #[serde(default = "default_allow_suggestions")]
+    // Колонка NOT NULL DEFAULT TRUE (миграция 0017) — значение всегда приходит из БД.
     pub allow_optional_mod_suggestions: bool,
     pub recommended_memory_min_mb: i32,
     pub recommended_memory_max_mb: i32,

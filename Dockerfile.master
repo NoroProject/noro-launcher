@@ -28,8 +28,11 @@ WORKDIR /app
 # запускает сам мастер при bootstrap сборки. Рантаймы Mojang для этого не
 # годятся — под ключом `linux` у них только x86_64, и на arm64-хосте такой
 # бинарник не стартует. Хватает 17: все процессоры собраны под Java 8.
+# curl — только для HEALTHCHECK контейнера: в образе нет ни wget, ни curl, и
+# без него docker-compose не может опросить /health.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    curl \
     openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 

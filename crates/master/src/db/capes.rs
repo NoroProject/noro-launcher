@@ -66,17 +66,20 @@ pub async fn set_user_granted_capes(pool: &PgPool, user_id: Uuid, cape_ids: &[Uu
         .execute(&mut *tx)
         .await?;
     for &cape_id in cape_ids {
-        sqlx::query("INSERT INTO user_capes (user_id, cape_id) VALUES ($1, $2) ON CONFLICT DO NOTHING")
-            .bind(user_id)
-            .bind(cape_id)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            "INSERT INTO user_capes (user_id, cape_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(cape_id)
+        .execute(&mut *tx)
+        .await?;
     }
     // Если текущий экипированный плащ игрока больше не в списке доступных — сбрасываем его
-    let current_url: Option<String> = sqlx::query_scalar("SELECT cape_url FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_optional(&mut *tx)
-        .await?;
+    let current_url: Option<String> =
+        sqlx::query_scalar("SELECT cape_url FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&mut *tx)
+            .await?;
     if let Some(url) = current_url {
         let still_allowed: bool = sqlx::query_scalar(
             "SELECT EXISTS(

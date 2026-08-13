@@ -61,12 +61,19 @@ pub async fn run() -> Result<()> {
 
     // Фоновый опрос GitHub (если настроен).
     launcher_builder::github_watcher::spawn(state.clone());
+    db::cleanup::spawn(state.db.clone());
 
     let app = router(state);
 
     let listener = tokio::net::TcpListener::bind(&config.bind_addr).await?;
     tracing::info!("noro-master слушает на {}", config.bind_addr);
-    axum::serve(listener, app).await?;
+    // ConnectInfo нужен ограничителю частоты: без прокси-заголовка адрес
+    // клиента берётся из соединения.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -77,38 +84,49 @@ fn router(state: AppState) -> Router {
     };
 
     // Yggdrasil (authlib-injector) — без авторизации.
-    let yggdrasil = Router::new().nest(
-        "/api/yggdrasil",
-        Router::new()
-            .route("/", get(auth::yggdrasil::root))
-            .route(
-                "/authserver/authenticate",
-                post(auth::yggdrasil::authenticate),
-            )
-            .route("/authserver/refresh", post(auth::yggdrasil::refresh))
-            .route("/authserver/validate", post(auth::yggdrasil::validate))
-            .route("/authserver/invalidate", post(auth::yggdrasil::invalidate))
-            // Пути как у Mojang, но с хостом вместо префикса: authlib-injector
-            // отображает sessionserver.mojang.com в `{root}/sessionserver`,
-            // сохраняя остаток пути. Без этого префикса join и hasJoined
-            // просто не находятся.
-            .route(
-                "/sessionserver/session/minecraft/join",
-                post(auth::yggdrasil::join),
-            )
-            .route(
-                "/sessionserver/session/minecraft/hasJoined",
-                get(auth::yggdrasil::has_joined),
-            )
-            .route(
-                "/sessionserver/session/minecraft/profile/{uuid}",
-                get(auth::yggdrasil::profile),
-            )
-            .route(
-                "/api/profiles/minecraft",
-                post(auth::yggdrasil::profiles_bulk),
-            ),
-    );
+    let yggdrasil = Router::new()
+        // Корень ALI обязан отвечать и со слэшем: лаунчер передаёт агенту
+        // `{master}/api/yggdrasil`, а authlib-injector дописывает `/` перед тем,
+        // как забрать метаданные. Вложенный роутер отдавал на такой адрес 404 —
+        // агент оставался без `skinDomains`, клиент подставлял дефолтный список
+        // Mojang и молча отбрасывал все текстуры с нашего CDN.
+        .route("/api/yggdrasil/", get(auth::yggdrasil::root))
+        .nest(
+            "/api/yggdrasil",
+            Router::new()
+                .route("/", get(auth::yggdrasil::root))
+                .route(
+                    "/authserver/authenticate",
+                    post(auth::yggdrasil::authenticate),
+                )
+                .route("/authserver/refresh", post(auth::yggdrasil::refresh))
+                .route("/authserver/validate", post(auth::yggdrasil::validate))
+                .route("/authserver/invalidate", post(auth::yggdrasil::invalidate))
+                // Пути как у Mojang, но с хостом вместо префикса: authlib-injector
+                // отображает sessionserver.mojang.com в `{root}/sessionserver`,
+                // сохраняя остаток пути. Без этого префикса join и hasJoined
+                // просто не находятся.
+                .route(
+                    "/sessionserver/session/minecraft/join",
+                    post(auth::yggdrasil::join),
+                )
+                .route(
+                    "/sessionserver/session/minecraft/hasJoined",
+                    get(auth::yggdrasil::has_joined),
+                )
+                .route(
+                    "/sessionserver/session/minecraft/profile/{uuid}",
+                    get(auth::yggdrasil::profile),
+                )
+                .route(
+                    "/api/profiles/minecraft",
+                    post(auth::yggdrasil::profiles_bulk),
+                ),
+        );
+
+    // Общий счётчик на все эндпоинты входа: окно считается по IP, а не по
+    // маршруту, иначе перебор просто чередовал бы ручки.
+    let limiter = api::rate_limit::RateLimiter::new();
 
     // Discord OAuth & Passkeys.
     let discord = Router::new()
@@ -149,7 +167,11 @@ fn router(state: AppState) -> Router {
         )
         .route("/auth/refresh", post(auth::discord::refresh))
         .route("/auth/logout", get(auth::discord::logout))
-        .route("/auth/me", get(cabinet::me));
+        .route("/auth/me", get(cabinet::me))
+        .layer(axum::middleware::from_fn_with_state(
+            limiter.clone(),
+            api::rate_limit::limit,
+        ));
 
     // Лаунчер.
     let launcher_api = Router::new()
@@ -158,12 +180,27 @@ fn router(state: AppState) -> Router {
         .route("/api/launcher/downloads", get(launcher::downloads))
         .route("/files/{sha1}", get(file_serve::serve_file))
         .route("/api/textures/default-skin", get(textures::default_skin))
-        .route("/api/textures/presets/{name}", get(textures::preset_skin_endpoint))
+        .route(
+            "/api/textures/presets/{name}",
+            get(textures::preset_skin_endpoint),
+        )
         .route("/api/textures/renders", get(textures::render_endpoint))
-        .route("/api/textures/renders/head", get(textures::render_head_endpoint))
-        .route("/api/textures/renders/bust", get(textures::render_bust_endpoint))
-        .route("/api/textures/renders/body", get(textures::render_body_endpoint))
-        .route("/api/textures/renders/cape", get(textures::render_cape_endpoint))
+        .route(
+            "/api/textures/renders/head",
+            get(textures::render_head_endpoint),
+        )
+        .route(
+            "/api/textures/renders/bust",
+            get(textures::render_bust_endpoint),
+        )
+        .route(
+            "/api/textures/renders/body",
+            get(textures::render_body_endpoint),
+        )
+        .route(
+            "/api/textures/renders/cape",
+            get(textures::render_cape_endpoint),
+        )
         .route("/api/launcher/locales", get(translations::list))
         .route("/api/launcher/locales/{locale}", get(translations::get));
 
@@ -175,7 +212,10 @@ fn router(state: AppState) -> Router {
             "/api/me/skin",
             post(cabinet::upload_skin).delete(cabinet::delete_skin),
         )
-        .route("/api/me/skin/from-username", post(cabinet::upload_skin_from_username))
+        .route(
+            "/api/me/skin/from-username",
+            post(cabinet::upload_skin_from_username),
+        )
         .route(
             "/api/me/passkeys/register/options",
             post(auth::passkeys::register_options).options(|| async {}),
@@ -217,9 +257,19 @@ fn router(state: AppState) -> Router {
 
     // Полноценный OAuth 2.0 Провайдер
     let oauth2_provider_api = Router::new()
-        .route("/oauth2/authorize", get(auth::oauth2_provider::authorize_page))
-        .route("/oauth2/authorize/accept", post(auth::oauth2_provider::accept_authorize))
-        .route("/oauth2/token", post(auth::oauth2_provider::token_endpoint));
+        .route(
+            "/oauth2/authorize",
+            get(auth::oauth2_provider::authorize_page),
+        )
+        .route(
+            "/oauth2/authorize/accept",
+            post(auth::oauth2_provider::accept_authorize),
+        )
+        .route("/oauth2/token", post(auth::oauth2_provider::token_endpoint))
+        .layer(axum::middleware::from_fn_with_state(
+            limiter.clone(),
+            api::rate_limit::limit,
+        ));
 
     // Агенты игровых серверов.
     let agent_api = Router::new()
@@ -237,17 +287,28 @@ fn router(state: AppState) -> Router {
         put(translations::put).delete(translations::delete),
     );
 
-    Router::new()
+    let cors = cors_layer(&state.config);
+
+    // Публичное и пользовательское API: тело ограничено. Раньше лимит был снят
+    // на всём роутере разом, и аноним мог занять память запросом любого размера
+    // на любом эндпоинте. Самая крупная загрузка здесь — скин на 256 КБ.
+    let public_api = Router::new()
+        .route("/health", get(api::health::health))
         .merge(yggdrasil)
         .merge(discord)
         .merge(launcher_api)
         .merge(cabinet_api)
         .merge(oauth2_provider_api)
         .merge(agent_api)
-        .merge(admin_api)
-        .layer(axum::extract::DefaultBodyLimit::disable())
+        .layer(axum::extract::DefaultBodyLimit::max(PUBLIC_BODY_LIMIT));
+
+    Router::new()
+        .merge(public_api)
+        // Админка заливает сборки, моды и бинарники лаунчера — тут лимит снят
+        // осознанно, и маршруты закрыты проверкой прав.
+        .merge(admin_api.layer(axum::extract::DefaultBodyLimit::disable()))
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
+        .layer(cors)
         // WebDAV подключается ПОСЛЕ слоёв: CorsLayer сам отвечает на OPTIONS,
         // а Finder ждёт от него заголовок `DAV` — без него том не монтируется.
         .merge(
@@ -256,4 +317,36 @@ fn router(state: AppState) -> Router {
                 .layer(TraceLayer::new_for_http()),
         )
         .with_state(state)
+}
+
+/// Потолок тела запроса для публичного API.
+const PUBLIC_BODY_LIMIT: usize = 8 * 1024 * 1024;
+
+/// CORS по списку origin'ов из конфига.
+///
+/// Без `NORO_ALLOWED_ORIGINS` остаётся permissive — иначе локальная разработка
+/// перестала бы работать молча. В проде переменную нужно задать.
+fn cors_layer(config: &Config) -> CorsLayer {
+    if config.allowed_origins.is_empty() {
+        tracing::warn!("NORO_ALLOWED_ORIGINS не задан — CORS открыт для любого origin");
+        return CorsLayer::permissive();
+    }
+
+    let origins: Vec<_> = config
+        .allowed_origins
+        .iter()
+        .filter_map(|o| match o.parse::<axum::http::HeaderValue>() {
+            Ok(v) => Some(v),
+            Err(_) => {
+                tracing::error!(origin = %o, "origin не разобран, пропущен");
+                None
+            }
+        })
+        .collect();
+
+    tracing::info!(count = origins.len(), "CORS ограничен списком origin'ов");
+    CorsLayer::new()
+        .allow_origin(origins)
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any)
 }

@@ -45,7 +45,13 @@ pub async fn root(State(state): State<AppState>) -> Json<Value> {
 fn skin_domains(config: &crate::config::Config) -> Vec<String> {
     let mut domains = Vec::new();
     let mut add_url = |url: &str| {
-        let host_and_port = url.split("://").nth(1).unwrap_or(url).split('/').next().unwrap_or(url);
+        let host_and_port = url
+            .split("://")
+            .nth(1)
+            .unwrap_or(url)
+            .split('/')
+            .next()
+            .unwrap_or(url);
         let pure_host = host_and_port.split(':').next().unwrap_or(host_and_port);
         if !pure_host.is_empty() && !domains.contains(&pure_host.to_string()) {
             domains.push(pure_host.to_string());
@@ -304,4 +310,53 @@ fn profile_json(state: &AppState, u: &crate::db::models::UserRow) -> Value {
             { "name": "textures", "value": b64 }
         ]
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    /// Сценарии идут одним тестом: `Config::from_env` читает переменные
+    /// процесса, а параллельные тесты затирали бы их друг у друга.
+    fn config_with(public: &str, cdn: Option<&str>) -> Config {
+        std::env::set_var("NORO_PUBLIC_URL", public);
+        match cdn {
+            Some(c) => std::env::set_var("NORO_FILES_CDN_URL", c),
+            None => std::env::remove_var("NORO_FILES_CDN_URL"),
+        }
+        Config::from_env().expect("конфиг собирается")
+    }
+
+    /// Клиент грузит текстуру, только если её хост есть в `skinDomains`.
+    /// Скины отдаёт CDN, значит его домен обязан попасть в список — иначе
+    /// игроки видят друг друга Стивами, и нигде никакой ошибки не появляется.
+    #[test]
+    fn skin_domains_cover_every_texture_host() {
+        let domains = skin_domains(&config_with(
+            "https://api.example.dev",
+            Some("https://cdn.example.dev/files"),
+        ));
+        assert!(domains.contains(&"api.example.dev".to_string()));
+        assert!(
+            domains.contains(&"cdn.example.dev".to_string()),
+            "домен CDN обязан быть в списке: {domains:?}"
+        );
+
+        // Порт — отдельная запись: в разработке текстуры отдаются с :8080.
+        let domains = skin_domains(&config_with("http://localhost:8080", None));
+        assert!(domains.contains(&"localhost".to_string()));
+        assert!(domains.contains(&"localhost:8080".to_string()));
+
+        // Один и тот же хост в public_url и CDN не должен дублироваться.
+        let domains = skin_domains(&config_with(
+            "https://api.example.dev",
+            Some("https://api.example.dev/files"),
+        ));
+        assert_eq!(
+            domains.iter().filter(|d| *d == "api.example.dev").count(),
+            1,
+            "дубли в списке: {domains:?}"
+        );
+    }
 }

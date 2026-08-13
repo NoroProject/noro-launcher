@@ -22,6 +22,20 @@ http://localhost:8080/auth/discord/callback
 http://localhost:8080/auth/discord/launcher/callback
 ```
 
+## CORS
+
+`NORO_ALLOWED_ORIGINS` is a comma-separated list of browser origins allowed to
+call the API:
+
+```env
+NORO_ALLOWED_ORIGINS=https://noro.example.dev
+```
+
+Leave it unset in local development — the master then accepts any origin and
+logs a warning at startup. **Set it in production.** The Yggdrasil and agent
+endpoints are unaffected either way: game servers and agents call them
+server-side and never send an `Origin` header.
+
 ## File delivery / CDN
 
 By default every artifact is served by the master itself from

@@ -34,10 +34,12 @@ pub async fn verify_and_consume_challenge(
     pool: &PgPool,
     challenge: &str,
 ) -> Result<Option<Option<Uuid>>> {
-    let row = sqlx::query_scalar::<_, Option<Uuid>>("SELECT user_id FROM passkey_challenges WHERE challenge = $1 AND expires_at > NOW()")
-        .bind(challenge)
-        .fetch_optional(pool)
-        .await?;
+    let row = sqlx::query_scalar::<_, Option<Uuid>>(
+        "SELECT user_id FROM passkey_challenges WHERE challenge = $1 AND expires_at > NOW()",
+    )
+    .bind(challenge)
+    .fetch_optional(pool)
+    .await?;
 
     if let Some(user_id) = row {
         sqlx::query("DELETE FROM passkey_challenges WHERE challenge = $1")
@@ -82,13 +84,14 @@ pub async fn list_passkeys_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<
     Ok(rows)
 }
 
-pub async fn get_passkey_by_credential_id(pool: &PgPool, credential_id: &str) -> Result<Option<PasskeyRow>> {
-    let row = sqlx::query_as::<_, PasskeyRow>(
-        "SELECT * FROM passkeys WHERE credential_id = $1",
-    )
-    .bind(credential_id)
-    .fetch_optional(pool)
-    .await?;
+pub async fn get_passkey_by_credential_id(
+    pool: &PgPool,
+    credential_id: &str,
+) -> Result<Option<PasskeyRow>> {
+    let row = sqlx::query_as::<_, PasskeyRow>("SELECT * FROM passkeys WHERE credential_id = $1")
+        .bind(credential_id)
+        .fetch_optional(pool)
+        .await?;
     Ok(row)
 }
 

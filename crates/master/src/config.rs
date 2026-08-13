@@ -39,6 +39,11 @@ pub struct Config {
 
     /// Конфигурация S3-совместимого хранилища для загрузки файлов.
     pub s3: Option<S3Config>,
+
+    /// Origin'ы, которым браузер разрешает ходить в API (через запятую в
+    /// `NORO_ALLOWED_ORIGINS`). Пусто — CORS остаётся permissive: локальная
+    /// разработка поднимает Nuxt на произвольном порту.
+    pub allowed_origins: Vec<String>,
 }
 
 /// Настройки S3-совместимого хранилища (AWS S3, Cloudflare R2, MinIO).
@@ -84,6 +89,11 @@ impl Config {
                 .ok()
                 .map(|u| u.trim_end_matches('/').to_string()),
             s3: S3Config::from_env(),
+            allowed_origins: env_or("NORO_ALLOWED_ORIGINS", "")
+                .split(',')
+                .map(|o| o.trim().trim_end_matches('/').to_string())
+                .filter(|o| !o.is_empty())
+                .collect(),
         })
     }
 
