@@ -15,6 +15,13 @@ use uuid::Uuid;
 pub enum ClientWsMsg {
     Authenticate {
         access_token: String,
+        /// Версия и платформа лаунчера — чтобы админка видела, кто на чём сидит.
+        /// С `default`: лаунчеры, выпущенные до появления полей, продолжают
+        /// авторизовываться, просто без этих данных.
+        #[serde(default)]
+        launcher_version: String,
+        #[serde(default)]
+        platform: String,
     },
     RequestServerList,
     RequestNews,

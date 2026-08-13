@@ -7,6 +7,7 @@ pub mod catalog;
 pub mod cores;
 pub mod game_servers;
 pub mod launcher;
+pub mod launcher_clients;
 pub mod mod_install;
 pub mod mod_suggestions;
 pub mod news;

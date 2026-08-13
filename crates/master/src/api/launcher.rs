@@ -129,7 +129,11 @@ async fn handle_client_msg(
     tx: &mpsc::UnboundedSender<ServerWsMsg>,
 ) -> anyhow::Result<()> {
     match msg {
-        ClientWsMsg::Authenticate { access_token } => {
+        ClientWsMsg::Authenticate {
+            access_token,
+            launcher_version,
+            platform,
+        } => {
             let token = Uuid::parse_str(&access_token).ok();
             let row = match token {
                 Some(t) => crate::db::user_by_access_token(&state.db, t).await?,
@@ -141,6 +145,18 @@ async fn handle_client_msg(
                     let profile = crate::db::profile_from_row(&state.db, r).await?;
                     *authed_user = Some(user_id);
                     state.ws.authenticate(conn_id, user_id);
+                    // Не критично для входа: если запись не удалась, игрок всё
+                    // равно должен подключиться — это только статистика.
+                    if let Err(e) = crate::db::record_launcher_client(
+                        &state.db,
+                        user_id,
+                        &launcher_version,
+                        &platform,
+                    )
+                    .await
+                    {
+                        tracing::warn!(error = %e, "не удалось записать версию лаунчера");
+                    }
                     let _ = tx.send(ServerWsMsg::AuthOk { user: profile });
                 }
                 Some(_) => {

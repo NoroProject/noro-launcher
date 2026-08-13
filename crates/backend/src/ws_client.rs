@@ -25,7 +25,7 @@ impl WsClient {
         *self.token.write() = token.clone();
         // Если есть активное соединение — сразу аутентифицируемся.
         if let Some(t) = token {
-            let _ = self.out.send(ClientWsMsg::Authenticate { access_token: t });
+            let _ = self.out.send(authenticate(t));
         }
     }
 }
@@ -71,11 +71,7 @@ async fn connection_loop(
                 // освобождаем guard, чтобы не держать его через await).
                 let auth_token = token.read().clone();
                 if let Some(t) = auth_token {
-                    let _ = sink
-                        .send(Message::Text(
-                            ClientWsMsg::Authenticate { access_token: t }.to_json(),
-                        ))
-                        .await;
+                    let _ = sink.send(Message::Text(authenticate(t).to_json())).await;
                 }
 
                 loop {
@@ -114,5 +110,17 @@ async fn connection_loop(
 
         tokio::time::sleep(backoff).await;
         backoff = (backoff * 2).min(max_backoff);
+    }
+}
+
+/// Сообщение авторизации с описанием клиента.
+///
+/// Версия берётся из самого бинарника, платформа — из target-триплета сборки:
+/// так админка видит, кто остался на старом лаунчере, без отдельного запроса.
+fn authenticate(access_token: String) -> ClientWsMsg {
+    ClientWsMsg::Authenticate {
+        access_token,
+        launcher_version: env!("CARGO_PKG_VERSION").to_string(),
+        platform: format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH),
     }
 }

@@ -6,6 +6,18 @@ await auth.loadMe()
 
 const masterUrl = useRuntimeConfig().public.masterUrl
 
+/**
+ * Плоская голова, а не изометрия: в списке значок размером 20px, и объёмный
+ * рендер на нём читается хуже плоского — грани съедают и без того малое лицо.
+ * `mode=flat-head` берёт область лица со слоем шапки, `/renders/head` ушёл бы
+ * в 3D-ветку.
+ */
+function headUrl(skinUrl?: string | null) {
+  const params = new URLSearchParams({ mode: 'flat-head', scale: '8' })
+  if (skinUrl) params.set('url', skinUrl)
+  return `${masterUrl}/api/textures/renders?${params.toString()}`
+}
+
 const { data: users, refresh, pending, error } = await useAsyncData('admin-users', () =>
   auth.request<UserProfile[]>('/api/admin/users?limit=200'), { default: () => [] }
 )
@@ -51,7 +63,7 @@ const { data: users, refresh, pending, error } = await useAsyncData('admin-users
                   <!-- Skin Head Badge -->
                   <div class="absolute -bottom-1 -right-1 size-5 rounded border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] overflow-hidden shadow">
                     <img
-                      :src="user.skin_url ? `${masterUrl}/api/textures/renders/head?url=${encodeURIComponent(user.skin_url)}` : `${masterUrl}/api/textures/renders/head`"
+                      :src="headUrl(user.skin_url)"
                       class="size-full object-contain"
                       alt="Skin Head"
                     >
