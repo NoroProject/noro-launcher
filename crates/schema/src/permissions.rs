@@ -76,4 +76,52 @@ mod tests {
             "noro.server.hitech2"
         ));
     }
+
+    /// Право на один сервер не должно открывать соседний: именно это отделяет
+    /// закрытую сборку от общедоступной.
+    #[test]
+    fn server_grant_does_not_leak_to_another_server() {
+        let perms = ["noro.server.hitech.join"];
+        assert!(any_permission_matches(perms, "noro.server.hitech.join"));
+        assert!(!any_permission_matches(perms, "noro.server.vanilla.join"));
+    }
+
+    /// Шаблон обрывается на границе сегмента, а не по префиксу строки: иначе
+    /// `noro.admin.*` выдал бы права на всё, что просто начинается так же.
+    #[test]
+    fn wildcard_stops_at_the_segment_boundary() {
+        assert!(!permission_matches("noro.admin.*", "noro.adminx.users"));
+        assert!(!permission_matches("noro.server.*", "noro.servers.list"));
+        assert!(permission_matches("noro.admin.*", "noro.admin.users"));
+    }
+
+    /// `*` поддерживается только как одиночный шаблон и как суффикс `.*`.
+    #[test]
+    fn other_star_placements_match_nothing() {
+        assert!(!permission_matches("noro.*.users", "noro.admin.users"));
+        assert!(!permission_matches("*.users", "noro.admin.users"));
+        assert!(!permission_matches("noro.admin*", "noro.admin.users"));
+    }
+
+    #[test]
+    fn superadmin_covers_every_permission() {
+        let perms = [PERM_SUPERADMIN];
+        assert!(any_permission_matches(perms, PERM_ADMIN_WRAPPER));
+        assert!(any_permission_matches(perms, &perm_server_join("hitech")));
+    }
+
+    #[test]
+    fn empty_permission_set_grants_nothing() {
+        let empty: [&str; 0] = [];
+        assert!(!any_permission_matches(empty, PERM_ADMIN_USERS));
+    }
+
+    /// Управление игровой машиной — отдельное право, и админ серверов его не
+    /// получает: запись файла плюс рестарт это фактически рут на машине.
+    #[test]
+    fn server_admin_does_not_imply_wrapper_access() {
+        let perms = [PERM_ADMIN_SERVERS];
+        assert!(!any_permission_matches(perms, PERM_ADMIN_WRAPPER));
+        assert!(any_permission_matches([PERM_ADMIN_ALL], PERM_ADMIN_WRAPPER));
+    }
 }

@@ -58,3 +58,42 @@ pub fn launcher_dir_name() -> String {
         _ => "noro-launcher".into(),
     }
 }
+
+#[cfg(test)]
+mod uuid_tests {
+    use super::*;
+
+    /// Маппинга Discord → MC в базе нет: UUID выводится заново при каждом
+    /// заходе. Если значение когда-нибудь поедет, игроки потеряют инвентарь,
+    /// прогресс и права на всех серверах сразу — поэтому оно зафиксировано.
+    #[test]
+    fn discord_id_maps_to_a_stable_uuid() {
+        let id = "123456789012345678";
+        assert_eq!(
+            mc_uuid_from_discord(id).to_string(),
+            mc_uuid_from_discord(id).to_string(),
+            "одинаковый вход обязан давать одинаковый UUID"
+        );
+        assert_eq!(
+            mc_uuid_from_discord(id),
+            uuid::Uuid::new_v5(&MC_UUID_NAMESPACE, b"Discord:123456789012345678"),
+            "схема имени изменилась — все существующие игроки сменят UUID"
+        );
+    }
+
+    #[test]
+    fn different_accounts_get_different_uuids() {
+        assert_ne!(
+            mc_uuid_from_discord("111111111111111111"),
+            mc_uuid_from_discord("222222222222222222")
+        );
+    }
+
+    #[test]
+    fn namespace_is_pinned() {
+        assert_eq!(
+            MC_UUID_NAMESPACE.to_string(),
+            "4e6f726f-4d43-5555-4944-4e5370616365"
+        );
+    }
+}

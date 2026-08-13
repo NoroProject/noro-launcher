@@ -322,3 +322,7 @@ pub fn find_java(instance_dir: &Path, manifest: &BuildManifest) -> Option<PathBu
     }
     None
 }
+
+#[cfg(test)]
+#[path = "file_sync_tests.rs"]
+mod tests;
