@@ -23,6 +23,10 @@ pub struct LauncherConfig {
     /// Персональные настройки клиента для конкретных серверов.
     #[serde(default)]
     pub server_settings: BTreeMap<Uuid, ServerClientSettings>,
+    /// Выбранная версия сборки по серверам. Нет записи — берётся текущая
+    /// опубликованная, то есть поведение по умолчанию не меняется.
+    #[serde(default)]
+    pub selected_build: BTreeMap<Uuid, Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +47,7 @@ impl Default for LauncherConfig {
             jvm_flags: String::new(),
             show_console_on_launch: true,
             server_settings: BTreeMap::new(),
+            selected_build: BTreeMap::new(),
         }
     }
 }

@@ -86,6 +86,11 @@ pub enum MessageToBackend {
         server_id: Uuid,
         enabled: Vec<String>,
     },
+    /// Выбрать версию сборки для сервера. `None` — вернуться к текущей.
+    SelectBuild {
+        server_id: uuid::Uuid,
+        build_id: Option<uuid::Uuid>,
+    },
     SuggestOptionalMod {
         server_id: Uuid,
         build_id: Option<Uuid>,

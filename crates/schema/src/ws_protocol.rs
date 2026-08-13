@@ -27,6 +27,10 @@ pub enum ClientWsMsg {
     RequestNews,
     RequestBuildManifest {
         server_id: Uuid,
+        /// Какую версию собирать. `None` — текущая опубликованная; так шлют
+        /// лаунчеры, выпущенные до появления выбора версии.
+        #[serde(default)]
+        build_id: Option<Uuid>,
     },
     SetOptionalMods {
         server_id: Uuid,

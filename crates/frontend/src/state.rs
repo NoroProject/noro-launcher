@@ -180,6 +180,8 @@ pub struct LauncherUI {
     pub login_key_focus: Option<gpui::FocusHandle>,
 
     pub servers: Vec<ServerEntry>,
+    /// Версия, выбранная игроком по серверам. Нет записи — текущая.
+    pub selected_build: std::collections::HashMap<Uuid, Option<Uuid>>,
     pub news: Vec<NewsItem>,
     pub sync: HashMap<Uuid, SyncUiState>,
     /// Что делать со сборкой: ставить, обновлять или запускать.
@@ -285,6 +287,7 @@ impl LauncherUI {
             login_key_input: String::new(),
             login_key_focus: None,
             servers: Vec::new(),
+            selected_build: std::collections::HashMap::new(),
             news: Vec::new(),
             sync: HashMap::new(),
             build_state: HashMap::new(),
@@ -1024,6 +1027,18 @@ impl LauncherUI {
             self.backend
                 .send(MessageToBackend::SetOptionalMods { server_id, enabled });
         }
+    }
+
+    /// Выбрать версию сборки для сервера.
+    ///
+    /// `None` — вернуться к текущей опубликованной. Выбор хранит бэкенд: он же
+    /// перезапрашивает манифест, поэтому список файлов и модов обновится сам.
+    pub fn select_build(&mut self, server_id: Uuid, build_id: Option<Uuid>) {
+        self.selected_build.insert(server_id, build_id);
+        self.backend.send(MessageToBackend::SelectBuild {
+            server_id,
+            build_id,
+        });
     }
 
     pub fn set_memory(&mut self, min_mb: u32, max_mb: u32) {

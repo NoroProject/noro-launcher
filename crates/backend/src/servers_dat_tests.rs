@@ -17,6 +17,7 @@ fn node(name: &str, host: &str, port: u16, proxy: bool) -> GameServerEntry {
 
 fn build(nodes: Vec<GameServerEntry>) -> ServerEntry {
     ServerEntry {
+        available_builds: Vec::new(),
         id: Uuid::new_v4(),
         name: "MauMods".into(),
         description: String::new(),

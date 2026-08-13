@@ -1,5 +1,6 @@
 //! Launcher pages facade.
 
+mod build_picker;
 mod common;
 mod game;
 mod game_bar;

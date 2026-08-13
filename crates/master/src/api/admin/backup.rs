@@ -65,12 +65,12 @@ pub async fn download(State(state): State<AppState>, admin: AdminAuth) -> AppRes
     });
 
     let name = format!("noro-{}.dump", chrono::Utc::now().format("%Y-%m-%d-%H%M%S"));
-    Ok(Response::builder()
+    Response::builder()
         .header(header::CONTENT_TYPE, "application/octet-stream")
         .header(
             header::CONTENT_DISPOSITION,
             format!("attachment; filename=\"{name}\""),
         )
         .body(Body::from_stream(tokio_util::io::ReaderStream::new(stdout)))
-        .map_err(|e| AppError::Other(e.into()))?)
+        .map_err(|e| AppError::Other(e.into()))
 }

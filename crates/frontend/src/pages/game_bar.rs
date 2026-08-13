@@ -30,6 +30,11 @@ pub fn bottom_bar(
         .flex()
         .items_center()
         .child(version_block(server))
+        // Селектор — сразу за текущей версией: выбор относится к ней, а не к
+        // кнопке запуска. Когда версия одна, ничего не добавляется.
+        .children(
+            super::build_picker::build_picker(ui, server, cx).map(|p| div().ml(px(20.)).child(p)),
+        )
         .child(div().flex_1())
         .child(
             div()

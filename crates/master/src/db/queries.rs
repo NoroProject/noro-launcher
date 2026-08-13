@@ -683,6 +683,29 @@ fn sum_online(servers: &[schema::GameServerEntry]) -> (Option<u32>, Option<u32>)
     )
 }
 
+/// Все сборки сервера, свежие сверху: и опубликованные, и черновики.
+///
+/// Отбор по правам делается выше — здесь не хватает данных о пользователе.
+pub async fn list_server_builds(
+    pool: &PgPool,
+    server_id: Uuid,
+) -> Result<Vec<schema::BuildOption>> {
+    let rows: Vec<(Uuid, String, bool)> = sqlx::query_as(
+        "SELECT id, version, published FROM builds WHERE server_id = $1 ORDER BY created_at DESC",
+    )
+    .bind(server_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, version, published)| schema::BuildOption {
+            id,
+            version,
+            published,
+        })
+        .collect())
+}
+
 /// Сервер + актуальная опубликованная сборка → ServerEntry для лаунчера.
 pub async fn server_entry(pool: &PgPool, s: &ServerRow) -> Result<ServerEntry> {
     let build: Option<(Uuid, String)> = sqlx::query_as(
@@ -721,6 +744,7 @@ pub async fn server_entry(pool: &PgPool, s: &ServerRow) -> Result<ServerEntry> {
         limited: s.limited,
         sort_order: s.sort_order,
         game_servers,
+        available_builds: list_server_builds(pool, s.id).await?,
         online,
         max_online,
     })

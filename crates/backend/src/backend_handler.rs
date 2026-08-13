@@ -11,6 +11,23 @@ use schema::{ClientWsMsg, ServerWsMsg};
 use uuid::Uuid;
 
 impl BackendState {
+    /// Запрос манифеста с учётом выбранной игроком версии.
+    ///
+    /// Без выбора уходит `None`, и мастер отдаёт текущую опубликованную —
+    /// поведение по умолчанию не меняется.
+    fn request_manifest_msg(&self, server_id: Uuid) -> ClientWsMsg {
+        ClientWsMsg::RequestBuildManifest {
+            server_id,
+            build_id: self
+                .ctx
+                .config
+                .get()
+                .selected_build
+                .get(&server_id)
+                .copied(),
+        }
+    }
+
     /// Команда от frontend.
     pub async fn handle_to_backend(&mut self, msg: MessageToBackend) {
         match msg {
@@ -224,9 +241,7 @@ impl BackendState {
                     self.send_server_recommendation(server_id, &manifest);
                     self.send_optional_mods(server_id, &manifest);
                 } else {
-                    self.ctx
-                        .ws
-                        .send(ClientWsMsg::RequestBuildManifest { server_id });
+                    self.ctx.ws.send(self.request_manifest_msg(server_id));
                 }
             }
 
@@ -257,6 +272,26 @@ impl BackendState {
                 self.ctx
                     .ws
                     .send(ClientWsMsg::SetOptionalMods { server_id, enabled });
+            }
+
+            MessageToBackend::SelectBuild {
+                server_id,
+                build_id,
+            } => {
+                self.ctx.config.update(|c| match build_id {
+                    Some(id) => {
+                        c.selected_build.insert(server_id, id);
+                    }
+                    // Возврат к текущей версии — это отсутствие записи, а не
+                    // запомненный id: иначе выбор «залипнет» на старой сборке,
+                    // когда админ выкатит новую.
+                    None => {
+                        c.selected_build.remove(&server_id);
+                    }
+                });
+                // Манифест перезапрашивается сразу: игрок ждёт, что список
+                // файлов и модов обновится под выбранную версию.
+                self.ctx.ws.send(self.request_manifest_msg(server_id));
             }
 
             MessageToBackend::SuggestOptionalMod {
@@ -660,9 +695,7 @@ impl BackendState {
         if let Some(manifest) = self.manifests.get(&server_id).cloned() {
             self.begin_launch(server_id, manifest);
         } else {
-            self.ctx
-                .ws
-                .send(ClientWsMsg::RequestBuildManifest { server_id });
+            self.ctx.ws.send(self.request_manifest_msg(server_id));
         }
     }
 
@@ -867,9 +900,7 @@ impl BackendState {
                 if self.user.is_some()
                     && (had_manifest || self.pending_launch.contains_key(&server_id))
                 {
-                    self.ctx
-                        .ws
-                        .send(ClientWsMsg::RequestBuildManifest { server_id });
+                    self.ctx.ws.send(self.request_manifest_msg(server_id));
                 }
             }
             ServerWsMsg::PermissionsUpdated { user } => {
