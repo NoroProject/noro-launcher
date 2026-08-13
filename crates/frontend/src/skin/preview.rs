@@ -35,13 +35,7 @@ pub fn render_view(
         sway,
         ..View::default()
     };
-    let mut canvas = render_rgba(
-        skin_png,
-        cape_png,
-        SUPERSAMPLE_W,
-        SUPERSAMPLE_H,
-        &view,
-    )?;
+    let mut canvas = render_rgba(skin_png, cape_png, SUPERSAMPLE_W, SUPERSAMPLE_H, &view)?;
     // GPUI грузит текстуры как BGRA.
     for pixel in canvas.chunks_exact_mut(4) {
         let r = pixel[0];

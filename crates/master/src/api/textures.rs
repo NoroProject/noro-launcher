@@ -35,9 +35,13 @@ pub struct RenderQuery {
 pub async fn default_skin() -> Response {
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "image/png"), (header::CACHE_CONTROL, "public, max-age=31536000, immutable")],
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
         STEVE,
-    ).into_response()
+    )
+        .into_response()
 }
 
 pub async fn preset_skin_endpoint(Path(name): Path<String>) -> Response {
@@ -45,14 +49,22 @@ pub async fn preset_skin_endpoint(Path(name): Path<String>) -> Response {
     let bytes = get_preset_bytes(&clean);
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "image/png"), (header::CACHE_CONTROL, "public, max-age=31536000, immutable")],
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
         bytes,
-    ).into_response()
+    )
+        .into_response()
 }
 
-pub async fn render_endpoint(State(state): State<AppState>, Query(q): Query<RenderQuery>) -> Response {
+pub async fn render_endpoint(
+    State(state): State<AppState>,
+    Query(q): Query<RenderQuery>,
+) -> Response {
     let skin_bytes = resolve_skin_bytes(&state, &q).await;
-    let skin = image::load_from_memory(&skin_bytes).unwrap_or_else(|_| image::load_from_memory(STEVE).unwrap());
+    let skin = image::load_from_memory(&skin_bytes)
+        .unwrap_or_else(|_| image::load_from_memory(STEVE).unwrap());
 
     let scale = q.scale.unwrap_or(10).clamp(1, 64);
     let overlay = q.overlay.unwrap_or(true);
@@ -71,27 +83,43 @@ pub async fn render_endpoint(State(state): State<AppState>, Query(q): Query<Rend
 
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "image/png"), (header::CACHE_CONTROL, "public, max-age=3600")],
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, "public, max-age=3600"),
+        ],
         bytes,
-    ).into_response()
+    )
+        .into_response()
 }
 
-pub async fn render_head_endpoint(state: State<AppState>, Query(mut q): Query<RenderQuery>) -> Response {
+pub async fn render_head_endpoint(
+    state: State<AppState>,
+    Query(mut q): Query<RenderQuery>,
+) -> Response {
     q.mode = Some("head".into());
     render_endpoint(state, Query(q)).await
 }
 
-pub async fn render_bust_endpoint(state: State<AppState>, Query(mut q): Query<RenderQuery>) -> Response {
+pub async fn render_bust_endpoint(
+    state: State<AppState>,
+    Query(mut q): Query<RenderQuery>,
+) -> Response {
     q.mode = Some("bust".into());
     render_endpoint(state, Query(q)).await
 }
 
-pub async fn render_body_endpoint(state: State<AppState>, Query(mut q): Query<RenderQuery>) -> Response {
+pub async fn render_body_endpoint(
+    state: State<AppState>,
+    Query(mut q): Query<RenderQuery>,
+) -> Response {
     q.mode = Some("body".into());
     render_endpoint(state, Query(q)).await
 }
 
-pub async fn render_cape_endpoint(state: State<AppState>, Query(mut q): Query<RenderQuery>) -> Response {
+pub async fn render_cape_endpoint(
+    state: State<AppState>,
+    Query(mut q): Query<RenderQuery>,
+) -> Response {
     q.mode = Some("cape".into());
     render_endpoint(state, Query(q)).await
 }
@@ -107,7 +135,12 @@ async fn resolve_skin_bytes(state: &AppState, q: &RenderQuery) -> Vec<u8> {
             }
         }
     }
-    if let Some(name) = q.username.as_deref().or(q.uuid.as_deref()).or(q.discord.as_deref()) {
+    if let Some(name) = q
+        .username
+        .as_deref()
+        .or(q.uuid.as_deref())
+        .or(q.discord.as_deref())
+    {
         if let Ok(users) = crate::db::list_users(&state.db, 500, 0).await {
             for u in users {
                 if u.mc_username.eq_ignore_ascii_case(name)

@@ -46,7 +46,9 @@ impl Conn {
         match tokio::time::timeout(op.timeout(), reply_rx).await {
             Ok(Ok(Ok(data))) => Ok(data),
             Ok(Ok(Err(message))) => Err(AppError::BadRequest(message)),
-            Ok(Err(_)) => Err(AppError::BadRequest("соединение с враппером закрылось".into())),
+            Ok(Err(_)) => Err(AppError::BadRequest(
+                "соединение с враппером закрылось".into(),
+            )),
             Err(_) => {
                 // Ответ уже не придёт вовремя — снимаем ожидание, иначе карта
                 // ожиданий растёт на каждый зависший вызов.

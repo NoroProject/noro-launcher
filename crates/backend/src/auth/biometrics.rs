@@ -40,17 +40,16 @@ if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &e
         reason.replace('"', "\\\"")
     );
 
-    let output = Command::new("swift")
-        .arg("-e")
-        .arg(&script)
-        .output()?;
+    let output = Command::new("swift").arg("-e").arg(&script).output()?;
 
     if output.status.code() == Some(0) {
         Ok(true)
     } else if output.status.code() == Some(1) {
         Ok(false)
     } else {
-        Err(anyhow!("Touch ID is not available or disabled on this device"))
+        Err(anyhow!(
+            "Touch ID is not available or disabled on this device"
+        ))
     }
 }
 

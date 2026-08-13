@@ -23,10 +23,13 @@ pub fn tab_button(
         .font_family(FONT_PIXEL_ALT)
         .text_size(px(13.))
         .when(active, |d| {
-            d.bg(rgb(CTA)).text_color(rgb(BG_INPUT)).font_weight(FontWeight::BOLD)
+            d.bg(rgb(CTA))
+                .text_color(rgb(BG_INPUT))
+                .font_weight(FontWeight::BOLD)
         })
         .when(!active, |d| {
-            d.text_color(rgb(TEXT_MUTED)).hover(|s| s.bg(rgba(0xffffff10)))
+            d.text_color(rgb(TEXT_MUTED))
+                .hover(|s| s.bg(rgba(0xffffff10)))
         })
         .child(label.to_string())
         .on_click(on_click)

@@ -13,14 +13,29 @@ use std::time::Duration;
 #[serde(tag = "op", content = "args", rename_all = "snake_case")]
 pub enum Op {
     /// `start` | `stop` | `restart` | `kill`.
-    Power { action: String },
+    Power {
+        action: String,
+    },
     /// Строка в консоль сервера, как если бы её набрали руками.
-    Command { line: String },
-    FsList { path: String },
-    FsRead { path: String },
-    FsWrite { path: String, content: String },
-    FsDelete { path: String },
-    FsMkdir { path: String },
+    Command {
+        line: String,
+    },
+    FsList {
+        path: String,
+    },
+    FsRead {
+        path: String,
+    },
+    FsWrite {
+        path: String,
+        content: String,
+    },
+    FsDelete {
+        path: String,
+    },
+    FsMkdir {
+        path: String,
+    },
     /// Файл качается враппером из стора мастера и кладётся в `dir`. Списка
     /// установленного отдельной операцией нет: каталог модов читается обычным
     /// `FsList`, а имя каталога мастер знает из платформы в hello.
@@ -30,10 +45,16 @@ pub enum Op {
         filename: String,
         dir: String,
     },
-    BackupCreate { name: String },
+    BackupCreate {
+        name: String,
+    },
     BackupList,
-    BackupRestore { name: String },
-    BackupDelete { name: String },
+    BackupRestore {
+        name: String,
+    },
+    BackupDelete {
+        name: String,
+    },
 }
 
 impl Op {

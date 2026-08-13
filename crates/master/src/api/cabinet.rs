@@ -132,9 +132,14 @@ pub async fn upload_skin_from_username(
         return Err(AppError::BadRequest("Skin for player not found".into()));
     }
 
-    let data = resp.bytes().await.map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let data = resp
+        .bytes()
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
     if data.len() < 8 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
-        return Err(AppError::BadRequest("Downloaded skin is not a valid PNG".into()));
+        return Err(AppError::BadRequest(
+            "Downloaded skin is not a valid PNG".into(),
+        ));
     }
 
     let stored = state
@@ -144,14 +149,13 @@ pub async fn upload_skin_from_username(
         .map_err(AppError::Other)?;
     let skin_url = state.config.file_url(&stored.sha1);
     crate::db::set_skin(&state.db, user.user_id, Some(&skin_url)).await?;
-    let _ = sqlx::query(
-        "INSERT INTO user_skin_presets (user_id, name, skin_url) VALUES ($1, $2, $3)",
-    )
-    .bind(user.user_id)
-    .bind(username)
-    .bind(&skin_url)
-    .execute(&state.db)
-    .await;
+    let _ =
+        sqlx::query("INSERT INTO user_skin_presets (user_id, name, skin_url) VALUES ($1, $2, $3)")
+            .bind(user.user_id)
+            .bind(username)
+            .bind(&skin_url)
+            .execute(&state.db)
+            .await;
 
     let profile = crate::db::load_profile(&state.db, user.user_id).await?;
     state.ws.send_to_user(
@@ -171,7 +175,9 @@ pub async fn list_capes(
     if is_admin {
         Ok(Json(crate::db::list_capes(&state.db).await?))
     } else {
-        Ok(Json(crate::db::list_capes_for_user(&state.db, user.user_id).await?))
+        Ok(Json(
+            crate::db::list_capes_for_user(&state.db, user.user_id).await?,
+        ))
     }
 }
 
@@ -184,9 +190,12 @@ pub async fn set_cape(
     let cape_url = match req.cape_id {
         Some(cape_id) => {
             if !is_admin {
-                let allowed_ids = crate::db::list_user_granted_cape_ids(&state.db, user.user_id).await?;
+                let allowed_ids =
+                    crate::db::list_user_granted_cape_ids(&state.db, user.user_id).await?;
                 if !allowed_ids.contains(&cape_id) {
-                    return Err(AppError::Forbidden("access to this cape is not granted".into()));
+                    return Err(AppError::Forbidden(
+                        "access to this cape is not granted".into(),
+                    ));
                 }
             }
             Some(
@@ -265,15 +274,13 @@ pub async fn rename_skin_preset(
     axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
     Json(req): Json<RenameSkinPresetReq>,
 ) -> AppResult<Json<()>> {
-    sqlx::query(
-        "UPDATE user_skin_presets SET name = $1 WHERE id = $2 AND user_id = $3",
-    )
-    .bind(&req.name)
-    .bind(id)
-    .bind(user.user_id)
-    .execute(&state.db)
-    .await
-    .map_err(|e| AppError::Other(e.into()))?;
+    sqlx::query("UPDATE user_skin_presets SET name = $1 WHERE id = $2 AND user_id = $3")
+        .bind(&req.name)
+        .bind(id)
+        .bind(user.user_id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| AppError::Other(e.into()))?;
 
     Ok(Json(()))
 }
@@ -283,14 +290,12 @@ pub async fn delete_skin_preset(
     user: AuthUser,
     axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
 ) -> AppResult<Json<()>> {
-    sqlx::query(
-        "DELETE FROM user_skin_presets WHERE id = $1 AND user_id = $2",
-    )
-    .bind(id)
-    .bind(user.user_id)
-    .execute(&state.db)
-    .await
-    .map_err(|e| AppError::Other(e.into()))?;
+    sqlx::query("DELETE FROM user_skin_presets WHERE id = $1 AND user_id = $2")
+        .bind(id)
+        .bind(user.user_id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| AppError::Other(e.into()))?;
 
     Ok(Json(()))
 }

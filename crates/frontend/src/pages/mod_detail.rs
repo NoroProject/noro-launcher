@@ -16,7 +16,10 @@ use uuid::Uuid;
 
 pub fn view(ui: &mut LauncherUI, server_id: Uuid, hit: CatalogHitInfo, cx: &mut Cx) -> AnyElement {
     let project = ui.mod_project.clone();
-    let shots = project.as_ref().map(|p| p.gallery.clone()).unwrap_or_default();
+    let shots = project
+        .as_ref()
+        .map(|p| p.gallery.clone())
+        .unwrap_or_default();
     for url in &shots {
         ui.ensure_optional_mod_icon_loaded(Some(url.clone()), cx);
     }

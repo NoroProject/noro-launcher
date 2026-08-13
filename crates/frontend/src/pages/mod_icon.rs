@@ -134,7 +134,8 @@ pub fn is_mod_installed(ui: &LauncherUI, server_id: uuid::Uuid, hit_title: &str)
                 .filter(|c| c.is_alphanumeric())
                 .collect::<String>()
                 .to_lowercase();
-            !clean_name.is_empty() && (clean_title.contains(&clean_name) || clean_name.contains(&clean_title))
+            !clean_name.is_empty()
+                && (clean_title.contains(&clean_name) || clean_name.contains(&clean_title))
         }) {
             return true;
         }

@@ -32,7 +32,11 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .mod_catalog_hits
         .iter()
         .filter_map(|h| h.icon_url.clone())
-        .chain(ui.mod_catalog_selected.iter().filter_map(|s| s.icon_url.clone()))
+        .chain(
+            ui.mod_catalog_selected
+                .iter()
+                .filter_map(|s| s.icon_url.clone()),
+        )
         .collect();
     for url in icon_urls {
         ui.ensure_optional_mod_icon_loaded(Some(url), cx);
@@ -169,10 +173,18 @@ fn mod_catalog_grid(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyEle
 fn pagination_controls(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let total = ui.mod_catalog_total;
     let offset = ui.mod_catalog_offset;
-    let limit = if ui.mod_catalog_limit == 0 { 20 } else { ui.mod_catalog_limit };
+    let limit = if ui.mod_catalog_limit == 0 {
+        20
+    } else {
+        ui.mod_catalog_limit
+    };
 
     let current_page = (offset / limit) + 1;
-    let total_pages = if total == 0 { 1 } else { (total + limit - 1) / limit };
+    let total_pages = if total == 0 {
+        1
+    } else {
+        (total + limit - 1) / limit
+    };
 
     let server = ui.servers.iter().find(|s| s.id == server_id);
     let mc_ver = server.map(|s| s.mc_version.clone());
@@ -199,59 +211,49 @@ fn pagination_controls(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElem
         .justify_between()
         .px(px(8.))
         .py(px(4.))
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap(px(8.))
-                .when(has_prev, |d| {
-                    d.child(btn(
-                        "prev-page-btn",
-                        "< Prev",
-                        false,
-                        cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                            this.backend.send(MessageToBackend::SearchCatalog {
-                                query: "".to_string(),
-                                provider: prov_prev.clone(),
-                                mc_version: mc_prev.clone(),
-                                loader: ldr_prev.clone(),
-                                offset: prev_offset,
-                            });
-                            cx.notify();
-                        }),
-                    ))
+        .child(div().flex().items_center().gap(px(8.)).when(has_prev, |d| {
+            d.child(btn(
+                "prev-page-btn",
+                "< Prev",
+                false,
+                cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.backend.send(MessageToBackend::SearchCatalog {
+                        query: "".to_string(),
+                        provider: prov_prev.clone(),
+                        mc_version: mc_prev.clone(),
+                        loader: ldr_prev.clone(),
+                        offset: prev_offset,
+                    });
+                    cx.notify();
                 }),
-        )
+            ))
+        }))
         .child(
             div()
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(13.))
                 .text_color(rgb(TEXT_MUTED))
-                .child(format!("Page {current_page} of {total_pages} ({total} mods)")),
+                .child(format!(
+                    "Page {current_page} of {total_pages} ({total} mods)"
+                )),
         )
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap(px(8.))
-                .when(has_next, |d| {
-                    d.child(btn(
-                        "next-page-btn",
-                        "Next >",
-                        false,
-                        cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                            this.backend.send(MessageToBackend::SearchCatalog {
-                                query: "".to_string(),
-                                provider: prov_next.clone(),
-                                mc_version: mc_next.clone(),
-                                loader: ldr_next.clone(),
-                                offset: next_offset,
-                            });
-                            cx.notify();
-                        }),
-                    ))
+        .child(div().flex().items_center().gap(px(8.)).when(has_next, |d| {
+            d.child(btn(
+                "next-page-btn",
+                "Next >",
+                false,
+                cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.backend.send(MessageToBackend::SearchCatalog {
+                        query: "".to_string(),
+                        provider: prov_next.clone(),
+                        mc_version: mc_next.clone(),
+                        loader: ldr_next.clone(),
+                        offset: next_offset,
+                    });
+                    cx.notify();
                 }),
-        )
+            ))
+        }))
         .into_any_element()
 }
 
@@ -304,39 +306,41 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                     focus_handle_click.focus(window, cx);
                     cx.notify();
                 }))
-                .on_key_down(cx.listener(move |this, event: &gpui::KeyDownEvent, _w, cx| {
-                    let keystroke = &event.keystroke;
-                    match keystroke.key.as_str() {
-                        "backspace" => {
-                            this.mod_catalog_query.pop();
-                        }
-                        "enter" => {
-                            let q = this.mod_catalog_query.trim().to_string();
-                            let prov = this.mod_catalog_provider.clone();
-                            let mc = mc_for_enter.clone();
-                            let ldr = ldr_for_enter.clone();
-                            this.mod_catalog_offset = 0;
-                            this.backend.send(MessageToBackend::SearchCatalog {
-                                query: q,
-                                provider: prov,
-                                mc_version: mc,
-                                loader: ldr,
-                                offset: 0,
-                            });
-                        }
-                        "space" => {
-                            this.mod_catalog_query.push(' ');
-                        }
-                        // key_char уже учитывает shift и раскладку, а при cmd/ctrl он
-                        // пустой — так что горячие клавиши не сыплются в строку поиска.
-                        _ => {
-                            if let Some(ch) = keystroke.key_char.as_deref() {
-                                this.mod_catalog_query.push_str(ch);
+                .on_key_down(
+                    cx.listener(move |this, event: &gpui::KeyDownEvent, _w, cx| {
+                        let keystroke = &event.keystroke;
+                        match keystroke.key.as_str() {
+                            "backspace" => {
+                                this.mod_catalog_query.pop();
+                            }
+                            "enter" => {
+                                let q = this.mod_catalog_query.trim().to_string();
+                                let prov = this.mod_catalog_provider.clone();
+                                let mc = mc_for_enter.clone();
+                                let ldr = ldr_for_enter.clone();
+                                this.mod_catalog_offset = 0;
+                                this.backend.send(MessageToBackend::SearchCatalog {
+                                    query: q,
+                                    provider: prov,
+                                    mc_version: mc,
+                                    loader: ldr,
+                                    offset: 0,
+                                });
+                            }
+                            "space" => {
+                                this.mod_catalog_query.push(' ');
+                            }
+                            // key_char уже учитывает shift и раскладку, а при cmd/ctrl он
+                            // пустой — так что горячие клавиши не сыплются в строку поиска.
+                            _ => {
+                                if let Some(ch) = keystroke.key_char.as_deref() {
+                                    this.mod_catalog_query.push_str(ch);
+                                }
                             }
                         }
-                    }
-                    cx.notify();
-                }))
+                        cx.notify();
+                    }),
+                )
                 .child(ic("search", 16., TEXT_MUTED))
                 .child(
                     div()
@@ -492,7 +496,9 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
         .gap(px(16.))
         .child(
             div()
-                .id(SharedString::from(format!("mod-card-info-{project_id_str}")))
+                .id(SharedString::from(format!(
+                    "mod-card-info-{project_id_str}"
+                )))
                 .flex_1()
                 .min_w_0()
                 .flex()

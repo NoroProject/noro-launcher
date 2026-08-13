@@ -10,8 +10,12 @@ pub struct V3 {
 }
 
 impl V3 {
-    pub const fn new(x: f64, y: f64, z: f64) -> Self { Self { x, y, z } }
-    pub fn dot(&self, other: V3) -> f64 { self.x * other.x + self.y * other.y + self.z * other.z }
+    pub const fn new(x: f64, y: f64, z: f64) -> Self {
+        Self { x, y, z }
+    }
+    pub fn dot(&self, other: V3) -> f64 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
 }
 
 pub struct Mat3(pub [[f64; 3]; 3]);
@@ -20,7 +24,11 @@ impl Mat3 {
     pub fn rotation_yx(ry: f64, rx: f64) -> Self {
         let (sy, cy) = ry.sin_cos();
         let (sx, cx) = rx.sin_cos();
-        Self([[cy, 0.0, sy], [sx * sy, cx, -sx * cy], [-cx * sy, sx, cx * cy]])
+        Self([
+            [cy, 0.0, sy],
+            [sx * sy, cx, -sx * cy],
+            [-cx * sy, sx, cx * cy],
+        ])
     }
 
     pub fn transform(&self, v: V3) -> V3 {
@@ -72,8 +80,12 @@ pub fn rasterize_quad_highres(
 
     let sx_min = ((cx + min_x * res_mult) - 2.0).floor().max(0.0) as u32;
     let sx_max = ((cx + max_x * res_mult) + 2.0).ceil().min(cw as f64 - 1.0) as u32;
-    let sy_min = ((cy - (max_y - center_y) * res_mult) - 2.0).floor().max(0.0) as u32;
-    let sy_max = ((cy - (min_y - center_y) * res_mult) + 2.0).ceil().min(ch as f64 - 1.0) as u32;
+    let sy_min = ((cy - (max_y - center_y) * res_mult) - 2.0)
+        .floor()
+        .max(0.0) as u32;
+    let sy_max = ((cy - (min_y - center_y) * res_mult) + 2.0)
+        .ceil()
+        .min(ch as f64 - 1.0) as u32;
 
     let z_bias = if quad.is_overlay { 0.08 } else { 0.0 };
 
@@ -85,10 +97,14 @@ pub fn rasterize_quad_highres(
             if let Some((u, v, z_depth)) = sample_barycentric(wx, wy, &tv, &quad.uvs) {
                 let skin_x = u.floor().max(0.0) as u32;
                 let skin_y = v.floor().max(0.0) as u32;
-                if skin_x >= skin.width() || skin_y >= skin.height() { continue; }
+                if skin_x >= skin.width() || skin_y >= skin.height() {
+                    continue;
+                }
 
                 let col = skin.get_pixel(skin_x, skin_y);
-                if col[3] == 0 { continue; }
+                if col[3] == 0 {
+                    continue;
+                }
 
                 let idx = (py * cw + px) as usize;
                 let effective_z = z_depth + z_bias;
@@ -104,16 +120,36 @@ pub fn rasterize_quad_highres(
     }
 }
 
-fn sample_barycentric(x: f64, y: f64, verts: &[V3; 4], uvs: &[(f64, f64); 4]) -> Option<(f64, f64, f64)> {
-    if let Some((u, v, z)) = tri_bary(x, y, &verts[0], &verts[1], &verts[2], &uvs[0], &uvs[1], &uvs[2]) {
+fn sample_barycentric(
+    x: f64,
+    y: f64,
+    verts: &[V3; 4],
+    uvs: &[(f64, f64); 4],
+) -> Option<(f64, f64, f64)> {
+    if let Some((u, v, z)) = tri_bary(
+        x, y, &verts[0], &verts[1], &verts[2], &uvs[0], &uvs[1], &uvs[2],
+    ) {
         return Some((u, v, z));
     }
-    tri_bary(x, y, &verts[0], &verts[2], &verts[3], &uvs[0], &uvs[2], &uvs[3])
+    tri_bary(
+        x, y, &verts[0], &verts[2], &verts[3], &uvs[0], &uvs[2], &uvs[3],
+    )
 }
 
-fn tri_bary(x: f64, y: f64, p0: &V3, p1: &V3, p2: &V3, u0: &(f64, f64), u1: &(f64, f64), u2: &(f64, f64)) -> Option<(f64, f64, f64)> {
+fn tri_bary(
+    x: f64,
+    y: f64,
+    p0: &V3,
+    p1: &V3,
+    p2: &V3,
+    u0: &(f64, f64),
+    u1: &(f64, f64),
+    u2: &(f64, f64),
+) -> Option<(f64, f64, f64)> {
     let den = (p1.y - p2.y) * (p0.x - p2.x) + (p2.x - p1.x) * (p0.y - p2.y);
-    if den.abs() < 1e-6 { return None; }
+    if den.abs() < 1e-6 {
+        return None;
+    }
     let w0 = ((p1.y - p2.y) * (x - p2.x) + (p2.x - p1.x) * (y - p2.y)) / den;
     let w1 = ((p2.y - p0.y) * (x - p2.x) + (p0.x - p2.x) * (y - p2.y)) / den;
     let w2 = 1.0 - w0 - w1;

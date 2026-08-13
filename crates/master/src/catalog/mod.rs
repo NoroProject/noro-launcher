@@ -162,7 +162,14 @@ pub async fn source_for_project(
     modloader: &str,
 ) -> AppResult<ModSource> {
     let provider = provider_of(provider_name)?;
-    let vers = versions(state, provider, project_id, Some(mc_version), Some(modloader)).await?;
+    let vers = versions(
+        state,
+        provider,
+        project_id,
+        Some(mc_version),
+        Some(modloader),
+    )
+    .await?;
     let ver = vers
         .first()
         .ok_or_else(|| AppError::BadRequest("нет совместимых версий".into()))?;

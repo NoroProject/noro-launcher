@@ -40,7 +40,9 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 }),
         )
         .when(ui.skin_dragging, |d| d.child(skin_drag::drag_overlay(cx)))
-        .when(ui.cape_selector_open, |d| d.child(super::profile_cape::cape_modal(ui, cx)))
+        .when(ui.cape_selector_open, |d| {
+            d.child(super::profile_cape::cape_modal(ui, cx))
+        })
         .into_any_element()
 }
 
@@ -91,20 +93,39 @@ fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()
         .flex()
         .gap(px(8.))
-        .child(sub_tab_button("tab-main", "ОСНОВНАЯ", current == ProfileTab::Overview, |this, cx| {
-            this.profile_tab = ProfileTab::Overview;
-            cx.notify();
-        }, cx))
-        .child(sub_tab_button("tab-capes", "ПЛАЩИ", current == ProfileTab::Capes, |this, cx| {
-            this.profile_tab = ProfileTab::Capes;
-            cx.notify();
-        }, cx))
-        .child(sub_tab_button("tab-presets", "ПРЕСЕТЫ", current == ProfileTab::Skins, |this, cx| {
-            this.profile_tab = ProfileTab::Skins;
-            this.load_preset_renders(cx);
-            this.backend.send(bridge::MessageToBackend::RequestSkinPresetsList);
-            cx.notify();
-        }, cx))
+        .child(sub_tab_button(
+            "tab-main",
+            "ОСНОВНАЯ",
+            current == ProfileTab::Overview,
+            |this, cx| {
+                this.profile_tab = ProfileTab::Overview;
+                cx.notify();
+            },
+            cx,
+        ))
+        .child(sub_tab_button(
+            "tab-capes",
+            "ПЛАЩИ",
+            current == ProfileTab::Capes,
+            |this, cx| {
+                this.profile_tab = ProfileTab::Capes;
+                cx.notify();
+            },
+            cx,
+        ))
+        .child(sub_tab_button(
+            "tab-presets",
+            "ПРЕСЕТЫ",
+            current == ProfileTab::Skins,
+            |this, cx| {
+                this.profile_tab = ProfileTab::Skins;
+                this.load_preset_renders(cx);
+                this.backend
+                    .send(bridge::MessageToBackend::RequestSkinPresetsList);
+                cx.notify();
+            },
+            cx,
+        ))
         .into_any_element()
 }
 
@@ -123,7 +144,11 @@ fn sub_tab_button(
         .items_center()
         .rounded(px(R_SM))
         .cursor_pointer()
-        .bg(if active { rgba(0xf3e7b3f0) } else { rgba(0x0f2036d8) })
+        .bg(if active {
+            rgba(0xf3e7b3f0)
+        } else {
+            rgba(0x0f2036d8)
+        })
         .border_1()
         .border_color(rgb(if active { CTA_HOV } else { BORDER }))
         .text_color(rgb(if active { ON_CTA } else { TEXT_SECONDARY }))

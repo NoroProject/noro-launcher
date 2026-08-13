@@ -20,9 +20,16 @@ pub fn extract_jar_metadata(jar_path: &Path) -> Option<ModMetadata> {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&json_bytes) {
             let mod_id = json.get("id").and_then(|v| v.as_str()).map(String::from);
             let name = json.get("name").and_then(|v| v.as_str()).map(String::from);
-            let version = json.get("version").and_then(|v| v.as_str()).map(String::from);
+            let version = json
+                .get("version")
+                .and_then(|v| v.as_str())
+                .map(String::from);
             if mod_id.is_some() || name.is_some() || version.is_some() {
-                return Some(ModMetadata { mod_id, name, version });
+                return Some(ModMetadata {
+                    mod_id,
+                    name,
+                    version,
+                });
             }
         }
     }
@@ -30,11 +37,24 @@ pub fn extract_jar_metadata(jar_path: &Path) -> Option<ModMetadata> {
     if let Some((_, json_bytes)) = read_entry(&mut zip, "quilt.mod.json") {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&json_bytes) {
             let meta = json.pointer("/quilt_loader/metadata");
-            let mod_id = meta.and_then(|m| m.get("id")).and_then(|v| v.as_str()).map(String::from);
-            let name = meta.and_then(|m| m.get("name")).and_then(|v| v.as_str()).map(String::from);
-            let version = meta.and_then(|m| m.get("version")).and_then(|v| v.as_str()).map(String::from);
+            let mod_id = meta
+                .and_then(|m| m.get("id"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let name = meta
+                .and_then(|m| m.get("name"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let version = meta
+                .and_then(|m| m.get("version"))
+                .and_then(|v| v.as_str())
+                .map(String::from);
             if mod_id.is_some() || name.is_some() || version.is_some() {
-                return Some(ModMetadata { mod_id, name, version });
+                return Some(ModMetadata {
+                    mod_id,
+                    name,
+                    version,
+                });
             }
         }
     }
@@ -49,15 +69,17 @@ pub fn extract_jar_metadata(jar_path: &Path) -> Option<ModMetadata> {
                 for line in content.lines() {
                     let trimmed = line.trim();
                     if trimmed.starts_with("modId") && mod_id.is_none() {
-                        if let Some(val) = trimmed.splitn(2, '=').nth(1) {
-                            mod_id = Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
+                        if let Some(val) = trimmed.split_once('=').map(|x| x.1) {
+                            mod_id =
+                                Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
                         }
                     } else if trimmed.starts_with("displayName") && name.is_none() {
-                        if let Some(val) = trimmed.splitn(2, '=').nth(1) {
-                            name = Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
+                        if let Some(val) = trimmed.split_once('=').map(|x| x.1) {
+                            name =
+                                Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
                         }
                     } else if trimmed.starts_with("version") && version.is_none() {
-                        if let Some(val) = trimmed.splitn(2, '=').nth(1) {
+                        if let Some(val) = trimmed.split_once('=').map(|x| x.1) {
                             let v = val.trim().trim_matches('"').trim_matches('\'').to_string();
                             if v != "${file.jarVersion}" {
                                 version = Some(v);
@@ -66,7 +88,11 @@ pub fn extract_jar_metadata(jar_path: &Path) -> Option<ModMetadata> {
                     }
                 }
                 if mod_id.is_some() || name.is_some() || version.is_some() {
-                    return Some(ModMetadata { mod_id, name, version });
+                    return Some(ModMetadata {
+                        mod_id,
+                        name,
+                        version,
+                    });
                 }
             }
         }
@@ -124,7 +150,10 @@ fn try_quilt<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Option<(String, Vec<u8>
     read_entry(zip, icon_path)
 }
 
-fn try_forge_toml<R: Read + Seek>(zip: &mut ZipArchive<R>, entry: &str) -> Option<(String, Vec<u8>)> {
+fn try_forge_toml<R: Read + Seek>(
+    zip: &mut ZipArchive<R>,
+    entry: &str,
+) -> Option<(String, Vec<u8>)> {
     let (_, toml_bytes) = read_entry(zip, entry)?;
     let content = std::str::from_utf8(&toml_bytes).ok()?;
 
@@ -135,7 +164,7 @@ fn try_forge_toml<R: Read + Seek>(zip: &mut ZipArchive<R>, entry: &str) -> Optio
             || trimmed.starts_with("icon")
             || trimmed.starts_with("iconFile")
         {
-            if let Some(val) = trimmed.splitn(2, '=').nth(1) {
+            if let Some(val) = trimmed.split_once('=').map(|x| x.1) {
                 let logo = val.trim().trim_matches('"').trim_matches('\'');
                 if !logo.is_empty() {
                     if let Some(res) = read_entry(zip, logo) {
@@ -168,7 +197,9 @@ fn try_common_paths<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Option<(String, 
     for i in 0..zip.len() {
         if let Ok(file) = zip.by_index(i) {
             let name = file.name().to_lowercase();
-            if (name.ends_with("icon.png") || name.ends_with("logo.png")) && !name.contains("__macosx") {
+            if (name.ends_with("icon.png") || name.ends_with("logo.png"))
+                && !name.contains("__macosx")
+            {
                 found_index = Some(i);
                 break;
             }

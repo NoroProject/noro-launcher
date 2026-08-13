@@ -48,7 +48,10 @@ pub async fn serve_file(
     let filename = download.name.as_deref().and_then(safe_filename);
 
     let mut magic = [0u8; 8];
-    let content_type = if total >= 8 && file.read_exact(&mut magic).await.is_ok() && &magic[0..8] == b"\x89PNG\r\n\x1a\n" {
+    let content_type = if total >= 8
+        && file.read_exact(&mut magic).await.is_ok()
+        && &magic[0..8] == b"\x89PNG\r\n\x1a\n"
+    {
         "image/png"
     } else {
         "application/octet-stream"

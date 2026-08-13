@@ -92,7 +92,8 @@ pub async fn approve_suggestion(
 
     if let Some(bid) = build_id {
         if let Some(build) = crate::db::get_build(&state.db, bid).await? {
-            let mut opts: Vec<OptionalMod> = serde_json::from_value(build.optional_mods.clone()).unwrap_or_default();
+            let mut opts: Vec<OptionalMod> =
+                serde_json::from_value(build.optional_mods.clone()).unwrap_or_default();
 
             if !opts.iter().any(|m| m.name == suggestion.title) {
                 opts.push(OptionalMod {
@@ -176,7 +177,13 @@ pub async fn accept_suggestion(
     let path = format!("mods/{}", resolved.filename);
 
     crate::db::upsert_build_file(
-        &state.db, bid, &path, &resolved.sha1, resolved.size as i64, "both", "mod",
+        &state.db,
+        bid,
+        &path,
+        &resolved.sha1,
+        resolved.size as i64,
+        "both",
+        "mod",
     )
     .await?;
 

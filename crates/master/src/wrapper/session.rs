@@ -88,7 +88,12 @@ async fn session(socket: WebSocket, state: AppState, game_server_id: Uuid, name:
 /// лаунчере всё это время была бы серой. Как только сервер готов — замолкаем:
 /// дальше heartbeat шлёт агент, и он знает настоящий онлайн, а наши нули его
 /// затирали бы.
-fn on_status(state: &AppState, game_server_id: Uuid, conn: &super::hub::Conn, status: WrapperStatus) {
+fn on_status(
+    state: &AppState,
+    game_server_id: Uuid,
+    conn: &super::hub::Conn,
+    status: WrapperStatus,
+) {
     let was_ready = conn.state().status.ready;
     conn.set_status(status.clone());
 
@@ -101,7 +106,9 @@ fn on_status(state: &AppState, game_server_id: Uuid, conn: &super::hub::Conn, st
     let state = state.clone();
     tokio::spawn(async move {
         if booting {
-            if let Err(e) = crate::db::touch_game_server(&state.db, game_server_id, 0, 0, None).await {
+            if let Err(e) =
+                crate::db::touch_game_server(&state.db, game_server_id, 0, 0, None).await
+            {
                 tracing::warn!(error = %e, "не удалось отметить загрузку сервера");
             }
         }
@@ -111,9 +118,7 @@ fn on_status(state: &AppState, game_server_id: Uuid, conn: &super::hub::Conn, st
     });
 }
 
-async fn next_message(
-    stream: &mut futures_util::stream::SplitStream<WebSocket>,
-) -> Option<String> {
+async fn next_message(stream: &mut futures_util::stream::SplitStream<WebSocket>) -> Option<String> {
     while let Some(Ok(message)) = stream.next().await {
         match message {
             Message::Text(text) => return Some(text.to_string()),

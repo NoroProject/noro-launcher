@@ -59,9 +59,14 @@ pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(tab(
             "tab-game",
             t("nav-game"),
-            matches!(page, crate::state::Page::Servers | crate::state::Page::ServerDetail(_)),
+            matches!(
+                page,
+                crate::state::Page::Servers | crate::state::Page::ServerDetail(_)
+            ),
             move |this, cx| {
-                this.page = sid.map(crate::state::Page::ServerDetail).unwrap_or(crate::state::Page::Servers);
+                this.page = sid
+                    .map(crate::state::Page::ServerDetail)
+                    .unwrap_or(crate::state::Page::Servers);
                 cx.notify();
             },
             cx,
@@ -110,7 +115,11 @@ fn tab(
         .items_center()
         .rounded(px(R_SM))
         .cursor_pointer()
-        .bg(if active { rgba(0xf3e7b3f0) } else { rgba(0x0f2036d8) })
+        .bg(if active {
+            rgba(0xf3e7b3f0)
+        } else {
+            rgba(0x0f2036d8)
+        })
         .border_1()
         .border_color(rgb(if active { CTA_HOV } else { BORDER }))
         .text_color(rgb(if active { ON_CTA } else { TEXT_SECONDARY }))
@@ -123,7 +132,10 @@ fn tab(
 }
 
 pub fn initial(name: &str) -> String {
-    name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_else(|| "?".into())
+    name.chars()
+        .next()
+        .map(|c| c.to_uppercase().to_string())
+        .unwrap_or_else(|| "?".into())
 }
 
 pub fn parse_hex(c: &str) -> u32 {
@@ -135,6 +147,10 @@ pub fn progress_label(s: &crate::state::SyncUiState) -> String {
     if total == 0 {
         String::new()
     } else {
-        format!("{:.0} / {:.0} MB", s.done() as f64 / 1_048_576.0, total as f64 / 1_048_576.0)
+        format!(
+            "{:.0} / {:.0} MB",
+            s.done() as f64 / 1_048_576.0,
+            total as f64 / 1_048_576.0
+        )
     }
 }

@@ -73,9 +73,7 @@ async fn connection_loop(
                 if let Some(t) = auth_token {
                     let _ = sink
                         .send(Message::Text(
-                            ClientWsMsg::Authenticate { access_token: t }
-                                .to_json()
-                                .into(),
+                            ClientWsMsg::Authenticate { access_token: t }.to_json(),
                         ))
                         .await;
                 }
@@ -85,7 +83,7 @@ async fn connection_loop(
                         out = out_rx.recv() => {
                             match out {
                                 Some(msg) => {
-                                    if sink.send(Message::Text(msg.to_json().into())).await.is_err() {
+                                    if sink.send(Message::Text(msg.to_json())).await.is_err() {
                                         break;
                                     }
                                 }

@@ -101,17 +101,15 @@ pub fn sync_overlay(server_id: Uuid, sync: &SyncUiState, cx: &mut Cx) -> AnyElem
                                     .text_color(rgb(ERROR))
                                     .child(format!("Error: {e}")),
                             )
-                            .child(
-                                cta_button(
-                                    "sync-retry-btn",
-                                    Some("rotate-ccw"),
-                                    t("retry"),
-                                    cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                                        this.launch(server_id);
-                                        cx.notify();
-                                    }),
-                                ),
-                            ),
+                            .child(cta_button(
+                                "sync-retry-btn",
+                                Some("rotate-ccw"),
+                                t("retry"),
+                                cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                                    this.launch(server_id);
+                                    cx.notify();
+                                }),
+                            )),
                     )
                 }),
         )

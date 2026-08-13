@@ -50,10 +50,7 @@ fn os_matches(os: Option<&schema::ManifestRuleOs>) -> bool {
     };
     let name_ok = os.name.as_deref().is_none_or(|n| n == os_name());
     let arch_ok = os.arch.as_deref().is_none_or(|a| a == arch());
-    let version_ok = os
-        .version
-        .as_deref()
-        .is_none_or(|pattern| version_matches(pattern));
+    let version_ok = os.version.as_deref().is_none_or(version_matches);
     name_ok && arch_ok && version_ok
 }
 

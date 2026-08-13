@@ -525,12 +525,20 @@ impl LauncherUI {
     }
 
     pub fn load_preset_renders(&mut self, cx: &mut Context<Self>) {
-        if self.preset_images.contains_key("steve") { return; }
+        if self.preset_images.contains_key("steve") {
+            return;
+        }
         let master_url = self.config.master_url.clone();
-        let presets = ["steve", "alex", "ari", "zuri", "efe", "makena", "kai", "sunny", "noor"];
+        let presets = [
+            "steve", "alex", "ari", "zuri", "efe", "makena", "kai", "sunny", "noor",
+        ];
         for preset in presets {
             let name = preset.to_string();
-            let url = format!("{}/api/textures/renders/bust?preset={}&scale=8&yaw=-25&pitch=12", master_url.trim_end_matches('/'), name);
+            let url = format!(
+                "{}/api/textures/renders/bust?preset={}&scale=8&yaw=-25&pitch=12",
+                master_url.trim_end_matches('/'),
+                name
+            );
             cx.spawn(async move |this, cx| {
                 if let Ok(img) = crate::image_loader::load_image_from_url(url).await {
                     let _ = this.update(cx, |this, cx| {
@@ -538,7 +546,8 @@ impl LauncherUI {
                         cx.notify();
                     });
                 }
-            }).detach();
+            })
+            .detach();
         }
     }
 
@@ -804,15 +813,21 @@ impl LauncherUI {
                 let master_url = self.config.master_url.clone();
                 for cape in capes {
                     let id = cape.id;
-                    let render_url = format!("{}/api/textures/renders/cape?url={}&scale=10", master_url.trim_end_matches('/'), cape.url);
+                    let render_url = format!(
+                        "{}/api/textures/renders/cape?url={}&scale=10",
+                        master_url.trim_end_matches('/'),
+                        cape.url
+                    );
                     cx.spawn(async move |this, cx| {
-                        if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await {
+                        if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await
+                        {
                             let _ = this.update(cx, |this, cx| {
                                 this.cape_images.insert(id, img);
                                 cx.notify();
                             });
                         }
-                    }).detach();
+                    })
+                    .detach();
                 }
             }
             MessageToFrontend::SkinPresetsList { presets } => {
@@ -833,26 +848,37 @@ impl LauncherUI {
                     let url_bytes = url.clone();
                     let id_bytes = id.clone();
                     cx.spawn(async move |this, cx| {
-                        if let Ok((_, bytes)) = crate::image_loader::load_image_and_bytes(url_bytes).await {
+                        if let Ok((_, bytes)) =
+                            crate::image_loader::load_image_and_bytes(url_bytes).await
+                        {
                             let _ = this.update(cx, |this, cx| {
-                                if let Some(found) = this.custom_presets.iter_mut().find(|cp| cp.id == id_bytes) {
+                                if let Some(found) =
+                                    this.custom_presets.iter_mut().find(|cp| cp.id == id_bytes)
+                                {
                                     found.bytes = bytes;
                                 }
                                 cx.notify();
                             });
                         }
-                    }).detach();
+                    })
+                    .detach();
 
-                    let render_url = format!("{}/api/textures/renders/bust?url={}&scale=8&yaw=-25&pitch=12", master_url.trim_end_matches('/'), urlencoding::encode(&url));
+                    let render_url = format!(
+                        "{}/api/textures/renders/bust?url={}&scale=8&yaw=-25&pitch=12",
+                        master_url.trim_end_matches('/'),
+                        urlencoding::encode(&url)
+                    );
                     let id_render = id.clone();
                     cx.spawn(async move |this, cx| {
-                        if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await {
+                        if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await
+                        {
                             let _ = this.update(cx, |this, cx| {
                                 this.preset_images.insert(id_render, img);
                                 cx.notify();
                             });
                         }
-                    }).detach();
+                    })
+                    .detach();
                 }
             }
             MessageToFrontend::ConnectionState { online } => {

@@ -25,7 +25,9 @@ pub async fn authorize_page(
     axum::extract::RawQuery(query): axum::extract::RawQuery,
 ) -> AppResult<impl IntoResponse> {
     let web_url = std::env::var("NORO_WEB_URL").unwrap_or_else(|_| {
-        if state.config.public_url.contains("127.0.0.1") || state.config.public_url.contains("localhost") {
+        if state.config.public_url.contains("127.0.0.1")
+            || state.config.public_url.contains("localhost")
+        {
             "http://localhost:3000".to_string()
         } else {
             "https://noro.dalynkaa.dev".to_string()
@@ -36,7 +38,11 @@ pub async fn authorize_page(
     let target = if query_str.is_empty() {
         format!("{}/oauth2/authorize", web_url.trim_end_matches('/'))
     } else {
-        format!("{}/oauth2/authorize?{}", web_url.trim_end_matches('/'), query_str)
+        format!(
+            "{}/oauth2/authorize?{}",
+            web_url.trim_end_matches('/'),
+            query_str
+        )
     };
 
     Ok(Redirect::temporary(&target))
@@ -61,10 +67,24 @@ pub async fn accept_authorize(
         .ok_or_else(|| AppError::BadRequest("Приложение не найдено".into()))?;
 
     crate::db::authorize_app_for_user(&state.db, user.user_id, app.id, &form.scopes).await?;
-    let code = crate::db::create_oauth_code(&state.db, user.user_id, app.id, &form.redirect_uri, &form.scopes).await?;
+    let code = crate::db::create_oauth_code(
+        &state.db,
+        user.user_id,
+        app.id,
+        &form.redirect_uri,
+        &form.scopes,
+    )
+    .await?;
 
-    let sep = if form.redirect_uri.contains('?') { '&' } else { '?' };
-    let redirect_target = format!("{}{}code={}&state={}", form.redirect_uri, sep, code, form.state);
+    let sep = if form.redirect_uri.contains('?') {
+        '&'
+    } else {
+        '?'
+    };
+    let redirect_target = format!(
+        "{}{}code={}&state={}",
+        form.redirect_uri, sep, code, form.state
+    );
 
     Ok(Json(json!({
         "redirect": redirect_target,
@@ -86,7 +106,9 @@ pub async fn token_endpoint(
     Json(req): Json<TokenReq>,
 ) -> AppResult<Json<Value>> {
     if req.grant_type != "authorization_code" {
-        return Err(AppError::BadRequest("Поддерживается только grant_type=authorization_code".into()));
+        return Err(AppError::BadRequest(
+            "Поддерживается только grant_type=authorization_code".into(),
+        ));
     }
 
     let Some(code) = req.code else {
@@ -97,7 +119,8 @@ pub async fn token_endpoint(
         .await?
         .ok_or_else(|| AppError::Unauthorized("Код авторизации недействителен или истёк".into()))?;
 
-    let session = crate::db::create_session(&state.db, user_id, &scopes, chrono::Duration::days(30)).await?;
+    let session =
+        crate::db::create_session(&state.db, user_id, &scopes, chrono::Duration::days(30)).await?;
     let profile = crate::db::load_profile(&state.db, user_id).await?;
 
     Ok(Json(json!({

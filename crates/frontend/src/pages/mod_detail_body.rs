@@ -43,7 +43,11 @@ pub(super) fn html_to_text(html: &str) -> String {
             }
             '>' => {
                 in_tag = false;
-                let name = tag.trim_start_matches('/').split_whitespace().next().unwrap_or("");
+                let name = tag
+                    .trim_start_matches('/')
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("");
                 if matches!(name, "p" | "br" | "div" | "li" | "h1" | "h2" | "h3" | "tr") {
                     out.push('\n');
                 }

@@ -52,7 +52,10 @@ pub fn router() -> Router<AppState> {
             "/api/admin/builds/{id}/files/content",
             get(builds::get_file_content).put(builds::update_file_content),
         )
-        .route("/api/admin/builds/{id}/files/icon", get(builds::get_file_icon))
+        .route(
+            "/api/admin/builds/{id}/files/icon",
+            get(builds::get_file_icon),
+        )
         .route(
             "/api/admin/builds/{id}/files/prefix",
             delete(builds::delete_files_by_prefix),

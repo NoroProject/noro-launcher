@@ -42,8 +42,8 @@ pub fn spawn_discord_rpc() -> DiscordRpc {
     let (tx, mut rx) = mpsc::unbounded_channel::<DiscordRpcState>();
 
     tokio::spawn(async move {
-        let app_id = std::env::var("DISCORD_APP_ID")
-            .unwrap_or_else(|_| DEFAULT_DISCORD_APP_ID.to_string());
+        let app_id =
+            std::env::var("DISCORD_APP_ID").unwrap_or_else(|_| DEFAULT_DISCORD_APP_ID.to_string());
 
         let mut client: Option<DiscordIpcClient> = None;
         let mut connected = false;

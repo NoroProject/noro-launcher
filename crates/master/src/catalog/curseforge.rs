@@ -1,9 +1,9 @@
 //! Запросы к CurseForge. Без `CURSEFORGE_API_KEY` провайдер просто выключен.
 
+use super::curseforge_ids::{class_id, loader_type, sort_field};
 use super::json::{items, num};
 use super::query::{SearchPage, SearchQuery};
 use super::types::{Category, ModProject, ModVersion};
-use super::curseforge_ids::{class_id, loader_type, sort_field};
 use super::{curseforge_map as map, fetch_json};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;

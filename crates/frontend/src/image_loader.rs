@@ -80,7 +80,10 @@ fn normalize_image_bytes(bytes: Vec<u8>, fallback_format: ImageFormat) -> (Image
     if let Ok(dyn_img) = image::load_from_memory(&bytes) {
         let mut png_bytes = Vec::new();
         if dyn_img
-            .write_to(&mut std::io::Cursor::new(&mut png_bytes), image::ImageFormat::Png)
+            .write_to(
+                &mut std::io::Cursor::new(&mut png_bytes),
+                image::ImageFormat::Png,
+            )
             .is_ok()
         {
             return (ImageFormat::Png, png_bytes);

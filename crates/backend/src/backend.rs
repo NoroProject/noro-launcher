@@ -531,7 +531,10 @@ pub fn spawn_sync_and_launch(
             .config
             .get()
             .launch_config_for_server(&server_id, &manifest.recommended_client_settings);
-        let server_name = server.as_ref().map(|s| s.name.clone()).unwrap_or_else(|| "Minecraft".into());
+        let server_name = server
+            .as_ref()
+            .map(|s| s.name.clone())
+            .unwrap_or_else(|| "Minecraft".into());
         let online = server.as_ref().and_then(|s| s.online);
         let max_online = server.as_ref().and_then(|s| s.max_online);
         match game_runner::launch(
@@ -582,10 +585,11 @@ async fn run_game_process(
         },
     );
 
-    ctx.rpc.update(crate::discord_rpc::DiscordRpcState::GameMenu {
-        server_name: server_name.clone(),
-        start_timestamp,
-    });
+    ctx.rpc
+        .update(crate::discord_rpc::DiscordRpcState::GameMenu {
+            server_name: server_name.clone(),
+            start_timestamp,
+        });
 
     ctx.send(MessageToFrontend::GameStarted { server_id });
     ctx.ws.send(ClientWsMsg::ReportGameStart { server_id });
@@ -597,13 +601,13 @@ async fn run_game_process(
             server_id,
             ctx.frontend.clone(),
             false,
-            Some((
-                ctx.rpc.clone(),
-                server_name.clone(),
+            Some(crate::log_reader::RpcLogContext {
+                rpc: ctx.rpc.clone(),
+                server_name: server_name.clone(),
                 start_timestamp,
-                online,
-                max_online,
-            )),
+                online_current: online,
+                online_max: max_online,
+            }),
         ));
     }
     if let Some(stderr) = child.stderr.take() {
@@ -634,7 +638,8 @@ async fn run_game_process(
     });
     ctx.send(MessageToFrontend::GameStopped { server_id, exit_ok });
 
-    ctx.rpc.update(crate::discord_rpc::DiscordRpcState::Launcher {
-        server_name: Some(server_name),
-    });
+    ctx.rpc
+        .update(crate::discord_rpc::DiscordRpcState::Launcher {
+            server_name: Some(server_name),
+        });
 }

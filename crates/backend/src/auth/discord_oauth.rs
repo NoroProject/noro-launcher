@@ -125,10 +125,7 @@ async fn exchange_oauth2(master_url: &str, code: &str) -> Result<LoginResult> {
         user: UserProfile,
     }
 
-    let url = format!(
-        "{}/oauth2/token",
-        master_url.trim_end_matches('/')
-    );
+    let url = format!("{}/oauth2/token", master_url.trim_end_matches('/'));
     let resp: TokenResp = reqwest::Client::new()
         .post(&url)
         .json(&serde_json::json!({

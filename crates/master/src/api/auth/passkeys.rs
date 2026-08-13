@@ -92,7 +92,9 @@ pub async fn register_verify(
         .ok_or_else(|| AppError::BadRequest("Срок действия испытания истёк".into()))?;
 
     if challenge_user != Some(user.user_id) {
-        return Err(AppError::Forbidden("Недействительный пользователь для испытания".into()));
+        return Err(AppError::Forbidden(
+            "Недействительный пользователь для испытания".into(),
+        ));
     }
 
     let passkey = crate::db::create_passkey(
@@ -164,7 +166,13 @@ pub async fn login_verify(
         .await?
         .ok_or_else(|| AppError::Unauthorized("Passkey не найден".into()))?;
 
-    let session = crate::db::create_session(&state.db, passkey.user_id, "master", chrono::Duration::days(30)).await?;
+    let session = crate::db::create_session(
+        &state.db,
+        passkey.user_id,
+        "master",
+        chrono::Duration::days(30),
+    )
+    .await?;
     let user_profile = crate::db::load_profile(&state.db, passkey.user_id).await?;
 
     Ok(Json(json!({
@@ -181,9 +189,7 @@ pub struct PasskeyLauncherQuery {
     pub port: u16,
 }
 
-pub async fn passkey_launcher_page(
-    Query(q): Query<PasskeyLauncherQuery>,
-) -> Html<String> {
+pub async fn passkey_launcher_page(Query(q): Query<PasskeyLauncherQuery>) -> Html<String> {
     let port = q.port;
     let html = format!(
         r#"<!doctype html>
@@ -284,7 +290,13 @@ pub async fn passkey_launcher_verify(
         .await?
         .ok_or_else(|| AppError::Unauthorized("Passkey не найден".into()))?;
 
-    let session = crate::db::create_session(&state.db, passkey.user_id, "launcher", chrono::Duration::days(30)).await?;
+    let session = crate::db::create_session(
+        &state.db,
+        passkey.user_id,
+        "launcher",
+        chrono::Duration::days(30),
+    )
+    .await?;
     let code = crate::db::create_launcher_code(&state.db, passkey.user_id, &session).await?;
 
     Ok(Json(json!({

@@ -33,43 +33,103 @@ pub fn build_quads(parts: &[BodyPart]) -> Vec<Quad> {
         let local_quads = [
             // Front (+Z)
             Quad {
-                verts: [V3::new(min.x, max.y, max.z), V3::new(max.x, max.y, max.z), V3::new(max.x, min.y, max.z), V3::new(min.x, min.y, max.z)],
-                uvs: [(tx + d, ty + d), (tx + d + w, ty + d), (tx + d + w, ty + d + h), (tx + d, ty + d + h)],
+                verts: [
+                    V3::new(min.x, max.y, max.z),
+                    V3::new(max.x, max.y, max.z),
+                    V3::new(max.x, min.y, max.z),
+                    V3::new(min.x, min.y, max.z),
+                ],
+                uvs: [
+                    (tx + d, ty + d),
+                    (tx + d + w, ty + d),
+                    (tx + d + w, ty + d + h),
+                    (tx + d, ty + d + h),
+                ],
                 normal: V3::new(0.0, 0.0, 1.0),
                 is_overlay: p.is_overlay,
             },
             // Back (-Z)
             Quad {
-                verts: [V3::new(max.x, max.y, min.z), V3::new(min.x, max.y, min.z), V3::new(min.x, min.y, min.z), V3::new(max.x, min.y, min.z)],
-                uvs: [(tx + 2.0*d + w, ty + d), (tx + 2.0*d + 2.0*w, ty + d), (tx + 2.0*d + 2.0*w, ty + d + h), (tx + 2.0*d + w, ty + d + h)],
+                verts: [
+                    V3::new(max.x, max.y, min.z),
+                    V3::new(min.x, max.y, min.z),
+                    V3::new(min.x, min.y, min.z),
+                    V3::new(max.x, min.y, min.z),
+                ],
+                uvs: [
+                    (tx + 2.0 * d + w, ty + d),
+                    (tx + 2.0 * d + 2.0 * w, ty + d),
+                    (tx + 2.0 * d + 2.0 * w, ty + d + h),
+                    (tx + 2.0 * d + w, ty + d + h),
+                ],
                 normal: V3::new(0.0, 0.0, -1.0),
                 is_overlay: p.is_overlay,
             },
             // Right (+X)
             Quad {
-                verts: [V3::new(max.x, max.y, max.z), V3::new(max.x, max.y, min.z), V3::new(max.x, min.y, min.z), V3::new(max.x, min.y, max.z)],
-                uvs: [(tx + d, ty + d), (tx, ty + d), (tx, ty + d + h), (tx + d, ty + d + h)],
+                verts: [
+                    V3::new(max.x, max.y, max.z),
+                    V3::new(max.x, max.y, min.z),
+                    V3::new(max.x, min.y, min.z),
+                    V3::new(max.x, min.y, max.z),
+                ],
+                uvs: [
+                    (tx + d, ty + d),
+                    (tx, ty + d),
+                    (tx, ty + d + h),
+                    (tx + d, ty + d + h),
+                ],
                 normal: V3::new(1.0, 0.0, 0.0),
                 is_overlay: p.is_overlay,
             },
             // Left (-X)
             Quad {
-                verts: [V3::new(min.x, max.y, min.z), V3::new(min.x, max.y, max.z), V3::new(min.x, min.y, max.z), V3::new(min.x, min.y, min.z)],
-                uvs: [(tx + 2.0*d + w, ty + d), (tx + d + w, ty + d), (tx + d + w, ty + d + h), (tx + 2.0*d + w, ty + d + h)],
+                verts: [
+                    V3::new(min.x, max.y, min.z),
+                    V3::new(min.x, max.y, max.z),
+                    V3::new(min.x, min.y, max.z),
+                    V3::new(min.x, min.y, min.z),
+                ],
+                uvs: [
+                    (tx + 2.0 * d + w, ty + d),
+                    (tx + d + w, ty + d),
+                    (tx + d + w, ty + d + h),
+                    (tx + 2.0 * d + w, ty + d + h),
+                ],
                 normal: V3::new(-1.0, 0.0, 0.0),
                 is_overlay: p.is_overlay,
             },
             // Top (+Y)
             Quad {
-                verts: [V3::new(min.x, max.y, min.z), V3::new(max.x, max.y, min.z), V3::new(max.x, max.y, max.z), V3::new(min.x, max.y, max.z)],
-                uvs: [(tx + d, ty), (tx + d + w, ty), (tx + d + w, ty + d), (tx + d, ty + d)],
+                verts: [
+                    V3::new(min.x, max.y, min.z),
+                    V3::new(max.x, max.y, min.z),
+                    V3::new(max.x, max.y, max.z),
+                    V3::new(min.x, max.y, max.z),
+                ],
+                uvs: [
+                    (tx + d, ty),
+                    (tx + d + w, ty),
+                    (tx + d + w, ty + d),
+                    (tx + d, ty + d),
+                ],
                 normal: V3::new(0.0, 1.0, 0.0),
                 is_overlay: p.is_overlay,
             },
             // Bottom (-Y)
             Quad {
-                verts: [V3::new(min.x, min.y, max.z), V3::new(max.x, min.y, max.z), V3::new(max.x, min.y, min.z), V3::new(min.x, min.y, min.z)],
-                uvs: [(tx + d + w, ty), (tx + 2.0*d + w, ty), (tx + 2.0*d + w, ty + d), (tx + d + w, ty + d)],
+                verts: [
+                    V3::new(min.x, min.y, max.z),
+                    V3::new(max.x, min.y, max.z),
+                    V3::new(max.x, min.y, min.z),
+                    V3::new(min.x, min.y, min.z),
+                ],
+                uvs: [
+                    (tx + d + w, ty),
+                    (tx + 2.0 * d + w, ty),
+                    (tx + 2.0 * d + w, ty + d),
+                    (tx + d + w, ty + d),
+                ],
                 normal: V3::new(0.0, -1.0, 0.0),
                 is_overlay: p.is_overlay,
             },

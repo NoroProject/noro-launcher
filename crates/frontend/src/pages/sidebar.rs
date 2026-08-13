@@ -64,7 +64,9 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .flex_col()
                 .gap(px(4.))
                 .children(cards)
-                .when(ui.servers.is_empty() && !collapsed, |d| d.child(empty_hint())),
+                .when(ui.servers.is_empty() && !collapsed, |d| {
+                    d.child(empty_hint())
+                }),
         )
         // Нижняя панель
         .child(

@@ -41,7 +41,12 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-fn page_header(ui: &LauncherUI, server_id: Uuid, mods: &[OptionalModInfo], cx: &mut Cx) -> AnyElement {
+fn page_header(
+    ui: &LauncherUI,
+    server_id: Uuid,
+    mods: &[OptionalModInfo],
+    cx: &mut Cx,
+) -> AnyElement {
     let enabled = mods.iter().filter(|m| m.enabled).count();
     let allow_suggest = ui
         .allow_mod_suggestions

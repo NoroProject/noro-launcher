@@ -37,11 +37,26 @@ fn catalog_router() -> Router<AppState> {
             get(catalog::versions),
         )
         .route("/api/admin/mods/install", post(mod_install::install))
-        .route("/api/mod_suggestions", post(mod_suggestions::create_suggestion))
-        .route("/api/admin/mod_suggestions", get(mod_suggestions::list_suggestions))
-        .route("/api/admin/mod_suggestions/{id}/approve", post(mod_suggestions::approve_suggestion))
-        .route("/api/admin/mod_suggestions/{id}/reject", post(mod_suggestions::reject_suggestion))
-        .route("/api/admin/mod_suggestions/{id}/accept", post(mod_suggestions::accept_suggestion))
+        .route(
+            "/api/mod_suggestions",
+            post(mod_suggestions::create_suggestion),
+        )
+        .route(
+            "/api/admin/mod_suggestions",
+            get(mod_suggestions::list_suggestions),
+        )
+        .route(
+            "/api/admin/mod_suggestions/{id}/approve",
+            post(mod_suggestions::approve_suggestion),
+        )
+        .route(
+            "/api/admin/mod_suggestions/{id}/reject",
+            post(mod_suggestions::reject_suggestion),
+        )
+        .route(
+            "/api/admin/mod_suggestions/{id}/accept",
+            post(mod_suggestions::accept_suggestion),
+        )
 }
 
 fn users_router() -> Router<AppState> {
@@ -50,7 +65,10 @@ fn users_router() -> Router<AppState> {
         .route("/api/admin/users/{id}", get(users::get))
         .route("/api/admin/users/{id}/ban", put(users::ban))
         .route("/api/admin/users/{id}/cape", put(users::set_cape))
-        .route("/api/admin/users/{id}/capes", get(users::get_capes).put(users::set_granted_capes))
+        .route(
+            "/api/admin/users/{id}/capes",
+            get(users::get_capes).put(users::set_granted_capes),
+        )
         .route(
             "/api/admin/users/{id}/skin",
             post(users::upload_skin_for_user).delete(users::delete_skin_for_user),

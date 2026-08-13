@@ -98,14 +98,17 @@ impl BackendState {
                                     auth,
                                     user: profile,
                                 });
-                                return;
                             }
                         }
                         Ok(r) => {
                             let txt = r.text().await.unwrap_or_default();
                             modal_action.fail(txt.clone());
                             let _ = internal.send(InternalEvent::LoginFailed {
-                                kind: bridge::LoginErrorKind::Rejected(if txt.is_empty() { "Invalid access key".into() } else { txt }),
+                                kind: bridge::LoginErrorKind::Rejected(if txt.is_empty() {
+                                    "Invalid access key".into()
+                                } else {
+                                    txt
+                                }),
                             });
                         }
                         Err(e) => {
@@ -127,7 +130,9 @@ impl BackendState {
 
                 tokio::spawn(async move {
                     // 1. Попытка нативного Touch ID / Windows Hello из системного Keyring
-                    if let Ok(true) = crate::auth::biometrics::authenticate_biometrics("Авторизация в Noro Launcher") {
+                    if let Ok(true) = crate::auth::biometrics::authenticate_biometrics(
+                        "Авторизация в Noro Launcher",
+                    ) {
                         if let Some(stored) = token_store::load() {
                             let key = stored.access_token.clone();
                             let base = master.trim_end_matches('/');
@@ -145,7 +150,10 @@ impl BackendState {
                                             access_token: key,
                                             refresh_token: stored.refresh_token,
                                         };
-                                        let _ = internal.send(InternalEvent::LoginCompleted { auth, user: profile });
+                                        let _ = internal.send(InternalEvent::LoginCompleted {
+                                            auth,
+                                            user: profile,
+                                        });
                                         return;
                                     }
                                 }
@@ -205,9 +213,11 @@ impl BackendState {
             MessageToBackend::OpenServer { server_id } => {
                 if let Some(srv) = self.servers.iter().find(|s| s.id == server_id) {
                     if self.ctx.running.lock().is_empty() {
-                        self.ctx.rpc.update(crate::discord_rpc::DiscordRpcState::Launcher {
-                            server_name: Some(srv.name.clone()),
-                        });
+                        self.ctx
+                            .rpc
+                            .update(crate::discord_rpc::DiscordRpcState::Launcher {
+                                server_name: Some(srv.name.clone()),
+                            });
                     }
                 }
                 if let Some(manifest) = self.manifests.get(&server_id).cloned() {
@@ -225,9 +235,11 @@ impl BackendState {
                 modal_action,
             } => {
                 if let Some(srv) = self.servers.iter().find(|s| s.id == server_id) {
-                    self.ctx.rpc.update(crate::discord_rpc::DiscordRpcState::GameLoading {
-                        server_name: srv.name.clone(),
-                    });
+                    self.ctx
+                        .rpc
+                        .update(crate::discord_rpc::DiscordRpcState::GameLoading {
+                            server_name: srv.name.clone(),
+                        });
                 }
                 self.launch_server(server_id, modal_action).await;
             }
@@ -338,9 +350,15 @@ impl BackendState {
                     let client = reqwest::Client::new();
                     if let Ok(res) = client.get(&url).send().await {
                         if let Ok(data) = res.json::<serde_json::Value>().await {
-                            let total = data.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-                            let res_offset = data.get("offset").and_then(|v| v.as_u64()).unwrap_or(offset as u64) as u32;
-                            let res_limit = data.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as u32;
+                            let total =
+                                data.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                            let res_offset = data
+                                .get("offset")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(offset as u64)
+                                as u32;
+                            let res_limit =
+                                data.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as u32;
 
                             let mut hits = Vec::new();
                             if let Some(arr) = data.get("hits").and_then(|v| v.as_array()) {
@@ -565,7 +583,9 @@ impl BackendState {
                     let t = token.clone();
                     let ctx = self.ctx.clone();
                     tokio::spawn(async move {
-                        if let Ok(presets) = fetch_skin_presets_from_master(&http, &master, &t).await {
+                        if let Ok(presets) =
+                            fetch_skin_presets_from_master(&http, &master, &t).await
+                        {
                             ctx.send(MessageToFrontend::SkinPresetsList { presets });
                         }
                     });
@@ -582,7 +602,9 @@ impl BackendState {
                     tokio::spawn(async move {
                         match select_cape_on_master(&http, &master, &t, cape_id).await {
                             Ok(profile) => {
-                                let _ = internal.send(InternalEvent::ProfileUpdated { user: profile.clone() });
+                                let _ = internal.send(InternalEvent::ProfileUpdated {
+                                    user: profile.clone(),
+                                });
                                 ctx.send(MessageToFrontend::PermissionsUpdated { user: profile });
                             }
                             Err(e) => {
@@ -785,7 +807,9 @@ impl BackendState {
                     let t = token.clone();
                     let ctx = self.ctx.clone();
                     tokio::spawn(async move {
-                        if let Ok(presets) = fetch_skin_presets_from_master(&http, &master, &t).await {
+                        if let Ok(presets) =
+                            fetch_skin_presets_from_master(&http, &master, &t).await
+                        {
                             ctx.send(MessageToFrontend::SkinPresetsList { presets });
                         }
                     });

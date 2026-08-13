@@ -36,10 +36,7 @@ pub async fn read(state: &AppState, server: Uuid, path: &str) -> AppResult<Value
 }
 
 pub async fn write(state: &AppState, server: Uuid, path: &str, content: &str) -> AppResult<Value> {
-    state
-        .wrappers
-        .call(server, write_op(path, content))
-        .await
+    state.wrappers.call(server, write_op(path, content)).await
 }
 
 pub async fn delete(state: &AppState, server: Uuid, path: &str) -> AppResult<Value> {
