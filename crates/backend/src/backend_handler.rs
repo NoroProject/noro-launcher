@@ -448,6 +448,13 @@ impl BackendState {
                     .update(|c| c.show_console_on_launch = enabled);
             }
 
+            MessageToBackend::SetCrashReports { enabled } => {
+                // Применится со следующего запуска: Sentry поднимается до GPUI,
+                // а снять уже установленный хук паники на ходу нельзя.
+                self.ctx.config.update(|c| c.crash_reports = enabled);
+                self.send_config_state();
+            }
+
             MessageToBackend::SetServerMemory {
                 server_id,
                 min_mb,
@@ -702,6 +709,8 @@ impl BackendState {
             jvm_flags: c.jvm_flags,
             locale: c.locale.clone(),
             show_console_on_launch: c.show_console_on_launch,
+            crash_reports: c.crash_reports,
+            crash_reports_available: crate::telemetry::is_available(),
             master_url: c.master_url,
             server_settings,
         });

@@ -20,6 +20,9 @@ pub struct LauncherConfig {
     pub jvm_flags: String,
     /// Открывать ли окно консоли при запуске игры.
     pub show_console_on_launch: bool,
+    /// Отправлять ли отчёты о падениях. Игрок может отказаться — см. telemetry.
+    #[serde(default = "default_crash_reports")]
+    pub crash_reports: bool,
     /// Персональные настройки клиента для конкретных серверов.
     #[serde(default)]
     pub server_settings: BTreeMap<Uuid, ServerClientSettings>,
@@ -46,10 +49,16 @@ impl Default for LauncherConfig {
             memory_max_mb: 4096,
             jvm_flags: String::new(),
             show_console_on_launch: true,
+            crash_reports: default_crash_reports(),
             server_settings: BTreeMap::new(),
             selected_build: BTreeMap::new(),
         }
     }
+}
+
+/// По умолчанию включено: иначе о падениях мы не узнаём вовсе.
+fn default_crash_reports() -> bool {
+    true
 }
 
 fn default_locale() -> String {

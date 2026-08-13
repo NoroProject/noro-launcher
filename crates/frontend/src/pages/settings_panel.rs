@@ -30,9 +30,34 @@ pub fn settings_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             t("settings-jvm-flags"),
             t("settings-jvm-hint"),
             mono_value(&ui.config.jvm_flags, "not set"),
-            false,
+            ui.config.crash_reports_available,
         ))
+        // Строки нет, если в сборку не вшит DSN: переключать было бы нечего,
+        // а сама строка обещала бы игроку то, чего не происходит.
+        .when(ui.config.crash_reports_available, |d| {
+            d.child(row(
+                "triangle-alert",
+                t("settings-crash-reports"),
+                t("settings-crash-reports-hint"),
+                crash_reports_control(ui, cx),
+                false,
+            ))
+        })
         .into_any_element()
+}
+
+fn crash_reports_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    checkbox_row(
+        SharedString::new_static("g-crash-reports"),
+        ui.config.crash_reports,
+        true,
+        cx.listener(|this, _e: &ClickEvent, _w, cx| {
+            let v = this.config.crash_reports;
+            this.set_crash_reports(!v);
+            cx.notify();
+        }),
+    )
+    .into_any_element()
 }
 
 fn memory_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {

@@ -153,3 +153,5 @@ settings-source-recommended = MASTER RECOMMENDED
 settings-server = Server
 console-title = GAME CONSOLE
 settings-update-hint = A newer launcher version is available.
+settings-crash-reports = CRASH REPORTS
+settings-crash-reports-hint = Send an anonymous report when the launcher crashes. No account or machine name is included. Takes effect after a restart.

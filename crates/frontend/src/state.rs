@@ -87,6 +87,10 @@ pub struct UiConfig {
     pub memory_max_mb: u32,
     pub jvm_flags: String,
     pub show_console_on_launch: bool,
+    pub crash_reports: bool,
+    /// Вшит ли DSN в сборку. Нет — строку настройки не показываем: переключать
+    /// было бы нечего, а обещание «мы это шлём» оказалось бы ложным.
+    pub crash_reports_available: bool,
     pub master_url: String,
 }
 
@@ -97,6 +101,8 @@ impl Default for UiConfig {
             memory_max_mb: 4096,
             jvm_flags: String::new(),
             show_console_on_launch: true,
+            crash_reports: true,
+            crash_reports_available: false,
             master_url: String::new(),
         }
     }
@@ -616,6 +622,8 @@ impl LauncherUI {
                 memory_max_mb,
                 jvm_flags,
                 show_console_on_launch,
+                crash_reports,
+                crash_reports_available,
                 master_url,
                 locale,
                 server_settings,
@@ -629,6 +637,8 @@ impl LauncherUI {
                     memory_max_mb,
                     jvm_flags,
                     show_console_on_launch,
+                    crash_reports,
+                    crash_reports_available,
                     master_url,
                 };
                 self.server_settings = server_settings.into_iter().collect();
@@ -1077,6 +1087,14 @@ impl LauncherUI {
         self.config.show_console_on_launch = enabled;
         self.backend
             .send(MessageToBackend::SetShowConsoleOnLaunch { enabled });
+    }
+
+    /// Отправка отчётов о падениях. Вступает в силу со следующего запуска:
+    /// Sentry поднимается до GPUI, и снять его хук паники на ходу нельзя.
+    pub fn set_crash_reports(&mut self, enabled: bool) {
+        self.config.crash_reports = enabled;
+        self.backend
+            .send(MessageToBackend::SetCrashReports { enabled });
     }
 
     pub fn set_server_show_console_on_launch(&mut self, server_id: Uuid, enabled: bool) {

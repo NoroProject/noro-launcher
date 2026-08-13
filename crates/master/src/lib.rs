@@ -14,6 +14,7 @@ pub mod manifest;
 pub mod mojang_bootstrap;
 pub mod signing;
 pub mod state;
+pub mod telemetry;
 pub mod wrapper;
 pub mod ws;
 

@@ -20,6 +20,16 @@ fn main() {
         .join(schema::launcher_dir_name());
     let _ = std::fs::create_dir_all(&app_dir);
 
+    // Отчёты о падениях — до всего остального: хук паники должен стоять раньше,
+    // чем появится первый шанс упасть. Без вшитого DSN или при отказе игрока
+    // ничего не поднимается и никуда не уходит.
+    // Путь берём у backend, а не собираем свой: иначе настройка игрока и файл,
+    // который читает лаунчер, однажды разъедутся.
+    let config = backend::persistent::Persistent::<backend::config::LauncherConfig>::load(
+        backend::LauncherDirectories::new().config_file(),
+    );
+    let _sentry = backend::telemetry::init(&config.get());
+
     let lockfile_path = app_dir.join("app.lock");
     let socket_path = app_dir.join("app.sock");
 
@@ -93,6 +103,8 @@ fn run_primary(
     tracing::info!("frontend завершён, останавливаем backend");
     runtime.block_on(quit_coordinator.quit());
     let _ = std::fs::remove_file(lockfile_path);
+    // `exit` не вызывает деструкторы, поэтому guard сам ничего не дошлёт.
+    backend::telemetry::flush();
     std::process::exit(0);
 }
 

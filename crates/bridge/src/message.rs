@@ -123,6 +123,10 @@ pub enum MessageToBackend {
     SetShowConsoleOnLaunch {
         enabled: bool,
     },
+    /// Игрок разрешил или запретил отправку отчётов о падениях.
+    SetCrashReports {
+        enabled: bool,
+    },
     SetServerMemory {
         server_id: Uuid,
         min_mb: u32,
@@ -314,6 +318,9 @@ pub enum MessageToFrontend {
         memory_max_mb: u32,
         jvm_flags: String,
         show_console_on_launch: bool,
+        crash_reports: bool,
+        /// Вшит ли DSN в эту сборку. Без него переключатель показывать незачем.
+        crash_reports_available: bool,
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,

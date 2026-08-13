@@ -16,6 +16,7 @@ pub mod persistent;
 pub mod servers_dat;
 pub mod signing;
 pub mod sync;
+pub mod telemetry;
 pub mod translations;
 pub mod updater;
 pub mod ws_client;

@@ -155,3 +155,5 @@ settings-source-recommended = РЕКОМЕНДАЦИЯ МАСТЕРА
 settings-server = Сервер
 console-title = КОНСОЛЬ ИГРЫ
 settings-update-hint = Доступна новая версия лаунчера.
+settings-crash-reports = ОТЧЁТЫ О ПАДЕНИЯХ
+settings-crash-reports-hint = Отправлять анонимный отчёт, когда лаунчер падает. Ни аккаунт, ни имя компьютера в него не попадают. Применится после перезапуска.

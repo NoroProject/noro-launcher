@@ -48,6 +48,15 @@ anyhow = "1"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Отчёты об ошибках мастера. rustls, чтобы не тянуть системный OpenSSL в образ.
+sentry = { version = "0.34", default-features = false, features = [
+    "backtrace",
+    "contexts",
+    "panic",
+    "reqwest",
+    "rustls",
+] }
+sentry-tracing = "0.34"
 
 # HTTP сервер (master)
 axum = { version = "0.8", features = ["ws", "multipart", "macros"] }

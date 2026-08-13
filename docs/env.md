@@ -85,6 +85,28 @@ required, `NORO_S3_PUBLIC_URL` included: a half-filled block used to be read as
 `NORO_S3_PUBLIC_URL` used to be guessed as `{endpoint}/{bucket}` — a URL that
 does not resolve on R2, baked into signed manifests.
 
+## Error reporting (Sentry)
+
+Optional on both sides. An empty DSN means the SDK is never initialised — the
+master logs `SENTRY_DSN не задан` at startup so an empty Sentry project cannot be
+mistaken for a quiet one.
+
+```env
+# master
+SENTRY_DSN=
+SENTRY_ENVIRONMENT=production
+
+# web
+NUXT_PUBLIC_SENTRY_DSN=
+NUXT_PUBLIC_SENTRY_ENVIRONMENT=production
+```
+
+Only errors are sent: `traces_sample_rate` is 0 on both sides, and the Nuxt
+build uploads no source maps and sends no build telemetry. The desktop launcher
+is deliberately **not** wired to Sentry — that would ship players' crash data
+off their machines, which is a decision for you to make, not a side effect of
+this change.
+
 ## Web
 
 Nuxt reads env from `web/.env`. Copy `web/.env.example` to `web/.env`.

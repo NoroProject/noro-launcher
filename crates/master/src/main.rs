@@ -1,18 +1,18 @@
 //! Точка входа noro-master.
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     // .env (если есть) — простой загрузчик без зависимости.
     load_dotenv();
 
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,noro_master=debug,master=debug".into()),
-        )
-        .init();
+    // Sentry поднимается до рантайма и держится за guard до конца процесса:
+    // на выходе он дожидается отправки очереди событий.
+    let _sentry = master::telemetry::init();
+    master::telemetry::init_tracing(_sentry.is_some());
 
-    master::run().await
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(master::run())
 }
 
 /// Минимальный парсер .env: KEY=VALUE построчно, без кавычек/экранирования.
