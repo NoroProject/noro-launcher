@@ -109,10 +109,10 @@ function save() {
             <input v-model="draft.name" class="noro-input" placeholder="Name">
             <input v-model="draft.mc_host" class="noro-input" placeholder="Host">
             <input v-model.number="draft.mc_port" type="number" class="noro-input">
-            <select v-model="draft.kind" class="noro-input noro-select">
+            <NoroSelect v-model="draft.kind">
                 <option value="server">Backend</option>
                 <option value="proxy">Proxy</option>
-            </select>
+            </NoroSelect>
             <AtomButton type="submit" icon="i-lucide-check" variant="primary">Save</AtomButton>
             <AtomButton icon="i-lucide-x" variant="ghost" @click="editing = false" />
         </form>

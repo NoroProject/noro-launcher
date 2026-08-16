@@ -75,11 +75,11 @@ watch(open, async (isOpen) => {
         <div class="grid gap-5">
             <label v-if="!serverId" class="block">
                 <span class="noro-label">Pack</span>
-                <select v-model="picker.serverId.value" class="noro-input noro-select">
+                <NoroSelect v-model="picker.serverId.value">
                     <option v-for="s in picker.servers.value" :key="s.id" :value="s.id">
                         {{ s.name }}
                     </option>
-                </select>
+                </NoroSelect>
             </label>
 
             <section class="grid gap-2">

@@ -87,10 +87,10 @@ function label(job: BuildJob) {
 <template>
   <AtomModal v-model="open" title="BUILD LOG" subtitle="Inspect launcher builder output" wide>
     <div class="flex flex-wrap items-center gap-3">
-      <select v-model="selected" class="noro-input min-w-0 flex-1">
+      <NoroSelect v-model="selected" class="min-w-0 flex-1">
         <option v-if="!jobs.length" value="">No builds yet</option>
         <option v-for="job in jobs" :key="job.id" :value="job.id">{{ label(job) }}</option>
-      </select>
+      </NoroSelect>
       <UBadge v-if="status" :color="badge(status)" variant="subtle">{{ status }}</UBadge>
       <AtomButton
         variant="secondary"

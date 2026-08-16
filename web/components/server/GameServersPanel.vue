@@ -79,10 +79,10 @@ onMounted(gs.load);
             </label>
             <label class="min-w-0">
                 <span class="noro-label">Type</span>
-                <select v-model="form.kind" class="noro-input noro-select mt-2">
+                <NoroSelect v-model="form.kind" class="mt-2">
                     <option value="server">Backend</option>
                     <option value="proxy">Proxy</option>
-                </select>
+                </NoroSelect>
             </label>
             <AtomButton type="submit" icon="i-lucide-check" variant="primary" class="self-end">
                 Create

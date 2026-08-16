@@ -27,10 +27,10 @@ function addRole() {
   <div class="noro-panel p-5">
     <h2 class="mb-4 text-xl font-black text-[var(--noro-text)]">Roles</h2>
     <div class="mb-4 flex gap-2">
-      <select v-model="selectedRole" class="noro-input">
+      <NoroSelect v-model="selectedRole">
         <option value="">Select role</option>
         <option v-for="role in freeRoles" :key="role.id" :value="role.id">{{ role.display_name }}</option>
-      </select>
+      </NoroSelect>
       <AtomButton variant="primary" :loading="busy === 'role'" icon="i-lucide-plus" @click="addRole" />
     </div>
     <div class="grid gap-2">

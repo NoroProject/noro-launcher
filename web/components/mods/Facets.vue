@@ -52,24 +52,24 @@ const activeCount = computed(
 
         <label class="block">
             <span class="noro-label">Type</span>
-            <select v-model="filters.projectType" class="noro-input noro-select">
+            <NoroSelect v-model="filters.projectType">
                 <option v-for="type in PROJECT_TYPES" :key="type" :value="type">{{ type }}</option>
-            </select>
+            </NoroSelect>
         </label>
 
         <label class="block">
             <span class="noro-label">Minecraft</span>
-            <select v-model="filters.mc" class="noro-input noro-select">
+            <NoroSelect v-model="filters.mc">
                 <option value="">Any version</option>
                 <option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</option>
-            </select>
+            </NoroSelect>
         </label>
 
         <label class="block">
             <span class="noro-label">Loader</span>
-            <select v-model="filters.loader" class="noro-input noro-select">
+            <NoroSelect v-model="filters.loader">
                 <option v-for="l in LOADERS" :key="l" :value="l">{{ l || "Any loader" }}</option>
-            </select>
+            </NoroSelect>
         </label>
 
         <section class="grid gap-2">

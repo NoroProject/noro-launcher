@@ -27,12 +27,12 @@ defineEmits<{
         <form class="grid gap-4" @submit.prevent="$emit('create')">
             <label v-if="builds.length">
                 <span class="noro-label">Copy from</span>
-                <select v-model="form.copy_from" class="noro-input">
+                <NoroSelect v-model="form.copy_from">
                     <option value="">Start empty</option>
                     <option v-for="build in builds" :key="build.id" :value="build.id">
                         {{ build.version }} — {{ build.mc_version }} {{ build.modloader }}
                     </option>
-                </select>
+                </NoroSelect>
                 <span class="mt-1 block text-xs text-[var(--noro-muted)]">
                     Carries over every file and setting. Nothing is re-uploaded.
                 </span>

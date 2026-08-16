@@ -20,6 +20,12 @@ const SORTS = [
     { id: "newest", label: "Newest" },
 ];
 
+/** Прокси для `v-model` селекта: сортировка живёт у родителя. */
+const sortModel = computed({
+    get: () => props.sort,
+    set: (value: string | number) => emit("update:sort", String(value)),
+});
+
 const field = ref<HTMLInputElement | null>(null);
 
 function onHotkey(e: KeyboardEvent) {
@@ -57,15 +63,11 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onHotkey));
             />
         </div>
 
-        <select
-            :value="sort"
-            class="noro-input noro-select"
-            @change="emit('update:sort', ($event.target as HTMLSelectElement).value)"
-        >
+        <NoroSelect v-model="sortModel">
             <option v-for="option in SORTS" :key="option.id" :value="option.id">
                 {{ option.label }}
             </option>
-        </select>
+        </NoroSelect>
 
         <p class="text-xs text-[var(--noro-muted)] sm:col-span-2">
             {{ props.total ? `${compactNumber(props.total)} result(s)` : "No results yet" }}
