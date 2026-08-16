@@ -36,8 +36,7 @@ async function send() {
 </script>
 
 <template>
-  <UModal v-model:open="open" title="Request logs">
-    <template #body>
+  <NoroModal v-model="open" title="Request logs">
       <div class="grid gap-4">
         <label class="block">
           <span class="noro-label mb-1.5 block">Why</span>
@@ -63,6 +62,5 @@ async function send() {
 
         <p v-if="status" class="text-xs text-[var(--noro-muted)]">{{ status }}</p>
       </div>
-    </template>
-  </UModal>
+  </NoroModal>
 </template>

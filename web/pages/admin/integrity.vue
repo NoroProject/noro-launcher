@@ -48,13 +48,11 @@ onMounted(() => load())
       </AtomButton>
     </template>
 
-    <UAlert
-      class="mb-4"
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-info"
-      description="Client-side signal, not proof: the launcher is open source and a patched build reports whatever it likes. Treat these as a reason to look, never as grounds for an automatic ban."
-    />
+    <NoroNote class="mb-4">
+      Client-side signal, not proof: the launcher is open source and a patched
+      build reports whatever it likes. Treat these as a reason to look, never as
+      grounds for an automatic ban.
+    </NoroNote>
 
     <label class="mb-4 flex items-center gap-2 text-xs text-[var(--noro-muted)]">
       <input v-model="onlyOpen" type="checkbox" class="size-4">

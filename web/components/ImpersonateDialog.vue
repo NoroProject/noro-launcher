@@ -67,8 +67,7 @@ function poll(grantId: string) {
 </script>
 
 <template>
-  <UModal v-model:open="open" title="Sign in as this player">
-    <template #body>
+  <NoroModal v-model="open" title="Sign in as this player">
       <div class="grid gap-4">
         <UAlert
           color="warning"
@@ -97,6 +96,5 @@ function poll(grantId: string) {
 
         <p v-if="status" class="text-xs text-[var(--noro-muted)]">{{ status }}</p>
       </div>
-    </template>
-  </UModal>
+  </NoroModal>
 </template>

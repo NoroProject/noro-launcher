@@ -62,13 +62,12 @@ onMounted(() => load())
 
 <template>
   <NoroShell title="BLOCKLIST" subtitle="Files that must not be in a game folder">
-    <UAlert
-      class="mb-4"
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-info"
-      description="SHA1 is defeated by changing one byte, a name mask by renaming. Both catch the lazy, not the motivated — real coverage comes from the server side, where an agent verifies the mod set over its own channel. The list ships inside the signed manifest, so it cannot be swapped out on the client."
-    />
+    <NoroNote class="mb-4">
+      SHA1 is defeated by changing one byte, a name mask by renaming. Both catch
+      the lazy, not the motivated — real coverage comes from the server side,
+      where an agent verifies the mod set over its own channel. The list ships
+      inside the signed manifest, so it cannot be swapped out on the client.
+    </NoroNote>
 
     <section class="noro-panel mb-4 grid gap-4 p-4 md:grid-cols-[1fr_1fr_1fr_140px_auto]">
       <label class="block">
@@ -85,11 +84,11 @@ onMounted(() => load())
       </label>
       <label class="block">
         <span class="noro-label mb-1.5 block">Action</span>
-        <select v-model="action" class="noro-input w-full">
+        <NoroSelect v-model="action" class="w-full">
           <option value="delete">Delete</option>
           <option value="flag">Flag only</option>
           <option value="block_launch">Block launch</option>
-        </select>
+        </NoroSelect>
       </label>
       <div class="flex items-end">
         <AtomButton icon="i-lucide-plus" :loading="pending" @click="add">Add</AtomButton>
