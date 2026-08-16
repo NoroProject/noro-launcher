@@ -1,56 +1,14 @@
 //! Расширенное чтение и парсинг логов Minecraft (на основе PandoraLauncher).
-//! Поддерживает log4j XML формат, очистку чувствительных данных (токены, пути) и классификацию уровней.
+//!
+//! Поддерживает log4j XML формат и классификацию уровней. Санитизация — в
+//! [`crate::redact`]: те же правила нужны и файлам, а не только живому потоку.
 
+use crate::redact::redact;
 use bridge::{GameLogLevel, MessageToFrontend};
-use once_cell::sync::Lazy;
-use regex::Regex;
 use std::borrow::Cow;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
 use uuid::Uuid;
-
-static REPLACEMENTS: Lazy<[(Regex, &'static str); 8]> = Lazy::new(|| {
-    [
-        // ANSI color/control sequences from log4j console output.
-        (Regex::new(r#"\x1b\[[0-9;?]*[ -/]*[@-~]"#).unwrap(), ""),
-        // Замена токенов доступа
-        (
-            Regex::new(r#""SignedJWT: [^\s]+""#).unwrap(),
-            "SignedJWT: *****",
-        ),
-        (
-            Regex::new(r#""Session ID is [^\s)]+""#).unwrap(),
-            "Session ID is *****",
-        ),
-        (
-            Regex::new(r#""--accessToken, [^\s,]+""#).unwrap(),
-            "--accessToken, *****",
-        ),
-        // Замена путей пользователя
-        (Regex::new(r#"/home/[^/]+/"#).unwrap(), "/home/*****/"),
-        (Regex::new(r#"/Users/[^/]+/"#).unwrap(), "/Users/*****/"),
-        (
-            Regex::new(r#"\\Users\\[^\\]+\\"#).unwrap(),
-            "\\Users\\*****\\",
-        ),
-        (
-            Regex::new(r#"\\\\Users\\\\[^/]+\\\\"#).unwrap(),
-            "\\\\Users\\\\*****\\\\",
-        ),
-    ]
-});
-
-/// Очистить строку от чувствительных данных.
-pub fn redact(string: &str) -> Cow<'_, str> {
-    let mut replaced = Cow::Borrowed(string);
-    for (regex, replacement) in &*REPLACEMENTS {
-        let new = regex.replace_all(&replaced, *replacement);
-        if let Cow::Owned(new_str) = new {
-            replaced = Cow::Owned(new_str);
-        }
-    }
-    replaced
-}
 
 /// Данные для обновления Discord Rich Presence по строкам игрового лога.
 pub struct RpcLogContext {

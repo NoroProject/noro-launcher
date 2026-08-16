@@ -13,6 +13,7 @@ pub mod game_runner;
 pub mod log_reader;
 pub mod mod_icon;
 pub mod persistent;
+pub mod redact;
 pub mod servers_dat;
 pub mod signing;
 pub mod sync;
