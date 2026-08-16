@@ -223,6 +223,18 @@ pub struct LauncherUI {
     pub server_settings: HashMap<Uuid, ClientSettingsState>,
     pub server_recommendations: HashMap<Uuid, ClientSettingsState>,
     pub console_window: Option<gpui::WindowHandle<ConsoleWindow>>,
+    /// Запрос на вход в чужой аккаунт, ждущий подтверждения.
+    pub impersonate_prompt: Option<ImpersonatePrompt>,
+    /// Ник игрока, от чьего имени сейчас работает лаунчер.
+    pub impersonating_as: Option<String>,
+}
+
+/// Диалог «войти в аккаунт игрока».
+pub struct ImpersonatePrompt {
+    pub grant_id: Uuid,
+    pub target_username: String,
+    pub reason: String,
+    pub expires_in_secs: i64,
 }
 pub struct ConsoleWindow {
     pub server_id: Uuid,
@@ -324,6 +336,8 @@ impl LauncherUI {
             icons_loading: HashSet::new(),
             optional_mod_icons_loading: HashSet::new(),
             update_available: None,
+            impersonate_prompt: None,
+            impersonating_as: None,
             updating: false,
             toast: None,
             config: UiConfig::default(),
@@ -832,6 +846,24 @@ impl LauncherUI {
                     level,
                 });
             }
+            MessageToFrontend::ImpersonatePrompt {
+                grant_id,
+                target_username,
+                reason,
+                expires_in_secs,
+                ..
+            } => {
+                self.impersonate_prompt = Some(ImpersonatePrompt {
+                    grant_id,
+                    target_username,
+                    reason,
+                    expires_in_secs,
+                });
+            }
+            MessageToFrontend::ImpersonationChanged { as_username } => {
+                self.impersonate_prompt = None;
+                self.impersonating_as = as_username;
+            }
             MessageToFrontend::SkinUploadFailed => {
                 self.skin_uploading = false;
             }
@@ -1112,6 +1144,22 @@ impl LauncherUI {
     ///
     /// Сервер не указан — backend возьмёт тот, чей манифест уже загружен: логи
     /// лежат в каталоге инстанса, и без сервера отправлять нечего.
+    /// Ответить на диалог входа в чужой аккаунт.
+    pub fn answer_impersonate(&mut self, accepted: bool) {
+        let Some(prompt) = self.impersonate_prompt.take() else {
+            return;
+        };
+        self.backend.send(MessageToBackend::ImpersonateAnswer {
+            grant_id: prompt.grant_id,
+            accepted,
+        });
+    }
+
+    /// Выйти из чужого аккаунта.
+    pub fn exit_impersonation(&mut self) {
+        self.backend.send(MessageToBackend::ImpersonateExit);
+    }
+
     pub fn send_support_bundle(&mut self) {
         self.backend
             .send(MessageToBackend::SendSupportBundle { server_id: None });

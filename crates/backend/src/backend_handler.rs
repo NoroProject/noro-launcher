@@ -503,6 +503,14 @@ impl BackendState {
                 crate::translations::refresh(&self.ctx, code);
             }
 
+            MessageToBackend::ImpersonateAnswer { grant_id, accepted } => {
+                self.answer_impersonate(grant_id, accepted);
+            }
+
+            MessageToBackend::ImpersonateExit => {
+                self.exit_impersonation();
+            }
+
             MessageToBackend::SendSupportBundle { server_id } => {
                 self.send_support_bundle(server_id);
             }
@@ -894,8 +902,76 @@ impl BackendState {
                     self.send_optional_mods(*server_id, manifest);
                 }
             }
+            ServerWsMsg::ImpersonateRequest {
+                grant_id,
+                actor_username,
+                target_username,
+                reason,
+                expires_at,
+            } => {
+                let expires_in_secs = (expires_at - chrono::Utc::now()).num_seconds().max(0);
+                self.ctx.send(MessageToFrontend::ImpersonatePrompt {
+                    grant_id,
+                    actor_username,
+                    target_username,
+                    reason,
+                    expires_in_secs,
+                });
+            }
             ServerWsMsg::Pong => {}
         }
+    }
+
+    /// Ответ на диалог входа в чужой аккаунт.
+    ///
+    /// Отказ так же важен, как согласие: мастер ждёт ответа, и молчание
+    /// оставило бы веб-страницу админа в поллинге до истечения гранта.
+    fn answer_impersonate(&mut self, grant_id: Uuid, accepted: bool) {
+        self.ctx
+            .ws
+            .send(ClientWsMsg::ImpersonateResponse { grant_id, accepted });
+        if !accepted {
+            return;
+        }
+
+        let Some(token) = self.access_token.clone() else {
+            return;
+        };
+        // Свой токен запоминаем до подмены: выход из чужого аккаунта — это
+        // возврат к нему, а не повторный вход.
+        self.own_token = Some(token.clone());
+        let ctx = self.ctx.clone();
+        let master = self.ctx.config.get().master_url;
+        let internal = self.ctx.internal.clone();
+        tokio::spawn(async move {
+            match crate::impersonation::claim(&ctx.http, &master, &token, grant_id).await {
+                Ok(claimed) => {
+                    let _ = internal.send(crate::backend::InternalEvent::ImpersonationStarted {
+                        access_token: claimed.access_token,
+                        username: claimed.username,
+                    });
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "не удалось войти в аккаунт игрока");
+                    ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-impersonate-failed".into(),
+                        args: [("reason".to_string(), e.to_string())].into(),
+                        level: schema::NotifLevel::Error,
+                    });
+                }
+            }
+        });
+    }
+
+    /// Вернуться в свой аккаунт.
+    fn exit_impersonation(&mut self) {
+        let Some(own) = self.own_token.take() else {
+            return;
+        };
+        self.access_token = Some(own.clone());
+        self.ctx.ws.set_token(Some(own));
+        self.ctx
+            .send(MessageToFrontend::ImpersonationChanged { as_username: None });
     }
 
     /// «Сообщить о проблеме»: собрать логи и отправить их мастеру.

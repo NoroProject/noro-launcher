@@ -10,6 +10,7 @@ pub mod config;
 pub mod directories;
 pub mod discord_rpc;
 pub mod game_runner;
+pub mod impersonation;
 pub mod log_reader;
 pub mod mod_icon;
 pub mod persistent;

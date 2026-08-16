@@ -3,9 +3,10 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, audit, backup, build_routes, capes, catalog, cores, game_servers, integrity, launcher,
-    launcher_clients, mod_install, mod_suggestions, news, permission_nodes, roles, servers,
-    settings, stats, storage, tokens, users, versions, wrapper, wrapper_backups, wrapper_fs,
+    agents, audit, backup, build_routes, capes, catalog, cores, game_servers, impersonate,
+    integrity, launcher, launcher_clients, mod_install, mod_suggestions, news, permission_nodes,
+    roles, servers, settings, stats, storage, tokens, users, versions, wrapper, wrapper_backups,
+    wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -18,6 +19,23 @@ pub fn router() -> Router<AppState> {
         )
         .route("/api/admin/settings/env", get(settings::export_env))
         .route("/api/admin/diagnostics", get(settings::diagnostics))
+        .route(
+            "/api/admin/users/{id}/impersonate",
+            post(impersonate::start),
+        )
+        .route(
+            "/api/admin/impersonate/{grant_id}",
+            get(impersonate::status),
+        )
+        .route("/api/admin/step-up", get(impersonate::step_up::status))
+        .route(
+            "/api/admin/step-up/passkey",
+            post(impersonate::step_up::confirm_passkey),
+        )
+        .route(
+            "/api/admin/step-up/recovery",
+            post(impersonate::step_up::confirm_recovery),
+        )
         .route("/api/admin/integrity", get(integrity::list))
         .route("/api/admin/support/bundles", get(crate::api::support::list))
         .route(

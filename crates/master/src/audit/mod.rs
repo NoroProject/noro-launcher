@@ -5,6 +5,8 @@
 //! пути не восстановить, что стало с объектом, а разбирать спорную ситуацию
 //! придётся именно по этому.
 
+pub mod impersonation;
+
 use crate::state::AppState;
 use serde_json::Value;
 use uuid::Uuid;

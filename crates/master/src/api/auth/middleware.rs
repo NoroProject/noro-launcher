@@ -56,6 +56,9 @@ pub struct AdminAuth {
     pub actor: crate::audit::Actor,
     /// Эффективные права субъекта.
     pub permissions: Vec<String>,
+    /// Токен сессии, если вход по пользовательскому токену. Нужен, чтобы
+    /// отличить сессию, открытую под impersonation, от обычной.
+    pub session_token: Option<Uuid>,
 }
 
 impl AdminAuth {
@@ -105,6 +108,7 @@ impl FromRequestParts<AppState> for AdminAuth {
                         username: profile.username.clone(),
                     },
                     permissions,
+                    session_token: Some(token_uuid),
                 });
             }
         }
@@ -149,5 +153,6 @@ async fn admin_token_auth(state: &AppState, token: &str) -> Result<Option<AdminA
     Ok(Some(AdminAuth {
         actor: crate::audit::Actor::Token { name: row.name },
         permissions: row.permissions,
+        session_token: None,
     }))
 }

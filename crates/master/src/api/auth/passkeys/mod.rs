@@ -7,7 +7,7 @@
 mod login;
 mod register;
 
-pub use login::{login_options, login_verify};
+pub use login::{login_options, login_verify, verify as verify_login, LoginVerifyReq};
 pub use register::{delete_passkey, list_passkeys, register_options, register_verify};
 
 use crate::error::AppError;

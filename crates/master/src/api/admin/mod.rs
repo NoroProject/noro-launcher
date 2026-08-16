@@ -7,6 +7,7 @@ pub mod capes;
 pub mod catalog;
 pub mod cores;
 pub mod game_servers;
+pub mod impersonate;
 pub mod integrity;
 pub mod launcher;
 pub mod launcher_clients;

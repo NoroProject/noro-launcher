@@ -48,6 +48,11 @@ pub enum ClientWsMsg {
         server_id: Uuid,
         playtime_secs: u64,
     },
+    /// Ответ на диалог «войти в аккаунт игрока».
+    ImpersonateResponse {
+        grant_id: Uuid,
+        accepted: bool,
+    },
     Ping,
 }
 
@@ -63,6 +68,17 @@ pub enum NotifLevel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "t", content = "d")]
 pub enum ServerWsMsg {
+    /// Админ нажал «Login as» в вебе — лаунчер спрашивает подтверждение.
+    ///
+    /// Нативный диалог здесь второй фактор: он закрывает случай
+    /// «злоумышленник получил веб-сессию админа, но не доступ к его машине».
+    ImpersonateRequest {
+        grant_id: Uuid,
+        actor_username: String,
+        target_username: String,
+        reason: String,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    },
     AuthOk {
         user: UserProfile,
     },

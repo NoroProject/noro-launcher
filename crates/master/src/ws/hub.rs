@@ -61,6 +61,12 @@ impl WsHub {
         }
     }
 
+    /// В сети ли лаунчер игрока. Нужно, чтобы понять, слать ли диалог или
+    /// сразу предлагать фолбэк-код.
+    pub fn is_user_connected(&self, user_id: Uuid) -> bool {
+        self.conns.iter().any(|c| c.user_id == Some(user_id))
+    }
+
     /// Разослать всем подключённым лаунчерам.
     pub fn broadcast(&self, msg: &ServerWsMsg) {
         for c in self.conns.iter() {

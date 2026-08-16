@@ -233,6 +233,12 @@ fn router(state: AppState) -> Router {
         // Инициатива игрока: кнопка «Сообщить о проблеме» и предложение после
         // краша. Ни запроса от админа, ни гранта здесь не нужно.
         .route("/api/launcher/support-bundle", post(support::upload))
+        // Обменять подтверждённый грант на сессию. Ходит сам лаунчер своим
+        // текущим Bearer — токен не идёт через браузер и не светится в `ps`.
+        .route(
+            "/api/launcher/impersonate/claim",
+            post(api::admin::impersonate::claim),
+        )
         .route("/files/{sha1}", get(file_serve::serve_file))
         .route("/api/textures/default-skin", get(textures::default_skin))
         .route(
@@ -385,6 +391,13 @@ fn router(state: AppState) -> Router {
         .merge(admin_api.layer(axum::extract::DefaultBodyLimit::disable()))
         // Заслонка идёт до всего остального: ненастроенный мастер не должен
         // делать вид, что работает, — манифесты уехали бы со ссылками в никуда.
+        // Детальный аудит под impersonation. Идёт первым слоем: под чужим
+        // аккаунтом каждое изменение должно оставить след, иначе спор
+        // «меня обокрали» / «это был не я» разрешать будет нечем.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            audit::impersonation::layer,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             setup::gate::gate,

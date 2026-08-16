@@ -160,6 +160,14 @@ pub enum MessageToBackend {
         code: String,
     },
 
+    /// Ответ на диалог impersonation.
+    ImpersonateAnswer {
+        grant_id: Uuid,
+        accepted: bool,
+    },
+    /// Выйти из чужого аккаунта обратно в свой.
+    ImpersonateExit,
+
     /// «Сообщить о проблеме»: собрать логи и отправить мастеру.
     ///
     /// Инициатива игрока, а не запрос админа — ни согласия, ни гранта здесь не
@@ -431,6 +439,24 @@ pub enum MessageToFrontend {
     /// Соединение с мастером установлено/потеряно — для индикатора в UI.
     ConnectionState {
         online: bool,
+    },
+
+    /// Админ нажал «Login as» в вебе — спросить подтверждение здесь.
+    ///
+    /// Нативный диалог это второй фактор: он закрывает случай «злоумышленник
+    /// получил веб-сессию админа, но не доступ к его машине».
+    ImpersonatePrompt {
+        grant_id: Uuid,
+        actor_username: String,
+        target_username: String,
+        reason: String,
+        /// Сколько секунд осталось на решение.
+        expires_in_secs: i64,
+    },
+    /// Сессия impersonation началась или закончилась — для баннера в лаунчере.
+    ImpersonationChanged {
+        /// `None` — вернулись в свой аккаунт.
+        as_username: Option<String>,
     },
 
     OpenOrFocusMainWindow,

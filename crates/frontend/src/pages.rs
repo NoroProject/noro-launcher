@@ -8,6 +8,7 @@ pub mod game_console;
 mod game_empty;
 mod game_status;
 mod game_sync;
+mod impersonate_dialog;
 mod markdown;
 mod mod_detail;
 mod mod_detail_body;

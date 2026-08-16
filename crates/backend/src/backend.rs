@@ -37,6 +37,11 @@ pub enum InternalEvent {
     ProfileUpdated {
         user: UserProfile,
     },
+    /// Обмен гранта удался: пора переключить сессию на аккаунт игрока.
+    ImpersonationStarted {
+        access_token: String,
+        username: String,
+    },
 }
 
 /// Клонируемый контекст, доступный фоновым задачам (sync/launch).
@@ -76,6 +81,9 @@ pub struct BackendState {
     // Кэши.
     pub user: Option<UserProfile>,
     pub access_token: Option<String>,
+    /// Свой токен, пока лаунчер работает от имени игрока. Выход из чужого
+    /// аккаунта — возврат к нему, а не повторный вход.
+    pub own_token: Option<String>,
     pub servers: Vec<ServerEntry>,
     pub manifests: HashMap<Uuid, BuildManifest>,
     /// Сборки, ожидающие запуска после получения манифеста.
@@ -163,6 +171,7 @@ async fn run(
         internal_rx,
         user: None,
         access_token,
+        own_token: None,
         servers: Vec::new(),
         manifests: HashMap::new(),
         pending_launch: HashMap::new(),
@@ -243,6 +252,18 @@ impl BackendState {
                 self.user = Some(user.clone());
                 self.ctx
                     .send(MessageToFrontend::PermissionsUpdated { user });
+            }
+            InternalEvent::ImpersonationStarted {
+                access_token,
+                username,
+            } => {
+                // В keyring не сохраняем: чужая сессия живёт полчаса и не
+                // должна пережить перезапуск лаунчера.
+                self.access_token = Some(access_token.clone());
+                self.ctx.ws.set_token(Some(access_token));
+                self.ctx.send(MessageToFrontend::ImpersonationChanged {
+                    as_username: Some(username),
+                });
             }
         }
     }
