@@ -514,6 +514,23 @@ pub fn spawn_sync_and_launch(
         });
         modal.finish();
 
+        // Сверка каталога с манифестом в последний момент: между синком и
+        // запуском файлы никто не проверяет. Лишнее удаляется, расхождения
+        // уезжают мастеру. Игрок при этом видит нейтральное сообщение и
+        // продолжает запуск — флаг это повод для разбора, а не отказ.
+        let report =
+            crate::sync::verify_before_launch(&instance_dir, &manifest, &enabled_optional, &user)
+                .await;
+        if !report.findings.is_empty() {
+            tracing::warn!(findings = report.findings.len(), "сверка нашла расхождения");
+            ctx.send(MessageToFrontend::AddNotification {
+                key: "notif-build-files-restored".into(),
+                args: std::collections::BTreeMap::new(),
+                level: schema::NotifLevel::Info,
+            });
+        }
+        ctx.ws.send(ClientWsMsg::ReportIntegrity { report });
+
         // После синхронизации файлов, но до запуска: игра читает servers.dat
         // на старте и перезаписывает его при выходе. Список серверов не повод
         // не пустить игрока, поэтому ошибку только логируем.

@@ -3,7 +3,7 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, audit, backup, build_routes, capes, catalog, cores, game_servers, launcher,
+    agents, audit, backup, build_routes, capes, catalog, cores, game_servers, integrity, launcher,
     launcher_clients, mod_install, mod_suggestions, news, permission_nodes, roles, servers, stats,
     storage, tokens, users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
@@ -12,6 +12,8 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/agents", get(agents::list))
         .route("/api/admin/audit", get(audit::list))
+        .route("/api/admin/integrity", get(integrity::list))
+        .route("/api/admin/integrity/{id}/review", post(integrity::review))
         .route("/api/admin/permission-nodes", get(permission_nodes::list))
         .merge(catalog_router())
         .merge(users_router())

@@ -81,6 +81,7 @@ retry = ПОВТОРИТЬ
 notif-server-error = Ошибка сервера: { $reason }
 notif-no-server-access = Нет доступа к этому серверу
 notif-no-published-build = У сервера нет опубликованной сборки
+notif-build-files-restored = Восстановлены файлы сборки
 notif-update-failed = Не удалось обновиться: { $reason }
 notif-skin-upload-failed = Не удалось загрузить скин: { $reason }
 notif-sign-in-to-upload = Для загрузки скина нужно войти

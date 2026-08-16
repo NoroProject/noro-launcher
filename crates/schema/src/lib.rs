@@ -4,6 +4,7 @@
 //! поэтому его одинаково тянут и frontend (GPUI), и backend, и master.
 
 pub mod build;
+pub mod integrity;
 pub mod launcher;
 pub mod manifest_args;
 pub mod news;
@@ -13,6 +14,7 @@ pub mod user;
 pub mod ws_protocol;
 
 pub use build::*;
+pub use integrity::*;
 pub use launcher::*;
 pub use manifest_args::*;
 pub use news::*;

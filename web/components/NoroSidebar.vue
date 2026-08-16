@@ -19,6 +19,7 @@ const adminNavGroups = [
             { label: "Users", to: "/admin/users", icon: "i-lucide-users" },
             { label: "Capes", to: "/admin/capes", icon: "i-lucide-flag" },
             { label: "Roles", to: "/admin/roles", icon: "i-lucide-shield" },
+            { label: "Integrity", to: "/admin/integrity", icon: "i-lucide-shield-alert" },
         ],
     },
     {

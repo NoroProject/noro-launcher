@@ -2,5 +2,7 @@ pub mod downloader;
 pub mod fetch;
 pub mod file_sync;
 pub mod integrity;
+pub mod verify;
 
 pub use file_sync::{build_state, find_java, sync_server, ProgressFn};
+pub use verify::verify_before_launch;

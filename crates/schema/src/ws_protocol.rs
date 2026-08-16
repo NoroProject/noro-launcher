@@ -39,6 +39,11 @@ pub enum ClientWsMsg {
     ReportGameStart {
         server_id: Uuid,
     },
+    /// Сверка каталога с манифестом перед запуском. Отправляется всегда, в том
+    /// числе когда всё сошлось: молчание неотличимо от «лаунчер не проверял».
+    ReportIntegrity {
+        report: crate::integrity::IntegrityReport,
+    },
     ReportGameStop {
         server_id: Uuid,
         playtime_secs: u64,

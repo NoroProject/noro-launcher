@@ -213,7 +213,7 @@ const STAGE_GROUPS: &[StageGroup] = &[
 ];
 
 /// Пути файлов выключенных (или недоступных по правам) опциональных модов.
-fn excluded_optional_files(
+pub(super) fn excluded_optional_files(
     manifest: &BuildManifest,
     enabled: &[String],
     user: &UserProfile,

@@ -79,6 +79,7 @@ retry = RETRY
 notif-server-error = Server error: { $reason }
 notif-no-server-access = No access to this server
 notif-no-published-build = This server has no published build
+notif-build-files-restored = Build files were restored
 notif-update-failed = Update failed: { $reason }
 notif-skin-upload-failed = Skin upload failed: { $reason }
 notif-sign-in-to-upload = Sign in required to upload skin

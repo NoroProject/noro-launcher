@@ -66,6 +66,17 @@ pub async fn handle(
             }
         }
 
+        ClientWsMsg::ReportIntegrity { report } => {
+            // Без входа отчёт не к кому привязать, а анонимные находки
+            // разбирать не о ком.
+            if let Some(user_id) = *authed_user {
+                let saved = crate::db::save_integrity_report(&state.db, user_id, &report).await?;
+                if saved > 0 {
+                    tracing::warn!(%user_id, findings = saved, "сверка лаунчера нашла расхождения");
+                }
+            }
+        }
+
         ClientWsMsg::ReportGameStart { server_id } => {
             if let Some(user_id) = *authed_user {
                 let _ = crate::db::record_play_start(&state.db, user_id, server_id).await;
