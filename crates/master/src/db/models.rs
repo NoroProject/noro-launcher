@@ -75,6 +75,7 @@ pub struct BuildRow {
     pub recommended_show_console_on_launch: bool,
     pub unmanaged_paths: serde_json::Value,
     pub user_managed_paths: serde_json::Value,
+    pub path_rules: Option<serde_json::Value>,
     pub manifest_signature: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
 }

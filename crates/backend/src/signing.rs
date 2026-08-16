@@ -84,6 +84,7 @@ mod tests {
             }],
             artifact_kinds: Default::default(),
             unmanaged_paths: Vec::new(),
+            path_rules: Vec::new(),
             user_managed_paths: Vec::new(),
             optional_mods: Vec::new(),
             allow_optional_mod_suggestions: true,

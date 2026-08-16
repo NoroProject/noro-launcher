@@ -86,6 +86,12 @@ pub async fn build_manifest(
         .context("unmanaged_paths сборки не разобрать")?;
     let user_managed_paths: Vec<String> = serde_json::from_value(build.user_managed_paths.clone())
         .context("user_managed_paths сборки не разобрать")?;
+    // Правила либо заданы явно, либо выводятся из двух старых списков. Второе —
+    // не «на всякий случай»: у всех существующих сборок правил ещё нет.
+    let path_rules: Vec<schema::PathRule> = match &build.path_rules {
+        Some(v) => serde_json::from_value(v.clone()).context("path_rules сборки не разобрать")?,
+        None => schema::from_legacy(&unmanaged_paths, &user_managed_paths),
+    };
 
     // Объединяем аргументы: из base_build (ванилла/лоадер) + из build (если есть кастомные)
     // Сейчас берем напрямую из base_build.
@@ -112,6 +118,7 @@ pub async fn build_manifest(
         artifact_kinds,
         unmanaged_paths,
         user_managed_paths,
+        path_rules,
         optional_mods,
         allow_optional_mod_suggestions: build.allow_optional_mod_suggestions,
         recommended_client_settings: RecommendedClientSettings {

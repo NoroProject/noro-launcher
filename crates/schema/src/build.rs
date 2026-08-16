@@ -165,6 +165,11 @@ pub struct BuildManifest {
 
     /// Пути, которые лаунчер НЕ ТРОГАЕТ (saves, screenshots, options.txt).
     pub unmanaged_paths: Vec<String>,
+    /// Единый упорядоченный список правил (§10.6). Побеждает последнее
+    /// совпавшее. Пусто — манифест от мастера, который ещё не умеет их слать:
+    /// тогда правила выводятся из двух списков выше.
+    #[serde(default)]
+    pub path_rules: Vec<crate::path_rules::PathRule>,
 
     /// Пути, где пользователь МОЖЕТ добавлять файлы (не удаляются).
     pub user_managed_paths: Vec<String>,

@@ -49,6 +49,7 @@ pub fn manifest(files: Vec<(FileEntry, (String, ArtifactKind))>) -> BuildManifes
         verified_files: verified,
         artifact_kinds: kinds,
         unmanaged_paths: Vec::new(),
+        path_rules: Vec::new(),
         user_managed_paths: Vec::new(),
         optional_mods: Vec::new(),
         allow_optional_mod_suggestions: false,

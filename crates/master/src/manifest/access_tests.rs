@@ -83,6 +83,7 @@ fn manifest(mods: Vec<OptionalMod>, paths: &[&str]) -> BuildManifest {
             .map(|p| (p.to_string(), ArtifactKind::Mod))
             .collect(),
         unmanaged_paths: Vec::new(),
+        path_rules: Vec::new(),
         user_managed_paths: Vec::new(),
         optional_mods: mods,
         allow_optional_mod_suggestions: false,

@@ -1,7 +1,7 @@
 //! Синхронизация файлов сервера: проверка подписи, докачка изменённого,
 //! удаление лишнего (verified-set защита), обработка опциональных модов.
 
-use super::downloader::{download_all, needs_download, DownloadTask};
+use super::downloader::{download_all, DownloadTask};
 use crate::directories::safe_join;
 use anyhow::{bail, Result};
 use bridge::SyncStage;
@@ -39,11 +39,16 @@ pub async fn sync_server(
         .iter()
         .filter(|f| f.side.needed_on_client())
         .filter(|f| !excluded.contains(&f.path))
-        .filter(|f| !is_protected(&f.path, &manifest.unmanaged_paths))
+        .filter(|f| schema::mode_for(&f.path, &manifest.path_rules) != schema::PathMode::Unmanaged)
         // Java-рантайм и natives лежат в сборке под все платформы сразу; чужие
         // не только бесполезны, но и весят как пять лишних JRE.
         .filter(|f| f.matches_platform())
         .collect();
+
+    // База хешей: то, что мы установили в прошлый раз. Без неё режим `merged`
+    // не отличает правки игрока от обновления сервера.
+    let mut base = super::merge::BaseHashes::load(instance_dir).await;
+    let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
 
     // 3. Проверка файлов — что нужно скачать.
     progress(
@@ -68,13 +73,33 @@ pub async fn sync_server(
                 | ArtifactKind::ClientJar
                 | ArtifactKind::Other
         );
-        // User-managed ставим один раз: дальше файл принадлежит игроку, и
-        // расхождение хеша — это его правки, а не повод их затереть.
-        let wanted = if is_protected(&f.path, &manifest.user_managed_paths) {
-            !dest.exists()
-        } else {
-            needs_download(&dest, f.size, &f.sha1, verify_hash).await
-        };
+        let wanted =
+            match super::plan::decide_file(instance_dir, manifest, f, &base, verify_hash).await {
+                super::plan::Action::Download => true,
+                super::plan::Action::Skip => false,
+                super::plan::Action::Conflict(policy) => match policy {
+                    // Правки игрока важнее: молча затереть их — ровно то, от чего
+                    // режим и защищает. Админ увидит это флагом.
+                    schema::ConflictPolicy::KeepMine => {
+                        tracing::warn!(path = %f.path, "конфликт: оставлена версия игрока");
+                        false
+                    }
+                    // Берём серверную, но сначала откладываем версию игрока.
+                    schema::ConflictPolicy::TakeTheirs => {
+                        if let Err(e) =
+                            super::merge::backup_conflict(instance_dir, &f.path, &stamp).await
+                        {
+                            tracing::warn!(path = %f.path, error = %e, "не отложить версию игрока");
+                        }
+                        true
+                    }
+                },
+            };
+        // Запоминаем то, что сервер отдаёт сейчас: следующий проход сравнит с
+        // этим и поймёт, кто именно менял файл.
+        if wanted {
+            base.set(&f.path, &f.sha1);
+        }
         if wanted {
             tasks.push((
                 kind,
@@ -136,6 +161,10 @@ pub async fn sync_server(
         })
     });
     futures::future::try_join_all(jobs).await?;
+
+    // База пишется после загрузки: до неё файлов ещё нет, и запомнить их хеш
+    // значило бы соврать следующему проходу.
+    base.save(instance_dir).await;
 
     // 5. Удалить лишние файлы (всё, что не в effective и не защищено).
     progress(SyncStage::Cleaning, 0, 0, String::new());
@@ -248,13 +277,17 @@ async fn clean_extra(
     manifest: &BuildManifest,
 ) -> Result<()> {
     let keep: HashSet<String> = effective.iter().map(|f| f.path.clone()).collect();
-    let mut protected: Vec<String> = Vec::new();
-    protected.extend(manifest.unmanaged_paths.iter().cloned());
-    protected.extend(manifest.user_managed_paths.iter().cloned());
-    // Служебные внутренние пути лаунчера.
-    protected.push(".natives/".to_string());
-    protected.push(".noro-build".to_string());
-    protected.push(".noro-servers".to_string());
+    // Всё, что не принадлежит сборке целиком, из удаления исключено: правила
+    // разрешают удалять только managed-пути.
+    let rules = manifest.path_rules.clone();
+    // Служебные внутренние пути лаунчера. `.noro/` — база хешей и отложенные
+    // конфликты: снести их значит потерять и то, и другое.
+    let protected: Vec<String> = vec![
+        ".natives/".to_string(),
+        ".noro/".to_string(),
+        ".noro-build".to_string(),
+        ".noro-servers".to_string(),
+    ];
 
     let root = instance_dir.to_path_buf();
     let to_delete = tokio::task::spawn_blocking(move || {
@@ -274,6 +307,9 @@ async fn clean_extra(
                 continue;
             }
             if is_protected(&rel, &protected) {
+                continue;
+            }
+            if schema::mode_for(&rel, &rules) != schema::PathMode::Managed {
                 continue;
             }
             victims.push(entry.path().to_path_buf());
