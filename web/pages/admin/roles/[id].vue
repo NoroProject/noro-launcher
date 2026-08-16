@@ -106,12 +106,12 @@ async function removePermission(entries: PermissionEntry[]) {
         </label>
         <label>
           <span class="noro-label">Inherits from</span>
-          <select v-model="form.parent_id" class="noro-input noro-select">
+          <NoroSelect v-model="form.parent_id">
             <option value="">Nothing — own permissions only</option>
             <option v-for="item in parentOptions" :key="item.id" :value="item.id">
               {{ item.display_name }}
             </option>
-          </select>
+          </NoroSelect>
           <span class="mt-2 block text-xs text-[var(--noro-muted)]">
             Everything the parent grants applies here too, all the way up the chain.
             A role cannot inherit from one that already inherits from it.

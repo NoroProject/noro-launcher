@@ -11,6 +11,9 @@ const online = defineModel<boolean>('online', { default: false })
 const status = ref<LauncherStatus | null>(null)
 const sessions = ref<SessionRow[]>([])
 const pending = ref(false)
+/// Список сессий свёрнут: их бывает под два десятка, и развёрнутый список
+/// вытеснял со страницы всё остальное.
+const showSessions = ref(false)
 
 async function load() {
   pending.value = true
@@ -90,17 +93,26 @@ onMounted(() => load())
     </div>
 
     <div v-if="sessions.length" class="space-y-1">
-      <div class="noro-label">Active sessions</div>
-      <div
-        v-for="s in sessions"
-        :key="s.id"
-        class="flex items-center justify-between rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] px-3 py-2 text-xs"
+      <button
+        class="flex w-full items-center gap-2 text-left text-xs text-[var(--noro-muted)] transition hover:text-[var(--noro-text)]"
+        @click="showSessions = !showSessions"
       >
-        <span class="text-[var(--noro-muted)]">
-          {{ s.scope }} · {{ new Date(s.created_at).toLocaleDateString() }}
-          <span v-if="s.impersonated_by" class="text-[var(--noro-magenta)]">· impersonated</span>
-        </span>
-        <span class="text-[var(--noro-muted)]">until {{ new Date(s.expires_at).toLocaleDateString() }}</span>
+        <UIcon :name="showSessions ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-3.5" />
+        {{ sessions.length }} active session{{ sessions.length === 1 ? '' : 's' }}
+      </button>
+
+      <div v-if="showSessions" class="noro-scroll max-h-56 space-y-1 overflow-y-auto pr-1">
+        <div
+          v-for="s in sessions"
+          :key="s.id"
+          class="flex items-center justify-between rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] px-3 py-2 text-xs"
+        >
+          <span class="text-[var(--noro-muted)]">
+            {{ s.scope }} · {{ new Date(s.created_at).toLocaleDateString() }}
+            <span v-if="s.impersonated_by" class="text-[var(--noro-magenta)]">· impersonated</span>
+          </span>
+          <span class="text-[var(--noro-muted)]">until {{ new Date(s.expires_at).toLocaleDateString() }}</span>
+        </div>
       </div>
     </div>
   </section>

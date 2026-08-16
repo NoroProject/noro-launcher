@@ -67,18 +67,45 @@ onMounted(() => load())
   <section class="noro-panel p-5 space-y-4">
     <h3 class="text-lg font-black text-[var(--noro-text)]">Punishments</h3>
 
-    <div class="grid gap-2 sm:grid-cols-[120px_1fr_100px_auto]">
-      <select v-model="kind" class="noro-input">
-        <option value="warn">Warning</option>
-        <option value="ban">Ban</option>
-      </select>
-      <input v-model="reason" class="noro-input" placeholder="Reason — it is what explains this in six months">
-      <input v-model="hours" class="noro-input" placeholder="hours" inputmode="numeric">
-      <AtomButton icon="i-lucide-gavel" :loading="busy" :disabled="reason.trim().length < 3" @click="create">
-        Apply
-      </AtomButton>
+    <div class="grid gap-3">
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="block">
+          <span class="noro-label mb-1.5 block">Kind</span>
+          <NoroSelect v-model="kind" class="w-full">
+            <option value="warn">Warning</option>
+            <option value="ban">Ban</option>
+          </NoroSelect>
+        </label>
+        <label class="block">
+          <span class="noro-label mb-1.5 block">Hours <span class="text-[var(--noro-muted)]">— empty = forever</span></span>
+          <input v-model="hours" class="noro-input w-full" placeholder="forever" inputmode="numeric">
+        </label>
+      </div>
+
+      <label class="block">
+        <span class="noro-label mb-1.5 block">Reason</span>
+        <textarea
+          v-model="reason"
+          rows="3"
+          class="noro-input w-full resize-y"
+          placeholder="What explains this punishment in six months"
+        />
+      </label>
+
+      <div>
+        <!-- Цвет повторяет тяжесть: перепутать бан с предупреждением в одно
+             нажатие не должно быть легко. -->
+        <AtomButton
+          :variant="kind === 'ban' ? 'danger' : 'warning'"
+          icon="i-lucide-gavel"
+          :loading="busy"
+          :disabled="reason.trim().length < 3"
+          @click="create"
+        >
+          {{ kind === 'ban' ? 'Ban' : 'Warn' }}
+        </AtomButton>
+      </div>
     </div>
-    <p class="text-xs text-[var(--noro-muted)]">Leave hours empty for a permanent one.</p>
 
     <div v-if="rows.length" class="space-y-2">
       <div

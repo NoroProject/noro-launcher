@@ -52,9 +52,16 @@ onMounted(() => load())
     <h3 class="text-lg font-black text-[var(--noro-text)]">Notes</h3>
     <p class="text-xs text-[var(--noro-muted)]">Admins only — the player never sees these.</p>
 
-    <div class="flex gap-2">
-      <input v-model="body" class="noro-input flex-1" placeholder="What happened" @keyup.enter="add">
-      <AtomButton icon="i-lucide-plus" :loading="busy" :disabled="!body.trim()" @click="add">Add</AtomButton>
+    <div class="grid gap-2">
+      <textarea
+        v-model="body"
+        rows="3"
+        class="noro-input w-full resize-y"
+        placeholder="What happened"
+      />
+      <div>
+        <AtomButton icon="i-lucide-plus" :loading="busy" :disabled="!body.trim()" @click="add">Add</AtomButton>
+      </div>
     </div>
 
     <div v-if="rows.length" class="space-y-2">

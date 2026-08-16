@@ -49,7 +49,6 @@ const selectedActiveCape = ref('')
 const capeDropdownOpen = ref(false)
 const currentSelectedCapeObj = computed(() => capes.value.find(c => c.id === selectedActiveCape.value))
 const grantedCapeIds = ref<Set<string>>(new Set())
-const banReason = ref('')
 const busy = ref<string | null>(null)
 const skinFile = ref<File | null>(null)
 
@@ -89,13 +88,6 @@ async function deletePresetForUser(presetId: string) {
       method: 'DELETE'
     })
   })
-}
-
-async function setBan(banned: boolean) {
-  await run('ban', () => auth.request(`/api/admin/users/${id.value}/ban`, {
-    method: 'PUT',
-    body: { banned, reason: banned ? banReason.value || null : null }
-  }))
 }
 
 function toggleCapeGrant(capeId: string) {
@@ -210,8 +202,6 @@ function onSkinFilePicked(e: Event) {
       <!-- Tab 1: Profile & Permissions -->
       <div v-if="activeTab === 'profile'" class="grid gap-5 xl:grid-cols-[360px_1fr]">
         <div class="space-y-5">
-        <UserLauncherPanel v-model:online="launcherOnline" :user-id="id" @impersonate="showImpersonate = true" @request-logs="showRequestLogs = true" />
-        <DiagnosticsCard :user-id="id" :online="launcherOnline" />
         <div class="noro-panel h-fit p-5 space-y-4">
           <div class="flex items-center gap-4">
             <img v-if="user.discord_avatar" :src="user.discord_avatar" alt="" class="size-16 rounded-lg object-cover">
@@ -227,6 +217,9 @@ function onSkinFilePicked(e: Event) {
             <code class="break-all text-xs text-[var(--noro-text)]">{{ user.uuid }}</code>
           </div>
         </div>
+        <UserLauncherPanel v-model:online="launcherOnline" :user-id="id" @impersonate="showImpersonate = true" @request-logs="showRequestLogs = true" />
+        <DiagnosticsCard :user-id="id" :online="launcherOnline" />
+        </div>
 
         <div class="grid gap-5">
           <AdminUserRoles :roles="roles" :user-roles="user.roles" :busy="busy" @add="addRole" @remove="removeRole" />
@@ -239,7 +232,6 @@ function onSkinFilePicked(e: Event) {
             @add="addPermission"
             @remove="removePermission"
           />
-        </div>
         </div>
       </div>
 
@@ -281,63 +273,64 @@ function onSkinFilePicked(e: Event) {
               </div>
             </div>
 
-            <!-- Saved Skin Presets Panel -->
-            <div class="noro-panel p-5 space-y-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h3 class="noro-label">Skin Presets</h3>
-                  <p class="text-xs text-[var(--noro-muted)]">Saved player skins gallery</p>
-                </div>
-                <UBadge color="primary" variant="subtle">{{ skinPresets.length }} presets</UBadge>
-              </div>
-
-              <div v-if="skinPresets.length" class="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-1 noro-scroll">
-                <div
-                  v-for="preset in skinPresets"
-                  :key="preset.id"
-                  class="group relative flex flex-col justify-between rounded-lg border p-3 transition"
-                  :class="user.skin_url === preset.skin_url ? 'border-[var(--noro-cream)] bg-[var(--noro-input)] shadow-md' : 'border-[var(--noro-border)] bg-[var(--noro-bg-deep)] hover:border-[var(--noro-muted)]'"
-                >
-                  <div class="flex items-center justify-between gap-1 mb-2">
-                    <span class="truncate text-xs font-bold text-[var(--noro-text)]" :title="preset.name">{{ preset.name }}</span>
-                    <button
-                      type="button"
-                      class="text-[var(--noro-muted)] hover:text-red-400 p-0.5 rounded transition opacity-0 group-hover:opacity-100"
-                      title="Delete preset"
-                      @click.stop="deletePresetForUser(preset.id)"
-                    >
-                      <UIcon name="i-lucide-trash-2" class="size-3.5" />
-                    </button>
-                  </div>
-
-                  <div class="flex items-center justify-center py-2 bg-[var(--noro-input)] rounded border border-[var(--noro-border)] mb-2 overflow-hidden">
-                    <img :src="preset.skin_url" alt="" class="h-16 w-auto object-contain image-render-pixelated">
-                  </div>
-
-                  <div>
-                    <UBadge v-if="user.skin_url === preset.skin_url" color="primary" variant="subtle" class="w-full justify-center text-[10px]">
-                      Active
-                    </UBadge>
-                    <AtomButton
-                      v-else
-                      variant="secondary"
-                      size="sm"
-                      class="w-full justify-center text-[10px]"
-                      :disabled="busy === 'select-preset'"
-                      @click="selectPresetForUser(preset.skin_url)"
-                    >
-                      Equip
-                    </AtomButton>
-                  </div>
-                </div>
-              </div>
-              <EmptyState v-else icon="i-lucide-images" title="No skin presets" text="Player hasn't saved any presets yet." />
-            </div>
           </div>
         </section>
 
         <!-- Capes Management & Access Permissions -->
         <section class="space-y-5">
+        <!-- Saved Skin Presets Panel -->
+        <div class="noro-panel p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="noro-label">Skin Presets</h3>
+              <p class="text-xs text-[var(--noro-muted)]">Saved player skins gallery</p>
+            </div>
+            <UBadge color="primary" variant="subtle">{{ skinPresets.length }} presets</UBadge>
+          </div>
+
+          <div v-if="skinPresets.length" class="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div
+              v-for="preset in skinPresets"
+              :key="preset.id"
+              class="group relative flex flex-col justify-between rounded-lg border p-3 transition"
+              :class="user.skin_url === preset.skin_url ? 'border-[var(--noro-cream)] bg-[var(--noro-input)] shadow-md' : 'border-[var(--noro-border)] bg-[var(--noro-bg-deep)] hover:border-[var(--noro-muted)]'"
+            >
+              <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="truncate text-xs font-bold text-[var(--noro-text)]" :title="preset.name">{{ preset.name }}</span>
+                <button
+                  type="button"
+                  class="text-[var(--noro-muted)] hover:text-red-400 p-0.5 rounded transition opacity-0 group-hover:opacity-100"
+                  title="Delete preset"
+                  @click.stop="deletePresetForUser(preset.id)"
+                >
+                  <UIcon name="i-lucide-trash-2" class="size-3.5" />
+                </button>
+              </div>
+
+              <div class="mb-2 flex items-center justify-center overflow-hidden rounded border border-[var(--noro-border)] bg-[var(--noro-input)] py-2">
+                <SkinCard3D :skin-url="preset.skin_url" mode="body" :scale="6" />
+              </div>
+
+              <div>
+                <UBadge v-if="user.skin_url === preset.skin_url" color="primary" variant="subtle" class="w-full justify-center text-[10px]">
+                  Active
+                </UBadge>
+                <AtomButton
+                  v-else
+                  variant="secondary"
+                  size="sm"
+                  class="w-full justify-center text-[10px]"
+                  :disabled="busy === 'select-preset'"
+                  @click="selectPresetForUser(preset.skin_url)"
+                >
+                  Equip
+                </AtomButton>
+              </div>
+            </div>
+          </div>
+          <EmptyState v-else icon="i-lucide-images" title="No skin presets" text="Player hasn't saved any presets yet." />
+        </div>
+
           <!-- Active Cape Selection -->
           <div class="noro-panel p-5 space-y-4">
             <div class="flex items-center justify-between">
@@ -466,16 +459,6 @@ function onSkinFilePicked(e: Event) {
       <div v-if="activeTab === 'moderation'" class="grid gap-5 xl:grid-cols-2">
         <PunishmentsPanel :user-id="id" />
         <UserNotesPanel :user-id="id" />
-      </div>
-
-      <div v-if="activeTab === 'moderation'" class="noro-panel mt-5 p-5 space-y-4 max-w-xl">
-        <h2 class="text-xl font-black text-[var(--noro-text)]">User Moderation</h2>
-        <p class="text-sm text-[var(--noro-muted)]">Restrict player launcher login and server access</p>
-        <input v-model="banReason" class="noro-input" placeholder="Enter ban reason...">
-        <div class="flex flex-wrap gap-3">
-          <AtomButton variant="danger" :loading="busy === 'ban'" icon="i-lucide-ban" @click="setBan(true)">Ban Player</AtomButton>
-          <AtomButton variant="secondary" :loading="busy === 'ban'" icon="i-lucide-check" @click="setBan(false)">Unban Player</AtomButton>
-        </div>
       </div>
     </div>
 
