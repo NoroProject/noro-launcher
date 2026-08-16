@@ -1288,18 +1288,34 @@ pub async fn set_current_launcher_version(
 // Admin-токены
 // ---------------------------------------------------------------------------
 
-pub async fn admin_token_by_hash(pool: &PgPool, hash: &str) -> Result<Option<AdminTokenRow>> {
-    let row = sqlx::query_as::<_, AdminTokenRow>("SELECT * FROM admin_tokens WHERE token_hash=$1")
-        .bind(hash)
-        .fetch_optional(pool)
+/// Найти токен по селектору. Владение секретом проверяется отдельно —
+/// `last_used_at` здесь не трогается, иначе отметка ставилась бы и на неудачные
+/// попытки.
+pub async fn admin_token_by_lookup(pool: &PgPool, lookup: &str) -> Result<Option<AdminTokenRow>> {
+    Ok(
+        sqlx::query_as::<_, AdminTokenRow>("SELECT * FROM admin_tokens WHERE token_lookup=$1")
+            .bind(lookup)
+            .fetch_optional(pool)
+            .await?,
+    )
+}
+
+pub async fn touch_admin_token(pool: &PgPool, id: Uuid) -> Result<()> {
+    sqlx::query("UPDATE admin_tokens SET last_used_at=NOW() WHERE id=$1")
+        .bind(id)
+        .execute(pool)
         .await?;
-    if row.is_some() {
-        sqlx::query("UPDATE admin_tokens SET last_used_at=NOW() WHERE token_hash=$1")
-            .bind(hash)
-            .execute(pool)
-            .await?;
-    }
-    Ok(row)
+    Ok(())
+}
+
+/// Досчитать argon2 для токена, доставшегося от старой схемы.
+pub async fn upgrade_admin_token_hash(pool: &PgPool, id: Uuid, phc: &str) -> Result<()> {
+    sqlx::query("UPDATE admin_tokens SET token_hash=$2 WHERE id=$1 AND token_hash IS NULL")
+        .bind(id)
+        .bind(phc)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn list_admin_tokens(pool: &PgPool) -> Result<Vec<AdminTokenRow>> {
@@ -1313,13 +1329,16 @@ pub async fn list_admin_tokens(pool: &PgPool) -> Result<Vec<AdminTokenRow>> {
 pub async fn create_admin_token(
     pool: &PgPool,
     name: &str,
+    lookup: &str,
     token_hash: &str,
     permissions: &[String],
 ) -> Result<Uuid> {
     Ok(sqlx::query_scalar(
-        "INSERT INTO admin_tokens (name, token_hash, permissions) VALUES ($1,$2,$3) RETURNING id",
+        "INSERT INTO admin_tokens (name, token_lookup, token_hash, permissions)
+         VALUES ($1,$2,$3,$4) RETURNING id",
     )
     .bind(name)
+    .bind(lookup)
     .bind(token_hash)
     .bind(permissions)
     .fetch_one(pool)

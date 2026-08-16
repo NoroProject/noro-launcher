@@ -1,22 +1,48 @@
 //! Админ: API-токены для CLI/CI.
 
-use crate::api::auth::{hash_admin_token, AdminAuth};
+use crate::api::auth::{admin_token, AdminAuth};
 use crate::audit::{self, target};
-use crate::db::models::AdminTokenRow;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
-use serde::Deserialize;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
+
+/// Токен в списке. Ни селектора, ни хеша: прежний список отдавал в браузер
+/// `token_hash`, который тогда был и рабочим доказательством владения.
+#[derive(Serialize)]
+pub struct TokenItem {
+    pub id: Uuid,
+    pub name: String,
+    pub permissions: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    /// Токен ещё на старой схеме хеширования — перейдёт при первом
+    /// использовании. Видно в админке, чтобы забытые токены можно было отозвать.
+    pub legacy_hash: bool,
+}
 
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<AdminTokenRow>>> {
+) -> AppResult<Json<Vec<TokenItem>>> {
     admin.require(schema::PERM_ADMIN_ALL)?;
-    Ok(Json(crate::db::list_admin_tokens(&state.db).await?))
+    let items = crate::db::list_admin_tokens(&state.db)
+        .await?
+        .into_iter()
+        .map(|t| TokenItem {
+            id: t.id,
+            name: t.name,
+            permissions: t.permissions,
+            created_at: t.created_at,
+            last_used_at: t.last_used_at,
+            legacy_hash: t.token_hash.is_none(),
+        })
+        .collect();
+    Ok(Json(items))
 }
 
 #[derive(Deserialize)]
@@ -33,19 +59,21 @@ pub async fn create(
     Json(req): Json<CreateReq>,
 ) -> AppResult<Json<Value>> {
     admin.require(schema::PERM_ADMIN_ALL)?;
-    // Сгенерировать секрет.
-    let secret = {
-        use rand::Rng;
-        let bytes: [u8; 32] = rand::thread_rng().gen();
-        format!("noro_{}", hex::encode(bytes))
-    };
-    let hash = hash_admin_token(&secret);
+    let secret = admin_token::generate();
+    let hash = admin_token::hash(&secret).map_err(AppError::Other)?;
     let perms = if req.permissions.is_empty() {
         vec![schema::PERM_ADMIN_ALL.to_string()]
     } else {
         req.permissions
     };
-    let id = crate::db::create_admin_token(&state.db, &req.name, &hash, &perms).await?;
+    let id = crate::db::create_admin_token(
+        &state.db,
+        &req.name,
+        &admin_token::lookup(&secret),
+        &hash,
+        &perms,
+    )
+    .await?;
     audit::record(
         &state,
         &admin.actor,

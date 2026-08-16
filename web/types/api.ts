@@ -154,10 +154,11 @@ export interface ServerCoreRow {
 export interface AdminTokenRow {
   id: string;
   name: string;
-  token_hash: string;
   permissions: string[];
   created_at: string;
   last_used_at?: string | null;
+  /** Токен ещё на старой схеме хеширования — перейдёт при первом использовании. */
+  legacy_hash: boolean;
 }
 
 export interface ModrinthHit {

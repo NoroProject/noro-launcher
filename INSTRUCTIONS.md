@@ -1172,6 +1172,15 @@ The DEV seed (`DEV_SIGNING_SEED`) is public in source code — **never use it in
 Server-side admin operations (CI, `admin_cli`) use admin tokens stored as Argon2 hashes.
 Tokens carry a permission set, not full admin access.
 
+Secrets look like `noro_at_<64 hex chars>` — the prefix is what secret scanners
+and humans match on. Each row stores the secret twice, in two distinct roles:
+`token_lookup` is a SHA-256 selector used to find the row (Argon2 is salted and
+cannot be looked up), and `token_hash` is the Argon2 verifier that proves
+ownership. A database dump therefore no longer yields working tokens.
+
+Tokens issued before this split carry `token_hash IS NULL` and are shown as
+`legacy` in the admin UI; the master rehashes them on their next successful use.
+
 ### 18.5 CORS
 
 Allowed browser origins come from `NORO_ALLOWED_ORIGINS` (comma-separated).

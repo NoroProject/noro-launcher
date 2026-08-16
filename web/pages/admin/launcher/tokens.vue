@@ -80,7 +80,14 @@ async function revoke(id: string) {
         <thead><tr><th>Name</th><th>Permissions</th><th>Last used</th><th /></tr></thead>
         <tbody>
           <tr v-for="token in tokens" :key="token.id">
-            <td class="font-semibold text-[var(--noro-text)]">{{ token.name }}</td>
+            <td class="font-semibold text-[var(--noro-text)]">
+              {{ token.name }}
+              <span
+                v-if="token.legacy_hash"
+                class="ml-2 rounded bg-[color-mix(in_srgb,var(--noro-cream)_16%,transparent)] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-[var(--noro-cream)]"
+                title="Issued under the old hashing scheme. Upgrades on first use — revoke it if nothing uses it anymore."
+              >legacy</span>
+            </td>
             <td>{{ token.permissions.join(', ') }}</td>
             <td>{{ token.last_used_at || 'never' }}</td>
             <td class="text-right">

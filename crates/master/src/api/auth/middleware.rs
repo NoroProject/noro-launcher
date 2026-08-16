@@ -1,12 +1,12 @@
 //! Extractors авторизации: AuthUser (Bearer-токен пользователя) и AdminAuth
 //! (пользователь с admin-правом ИЛИ admin-токен из CLI/CI).
 
+use super::admin_token;
 use crate::error::AppError;
 use crate::state::AppState;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use schema::UserProfile;
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 fn bearer(parts: &Parts) -> Option<String> {
@@ -87,13 +87,9 @@ impl FromRequestParts<AppState> for AdminAuth {
         let token =
             bearer(parts).ok_or_else(|| AppError::Unauthorized("нет Bearer-токена".into()))?;
 
-        // Сначала пробуем как admin-токен (hash совпадает).
-        let hash = hex::encode(Sha256::digest(token.as_bytes()));
-        if let Some(t) = crate::db::admin_token_by_hash(&state.db, &hash).await? {
-            return Ok(AdminAuth {
-                actor: crate::audit::Actor::Token { name: t.name },
-                permissions: t.permissions,
-            });
+        // Сначала пробуем как admin-токен.
+        if let Some(t) = admin_token_auth(state, &token).await? {
+            return Ok(t);
         }
 
         // Иначе — пользовательский токен.
@@ -117,7 +113,41 @@ impl FromRequestParts<AppState> for AdminAuth {
     }
 }
 
-/// Хешировать секрет admin-токена для хранения/поиска.
-pub fn hash_admin_token(secret: &str) -> String {
-    hex::encode(Sha256::digest(secret.as_bytes()))
+/// Проверить предъявленный admin-токен.
+///
+/// `None` означает «это не admin-токен» — вызывающий пробует его как
+/// пользовательский. Отказ в правах здесь не различается с «не найден»
+/// намеренно: подсказывать, что токен существует, но не подошёл, незачем.
+async fn admin_token_auth(state: &AppState, token: &str) -> Result<Option<AdminAuth>, AppError> {
+    let lookup = admin_token::lookup(token);
+    let Some(row) = crate::db::admin_token_by_lookup(&state.db, &lookup).await? else {
+        return Ok(None);
+    };
+
+    match &row.token_hash {
+        Some(phc) => {
+            if !admin_token::verify(token, phc) {
+                // Селектор сошёлся, а argon2 — нет. SHA-256-коллизии не бывает,
+                // значит запись испорчена: об этом надо знать.
+                tracing::error!(token = %row.name, "admin-токен: селектор сошёлся, хеш нет");
+                return Ok(None);
+            }
+        }
+        // Токен из старой схемы: доказательством был сам SHA-256, и он совпал.
+        // Секрет у нас на руках ровно сейчас — досчитываем argon2 и больше к
+        // старой схеме не возвращаемся.
+        None => match admin_token::hash(token) {
+            Ok(phc) => {
+                crate::db::upgrade_admin_token_hash(&state.db, row.id, &phc).await?;
+                tracing::info!(token = %row.name, "admin-токен переведён на argon2");
+            }
+            Err(e) => tracing::error!(error = %e, token = %row.name, "не пересчитать хеш токена"),
+        },
+    }
+
+    crate::db::touch_admin_token(&state.db, row.id).await?;
+    Ok(Some(AdminAuth {
+        actor: crate::audit::Actor::Token { name: row.name },
+        permissions: row.permissions,
+    }))
 }

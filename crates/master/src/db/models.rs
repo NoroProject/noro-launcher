@@ -136,11 +136,18 @@ pub struct LauncherVersionRow {
     pub kind: String,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize)]
+/// Строка admin-токена. Не `Serialize`: и селектор, и хеш — служебные значения,
+/// которым нечего делать в ответе API. Наружу их отдавал прежний список
+/// токенов, где `token_hash` был ещё и рабочим доказательством владения.
+#[derive(Debug, Clone, FromRow)]
 pub struct AdminTokenRow {
     pub id: Uuid,
     pub name: String,
-    pub token_hash: String,
+    /// SHA-256 секрета: по нему ищется строка.
+    pub token_lookup: String,
+    /// argon2 в формате PHC. `None` — токен достался от старой схемы и будет
+    /// переведён при первом же использовании.
+    pub token_hash: Option<String>,
     pub permissions: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub last_used_at: Option<DateTime<Utc>>,
