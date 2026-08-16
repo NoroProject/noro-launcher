@@ -51,6 +51,12 @@ pub async fn verify_before_launch(
     findings.extend(scan::remove_extras(instance_dir, manifest, &expected).await);
     findings.extend(scan::forbidden_optionals(manifest, enabled_optional, user));
 
+    // Запрещённые файлы — поверх всех правил путей: они достают и то, что синк
+    // не трогает вовсе.
+    let blocked = crate::sync::blocklist::enforce(instance_dir, &manifest.blocked_files).await;
+    let block_launch = blocked.block_launch;
+    findings.extend(blocked.findings);
+
     cache.save(instance_dir).await;
 
     IntegrityReport {
@@ -61,6 +67,7 @@ pub async fn verify_before_launch(
         enabled_optional: enabled_optional.to_vec(),
         findings,
         checked_files: checked,
+        block_launch,
     }
 }
 

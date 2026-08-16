@@ -3,6 +3,7 @@
 //! Этот крейт не зависит от tokio/axum/sqlx — только сериализация и базовые типы,
 //! поэтому его одинаково тянут и frontend (GPUI), и backend, и master.
 
+pub mod blocklist;
 pub mod build;
 pub mod integrity;
 pub mod launcher;
@@ -15,6 +16,7 @@ pub mod server;
 pub mod user;
 pub mod ws_protocol;
 
+pub use blocklist::*;
 pub use build::*;
 pub use integrity::*;
 pub use launcher::*;

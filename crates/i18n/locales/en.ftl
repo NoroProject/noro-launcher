@@ -80,6 +80,7 @@ notif-server-error = Server error: { $reason }
 notif-no-server-access = No access to this server
 notif-no-published-build = This server has no published build
 notif-build-files-restored = Build files were restored
+notif-launch-blocked = Launch blocked: a banned file was found in the game folder
 notif-support-sent = Logs sent — thank you
 impersonate-title = SIGN IN AS A PLAYER
 logreq-title = AN ADMIN IS ASKING FOR LOGS

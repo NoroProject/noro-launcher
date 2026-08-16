@@ -84,6 +84,7 @@ fn manifest(mods: Vec<OptionalMod>, paths: &[&str]) -> BuildManifest {
             .collect(),
         unmanaged_paths: Vec::new(),
         path_rules: Vec::new(),
+        blocked_files: Vec::new(),
         user_managed_paths: Vec::new(),
         optional_mods: mods,
         allow_optional_mod_suggestions: false,

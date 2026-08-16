@@ -170,6 +170,11 @@ pub struct BuildManifest {
     /// тогда правила выводятся из двух списков выше.
     #[serde(default)]
     pub path_rules: Vec<crate::path_rules::PathRule>,
+    /// Запрещённые файлы. Едут внутри подписи — иначе список подменяется на
+    /// клиенте. Приоритет выше всех правил путей, включая `unmanaged`: папка
+    /// ресурспаков не синхронизируется, но xray оттуда удаляется.
+    #[serde(default)]
+    pub blocked_files: Vec<crate::blocklist::BlockedFile>,
 
     /// Пути, где пользователь МОЖЕТ добавлять файлы (не удаляются).
     pub user_managed_paths: Vec<String>,

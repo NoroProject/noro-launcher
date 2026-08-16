@@ -100,6 +100,10 @@ pub async fn build_manifest(
     let game_args: Vec<schema::ManifestArg> = serde_json::from_value(base_build.game_args.clone())
         .context("game_args базовой сборки не разобрать")?;
 
+    // Внутрь подписи: список, который можно подменить на клиенте, ничего не
+    // запрещает.
+    let blocked_files = crate::db::blocked_files_for(&state.db, build.server_id).await?;
+
     let mut manifest = BuildManifest {
         build_id: build.id,
         server_id: build.server_id,
@@ -119,6 +123,7 @@ pub async fn build_manifest(
         unmanaged_paths,
         user_managed_paths,
         path_rules,
+        blocked_files,
         optional_mods,
         allow_optional_mod_suggestions: build.allow_optional_mod_suggestions,
         recommended_client_settings: RecommendedClientSettings {

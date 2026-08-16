@@ -550,7 +550,22 @@ pub fn spawn_sync_and_launch(
                 level: schema::NotifLevel::Info,
             });
         }
+        let blocked = report.block_launch;
         ctx.ws.send(ClientWsMsg::ReportIntegrity { report });
+        if blocked {
+            // Не удаляем сами: игрок должен увидеть, из-за чего его не пускают,
+            // а удаление молча выглядело бы поломкой лаунчера.
+            ctx.send(MessageToFrontend::AddNotification {
+                key: "notif-launch-blocked".into(),
+                args: std::collections::BTreeMap::new(),
+                level: schema::NotifLevel::Error,
+            });
+            ctx.send(MessageToFrontend::SyncFailed {
+                server_id,
+                reason: "запуск заблокирован: найден запрещённый файл".into(),
+            });
+            return;
+        }
 
         // После синхронизации файлов, но до запуска: игра читает servers.dat
         // на старте и перезаписывает его при выходе. Список серверов не повод

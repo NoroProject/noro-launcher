@@ -1,3 +1,4 @@
+pub mod blocklist;
 pub mod downloader;
 pub mod fetch;
 pub mod file_sync;

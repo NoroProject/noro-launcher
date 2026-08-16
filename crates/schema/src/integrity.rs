@@ -57,6 +57,9 @@ pub struct IntegrityReport {
     pub findings: Vec<IntegrityFinding>,
     /// Сколько файлов сверено — чтобы отличать «всё чисто» от «проверка не шла».
     pub checked_files: u32,
+    /// Нашёлся файл, из-за которого игру запускать нельзя.
+    #[serde(default)]
+    pub block_launch: bool,
 }
 
 /// Диагностический снапшот лаунчера.

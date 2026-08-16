@@ -82,6 +82,7 @@ notif-server-error = Ошибка сервера: { $reason }
 notif-no-server-access = Нет доступа к этому серверу
 notif-no-published-build = У сервера нет опубликованной сборки
 notif-build-files-restored = Восстановлены файлы сборки
+notif-launch-blocked = Запуск заблокирован: в игровой папке найден запрещённый файл
 notif-support-sent = Логи отправлены — спасибо
 impersonate-title = ВХОД В АККАУНТ ИГРОКА
 logreq-title = АДМИН ПРОСИТ ЛОГИ

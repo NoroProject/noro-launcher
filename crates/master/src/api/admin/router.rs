@@ -3,16 +3,21 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, audit, backup, build_routes, capes, catalog, cores, game_servers, impersonate,
-    integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions, news, notes,
-    permission_nodes, punishments, remote, roles, servers, settings, stats, storage, tokens,
-    user_launcher, users, versions, wrapper, wrapper_backups, wrapper_fs,
+    agents, audit, backup, blocklist, build_routes, capes, catalog, cores, game_servers,
+    impersonate, integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions,
+    news, notes, permission_nodes, punishments, remote, roles, servers, settings, stats, storage,
+    tokens, user_launcher, users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/agents", get(agents::list))
         .route("/api/admin/audit", get(audit::list))
+        .route(
+            "/api/admin/blocklist",
+            get(blocklist::list).post(blocklist::create),
+        )
+        .route("/api/admin/blocklist/{id}", delete(blocklist::delete))
         .route(
             "/api/admin/settings",
             get(settings::list).put(settings::save),

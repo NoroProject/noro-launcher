@@ -1,6 +1,7 @@
 pub mod agents;
 pub mod audit;
 pub mod backup;
+pub mod blocklist;
 pub mod build_routes;
 pub mod builds;
 pub mod capes;

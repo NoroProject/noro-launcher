@@ -59,6 +59,7 @@ fn merged_manifest(pattern: &str, server_sha1: &str) -> BuildManifest {
             mode: schema::PathMode::Merged,
             conflict: schema::ConflictPolicy::KeepMine,
         }],
+        blocked_files: Vec::new(),
         optional_mods: Vec::new(),
         allow_optional_mod_suggestions: false,
         recommended_client_settings: RecommendedClientSettings {
