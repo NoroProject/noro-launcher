@@ -14,6 +14,7 @@ use std::sync::Arc;
 /// Собрать список загрузок и обновлённую базу хешей.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn collect(
+    client: &reqwest::Client,
     instance_dir: &Path,
     manifest: &BuildManifest,
     effective: &[&FileEntry],
@@ -47,6 +48,16 @@ pub(super) async fn collect(
         let wanted = match plan::decide_file(instance_dir, manifest, f, &base, verify_hash).await {
             plan::Action::Download => true,
             plan::Action::Skip => false,
+            // Прежде чем звать человека — попробовать слить по ключам: правки
+            // разных строк одного конфига спорить не должны.
+            plan::Action::Conflict(_)
+                if crate::sync::keymerge::try_merge(client, instance_dir, &f.path, &f.url)
+                    .await
+                    .is_some() =>
+            {
+                tracing::info!(path = %f.path, "конфликт разрешён слиянием по ключам");
+                false
+            }
             plan::Action::Conflict(policy) => match policy {
                 // Правки игрока важнее: молча затереть их — ровно то, от чего
                 // режим и защищает. Админ увидит это флагом.

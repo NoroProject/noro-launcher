@@ -60,6 +60,7 @@ pub async fn sync_server(
 
     // 3. Проверка файлов — что нужно скачать.
     let (tasks, base) = tasks::collect(
+        client,
         instance_dir,
         manifest,
         &effective,
@@ -108,6 +109,12 @@ pub async fn sync_server(
         })
     });
     futures::future::try_join_all(jobs).await?;
+
+    // Копии конфигов для слияния по ключам: делаются после загрузки, когда на
+    // диске уже лежит серверная версия.
+    for f in &effective {
+        crate::sync::keymerge::remember_base(instance_dir, &f.path).await;
+    }
 
     // База пишется после загрузки: до неё файлов ещё нет, и запомнить их хеш
     // значило бы соврать следующему проходу.
