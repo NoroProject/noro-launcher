@@ -14,6 +14,8 @@ pub struct AppState {
     pub ws: WsHub,
     pub files: FileStore,
     pub signer: Signer25519,
+    /// RSA-подпись профилей Yggdrasil — без неё игроки не видят чужие скины.
+    pub profile_signer: Arc<crate::yggdrasil_sign::ProfileSigner>,
     pub config: Arc<Config>,
     pub http: reqwest::Client,
     pub import_jobs: Arc<dashmap::DashMap<uuid::Uuid, crate::build_importer::ImportProgress>>,

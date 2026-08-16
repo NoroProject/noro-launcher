@@ -17,6 +17,7 @@ pub mod state;
 pub mod telemetry;
 pub mod wrapper;
 pub mod ws;
+pub mod yggdrasil_sign;
 
 use anyhow::Result;
 use axum::routing::{delete, get, post, put};
@@ -42,6 +43,9 @@ pub async fn run() -> Result<()> {
         tracing::info!("публичный ключ подписи: {}", signer.public_key_hex());
     }
 
+    // Ключ создаётся при первом старте и живёт в data_dir рядом с файлами.
+    let profile_signer = yggdrasil_sign::ProfileSigner::load_or_create(&config.data_dir)?;
+
     let db = db::connect_and_migrate(&config.database_url).await?;
     let files = files::FileStore::new(&config.data_dir);
     let http = reqwest::Client::builder()
@@ -53,6 +57,7 @@ pub async fn run() -> Result<()> {
         ws: ws::WsHub::new(),
         files,
         signer,
+        profile_signer: Arc::new(profile_signer),
         config: Arc::new(config.clone()),
         http,
         import_jobs: Arc::new(dashmap::DashMap::new()),

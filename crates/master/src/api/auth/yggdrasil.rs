@@ -24,9 +24,9 @@ fn parse_uuid_loose(s: &str) -> Option<Uuid> {
 
 /// Корневой ALI-манифест authlib-injector.
 pub async fn root(State(state): State<AppState>) -> Json<Value> {
-    // signaturePublicKey в формате PEM из нашего ed25519? authlib-injector ждёт RSA.
-    // Мы раздаём текстуры без подписи, поэтому ключ-заглушку не публикуем как RSA;
-    // оставляем поле пустым — клиенты работают с unsigned-текстурами.
+    // Этим ключом клиент проверяет подпись чужих профилей. Пока поле было пустым,
+    // игроки видели только свой скин: свой профиль клиент берёт у нас сам и верит
+    // по TLS, а чужой ему пересылает игровой сервер, и там нужна подпись.
     Json(json!({
         "meta": {
             "serverName": "Noro",
@@ -38,7 +38,7 @@ pub async fn root(State(state): State<AppState>) -> Json<Value> {
             }
         },
         "skinDomains": skin_domains(&state.config),
-        "signaturePublicKey": ""
+        "signaturePublicKey": state.profile_signer.public_key_pem()
     }))
 }
 
@@ -214,7 +214,9 @@ pub async fn has_joined(
     match row {
         Some(u) => {
             tracing::info!(username = %q.username, "yggdrasil hasJoined SUCCESS");
-            Ok(Json(profile_json(&state, &u)))
+            // Именно этот ответ игровой сервер пересылает остальным игрокам,
+            // поэтому подпись здесь обязательна — так требует спецификация ALI.
+            Ok(Json(profile_json(&state, &u, true)))
         }
         None => {
             tracing::warn!(username = %q.username, server_id = %q.server_id, "yggdrasil hasJoined NOT FOUND / EXPIRED");
@@ -223,10 +225,23 @@ pub async fn has_joined(
     }
 }
 
+#[derive(Deserialize)]
+pub struct ProfileQuery {
+    /// `false` — вернуть профиль с подписью. По спецификации ALI по умолчанию
+    /// `true`, то есть подпись из ответа исключается.
+    #[serde(default = "default_unsigned")]
+    pub unsigned: bool,
+}
+
+fn default_unsigned() -> bool {
+    true
+}
+
 /// Профиль по UUID или нику (с текстурами).
 pub async fn profile(
     State(state): State<AppState>,
     Path(uuid_or_name): Path<String>,
+    Query(q): Query<ProfileQuery>,
 ) -> Result<Json<Value>, StatusCode> {
     tracing::info!(query = %uuid_or_name, "yggdrasil profile query");
     let u = if let Some(parsed) = parse_uuid_loose(&uuid_or_name) {
@@ -251,7 +266,7 @@ pub async fn profile(
         .ok_or(StatusCode::NO_CONTENT)?,
     };
 
-    Ok(Json(profile_json(&state, &user_row)))
+    Ok(Json(profile_json(&state, &user_row, !q.unsigned)))
 }
 
 #[derive(Deserialize)]
@@ -278,7 +293,7 @@ pub async fn profiles_bulk(
 }
 
 /// Сформировать профиль с base64-свойством textures.
-fn profile_json(state: &AppState, u: &crate::db::models::UserRow) -> Value {
+fn profile_json(state: &AppState, u: &crate::db::models::UserRow, signed: bool) -> Value {
     let mut textures = serde_json::Map::new();
     // Свой скин либо общий Стив: пустой блок textures заставлял клиент
     // выбирать Стива или Алекса самостоятельно, и вид расходился с кабинетом.
@@ -300,12 +315,17 @@ fn profile_json(state: &AppState, u: &crate::db::models::UserRow) -> Value {
     let b64 = base64::engine::general_purpose::STANDARD
         .encode(serde_json::to_vec(&textures_payload).unwrap_or_default());
 
+    // `signed` — то, что уедет чужим клиентам через игровой сервер. Свой профиль
+    // клиент забирает напрямую, и ему подпись не нужна, но и не мешает.
+    let mut property = json!({ "name": "textures", "value": b64 });
+    if signed {
+        property["signature"] = json!(state.profile_signer.sign_property(&b64));
+    }
+
     json!({
         "id": undash(&u.mc_uuid),
         "name": u.mc_username,
-        "properties": [
-            { "name": "textures", "value": b64 }
-        ]
+        "properties": [property]
     })
 }
 
