@@ -105,6 +105,15 @@ hmac = "0.12"
 hex = "0.4"
 base64 = "0.22"
 argon2 = "0.5"
+# WebAuthn. `danger-allow-state-serialisation` включён намеренно: мастер
+# держит состояние регистрации/входа в БД между двумя HTTP-запросами, а не в
+# памяти процесса, иначе рестарт или второй инстанс ломают вход.
+# `conditional-ui` даёт вход без ввода имени — экран входа спрашивает только
+# отпечаток, поля «кто вы» там нет и не было.
+webauthn-rs = { version = "0.5", features = [
+    "danger-allow-state-serialisation",
+    "conditional-ui",
+] }
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }

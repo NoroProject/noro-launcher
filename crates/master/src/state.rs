@@ -23,6 +23,9 @@ pub struct AppState {
     pub catalog: HttpCache,
     /// Подключённые ServerWrapper'ы игровых серверов.
     pub wrappers: crate::wrapper::WrapperHub,
+    /// Проверка passkey. Собирается один раз при старте: домен и origin'ы
+    /// заданы конфигом, и ошибка в них должна валить запуск, а не вход игрока.
+    pub webauthn: Arc<webauthn_rs::Webauthn>,
 }
 
 impl AppState {

@@ -37,6 +37,15 @@ impl AppError {
     }
 }
 
+/// JSON-ошибка внутри хендлера — это наша поломка (не разобрали собственное
+/// сохранённое состояние), а не плохой запрос. Тело запроса разбирает
+/// экстрактор `Json`, и его отказ сюда не попадает.
+impl From<serde_json::Error> for AppError {
+    fn from(e: serde_json::Error) -> Self {
+        AppError::Other(e.into())
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = self.status();

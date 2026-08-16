@@ -57,38 +57,19 @@ async function loadPasskeys() {
 
 async function addPasskey() {
   try {
-    const opts = await auth.request<any>('/api/me/passkeys/register/options', { method: 'POST' })
-    const challengeBytes = new Uint8Array(opts.challenge.match(/.{1,2}/g).map((byte: string) => parseInt(byte, 16)))
+    const opts = await auth.request<ChallengeRes>('/api/me/passkeys/register/options', { method: 'POST' })
+    const credential = await createCredential(opts)
 
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        challenge: challengeBytes,
-        rp: opts.rp,
-        user: {
-          id: new TextEncoder().encode(opts.user.id),
-          name: opts.user.name,
-          displayName: opts.user.displayName,
-        },
-        pubKeyCredParams: opts.pubKeyCredParams,
-        authenticatorSelection: opts.authenticatorSelection,
-        timeout: opts.timeout,
+    await auth.request('/api/me/passkeys/register/verify', {
+      method: 'POST',
+      body: {
+        state_id: opts.state_id,
+        name: navigator.userAgent.includes('Mac') ? 'Touch ID / Mac Passkey' : 'Passkey',
+        credential,
       }
-    }) as PublicKeyCredential
-
-    if (credential) {
-      const rawId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
-      await auth.request('/api/me/passkeys/register/verify', {
-        method: 'POST',
-        body: {
-          challenge: opts.challenge,
-          name: navigator.userAgent.includes('Mac') ? 'Touch ID / Mac Passkey' : 'Passkey',
-          credential_id: credential.id,
-          public_key: rawId,
-        }
-      })
-      notify.ok()
-      await loadPasskeys()
-    }
+    })
+    notify.ok()
+    await loadPasskeys()
   } catch (e) {
     notify.fail(e, 'Failed to register Passkey')
   }
@@ -189,7 +170,11 @@ onMounted(() => loadPasskeys())
               <UIcon name="i-lucide-fingerprint" class="size-5 text-[var(--noro-blue)]" />
               <div>
                 <div class="font-bold text-[var(--noro-text)]">{{ pk.name }}</div>
-                <div class="text-[10px] text-[var(--noro-muted)]">Создан {{ new Date(pk.created_at).toLocaleDateString() }}</div>
+                <div class="text-[10px] text-[var(--noro-muted)]">
+                  Создан {{ new Date(pk.created_at).toLocaleDateString() }}
+                  ·
+                  {{ pk.last_used_at ? `вход ${new Date(pk.last_used_at).toLocaleDateString()}` : 'ни разу не использован' }}
+                </div>
               </div>
             </div>
             <button

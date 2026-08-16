@@ -63,6 +63,7 @@ pub async fn run() -> Result<()> {
         import_jobs: Arc::new(dashmap::DashMap::new()),
         catalog: catalog::HttpCache::default(),
         wrappers: wrapper::WrapperHub::default(),
+        webauthn: Arc::new(api::auth::webauthn::build(&config)?),
     };
 
     // Фоновый опрос GitHub (если настроен).
@@ -154,14 +155,6 @@ fn router(state: AppState) -> Router {
         .route(
             "/auth/passkeys/login/verify",
             post(auth::passkeys::login_verify).options(|| async {}),
-        )
-        .route(
-            "/auth/passkeys/launcher",
-            get(auth::passkeys::passkey_launcher_page),
-        )
-        .route(
-            "/auth/passkeys/launcher/verify",
-            post(auth::passkeys::passkey_launcher_verify).options(|| async {}),
         )
         .route(
             "/api/auth/passkeys/login/options",

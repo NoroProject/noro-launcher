@@ -13,29 +13,16 @@ async function loginWithPasskey() {
   busy.value = true
   message.value = null
   try {
-    const opts = await auth.request<any>('/auth/passkeys/login/options', { method: 'POST' })
-    const challengeBytes = new Uint8Array(opts.challenge.match(/.{1,2}/g).map((byte: string) => parseInt(byte, 16)))
+    const opts = await auth.request<ChallengeRes>('/auth/passkeys/login/options', { method: 'POST' })
+    const credential = await getCredential(opts)
 
-    const credential = await navigator.credentials.get({
-      publicKey: {
-        challenge: challengeBytes,
-        timeout: opts.timeout,
-        userVerification: opts.userVerification,
-      }
-    }) as PublicKeyCredential
-
-    if (credential) {
-      const res = await auth.request<any>('/auth/passkeys/login/verify', {
-        method: 'POST',
-        body: {
-          challenge: opts.challenge,
-          credential_id: credential.id,
-        }
-      })
-      auth.token.value = res.access_token
-      auth.user.value = res.user
-      await navigateTo(next.value)
-    }
+    const res = await auth.request<any>('/auth/passkeys/login/verify', {
+      method: 'POST',
+      body: { state_id: opts.state_id, credential }
+    })
+    auth.token.value = res.access_token
+    auth.user.value = res.user
+    await navigateTo(next.value)
   } catch (e) {
     message.value = humanError(e)
   } finally {
