@@ -58,6 +58,11 @@ pub const PERM_ADMIN_AUDIT: &str = "noro.admin.audit";
 /// лежит содержимое чужого компьютера, пусть и очищенное.
 pub const PERM_ADMIN_SUPPORT_LOGS: &str = "noro.admin.support.logs";
 
+/// Сбор логов без согласия игрока. Отдельно от чтения: нужен ровно там, где
+/// согласие бессмысленно — иначе единственный, чьи логи никогда не придут, это
+/// тот, ради кого всё затевалось. Каждое применение — отдельное событие аудита.
+pub const PERM_ADMIN_SUPPORT_LOGS_FORCE: &str = "noro.admin.support.logs.force";
+
 pub const PERM_MOD_USERS_BAN: &str = "noro.mod.users.ban";
 
 pub const PERM_LAUNCHER_BETA: &str = "noro.launcher.beta";

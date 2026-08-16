@@ -48,6 +48,11 @@ pub enum ClientWsMsg {
         server_id: Uuid,
         playtime_secs: u64,
     },
+    /// Ответ на запрос логов. `accepted: false` — игрок отказал.
+    LogRequestResponse {
+        request_id: Uuid,
+        accepted: bool,
+    },
     /// Ответ на диалог «войти в аккаунт игрока».
     ImpersonateResponse {
         grant_id: Uuid,
@@ -68,6 +73,18 @@ pub enum NotifLevel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "t", content = "d")]
 pub enum ServerWsMsg {
+    /// Админ просит логи. Модалка показывает, кто и зачем, а игрок решает.
+    ///
+    /// `forced` — сбор без согласия: у админа отдельное право на это, а игрок
+    /// видит, что логи уже уехали. Прятать это незачем — журнал всё равно
+    /// покажет, а честность здесь дешевле недоверия.
+    LogRequest {
+        request_id: Uuid,
+        actor_username: String,
+        reason: String,
+        forced: bool,
+        expires_at: chrono::DateTime<chrono::Utc>,
+    },
     /// Админ нажал «Login as» в вебе — лаунчер спрашивает подтверждение.
     ///
     /// Нативный диалог здесь второй фактор: он закрывает случай

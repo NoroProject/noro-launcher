@@ -17,7 +17,7 @@ mod send;
 
 pub use collect::collect;
 pub use pack::pack;
-pub use send::send;
+pub use send::{send, send_for_request};
 
 use serde::{Deserialize, Serialize};
 

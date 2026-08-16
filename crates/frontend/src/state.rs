@@ -227,6 +227,21 @@ pub struct LauncherUI {
     pub impersonate_prompt: Option<ImpersonatePrompt>,
     /// Ник игрока, от чьего имени сейчас работает лаунчер.
     pub impersonating_as: Option<String>,
+    /// Запрос логов, ждущий решения.
+    pub log_request_prompt: Option<LogRequestPrompt>,
+    /// Открыт ли предпросмотр того, что уйдёт.
+    pub log_request_preview_open: bool,
+}
+
+/// Запрос логов от админа.
+pub struct LogRequestPrompt {
+    pub request_id: Uuid,
+    pub actor_username: String,
+    pub reason: String,
+    /// Собран без спроса: логи уже уехали, модалка только сообщает.
+    pub forced: bool,
+    pub preview: String,
+    pub files: Vec<(String, u64)>,
 }
 
 /// Диалог «войти в аккаунт игрока».
@@ -337,6 +352,8 @@ impl LauncherUI {
             optional_mod_icons_loading: HashSet::new(),
             update_available: None,
             impersonate_prompt: None,
+            log_request_prompt: None,
+            log_request_preview_open: false,
             impersonating_as: None,
             updating: false,
             toast: None,
@@ -860,6 +877,24 @@ impl LauncherUI {
                     expires_in_secs,
                 });
             }
+            MessageToFrontend::LogRequestPrompt {
+                request_id,
+                actor_username,
+                reason,
+                forced,
+                preview,
+                files,
+            } => {
+                self.log_request_preview_open = false;
+                self.log_request_prompt = Some(LogRequestPrompt {
+                    request_id,
+                    actor_username,
+                    reason,
+                    forced,
+                    preview,
+                    files,
+                });
+            }
             MessageToFrontend::ImpersonationChanged { as_username } => {
                 self.impersonate_prompt = None;
                 self.impersonating_as = as_username;
@@ -1144,6 +1179,22 @@ impl LauncherUI {
     ///
     /// Сервер не указан — backend возьмёт тот, чей манифест уже загружен: логи
     /// лежат в каталоге инстанса, и без сервера отправлять нечего.
+    /// Ответить на запрос логов.
+    pub fn answer_log_request(&mut self, accepted: bool) {
+        let Some(prompt) = self.log_request_prompt.take() else {
+            return;
+        };
+        self.backend.send(MessageToBackend::LogRequestAnswer {
+            request_id: prompt.request_id,
+            accepted,
+        });
+    }
+
+    /// Закрыть окно принудительного сбора: отвечать там нечего.
+    pub fn dismiss_log_request(&mut self) {
+        self.log_request_prompt = None;
+    }
+
     /// Ответить на диалог входа в чужой аккаунт.
     pub fn answer_impersonate(&mut self, accepted: bool) {
         let Some(prompt) = self.impersonate_prompt.take() else {

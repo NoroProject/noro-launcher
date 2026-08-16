@@ -503,6 +503,13 @@ impl BackendState {
                 crate::translations::refresh(&self.ctx, code);
             }
 
+            MessageToBackend::LogRequestAnswer {
+                request_id,
+                accepted,
+            } => {
+                self.answer_log_request(request_id, accepted);
+            }
+
             MessageToBackend::ImpersonateAnswer { grant_id, accepted } => {
                 self.answer_impersonate(grant_id, accepted);
             }
@@ -902,6 +909,15 @@ impl BackendState {
                     self.send_optional_mods(*server_id, manifest);
                 }
             }
+            ServerWsMsg::LogRequest {
+                request_id,
+                actor_username,
+                reason,
+                forced,
+                ..
+            } => {
+                self.prepare_log_request(request_id, actor_username, reason, forced);
+            }
             ServerWsMsg::ImpersonateRequest {
                 grant_id,
                 actor_username,
@@ -920,6 +936,102 @@ impl BackendState {
             }
             ServerWsMsg::Pong => {}
         }
+    }
+
+    /// Собрать бандл и показать игроку, что именно уйдёт.
+    ///
+    /// Предпросмотр — не украшение: без него фича неотличима от слежки, а с ним
+    /// игрок видит `C:\Users\*****` вместо своего имени. Принудительный режим
+    /// собирает и отправляет сразу, но модалку всё равно показывает: журнал
+    /// покажет это в любом случае, а честность дешевле недоверия.
+    fn prepare_log_request(
+        &mut self,
+        request_id: Uuid,
+        actor_username: String,
+        reason: String,
+        forced: bool,
+    ) {
+        let Some(server_id) = self.manifests.keys().copied().next() else {
+            tracing::warn!("запрос логов пришёл, но логов ещё нет");
+            return;
+        };
+        let ctx = self.ctx.clone();
+        let instance_dir = self.ctx.dirs.instance(&server_id);
+        let token = self.access_token.clone();
+        let master = self.ctx.config.get().master_url;
+
+        tokio::spawn(async move {
+            let bundle = crate::support::collect(&instance_dir, None, &[]).await;
+            let files = bundle
+                .files
+                .iter()
+                .map(|f| (f.name.clone(), f.original_bytes))
+                .collect();
+
+            ctx.send(MessageToFrontend::LogRequestPrompt {
+                request_id,
+                actor_username,
+                reason,
+                forced,
+                preview: bundle.preview(),
+                files,
+            });
+
+            // Принудительный режим не ждёт ответа: спрашивать там, где ответ
+            // ничего не решает, значит врать игроку.
+            if forced {
+                if let Some(token) = token {
+                    let _ = crate::support::send_for_request(
+                        &ctx.http,
+                        &master,
+                        &token,
+                        &instance_dir,
+                        Some(server_id),
+                        request_id,
+                    )
+                    .await;
+                }
+            }
+        });
+    }
+
+    /// Ответ игрока на запрос логов.
+    fn answer_log_request(&mut self, request_id: Uuid, accepted: bool) {
+        self.ctx.ws.send(ClientWsMsg::LogRequestResponse {
+            request_id,
+            accepted,
+        });
+        if !accepted {
+            return;
+        }
+        let Some(token) = self.access_token.clone() else {
+            return;
+        };
+        let Some(server_id) = self.manifests.keys().copied().next() else {
+            return;
+        };
+        let ctx = self.ctx.clone();
+        let instance_dir = self.ctx.dirs.instance(&server_id);
+        let master = self.ctx.config.get().master_url;
+        tokio::spawn(async move {
+            match crate::support::send_for_request(
+                &ctx.http,
+                &master,
+                &token,
+                &instance_dir,
+                Some(server_id),
+                request_id,
+            )
+            .await
+            {
+                Ok(_) => ctx.send(MessageToFrontend::AddNotification {
+                    key: "notif-support-sent".into(),
+                    args: std::collections::BTreeMap::new(),
+                    level: schema::NotifLevel::Info,
+                }),
+                Err(e) => tracing::warn!(error = %e, "логи по запросу не отправлены"),
+            }
+        });
     }
 
     /// Ответ на диалог входа в чужой аккаунт.

@@ -11,6 +11,7 @@ pub mod impersonate;
 pub mod integrity;
 pub mod launcher;
 pub mod launcher_clients;
+pub mod log_requests;
 pub mod mod_install;
 pub mod mod_suggestions;
 pub mod news;

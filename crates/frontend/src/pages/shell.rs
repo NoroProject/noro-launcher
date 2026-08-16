@@ -1,6 +1,6 @@
 use super::{
-    game, impersonate_dialog, news, news_detail, profile, server_mod_catalog, server_mods,
-    server_settings, settings, sidebar,
+    game, impersonate_dialog, log_request_dialog, news, news_detail, profile, server_mod_catalog,
+    server_mods, server_settings, settings, sidebar,
 };
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
@@ -18,6 +18,7 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
     // Баннер над всем: забыть, что ты в чужом аккаунте, нельзя.
     let banner = impersonate_dialog::banner(ui, cx);
     let dialog = impersonate_dialog::dialog(ui, cx);
+    let log_dialog = log_request_dialog::dialog(ui, cx);
 
     div()
         .size_full()
@@ -49,7 +50,8 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
                                 game::page(ui, cx)
                             }
                         })
-                        .children(dialog),
+                        .children(dialog)
+                        .children(log_dialog),
                 ),
         )
         .into_any_element()

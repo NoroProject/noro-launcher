@@ -25,6 +25,10 @@ pub struct UploadQuery {
     pub server_id: Option<Uuid>,
     #[serde(default)]
     pub note: String,
+    /// Запрос админа, по которому бандл собран. Без него бандл считается
+    /// отправленным добровольно — и игрок сможет его удалить.
+    #[serde(default)]
+    pub request_id: Option<Uuid>,
 }
 
 /// Приём бандла от лаунчера. Игрок отправляет свои логи сам — кнопкой
@@ -56,16 +60,34 @@ pub async fn upload(
         .await
         .map_err(AppError::Other)?;
 
+    // Бандл по запросу админа игрок удалить не сможет — иначе принудительный
+    // режим не имел бы смысла. Поэтому запрос обязан быть настоящим и открытым.
+    let voluntary = match q.request_id {
+        None => true,
+        Some(rid) => {
+            if !crate::db::request_open_for(&state.db, rid, user.user_id).await? {
+                return Err(AppError::Forbidden(
+                    "запрос не найден, не принят или истёк".into(),
+                ));
+            }
+            false
+        }
+    };
+
     let id = crate::db::create_support_bundle(
         &state.db,
         user.user_id,
         q.server_id,
         q.note.chars().take(2000).collect::<String>().trim(),
-        true,
+        voluntary,
         &stored.sha1,
         stored.size as i64,
     )
     .await?;
+
+    if let Some(rid) = q.request_id {
+        crate::db::deliver_log_request(&state.db, rid, id).await?;
+    }
 
     tracing::info!(%id, user = %user.user_id, bytes = clean.len(), "принят бандл логов");
     Ok(Json(json!({ "id": id })))

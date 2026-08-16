@@ -2,7 +2,7 @@
 import type { LauncherStatus, SessionRow } from '~/types/sessions'
 
 const props = defineProps<{ userId: string }>()
-const emit = defineEmits<{ impersonate: [] }>()
+const emit = defineEmits<{ impersonate: []; requestLogs: [] }>()
 
 const auth = useAuth()
 const notify = useNotify()
@@ -79,6 +79,9 @@ onMounted(() => load())
 
     <div class="flex flex-wrap gap-2">
       <AtomButton icon="i-lucide-user-check" @click="emit('impersonate')">Login as</AtomButton>
+      <AtomButton variant="dark" icon="i-lucide-file-text" @click="emit('requestLogs')">
+        Request logs
+      </AtomButton>
       <AtomButton variant="dark" icon="i-lucide-log-out" @click="revokeAll">
         End all sessions
       </AtomButton>

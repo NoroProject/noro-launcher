@@ -160,6 +160,12 @@ pub enum MessageToBackend {
         code: String,
     },
 
+    /// Ответ на запрос логов.
+    LogRequestAnswer {
+        request_id: Uuid,
+        accepted: bool,
+    },
+
     /// Ответ на диалог impersonation.
     ImpersonateAnswer {
         grant_id: Uuid,
@@ -453,6 +459,19 @@ pub enum MessageToFrontend {
         /// Сколько секунд осталось на решение.
         expires_in_secs: i64,
     },
+    /// Админ просит логи. Игрок решает, отправлять ли.
+    LogRequestPrompt {
+        request_id: Uuid,
+        actor_username: String,
+        reason: String,
+        /// Собран без спроса: логи уже уехали, модалка только сообщает.
+        forced: bool,
+        /// Что именно уйдёт — уже очищенный текст.
+        preview: String,
+        /// Имена файлов и их размер на диске.
+        files: Vec<(String, u64)>,
+    },
+
     /// Сессия impersonation началась или закончилась — для баннера в лаунчере.
     ImpersonationChanged {
         /// `None` — вернулись в свой аккаунт.

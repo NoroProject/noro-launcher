@@ -98,6 +98,15 @@ pub async fn handle(
             }
         }
 
+        ClientWsMsg::LogRequestResponse {
+            request_id,
+            accepted,
+        } => {
+            if let Some(user_id) = *authed_user {
+                crate::db::answer_log_request(&state.db, request_id, user_id, accepted).await?;
+            }
+        }
+
         ClientWsMsg::ImpersonateResponse { grant_id, accepted } => {
             // Отказ записываем так же, как согласие: веб-страница админа ждёт
             // ответа, и молчание оставило бы её в поллинге до истечения гранта.
