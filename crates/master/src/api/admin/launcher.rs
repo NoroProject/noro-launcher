@@ -1,6 +1,7 @@
 //! Админ: версии лаунчера, проверка GitHub, сборка, деплой.
 
 use crate::api::auth::AdminAuth;
+use crate::audit::{self, target};
 use crate::db::models::LauncherVersionRow;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -126,6 +127,14 @@ pub async fn deploy(
         signature: row.signature.clone(),
         is_current: true,
     };
+    audit::record(
+        &state,
+        &admin.actor,
+        "launcher.deploy",
+        target("launcher_version", version_id),
+        json!({ "version": row.version, "platform": row.platform }),
+    )
+    .await;
     state
         .ws
         .broadcast(&schema::ServerWsMsg::LauncherUpdate { version });

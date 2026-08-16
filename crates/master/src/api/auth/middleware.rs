@@ -52,13 +52,18 @@ impl FromRequestParts<AppState> for AuthUser {
 ///  - пользователь с правом, покрывающим запрошенное (например `noro.admin.users`);
 ///  - admin-токен с таким правом.
 pub struct AdminAuth {
-    /// id пользователя, если авторизация по пользовательскому токену.
-    pub user_id: Option<Uuid>,
+    /// Кто именно действует — для журнала аудита.
+    pub actor: crate::audit::Actor,
     /// Эффективные права субъекта.
     pub permissions: Vec<String>,
 }
 
 impl AdminAuth {
+    /// id пользователя, если авторизация по пользовательскому токену.
+    pub fn user_id(&self) -> Option<Uuid> {
+        self.actor.id()
+    }
+
     pub fn require(&self, perm: &str) -> Result<(), AppError> {
         let has = self
             .permissions
@@ -86,7 +91,7 @@ impl FromRequestParts<AppState> for AdminAuth {
         let hash = hex::encode(Sha256::digest(token.as_bytes()));
         if let Some(t) = crate::db::admin_token_by_hash(&state.db, &hash).await? {
             return Ok(AdminAuth {
-                user_id: None,
+                actor: crate::audit::Actor::Token { name: t.name },
                 permissions: t.permissions,
             });
         }
@@ -99,7 +104,10 @@ impl FromRequestParts<AppState> for AdminAuth {
                 let permissions: Vec<String> =
                     profile.all_permissions().map(String::from).collect();
                 return Ok(AdminAuth {
-                    user_id: Some(user_id),
+                    actor: crate::audit::Actor::User {
+                        id: user_id,
+                        username: profile.username.clone(),
+                    },
                     permissions,
                 });
             }

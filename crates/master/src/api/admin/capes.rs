@@ -70,7 +70,7 @@ pub async fn upload(
             &url,
             &stored.sha1,
             stored.size as i64,
-            admin.user_id,
+            admin.user_id(),
         )
         .await?,
     ))

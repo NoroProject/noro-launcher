@@ -3,14 +3,15 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, backup, build_routes, capes, catalog, cores, game_servers, launcher, launcher_clients,
-    mod_install, mod_suggestions, news, permission_nodes, roles, servers, stats, storage, tokens,
-    users, versions, wrapper, wrapper_backups, wrapper_fs,
+    agents, audit, backup, build_routes, capes, catalog, cores, game_servers, launcher,
+    launcher_clients, mod_install, mod_suggestions, news, permission_nodes, roles, servers, stats,
+    storage, tokens, users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/agents", get(agents::list))
+        .route("/api/admin/audit", get(audit::list))
         .route("/api/admin/permission-nodes", get(permission_nodes::list))
         .merge(catalog_router())
         .merge(users_router())

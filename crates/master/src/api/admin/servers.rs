@@ -1,6 +1,7 @@
 //! Админ: серверы.
 
 use crate::api::auth::AdminAuth;
+use crate::audit::{self, target};
 use crate::db::models::ServerRow;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -143,6 +144,18 @@ pub async fn update(
     let row = crate::db::get_server(&state.db, id)
         .await?
         .ok_or_else(|| AppError::NotFound("сервер".into()))?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "server.update",
+        target("server", id),
+        serde_json::json!({
+            "name": req.name,
+            "active": req.active,
+            "limited": req.limited,
+        }),
+    )
+    .await;
     broadcast_servers_changed(&state);
     Ok(Json(row))
 }
@@ -154,6 +167,14 @@ pub async fn delete(
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_ADMIN_SERVERS)?;
     crate::db::delete_server(&state.db, id).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "server.delete",
+        target("server", id),
+        serde_json::json!({}),
+    )
+    .await;
     broadcast_servers_changed(&state);
     Ok(Json(serde_json::json!({ "ok": true })))
 }

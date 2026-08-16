@@ -2,6 +2,7 @@
 //! опциональные моды, импорт mrpack/CurseForge.
 
 use crate::api::auth::AdminAuth;
+use crate::audit::{self, target};
 use crate::db::models::{BuildFileRow, BuildRow};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -122,6 +123,14 @@ pub async fn publish(
     admin.require(PERM_ADMIN_BUILDS)?;
     let manifest = rebuild_manifest(&state, id, false).await?;
     crate::db::set_build_published(&state.db, id, true).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "build.publish",
+        target("build", id),
+        json!({ "summary": crate::manifest::manifest_summary(&manifest) }),
+    )
+    .await;
     broadcast_builds_changed(&state, manifest.server_id);
 
     Ok(Json(json!({
@@ -203,6 +212,14 @@ pub async fn unpublish(
     admin.require(PERM_ADMIN_BUILDS)?;
     let server_id = build_server_id(&state, id).await?;
     crate::db::set_build_published(&state.db, id, false).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "build.unpublish",
+        target("build", id),
+        json!({}),
+    )
+    .await;
     broadcast_builds_changed(&state, server_id);
     Ok(Json(json!({ "ok": true })))
 }

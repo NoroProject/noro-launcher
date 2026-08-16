@@ -1,6 +1,7 @@
 //! Уборка хранилища: объекты, на которые больше никто не ссылается.
 
 use crate::api::auth::AdminAuth;
+use crate::audit;
 use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::State;
@@ -30,6 +31,17 @@ pub async fn delete_orphans(
 ) -> AppResult<Json<crate::files::gc::Report>> {
     admin.require(PERM_ADMIN_STORAGE)?;
     let report = crate::files::gc::collect(&state.db, &state.files, true).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "storage.gc",
+        None,
+        serde_json::json!({
+            "orphan_count": report.orphan_count,
+            "orphan_bytes": report.orphan_bytes,
+        }),
+    )
+    .await;
     tracing::warn!(
         count = report.orphan_count,
         bytes = report.orphan_bytes,

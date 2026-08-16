@@ -49,6 +49,11 @@ pub const PERM_ADMIN_STORAGE: &str = "noro.admin.storage";
 /// их привязки и токены сессий — это самый чувствительный объект в системе.
 pub const PERM_ADMIN_BACKUP: &str = "noro.admin.backup";
 
+/// Чтение журнала админских действий. Отдельно от `noro.admin.*`: журнал
+/// показывает, кто и что делал, — это и есть предмет разбора спорных ситуаций,
+/// и открывать его каждому, у кого есть админка, незачем.
+pub const PERM_ADMIN_AUDIT: &str = "noro.admin.audit";
+
 pub const PERM_MOD_USERS_BAN: &str = "noro.mod.users.ban";
 
 pub const PERM_LAUNCHER_BETA: &str = "noro.launcher.beta";

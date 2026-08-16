@@ -2,6 +2,7 @@
 //! WebSocket с лаунчерами, админ-API, bootstrap артефактов.
 
 pub mod api;
+pub mod audit;
 pub mod build_importer;
 pub mod catalog;
 pub mod config;

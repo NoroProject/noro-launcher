@@ -1,6 +1,7 @@
 //! Админ: роли и их права.
 
 use crate::api::auth::AdminAuth;
+use crate::audit::{self, target};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
@@ -40,6 +41,14 @@ pub async fn create(
         req.sort_order,
     )
     .await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "role.create",
+        target("role", id),
+        serde_json::json!({ "name": req.name, "display_name": req.display_name }),
+    )
+    .await;
     Ok(Json(serde_json::json!({ "id": id })))
 }
 
@@ -84,6 +93,18 @@ pub async fn update(
         req.parent_id,
     )
     .await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "role.update",
+        target("role", id),
+        serde_json::json!({
+            "display_name": req.display_name,
+            "parent_id": req.parent_id,
+            "lp_group": req.lp_group,
+        }),
+    )
+    .await;
     let roles = crate::db::list_roles(&state.db).await?;
     Ok(Json(roles.into_iter().find(|r| r.id == id).unwrap_or_else(
         || Role {
@@ -139,6 +160,14 @@ pub async fn delete(
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_ADMIN_ROLES)?;
     crate::db::delete_role(&state.db, id).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "role.delete",
+        target("role", id),
+        serde_json::json!({}),
+    )
+    .await;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
@@ -165,6 +194,14 @@ pub async fn add_permission(
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_ADMIN_ROLES)?;
     crate::db::add_role_permission(&state.db, id, &req.permission, req.server_id).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "role.permission.add",
+        target("role", id),
+        serde_json::json!({ "permission": req.permission, "server_id": req.server_id }),
+    )
+    .await;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
@@ -176,5 +213,13 @@ pub async fn remove_permission(
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_ADMIN_ROLES)?;
     crate::db::remove_role_permission(&state.db, id, &perm, scope.server_id).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "role.permission.remove",
+        target("role", id),
+        serde_json::json!({ "permission": perm, "server_id": scope.server_id }),
+    )
+    .await;
     Ok(Json(serde_json::json!({ "ok": true })))
 }

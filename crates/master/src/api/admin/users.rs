@@ -1,6 +1,7 @@
 //! Админ: управление пользователями.
 
 use crate::api::auth::AdminAuth;
+use crate::audit::{self, target};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, Query, State};
@@ -60,6 +61,14 @@ pub async fn ban(
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_MOD_USERS_BAN)?;
     crate::db::set_user_ban(&state.db, id, req.banned, req.reason.as_deref()).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        if req.banned { "user.ban" } else { "user.unban" },
+        target("user", id),
+        serde_json::json!({ "reason": req.reason }),
+    )
+    .await;
     let profile = crate::db::load_profile(&state.db, id).await?;
     state.ws.send_to_user(
         id,
@@ -76,7 +85,15 @@ pub async fn add_role(
     Path((id, role_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_ADMIN_USERS)?;
-    crate::db::add_user_role(&state.db, id, role_id, admin.user_id).await?;
+    crate::db::add_user_role(&state.db, id, role_id, admin.user_id()).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "user.role.add",
+        target("user", id),
+        serde_json::json!({ "role_id": role_id }),
+    )
+    .await;
     notify_user(&state, id).await
 }
 
@@ -87,6 +104,14 @@ pub async fn remove_role(
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_ADMIN_USERS)?;
     crate::db::remove_user_role(&state.db, id, role_id).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "user.role.remove",
+        target("user", id),
+        serde_json::json!({ "role_id": role_id }),
+    )
+    .await;
     notify_user(&state, id).await
 }
 #[derive(Deserialize)]
@@ -110,8 +135,22 @@ pub async fn add_permission(
     Json(req): Json<PermReq>,
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_ADMIN_USERS)?;
-    crate::db::add_user_permission(&state.db, id, &req.permission, req.server_id, admin.user_id)
-        .await?;
+    crate::db::add_user_permission(
+        &state.db,
+        id,
+        &req.permission,
+        req.server_id,
+        admin.user_id(),
+    )
+    .await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "user.permission.add",
+        target("user", id),
+        serde_json::json!({ "permission": req.permission, "server_id": req.server_id }),
+    )
+    .await;
     notify_user(&state, id).await
 }
 
@@ -123,6 +162,14 @@ pub async fn remove_permission(
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_ADMIN_USERS)?;
     crate::db::remove_user_permission(&state.db, id, &perm, scope.server_id).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "user.permission.remove",
+        target("user", id),
+        serde_json::json!({ "permission": perm, "server_id": scope.server_id }),
+    )
+    .await;
     notify_user(&state, id).await
 }
 #[derive(Deserialize)]

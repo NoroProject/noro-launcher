@@ -43,7 +43,7 @@ pub async fn create(
         &req.title,
         &req.body,
         req.preview_img_url.as_deref(),
-        admin.user_id,
+        admin.user_id(),
         req.pinned,
     )
     .await?;

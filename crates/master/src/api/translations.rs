@@ -78,7 +78,7 @@ pub async fn put(
         return Err(AppError::BadRequest("некорректный код языка".into()));
     }
     let sha1 = hex::encode(Sha1::digest(req.ftl.as_bytes()));
-    crate::db::upsert_translation(&state.db, &locale, &req.ftl, &sha1, admin.user_id).await?;
+    crate::db::upsert_translation(&state.db, &locale, &req.ftl, &sha1, admin.user_id()).await?;
     state
         .ws
         .broadcast(&schema::ServerWsMsg::TranslationsChanged);

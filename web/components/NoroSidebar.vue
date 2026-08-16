@@ -34,6 +34,7 @@ const adminNavGroups = [
         items: [
             { label: "Launcher", to: "/admin/launcher", icon: "i-lucide-rocket" },
             { label: "Tokens", to: "/admin/launcher/tokens", icon: "i-lucide-key-round" },
+            { label: "Audit", to: "/admin/audit", icon: "i-lucide-scroll-text" },
         ],
     },
 ];

@@ -1,6 +1,7 @@
 //! Админ: API-токены для CLI/CI.
 
 use crate::api::auth::{hash_admin_token, AdminAuth};
+use crate::audit::{self, target};
 use crate::db::models::AdminTokenRow;
 use crate::error::AppResult;
 use crate::state::AppState;
@@ -45,6 +46,14 @@ pub async fn create(
         req.permissions
     };
     let id = crate::db::create_admin_token(&state.db, &req.name, &hash, &perms).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "admin_token.create",
+        target("admin_token", id),
+        json!({ "name": req.name, "permissions": perms }),
+    )
+    .await;
     Ok(Json(
         json!({ "id": id, "token": secret, "permissions": perms }),
     ))
@@ -57,5 +66,13 @@ pub async fn delete(
 ) -> AppResult<Json<Value>> {
     admin.require(schema::PERM_ADMIN_ALL)?;
     crate::db::delete_admin_token(&state.db, id).await?;
+    audit::record(
+        &state,
+        &admin.actor,
+        "admin_token.delete",
+        target("admin_token", id),
+        json!({}),
+    )
+    .await;
     Ok(Json(json!({ "ok": true })))
 }
