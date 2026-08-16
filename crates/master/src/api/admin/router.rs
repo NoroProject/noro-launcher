@@ -4,14 +4,20 @@ use axum::Router;
 
 use super::{
     agents, audit, backup, build_routes, capes, catalog, cores, game_servers, integrity, launcher,
-    launcher_clients, mod_install, mod_suggestions, news, permission_nodes, roles, servers, stats,
-    storage, tokens, users, versions, wrapper, wrapper_backups, wrapper_fs,
+    launcher_clients, mod_install, mod_suggestions, news, permission_nodes, roles, servers,
+    settings, stats, storage, tokens, users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/agents", get(agents::list))
         .route("/api/admin/audit", get(audit::list))
+        .route(
+            "/api/admin/settings",
+            get(settings::list).put(settings::save),
+        )
+        .route("/api/admin/settings/env", get(settings::export_env))
+        .route("/api/admin/diagnostics", get(settings::diagnostics))
         .route("/api/admin/integrity", get(integrity::list))
         .route("/api/admin/support/bundles", get(crate::api::support::list))
         .route(

@@ -17,6 +17,7 @@ pub mod permission_nodes;
 pub mod roles;
 pub mod router;
 pub mod servers;
+pub mod settings;
 pub mod stats;
 pub mod storage;
 pub mod tokens;
