@@ -94,6 +94,10 @@ reqwest = { version = "0.12", default-features = false, features = [
 
 # Крипто/хеши
 ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8", "pem"] }
+# RSA — только для подписи профилей Yggdrasil: клиент проверяет её ключом из
+# signaturePublicKey, а там исторически RSA. Манифесты сборок подписываются
+# ed25519 выше и к этому отношения не имеют.
+rsa = { version = "0.9", features = ["sha1", "sha2"] }
 rand = "0.8"
 sha1 = "0.10"
 sha2 = "0.10"

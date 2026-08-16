@@ -29,16 +29,19 @@ pub fn sync(instance_dir: &Path, server: &ServerEntry) -> Result<bool> {
     let desired = desired_entries(server);
 
     let stamp_path = instance_dir.join(STAMP);
+    let path = instance_dir.join("servers.dat");
     let stamp = fingerprint(&desired);
     // В штампе первая строка — отпечаток, дальше адреса; сверяем только её.
     let known = std::fs::read_to_string(&stamp_path).unwrap_or_default();
-    if known.lines().next() == Some(stamp.as_str()) {
-        // Список мастера не менялся. Если игрок удалил наши записи руками —
-        // это его право, и навязывать их заново мы не будем.
+    // Наличие файла проверяем отдельно: штамп говорит лишь о том, менялся ли
+    // список у мастера. Пропади сам servers.dat — а штамп останься, — мы бы
+    // вечно отвечали «всё сделано», и список серверов не вернулся бы никогда.
+    // Удалённые игроком отдельные записи это по-прежнему не трогает: там файл
+    // на месте, и его содержимое разбирается ниже.
+    if known.lines().next() == Some(stamp.as_str()) && path.exists() {
         return Ok(false);
     }
 
-    let path = instance_dir.join("servers.dat");
     let existing = read(&path)?;
 
     // Чужими считаем всё, чей адрес не принадлежит мастеру — ни сейчас, ни в
@@ -59,7 +62,10 @@ pub fn sync(instance_dir: &Path, server: &ServerEntry) -> Result<bool> {
     let bytes =
         fastnbt::to_bytes(&ServersDat { servers: out }).context("сериализация servers.dat")?;
     std::fs::write(&path, bytes).with_context(|| format!("запись {}", path.display()))?;
-    std::fs::write(&stamp_path, stamp_with_ips(&stamp, &desired)).ok();
+    // Не `.ok()`: без штампа следующий запуск перепишет servers.dat заново и
+    // затрёт записи, которые игрок успел добавить сам.
+    std::fs::write(&stamp_path, stamp_with_ips(&stamp, &desired))
+        .with_context(|| format!("запись {}", stamp_path.display()))?;
     Ok(true)
 }
 

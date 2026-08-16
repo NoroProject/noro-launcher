@@ -134,3 +134,30 @@ fn keeps_player_entries_and_drops_removed_ones() {
         "снятый со сборки сервер должен уйти: {got:?}"
     );
 }
+
+/// Пропавший файл при живом штампе.
+///
+/// Штамп отвечает на вопрос «менялся ли список у мастера», а не «лежит ли файл
+/// на диске». Пока их путали, удалённый servers.dat не возвращался никогда:
+/// отпечаток совпадал, и sync молча отчитывался, что делать нечего.
+#[test]
+fn a_missing_file_is_rebuilt_even_when_the_stamp_matches() {
+    let dir = tempdir();
+    let server = build(vec![node("Main", "create.example.dev", 25565, false)]);
+
+    assert!(sync(&dir, &server).unwrap(), "первый запуск пишет файл");
+    assert!(dir.join("servers.dat").exists());
+
+    // Тот же список — второй раз писать незачем.
+    assert!(!sync(&dir, &server).unwrap(), "без изменений не переписываем");
+
+    // Файл пропал, штамп остался.
+    std::fs::remove_file(dir.join("servers.dat")).unwrap();
+
+    assert!(sync(&dir, &server).unwrap(), "пропавший файл нужно вернуть");
+    assert!(
+        names(&dir).contains(&("Main".into(), "create.example.dev".into())),
+        "сервер должен вернуться в список: {:?}",
+        names(&dir)
+    );
+}

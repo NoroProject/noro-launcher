@@ -94,7 +94,13 @@ fn header(ui: &LauncherUI, server_id: Uuid, hit: &CatalogHitInfo, cx: &mut Cx) -
                 .child(
                     div()
                         .font_family(FONT_PIXEL_ALT)
-                        .text_size(px(22.))
+                        .text_size(if hit.title.len() > 45 {
+                            px(15.)
+                        } else if hit.title.len() > 25 {
+                            px(18.)
+                        } else {
+                            px(22.)
+                        })
                         .font_weight(FontWeight::BOLD)
                         .text_color(rgb(CTA))
                         .child(hit.title.clone()),

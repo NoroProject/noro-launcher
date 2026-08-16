@@ -91,13 +91,15 @@ fn page_header(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .child(ic("search", 20., ACCENT))
         .child(
             div()
+                .flex_1()
+                .min_w_0()
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(18.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(CTA))
+                .truncate()
                 .child(title),
         )
-        .child(div().flex_1())
         .when(ui.mod_catalog_selected.is_some(), |d| {
             d.child(btn(
                 "back-to-grid-btn",
@@ -553,6 +555,7 @@ fn mod_card(ui: &LauncherUI, hit: CatalogHitInfo, server_id: Uuid, cx: &mut Cx) 
                                         .text_size(px(14.))
                                         .font_weight(FontWeight::BOLD)
                                         .text_color(rgb(TEXT_PRIMARY))
+                                        .truncate()
                                         .child(hit.title.clone()),
                                 )
                                 .child(
