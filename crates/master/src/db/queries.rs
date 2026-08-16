@@ -135,6 +135,9 @@ pub async fn profile_from_row(pool: &PgPool, u: UserRow) -> Result<UserProfile> 
         permissions,
         permission_grants,
         banned: u.banned,
+        is_local_account: u.is_local_account,
+        can_play: u.can_play,
+        is_root: u.is_root,
     })
 }
 

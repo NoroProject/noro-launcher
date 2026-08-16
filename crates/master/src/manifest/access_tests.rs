@@ -46,8 +46,8 @@ fn viewer(permissions: &[&str]) -> UserProfile {
         id: Uuid::nil(),
         uuid: Uuid::nil(),
         username: "player".into(),
-        discord_id: "0".into(),
-        discord_username: "player".into(),
+        discord_id: Some("0".into()),
+        discord_username: Some("player".into()),
         discord_avatar: None,
         skin_url: None,
         cape_url: None,
@@ -55,6 +55,9 @@ fn viewer(permissions: &[&str]) -> UserProfile {
         permissions: permissions.iter().map(|p| p.to_string()).collect(),
         permission_grants: Vec::new(),
         banned: false,
+        is_local_account: false,
+        can_play: true,
+        is_root: false,
     }
 }
 

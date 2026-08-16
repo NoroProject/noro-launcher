@@ -60,8 +60,11 @@ pub struct UserProfile {
     pub uuid: Uuid,
     /// MC ник.
     pub username: String,
-    pub discord_id: String,
-    pub discord_username: String,
+    /// Пусто у локального аккаунта: он заведён оператором, а не Discord'ом.
+    #[serde(default)]
+    pub discord_id: Option<String>,
+    #[serde(default)]
+    pub discord_username: Option<String>,
     pub discord_avatar: Option<String>,
     pub skin_url: Option<String>,
     pub cape_url: Option<String>,
@@ -74,6 +77,20 @@ pub struct UserProfile {
     pub permission_grants: Vec<PermissionGrant>,
     #[serde(default)]
     pub banned: bool,
+    /// Заведён оператором, без привязки к Discord.
+    #[serde(default)]
+    pub is_local_account: bool,
+    /// Может ли входить в игру. Операторский аккаунт по умолчанию не может:
+    /// ему это незачем, а игровой профиль — лишняя поверхность.
+    #[serde(default = "yes")]
+    pub can_play: bool,
+    /// Единственный аккаунт, который нельзя забанить и удалить.
+    #[serde(default)]
+    pub is_root: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

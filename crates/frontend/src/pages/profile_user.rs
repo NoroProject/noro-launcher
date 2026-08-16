@@ -37,7 +37,12 @@ pub fn user_card(ui: &LauncherUI, user: &schema::UserProfile, cx: &mut Cx) -> An
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(14.))
                 .text_color(rgb(TEXT_MUTED))
-                .child(format!("@{}", user.discord_username.to_uppercase())),
+                // Локальный аккаунт заведён оператором и Discord'а не имеет —
+                // показываем игровой ник, а не пустое «@».
+                .child(match &user.discord_username {
+                    Some(name) => format!("@{}", name.to_uppercase()),
+                    None => user.username.to_uppercase(),
+                }),
         )
         .child(div().flex().flex_wrap().gap(px(8.)).children(roles))
         .child(btn(

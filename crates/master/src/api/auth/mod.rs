@@ -4,6 +4,7 @@ pub mod discord;
 pub mod middleware;
 pub mod oauth2_provider;
 pub mod passkeys;
+pub mod recovery;
 pub mod webauthn;
 pub mod yggdrasil;
 

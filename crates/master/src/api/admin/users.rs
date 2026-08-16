@@ -60,6 +60,10 @@ pub async fn ban(
     Json(req): Json<BanReq>,
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_MOD_USERS_BAN)?;
+    // Инстанс, оставшийся без операторского входа, чинится только руками в БД.
+    if req.banned && crate::db::is_root_user(&state.db, id).await? {
+        return Err(AppError::Forbidden("root нельзя забанить".into()));
+    }
     crate::db::set_user_ban(&state.db, id, req.banned, req.reason.as_deref()).await?;
     audit::record(
         &state,

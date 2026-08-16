@@ -61,8 +61,10 @@ pub async fn resolve_skin_bytes(state: &AppState, q: &RenderQuery) -> AppResult<
         .find(|u| {
             u.mc_username.eq_ignore_ascii_case(name)
                 || u.mc_uuid.to_string() == name
-                || u.discord_username.eq_ignore_ascii_case(name)
-                || u.discord_id == name
+                || u.discord_username
+                    .as_deref()
+                    .is_some_and(|n| n.eq_ignore_ascii_case(name))
+                || u.discord_id.as_deref() == Some(name)
         })
         .ok_or_else(|| AppError::NotFound(format!("игрок {name}")))?;
 

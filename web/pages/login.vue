@@ -5,6 +5,9 @@ const notify = useNotify()
 
 const busy = ref(false)
 const message = ref<string | null>(null)
+const showRecovery = ref(false)
+const recoveryUser = ref('')
+const recoveryCode = ref('')
 
 const next = computed(() => String(route.query.next || '/cabinet'))
 const loginHref = computed(() => auth.discordLoginUrl(`/login?next=${encodeURIComponent(next.value)}`))
@@ -23,6 +26,25 @@ async function loginWithPasskey() {
     auth.token.value = res.access_token
     auth.user.value = res.user
     await navigateTo(next.value)
+  } catch (e) {
+    message.value = humanError(e)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function loginWithRecovery() {
+  busy.value = true
+  message.value = null
+  try {
+    const res = await auth.request<any>('/api/auth/recovery/login', {
+      method: 'POST',
+      body: { username: recoveryUser.value.trim(), code: recoveryCode.value.trim() },
+    })
+    auth.token.value = res.access_token
+    auth.user.value = res.user
+    // Код сгорел — следующий вход должен опираться на что-то долговечнее.
+    await navigateTo(res.bind_passkey ? '/cabinet?bind_passkey=1' : next.value)
   } catch (e) {
     message.value = humanError(e)
   } finally {
@@ -89,6 +111,32 @@ onMounted(async () => {
             <UIcon name="i-lucide-key-round" class="size-4 text-[var(--noro-blue)]" />
             SIGN IN WITH PASSKEY
           </button>
+
+          <!-- Не «аварийный вариант»: passkey нельзя привязать по http:// без
+               домена, и до настройки TLS код — единственный путь внутрь. -->
+          <button
+            v-if="!showRecovery"
+            type="button"
+            class="w-full py-2 text-[11px] font-bold uppercase tracking-wider text-[var(--noro-muted)] hover:text-[var(--noro-cream)] transition"
+            @click="showRecovery = true"
+          >
+            Use a recovery code
+          </button>
+
+          <form v-else class="grid gap-2 rounded-lg border border-[var(--noro-border)] p-4" @submit.prevent="loginWithRecovery">
+            <input v-model="recoveryUser" class="noro-input w-full" placeholder="Username" autocomplete="username">
+            <input v-model="recoveryCode" class="noro-input w-full font-mono" placeholder="XXXX-XXXX-XXXX">
+            <button
+              type="submit"
+              class="noro-cta w-full px-6 py-3 text-center text-xs font-bold"
+              :disabled="busy || !recoveryUser.trim() || !recoveryCode.trim()"
+            >
+              SIGN IN
+            </button>
+            <p class="text-[10px] text-[var(--noro-muted)]">
+              Each code works once. After signing in, bind a passkey — that is what the next login should rest on.
+            </p>
+          </form>
         </div>
       </section>
 

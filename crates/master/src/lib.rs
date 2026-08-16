@@ -213,6 +213,10 @@ fn router(state: AppState) -> Router {
             "/api/auth/passkeys/login/verify",
             post(auth::passkeys::login_verify).options(|| async {}),
         )
+        .route(
+            "/api/auth/recovery/login",
+            post(auth::recovery::login).options(|| async {}),
+        )
         .route("/auth/refresh", post(auth::discord::refresh))
         .route("/auth/logout", get(auth::discord::logout))
         .route("/auth/me", get(cabinet::me))
@@ -259,6 +263,11 @@ fn router(state: AppState) -> Router {
     let cabinet_api = Router::new()
         .route("/api/me", get(cabinet::me))
         .route("/api/me/username", put(cabinet::set_username))
+        .route("/api/me/recovery-codes", get(auth::recovery::remaining))
+        .route(
+            "/api/me/recovery-codes/reissue",
+            post(auth::recovery::reissue),
+        )
         .route("/api/me/support-bundles", get(support::my_bundles))
         .route("/api/me/support-bundles/{id}", delete(support::delete_mine))
         .route(
@@ -355,6 +364,7 @@ fn router(state: AppState) -> Router {
             post(setup::api::generate_signing_key),
         )
         .route("/api/setup/env", get(setup::api::env_block))
+        .route("/api/setup/root", post(setup::api::create_root))
         .route("/api/setup/complete", post(setup::api::complete));
 
     let public_api = Router::new()

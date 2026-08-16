@@ -6,11 +6,12 @@ definePageMeta({ layout: false })
 const setup = useSetup()
 const notify = useNotify()
 
-const STEPS = ['Token', 'URLs', 'Discord', 'Signing', 'Finish'] as const
+const STEPS = ['Token', 'URLs', 'Discord', 'Signing', 'Operator', 'Finish'] as const
 const step = ref(0)
 const busy = ref(false)
 const done = ref(false)
 const generated = ref<SigningKey | null>(null)
+const recoveryCodes = ref<string[] | null>(null)
 const envBlock = ref('')
 
 const settings = ref<Record<string, string>>({
@@ -56,10 +57,15 @@ const generateKey = () =>
     generated.value = await setup.generateSigningKey()
   })
 
+const createRoot = (username: string) =>
+  run(async () => {
+    recoveryCodes.value = (await setup.createRoot(username)).recovery_codes
+  })
+
 const toFinish = () =>
   run(async () => {
     envBlock.value = (await setup.envBlock()).env
-    step.value = 4
+    step.value = 5
   })
 
 const finish = () =>
@@ -121,6 +127,14 @@ onMounted(async () => {
           v-model="generated"
           :key-present="secretPresent('NORO_SIGNING_KEY')"
           @generate="generateKey"
+          @next="step = 4"
+        />
+
+        <SetupStepRoot
+          v-else-if="step === 4"
+          v-model="recoveryCodes"
+          :secure-context="setup.status.value?.secure_context ?? false"
+          @create="createRoot"
           @next="toFinish"
         />
 

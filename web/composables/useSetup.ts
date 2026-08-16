@@ -52,6 +52,12 @@ export function useSetup() {
 
   const envBlock = () => authed<{ env: string }>('/api/setup/env')
 
+  const createRoot = (username: string) =>
+    authed<{ id: string; username: string; recovery_codes: string[] }>('/api/setup/root', {
+      method: 'POST',
+      body: { username },
+    })
+
   const complete = () =>
     authed<{ ok: boolean; restart_required: boolean }>('/api/setup/complete', {
       method: 'POST',
@@ -66,6 +72,7 @@ export function useSetup() {
     loadStatus,
     saveSettings,
     generateSigningKey,
+    createRoot,
     envBlock,
     complete,
   }

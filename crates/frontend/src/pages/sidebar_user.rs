@@ -15,7 +15,10 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let discord = ui
         .user
         .as_ref()
-        .map(|u| format!("@{}", u.discord_username))
+        .map(|u| match &u.discord_username {
+            Some(name) => format!("@{name}"),
+            None => u.username.clone(),
+        })
         .unwrap_or_else(|| t("sidebar-no-discord").into());
 
     div()

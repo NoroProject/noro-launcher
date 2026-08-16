@@ -116,12 +116,68 @@ pub async fn env_block(State(state): State<AppState>, _auth: SetupAuth) -> AppRe
     Ok(Json(json!({ "env": lines.join("\n") })))
 }
 
+#[derive(Deserialize)]
+pub struct RootReq {
+    pub username: String,
+}
+
+/// Завести root-аккаунт и выдать recovery-коды.
+///
+/// Коды показываются один раз — это и есть вход, пока не настроен домен с TLS
+/// и не привязан passkey.
+pub async fn create_root(
+    State(state): State<AppState>,
+    _auth: SetupAuth,
+    Json(req): Json<RootReq>,
+) -> AppResult<Json<Value>> {
+    if crate::db::root_exists(&state.db).await? {
+        return Err(AppError::Conflict("root-аккаунт уже существует".into()));
+    }
+    let name = req.username.trim();
+    if name.is_empty()
+        || name.len() > 16
+        || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err(AppError::BadRequest(
+            "имя: до 16 символов, латиница, цифры и подчёркивание".into(),
+        ));
+    }
+
+    let user = crate::db::create_local_account(&state.db, name, true).await?;
+    // Полный доступ: это единственный аккаунт на пустом инстансе, и раздавать
+    // ему права по одному не из чего — ролей ещё нет.
+    crate::db::add_user_permission(&state.db, user.id, schema::PERM_SUPERADMIN, None, None).await?;
+    let codes = crate::db::issue_recovery_codes(&state.db, user.id).await?;
+
+    tracing::info!(user = %user.id, "создан root-аккаунт");
+    Ok(Json(json!({
+        "id": user.id,
+        "username": user.mc_username,
+        "recovery_codes": codes,
+    })))
+}
+
 /// Завершить настройку. Токен сжигается, файл удаляется.
 pub async fn complete(State(state): State<AppState>, _auth: SetupAuth) -> AppResult<Json<Value>> {
-    if !state.config.is_usable() {
+    // Смотрим в БД, а не в `state.config`: конфиг читается при старте, а
+    // настройки визард сохранил только что. Проверка по памяти требовала бы
+    // рестарта между «сохранил» и «завершил» — там, где визард его не просит.
+    let stored = crate::db::all_settings(&state.db).await?;
+    let filled = |key: &str| {
+        stored
+            .get(key)
+            .and_then(|v| v.as_str())
+            .is_some_and(|v| !v.trim().is_empty())
+    };
+    if !filled(keys::PUBLIC_URL.name) || !filled(keys::WEB_URL.name) {
         return Err(AppError::BadRequest(
             "не заданы публичные адреса сайта и API".into(),
         ));
+    }
+    // Без операторского аккаунта завершённая настройка означала бы инстанс,
+    // в который никто не может войти.
+    if !crate::db::root_exists(&state.db).await? {
+        return Err(AppError::BadRequest("не создан root-аккаунт".into()));
     }
     crate::db::complete_setup(&state.db).await?;
     super::token::burn_token_file(&state.config.data_dir).await;

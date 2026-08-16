@@ -8,8 +8,8 @@ use uuid::Uuid;
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct UserRow {
     pub id: Uuid,
-    pub discord_id: String,
-    pub discord_username: String,
+    pub discord_id: Option<String>,
+    pub discord_username: Option<String>,
     pub discord_avatar: Option<String>,
     pub mc_uuid: Uuid,
     pub mc_username: String,
@@ -19,6 +19,9 @@ pub struct UserRow {
     pub ban_reason: Option<String>,
     pub created_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
+    pub is_local_account: bool,
+    pub can_play: bool,
+    pub is_root: bool,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]
