@@ -149,7 +149,10 @@ fn a_missing_file_is_rebuilt_even_when_the_stamp_matches() {
     assert!(dir.join("servers.dat").exists());
 
     // Тот же список — второй раз писать незачем.
-    assert!(!sync(&dir, &server).unwrap(), "без изменений не переписываем");
+    assert!(
+        !sync(&dir, &server).unwrap(),
+        "без изменений не переписываем"
+    );
 
     // Файл пропал, штамп остался.
     std::fs::remove_file(dir.join("servers.dat")).unwrap();

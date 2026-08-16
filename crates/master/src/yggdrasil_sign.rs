@@ -43,7 +43,9 @@ impl ProfileSigner {
                 tracing::info!(path = %path.display(), "создаю ключ подписи профилей Yggdrasil");
                 let key = RsaPrivateKey::new(&mut rand::rngs::OsRng, BITS)
                     .context("генерация RSA-ключа")?;
-                let pem = key.to_pkcs8_pem(LineEnding::LF).context("сериализация ключа")?;
+                let pem = key
+                    .to_pkcs8_pem(LineEnding::LF)
+                    .context("сериализация ключа")?;
                 std::fs::write(&path, pem.as_bytes())
                     .with_context(|| format!("запись {}", path.display()))?;
                 restrict(&path)?;

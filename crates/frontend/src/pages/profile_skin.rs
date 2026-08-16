@@ -8,7 +8,8 @@ use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{
-    div, img, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, CursorStyle, MouseButton, SharedString,
+    div, img, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, CursorStyle, MouseButton,
+    SharedString,
 };
 use i18n::t;
 

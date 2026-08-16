@@ -218,7 +218,12 @@ fn stem_mod_name(filename: &str) -> String {
     let name = name.strip_suffix(".jar").unwrap_or(name);
     let clean = name
         .split(['-', '_', '+'])
-        .take_while(|part| !part.chars().next().is_some_and(|c| c.is_ascii_digit() || c == 'v'))
+        .take_while(|part| {
+            !part
+                .chars()
+                .next()
+                .is_some_and(|c| c.is_ascii_digit() || c == 'v')
+        })
         .collect::<Vec<_>>()
         .join("-")
         .to_lowercase();

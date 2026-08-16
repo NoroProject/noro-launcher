@@ -415,9 +415,7 @@ fn fullscreen(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             enabled,
             true,
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                let v = this
-                    .server_client_settings(server_id)
-                    .fullscreen;
+                let v = this.server_client_settings(server_id).fullscreen;
                 this.set_server_fullscreen(server_id, !v);
                 cx.notify();
             }),

@@ -75,7 +75,9 @@ pub fn t(key: &str) -> String {
 /// Проверить, существует ли ключ перевода в активном или встроенном каталоге.
 pub fn has_key(key: &str) -> bool {
     let guard = ACTIVE.read();
-    let Some(active) = guard.as_ref() else { return false };
+    let Some(active) = guard.as_ref() else {
+        return false;
+    };
     active.patch.as_ref().is_some_and(|p| p.has(key))
         || active.builtin.has(key)
         || active.fallback.has(key)
