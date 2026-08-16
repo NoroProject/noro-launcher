@@ -74,6 +74,18 @@ fn users_router() -> Router<AppState> {
             post(users::upload_skin_for_user).delete(users::delete_skin_for_user),
         )
         .route(
+            "/api/admin/users/{id}/skin-presets",
+            get(users::list_skin_presets_for_user),
+        )
+        .route(
+            "/api/admin/users/{id}/skin-presets/select",
+            post(users::select_skin_preset_for_user),
+        )
+        .route(
+            "/api/admin/users/{id}/skin-presets/{preset_id}",
+            delete(users::delete_skin_preset_for_user),
+        )
+        .route(
             "/api/admin/users/{id}/roles/{role_id}",
             post(users::add_role).delete(users::remove_role),
         )

@@ -221,6 +221,62 @@ pub async fn delete_skin_for_user(
     notify_user(&state, id).await
 }
 
+#[derive(serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+pub struct SkinPresetItem {
+    pub id: Uuid,
+    pub name: String,
+    pub skin_url: String,
+}
+
+pub async fn list_skin_presets_for_user(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Vec<SkinPresetItem>>> {
+    admin.require(PERM_ADMIN_USERS)?;
+    let rows = sqlx::query_as::<_, SkinPresetItem>(
+        "SELECT id, name, skin_url FROM user_skin_presets WHERE user_id = $1 ORDER BY created_at DESC",
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| AppError::Other(e.into()))?;
+
+    Ok(Json(rows))
+}
+
+#[derive(Deserialize)]
+pub struct SelectSkinPresetReq {
+    pub skin_url: String,
+}
+
+pub async fn select_skin_preset_for_user(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    Json(req): Json<SelectSkinPresetReq>,
+) -> AppResult<Json<UserProfile>> {
+    admin.require(PERM_ADMIN_USERS)?;
+    crate::db::set_skin(&state.db, id, Some(&req.skin_url)).await?;
+    notify_user(&state, id).await
+}
+
+pub async fn delete_skin_preset_for_user(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path((id, preset_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<Json<()>> {
+    admin.require(PERM_ADMIN_USERS)?;
+    sqlx::query("DELETE FROM user_skin_presets WHERE id = $1 AND user_id = $2")
+        .bind(preset_id)
+        .bind(id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| AppError::Other(e.into()))?;
+
+    Ok(Json(()))
+}
+
 async fn notify_user(state: &AppState, id: Uuid) -> AppResult<Json<UserProfile>> {
     let profile = crate::db::load_profile(&state.db, id).await?;
     state.ws.send_to_user(

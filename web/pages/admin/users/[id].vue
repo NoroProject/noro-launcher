@@ -25,6 +25,16 @@ const { data: userCapesData, refresh: refreshUserCapes } = await useAsyncData(`a
   auth.request<{ granted_cape_ids: string[] }>(`/api/admin/users/${id.value}/capes`), { default: () => ({ granted_cape_ids: [] }) }
 )
 
+interface SkinPresetItem {
+  id: string
+  name: string
+  skin_url: string
+}
+
+const { data: skinPresets, refresh: refreshSkinPresets } = await useAsyncData(`admin-user-skin-presets-${id.value}`, () =>
+  auth.request<SkinPresetItem[]>(`/api/admin/users/${id.value}/skin-presets`), { default: () => [] }
+)
+
 const activeTab = ref<'profile' | 'skin_capes' | 'moderation'>('profile')
 
 const permissions = computed(() =>
@@ -55,9 +65,27 @@ async function run(name: string, action: () => Promise<void>) {
     await action()
     await refreshUser()
     await refreshUserCapes()
+    await refreshSkinPresets()
   } finally {
     busy.value = null
   }
+}
+
+async function selectPresetForUser(skinUrl: string) {
+  await run('select-preset', async () => {
+    await auth.request(`/api/admin/users/${id.value}/skin-presets/select`, {
+      method: 'POST',
+      body: { skin_url: skinUrl }
+    })
+  })
+}
+
+async function deletePresetForUser(presetId: string) {
+  await run(`delete-preset-${presetId}`, async () => {
+    await auth.request(`/api/admin/users/${id.value}/skin-presets/${presetId}`, {
+      method: 'DELETE'
+    })
+  })
 }
 
 async function setBan(banned: boolean) {
@@ -244,6 +272,59 @@ function onSkinFilePicked(e: Event) {
                   Reset Skin
                 </AtomButton>
               </div>
+            </div>
+
+            <!-- Saved Skin Presets Panel -->
+            <div class="noro-panel p-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="noro-label">Skin Presets</h3>
+                  <p class="text-xs text-[var(--noro-muted)]">Saved player skins gallery</p>
+                </div>
+                <UBadge color="primary" variant="subtle">{{ skinPresets.length }} presets</UBadge>
+              </div>
+
+              <div v-if="skinPresets.length" class="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-1 noro-scroll">
+                <div
+                  v-for="preset in skinPresets"
+                  :key="preset.id"
+                  class="group relative flex flex-col justify-between rounded-lg border p-3 transition"
+                  :class="user.skin_url === preset.skin_url ? 'border-[var(--noro-cream)] bg-[var(--noro-input)] shadow-md' : 'border-[var(--noro-border)] bg-[var(--noro-bg-deep)] hover:border-[var(--noro-muted)]'"
+                >
+                  <div class="flex items-center justify-between gap-1 mb-2">
+                    <span class="truncate text-xs font-bold text-[var(--noro-text)]" :title="preset.name">{{ preset.name }}</span>
+                    <button
+                      type="button"
+                      class="text-[var(--noro-muted)] hover:text-red-400 p-0.5 rounded transition opacity-0 group-hover:opacity-100"
+                      title="Delete preset"
+                      @click.stop="deletePresetForUser(preset.id)"
+                    >
+                      <UIcon name="i-lucide-trash-2" class="size-3.5" />
+                    </button>
+                  </div>
+
+                  <div class="flex items-center justify-center py-2 bg-[var(--noro-input)] rounded border border-[var(--noro-border)] mb-2 overflow-hidden">
+                    <img :src="preset.skin_url" alt="" class="h-16 w-auto object-contain image-render-pixelated">
+                  </div>
+
+                  <div>
+                    <UBadge v-if="user.skin_url === preset.skin_url" color="primary" variant="subtle" class="w-full justify-center text-[10px]">
+                      Active
+                    </UBadge>
+                    <AtomButton
+                      v-else
+                      variant="secondary"
+                      size="sm"
+                      class="w-full justify-center text-[10px]"
+                      :disabled="busy === 'select-preset'"
+                      @click="selectPresetForUser(preset.skin_url)"
+                    >
+                      Equip
+                    </AtomButton>
+                  </div>
+                </div>
+              </div>
+              <EmptyState v-else icon="i-lucide-images" title="No skin presets" text="Player hasn't saved any presets yet." />
             </div>
           </div>
         </section>
