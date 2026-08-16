@@ -619,13 +619,28 @@ async fn run_game_process(
         ));
     }
 
-    // Ожидание выхода или kill.
-    let exit_ok = tokio::select! {
-        status = child.wait() => status.map(|s| s.success()).unwrap_or(false),
-        _ = kill_rx.recv() => {
-            let _ = child.start_kill();
-            let _ = child.wait().await;
-            false
+    // Ожидание выхода или kill с активной проверкой PID каждые 500 мс.
+    let mut poll_interval = tokio::time::interval(std::time::Duration::from_millis(500));
+    let exit_ok = loop {
+        tokio::select! {
+            status = child.wait() => {
+                break status.map(|s| s.success()).unwrap_or(false);
+            }
+            _ = kill_rx.recv() => {
+                let _ = child.start_kill();
+                let _ = child.wait().await;
+                break false;
+            }
+            _ = poll_interval.tick() => {
+                match child.try_wait() {
+                    Ok(Some(status)) => break status.success(),
+                    Ok(None) => {}
+                    Err(e) => {
+                        tracing::error!("ошибка проверки статуса процесса игры: {e}");
+                        break false;
+                    }
+                }
+            }
         }
     };
 
