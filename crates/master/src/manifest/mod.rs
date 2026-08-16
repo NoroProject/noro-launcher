@@ -4,57 +4,33 @@
 //! библиотеки + natives + assets + java. Колонка `kind` различает их.
 //! `mojang_artifacts` — лишь кеш скачивания, чтобы не качать одно и то же дважды.
 
+pub mod access;
+mod kinds;
+mod publish;
+
 use crate::db::models::BuildRow;
 use crate::state::AppState;
 use anyhow::{Context, Result};
+use kinds::side_from_str;
+pub use kinds::{kind_from_str, kind_to_str};
+pub use publish::{ensure_signed, manifest_summary};
 use schema::{
-    ArtifactKind, BuildManifest, FileEntry, FileSide, Modloader, OptionalMod,
-    RecommendedClientSettings,
+    ArtifactKind, BuildManifest, FileEntry, Modloader, OptionalMod, RecommendedClientSettings,
+    UserProfile,
 };
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
-/// Преобразовать строковый kind из БД в ArtifactKind.
-pub fn kind_from_str(s: &str) -> ArtifactKind {
-    match s {
-        "client_jar" => ArtifactKind::ClientJar,
-        "library" => ArtifactKind::Library,
-        "runtime" => ArtifactKind::Runtime,
-        "native" => ArtifactKind::Native,
-        "asset" => ArtifactKind::Asset,
-        "asset_index" => ArtifactKind::AssetIndex,
-        "java" => ArtifactKind::Java,
-        "mod" => ArtifactKind::Mod,
-        "config" => ArtifactKind::Config,
-        _ => ArtifactKind::Other,
-    }
-}
-
-pub fn kind_to_str(k: ArtifactKind) -> &'static str {
-    match k {
-        ArtifactKind::ClientJar => "client_jar",
-        ArtifactKind::Library => "library",
-        ArtifactKind::Runtime => "runtime",
-        ArtifactKind::Native => "native",
-        ArtifactKind::Asset => "asset",
-        ArtifactKind::AssetIndex => "asset_index",
-        ArtifactKind::Java => "java",
-        ArtifactKind::Mod => "mod",
-        ArtifactKind::Config => "config",
-        ArtifactKind::Other => "other",
-    }
-}
-
-fn side_from_str(s: &str) -> FileSide {
-    match s {
-        "client" => FileSide::Client,
-        "server" => FileSide::Server,
-        _ => FileSide::Both,
-    }
-}
-
 /// Собрать подписанный манифест для сборки.
-pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildManifest> {
+///
+/// `viewer` — игрок, которому манифест уедет. `None` означает служебную сборку
+/// (публикация, пересборка): фильтрация по правам не применяется, потому что
+/// адресата нет. Всё, что уходит игроку, обязано передавать профиль.
+pub async fn build_manifest(
+    state: &AppState,
+    build: &BuildRow,
+    viewer: Option<&UserProfile>,
+) -> Result<BuildManifest> {
     let base_build = crate::db::get_base_build(
         &state.db,
         &build.mc_version,
@@ -151,37 +127,10 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
         signature: Vec::new(),
     };
 
+    // До подписи: подпись должна покрывать ровно тот набор, который уедет.
+    if let Some(v) = viewer {
+        access::filter_for_viewer(&mut manifest, v);
+    }
     state.signer.sign_manifest(&mut manifest);
-    Ok(manifest)
-}
-
-/// Сериализовать манифест и проверить, что он валиден (для отладки публикации).
-pub fn manifest_summary(m: &BuildManifest) -> String {
-    let total: u64 = m.verified_files.iter().map(|f| f.size).sum();
-    format!(
-        "build {} v{} ({} {}): {} файлов, {:.1} МБ",
-        m.build_id,
-        m.version,
-        m.modloader.as_str(),
-        m.mc_version,
-        m.verified_files.len(),
-        total as f64 / 1_048_576.0
-    )
-}
-
-/// Гарантировать, что у сборки заполнен manifest_signature; пересобрать при нужде.
-pub async fn ensure_signed(state: &AppState, build: &BuildRow) -> Result<BuildManifest> {
-    let manifest = build_manifest(state, build).await?;
-    crate::db::update_build_manifest_meta(
-        &state.db,
-        build.id,
-        &manifest.main_class,
-        &serde_json::to_value(&manifest.jvm_args)?,
-        &serde_json::to_value(&manifest.game_args)?,
-        &manifest.assets_index_name,
-        &manifest.signature,
-    )
-    .await
-    .context("сохранение метаданных манифеста")?;
     Ok(manifest)
 }

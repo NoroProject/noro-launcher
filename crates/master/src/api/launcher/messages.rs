@@ -1,0 +1,140 @@
+//! Разбор входящих сообщений лаунчера.
+
+use crate::state::AppState;
+use schema::{ClientWsMsg, ServerWsMsg};
+use tokio::sync::mpsc;
+use uuid::Uuid;
+
+pub type Tx = mpsc::UnboundedSender<ServerWsMsg>;
+
+pub async fn handle(
+    state: &AppState,
+    conn_id: crate::ws::ConnId,
+    authed_user: &mut Option<Uuid>,
+    msg: ClientWsMsg,
+    tx: &Tx,
+) -> anyhow::Result<()> {
+    match msg {
+        ClientWsMsg::Authenticate {
+            access_token,
+            launcher_version,
+            platform,
+        } => {
+            authenticate(
+                state,
+                conn_id,
+                authed_user,
+                &access_token,
+                &launcher_version,
+                &platform,
+                tx,
+            )
+            .await?
+        }
+
+        ClientWsMsg::RequestServerList => {
+            let servers = super::servers::visible_servers(state, *authed_user).await?;
+            let _ = tx.send(ServerWsMsg::ServerList { servers });
+        }
+
+        ClientWsMsg::RequestNews => {
+            let rows = crate::db::list_news(&state.db, 20).await?;
+            let items = super::news::news_items(state, rows).await?;
+            let _ = tx.send(ServerWsMsg::News { items });
+        }
+
+        ClientWsMsg::RequestBuildManifest {
+            server_id,
+            build_id,
+        } => {
+            let Some(user_id) = *authed_user else {
+                let _ = tx.send(ServerWsMsg::AuthFail {
+                    reason: "auth-sign-in-first".into(),
+                });
+                return Ok(());
+            };
+            super::servers::send_manifest(state, user_id, server_id, build_id, tx).await?;
+        }
+
+        ClientWsMsg::SetOptionalMods { server_id, enabled } => {
+            // Выбор лаунчер хранит локально, мастеру он интересен как сигнал:
+            // limited-мода без права в манифесте больше нет (manifest::access),
+            // так что назвать его может только клиент, дописавший себе список.
+            if let Some(user_id) = *authed_user {
+                super::servers::report_forbidden_optionals(state, user_id, server_id, &enabled)
+                    .await?;
+            }
+        }
+
+        ClientWsMsg::ReportGameStart { server_id } => {
+            if let Some(user_id) = *authed_user {
+                let _ = crate::db::record_play_start(&state.db, user_id, server_id).await;
+            }
+        }
+
+        ClientWsMsg::ReportGameStop {
+            server_id,
+            playtime_secs,
+        } => {
+            if let Some(user_id) = *authed_user {
+                let _ = crate::db::record_play_stop(
+                    &state.db,
+                    user_id,
+                    server_id,
+                    playtime_secs as i64,
+                )
+                .await;
+            }
+        }
+
+        ClientWsMsg::Ping => {
+            let _ = tx.send(ServerWsMsg::Pong);
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn authenticate(
+    state: &AppState,
+    conn_id: crate::ws::ConnId,
+    authed_user: &mut Option<Uuid>,
+    access_token: &str,
+    launcher_version: &str,
+    platform: &str,
+    tx: &Tx,
+) -> anyhow::Result<()> {
+    let token = Uuid::parse_str(access_token).ok();
+    let row = match token {
+        Some(t) => crate::db::user_by_access_token(&state.db, t).await?,
+        None => None,
+    };
+    match row {
+        Some(r) if !r.banned => {
+            let user_id = r.id;
+            let profile = crate::db::profile_from_row(&state.db, r).await?;
+            *authed_user = Some(user_id);
+            state.ws.authenticate(conn_id, user_id);
+            // Не критично для входа: если запись не удалась, игрок всё
+            // равно должен подключиться — это только статистика.
+            if let Err(e) =
+                crate::db::record_launcher_client(&state.db, user_id, launcher_version, platform)
+                    .await
+            {
+                tracing::warn!(error = %e, "не удалось записать версию лаунчера");
+            }
+            let _ = tx.send(ServerWsMsg::AuthOk { user: profile });
+        }
+        Some(_) => {
+            let _ = tx.send(ServerWsMsg::AuthFail {
+                reason: "auth-banned".into(),
+            });
+        }
+        None => {
+            let _ = tx.send(ServerWsMsg::AuthFail {
+                reason: "auth-session-expired".into(),
+            });
+        }
+    }
+    Ok(())
+}
