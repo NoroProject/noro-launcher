@@ -463,7 +463,12 @@ function onSkinFilePicked(e: Event) {
       </div>
 
       <!-- Tab 3: Moderation -->
-      <div v-if="activeTab === 'moderation'" class="noro-panel p-5 space-y-4 max-w-xl">
+      <div v-if="activeTab === 'moderation'" class="grid gap-5 xl:grid-cols-2">
+        <PunishmentsPanel :user-id="id" />
+        <UserNotesPanel :user-id="id" />
+      </div>
+
+      <div v-if="activeTab === 'moderation'" class="noro-panel mt-5 p-5 space-y-4 max-w-xl">
         <h2 class="text-xl font-black text-[var(--noro-text)]">User Moderation</h2>
         <p class="text-sm text-[var(--noro-muted)]">Restrict player launcher login and server access</p>
         <input v-model="banReason" class="noro-input" placeholder="Enter ban reason...">

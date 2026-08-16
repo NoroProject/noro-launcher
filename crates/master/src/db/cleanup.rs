@@ -40,6 +40,13 @@ async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
     )
     .await?;
 
+    // Истёкшие баны. Без этого временный бан истекает в таблице наказаний, но
+    // игрок остаётся заблокированным до следующей правки его карточки.
+    let unbanned = crate::db::expire_punishments(pool).await?;
+    if unbanned > 0 {
+        tracing::info!(count = unbanned, "сняты истёкшие баны");
+    }
+
     // Бандлы логов старше 30 дней. Сам архив останется осиротевшим blob'ом и
     // уйдёт при следующей сборке мусора хранилища.
     let bundles = delete(pool, "DELETE FROM support_bundles WHERE expires_at < NOW()").await?;

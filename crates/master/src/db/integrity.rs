@@ -24,6 +24,52 @@ pub struct IntegrityFlagRow {
     pub reviewed_by: Option<Uuid>,
 }
 
+/// Снимок последней сверки: с чем игрок зашёл.
+///
+/// Отдельно от флагов: флаги пишутся только при расхождении, а версия сборки
+/// нужна журналу запусков и у тех, у кого всё сошлось.
+pub async fn save_integrity_snapshot(
+    pool: &PgPool,
+    user_id: Uuid,
+    report: &IntegrityReport,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO integrity_snapshots
+           (user_id, server_id, build_version, launcher_version, enabled_optional, ok, at)
+         VALUES ($1,$2,$3,$4,$5,$6,NOW())
+         ON CONFLICT (user_id, server_id) DO UPDATE
+           SET build_version = $3, launcher_version = $4,
+               enabled_optional = $5, ok = $6, at = NOW()",
+    )
+    .bind(user_id)
+    .bind(report.server_id)
+    .bind(&report.build_version)
+    .bind(&report.launcher_version)
+    .bind(serde_json::to_value(&report.enabled_optional)?)
+    .bind(report.findings.is_empty())
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Снимок для журнала запусков: версия сборки, версия лаунчера, моды, статус.
+#[allow(clippy::type_complexity)]
+pub async fn latest_integrity_snapshot(
+    pool: &PgPool,
+    user_id: Uuid,
+    server_id: Uuid,
+) -> Result<Option<(String, String, serde_json::Value, Option<bool>)>> {
+    let row = sqlx::query_as::<_, (String, String, serde_json::Value, bool)>(
+        "SELECT build_version, launcher_version, enabled_optional, ok
+         FROM integrity_snapshots WHERE user_id = $1 AND server_id = $2",
+    )
+    .bind(user_id)
+    .bind(server_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|(b, l, o, ok)| (b, l, o, Some(ok))))
+}
+
 /// Сохранить находки отчёта. Чистый отчёт строк не создаёт — иначе таблица
 /// растёт на каждый запуск каждого игрока ради «всё в порядке».
 pub async fn save_integrity_report(

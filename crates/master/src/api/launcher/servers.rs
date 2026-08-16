@@ -147,3 +147,28 @@ pub async fn report_forbidden_optionals(
     }
     Ok(())
 }
+
+/// Открыть запись журнала запусков со снапшотом того, с чем игрок зашёл.
+///
+/// Снимок берётся из последнего integrity-отчёта: он приходит прямо перед
+/// стартом и уже содержит и версию сборки, и набор включённых модов.
+pub async fn open_play_session(
+    state: &AppState,
+    user_id: Uuid,
+    server_id: Uuid,
+) -> anyhow::Result<()> {
+    let snapshot = crate::db::latest_integrity_snapshot(&state.db, user_id, server_id).await?;
+    let (build_version, launcher_version, optional, ok) =
+        snapshot.unwrap_or_else(|| (String::new(), String::new(), serde_json::json!([]), None));
+    crate::db::open_play_session(
+        &state.db,
+        user_id,
+        server_id,
+        &build_version,
+        &launcher_version,
+        &optional,
+        ok,
+    )
+    .await?;
+    Ok(())
+}

@@ -70,6 +70,9 @@ pub async fn handle(
             // Без входа отчёт не к кому привязать, а анонимные находки
             // разбирать не о ком.
             if let Some(user_id) = *authed_user {
+                // Снимок пишется всегда — журналу запусков нужна версия сборки
+                // и у тех, у кого всё сошлось.
+                crate::db::save_integrity_snapshot(&state.db, user_id, &report).await?;
                 let saved = crate::db::save_integrity_report(&state.db, user_id, &report).await?;
                 if saved > 0 {
                     tracing::warn!(%user_id, findings = saved, "сверка лаунчера нашла расхождения");
@@ -80,6 +83,7 @@ pub async fn handle(
         ClientWsMsg::ReportGameStart { server_id } => {
             if let Some(user_id) = *authed_user {
                 let _ = crate::db::record_play_start(&state.db, user_id, server_id).await;
+                super::servers::open_play_session(state, user_id, server_id).await?;
             }
         }
 
@@ -89,6 +93,13 @@ pub async fn handle(
         } => {
             if let Some(user_id) = *authed_user {
                 let _ = crate::db::record_play_stop(
+                    &state.db,
+                    user_id,
+                    server_id,
+                    playtime_secs as i64,
+                )
+                .await;
+                let _ = crate::db::close_play_session(
                     &state.db,
                     user_id,
                     server_id,

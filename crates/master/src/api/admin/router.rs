@@ -4,9 +4,9 @@ use axum::Router;
 
 use super::{
     agents, audit, backup, build_routes, capes, catalog, cores, game_servers, impersonate,
-    integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions, news,
-    permission_nodes, remote, roles, servers, settings, stats, storage, tokens, user_launcher,
-    users, versions, wrapper, wrapper_backups, wrapper_fs,
+    integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions, news, notes,
+    permission_nodes, punishments, remote, roles, servers, settings, stats, storage, tokens,
+    user_launcher, users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -48,6 +48,26 @@ pub fn router() -> Router<AppState> {
             get(remote::diagnostics).post(remote::request_diagnostics),
         )
         .route("/api/admin/users/{id}/action", post(remote::run_action))
+        .route(
+            "/api/admin/users/{id}/punishments",
+            get(punishments::list).post(punishments::create),
+        )
+        .route(
+            "/api/admin/users/{id}/punishments/{punishment_id}",
+            delete(punishments::revoke),
+        )
+        .route(
+            "/api/admin/users/{id}/notes",
+            get(notes::list).post(notes::add),
+        )
+        .route(
+            "/api/admin/users/{id}/notes/{note_id}",
+            delete(notes::delete),
+        )
+        .route(
+            "/api/admin/users/{id}/play-sessions",
+            get(notes::play_sessions),
+        )
         .route(
             "/api/admin/support/bundles/{id}",
             get(crate::api::support::download),
