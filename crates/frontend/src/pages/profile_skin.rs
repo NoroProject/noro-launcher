@@ -8,7 +8,7 @@ use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{
-    div, img, prelude::*, px, rgb, AnyElement, ClickEvent, CursorStyle, MouseButton, SharedString,
+    div, img, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, CursorStyle, MouseButton, SharedString,
 };
 use i18n::t;
 
@@ -84,7 +84,7 @@ fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
     div()
         .id("add-preset-tile")
         .w(gpui::relative(0.315))
-        .p(px(4.))
+        .p(px(6.))
         .bg(rgb(BG_CARD))
         .rounded(px(R_SM))
         .border_1()
@@ -94,62 +94,26 @@ fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
         .flex()
         .flex_col()
         .items_center()
-        .gap(px(4.))
+        .justify_center()
+        .gap(px(8.))
+        .py(px(24.))
         .on_click(cx.listener(on_upload_click))
         .child(
             div()
-                .w(px(72.))
-                .h(px(96.))
-                .flex()
-                .flex_col()
-                .items_center()
-                .justify_center()
-                .gap(px(6.))
-                .child(
-                    div()
-                        .w(px(32.))
-                        .h(px(32.))
-                        .rounded_full()
-                        .bg(rgb(BG_INPUT))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .child(ic("plus", 18., CTA)),
-                )
-                .child(
-                    div()
-                        .font_family(FONT_PIXEL_ALT)
-                        .text_size(px(8.))
-                        .text_color(rgb(TEXT_MUTED))
-                        .child(t("profile-preset-upload-png")),
-                ),
-        )
-        .child(
-            div()
-                .w_full()
-                .px(px(4.))
-                .truncate()
-                .text_center()
-                .font_family(FONT_PIXEL_ALT)
-                .text_size(px(10.))
-                .font_weight(gpui::FontWeight::BOLD)
-                .text_color(rgb(CTA))
-                .child(t("profile-preset-new")),
-        )
-        .child(
-            div()
-                .w_full()
-                .py(px(3.))
-                .rounded(px(R_SM))
-                .bg(rgb(BG_INPUT))
+                .size(px(44.))
+                .rounded_full()
+                .bg(rgba(0xf3e7b31a))
                 .border_1()
-                .border_color(rgb(BORDER))
-                .hover(|s| s.bg(rgb(BG_CARD)))
+                .border_color(rgba(0xf3e7b344))
                 .flex()
                 .items_center()
                 .justify_center()
+                .child(ic("plus", 22., CTA)),
+        )
+        .child(
+            div()
                 .font_family(FONT_PIXEL_ALT)
-                .text_size(px(9.))
+                .text_size(px(11.))
                 .font_weight(gpui::FontWeight::BOLD)
                 .text_color(rgb(TEXT_PRIMARY))
                 .child(t("profile-preset-upload")),

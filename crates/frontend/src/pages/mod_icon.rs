@@ -134,8 +134,7 @@ pub fn is_mod_installed(ui: &LauncherUI, server_id: uuid::Uuid, hit_title: &str)
                 .filter(|c| c.is_alphanumeric())
                 .collect::<String>()
                 .to_lowercase();
-            !clean_name.is_empty()
-                && (clean_title.contains(&clean_name) || clean_name.contains(&clean_title))
+            !clean_name.is_empty() && clean_title == clean_name
         }) {
             return true;
         }
@@ -143,12 +142,16 @@ pub fn is_mod_installed(ui: &LauncherUI, server_id: uuid::Uuid, hit_title: &str)
 
     if let Some(files) = ui.installed_files.get(&server_id) {
         if files.iter().any(|f| {
-            let clean_file = f
+            let file_name = std::path::Path::new(f)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(f);
+            let clean_file = file_name
                 .chars()
                 .filter(|c| c.is_alphanumeric())
                 .collect::<String>()
                 .to_lowercase();
-            clean_file.contains(&clean_title)
+            clean_file.starts_with(&clean_title) || clean_title == clean_file
         }) {
             return true;
         }

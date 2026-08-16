@@ -157,6 +157,39 @@ async fn into_build(
     changed: &mut HashSet<Uuid>,
 ) -> AppResult<String> {
     let path = format!("mods/{}", m.filename);
+
+    // Удалим прошлую версию этого же мода из сборки, если она там лежит.
+    let new_disk_path = state.files.path_for(&m.sha1);
+    let new_meta = backend::mod_icon::extract_jar_metadata(&new_disk_path);
+
+    if let Ok(existing_files) = crate::db::build_files(&state.db, build_id).await {
+        for f in existing_files {
+            if f.path.starts_with("mods/") && f.path != path {
+                let old_disk_path = state.files.path_for(&f.sha1);
+                let old_meta = backend::mod_icon::extract_jar_metadata(&old_disk_path);
+
+                let is_same_mod = match (&new_meta, &old_meta) {
+                    (Some(n), Some(o)) if n.mod_id.is_some() && n.mod_id == o.mod_id => true,
+                    _ => {
+                        let new_base = stem_mod_name(&m.filename);
+                        let old_base = stem_mod_name(&f.path);
+                        !new_base.is_empty() && new_base == old_base
+                    }
+                };
+
+                if is_same_mod {
+                    tracing::info!(
+                        "Removing older mod version file '{}' from build {} to install '{}'",
+                        f.path,
+                        build_id,
+                        path
+                    );
+                    let _ = crate::db::delete_build_file(&state.db, f.id).await;
+                }
+            }
+        }
+    }
+
     crate::db::upsert_build_file(
         &state.db,
         build_id,
@@ -178,4 +211,20 @@ async fn into_build(
     }
     changed.insert(super::builds::build_server_id(state, build_id).await?);
     Ok(path)
+}
+
+fn stem_mod_name(filename: &str) -> String {
+    let name = filename.strip_prefix("mods/").unwrap_or(filename);
+    let name = name.strip_suffix(".jar").unwrap_or(name);
+    let clean = name
+        .split(['-', '_', '+'])
+        .take_while(|part| !part.chars().next().is_some_and(|c| c.is_ascii_digit() || c == 'v'))
+        .collect::<Vec<_>>()
+        .join("-")
+        .to_lowercase();
+    if clean.is_empty() {
+        name.to_lowercase()
+    } else {
+        clean
+    }
 }

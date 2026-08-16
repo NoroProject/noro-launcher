@@ -62,11 +62,11 @@ function findInstalledMod(hitTitle: string, projectId?: string): InstalledModInf
         const cleanModId = (m.mod_id || "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
         const cleanPath = (m.path || "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 
-        return (
-            (cleanName && (cleanTitle.includes(cleanName) || cleanName.includes(cleanTitle))) ||
-            (cleanModId && (cleanTitle.includes(cleanModId) || cleanModId.includes(cleanProj))) ||
-            (cleanPath && cleanPath.includes(cleanTitle))
-        );
+        const titleMatch = Boolean(cleanName && cleanName === cleanTitle);
+        const projMatch = Boolean(cleanProj && (cleanModId === cleanProj || cleanName === cleanProj));
+        const modIdMatch = Boolean(cleanModId && cleanModId === cleanTitle);
+
+        return titleMatch || projMatch || modIdMatch;
     });
     return found ?? null;
 }

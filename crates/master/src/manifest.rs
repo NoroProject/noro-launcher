@@ -146,6 +146,7 @@ pub async fn build_manifest(state: &AppState, build: &BuildRow) -> Result<BuildM
                 .max(512) as u32,
             jvm_flags: build.recommended_jvm_flags.clone(),
             show_console_on_launch: build.recommended_show_console_on_launch,
+            fullscreen: false,
         },
         signature: Vec::new(),
     };
