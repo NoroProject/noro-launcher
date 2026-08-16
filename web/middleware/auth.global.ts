@@ -1,5 +1,6 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  const publicPages = new Set(['/', '/login'])
+  // /setup доступен без входа: аккаунтов на ненастроенном инстансе ещё нет.
+  const publicPages = new Set(['/', '/login', '/setup'])
   if (publicPages.has(to.path)) return
 
   const token = useCookie<string | null>('noro_token')
