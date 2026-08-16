@@ -23,13 +23,23 @@ pub struct AppState {
     pub catalog: HttpCache,
     /// Подключённые ServerWrapper'ы игровых серверов.
     pub wrappers: crate::wrapper::WrapperHub,
-    /// Проверка passkey. Собирается один раз при старте: домен и origin'ы
-    /// заданы конфигом, и ошибка в них должна валить запуск, а не вход игрока.
-    pub webauthn: Arc<webauthn_rs::Webauthn>,
+    /// Проверка passkey. Собирается один раз при старте. `None` — публичные
+    /// адреса ещё не заданы: домен, к которому браузер привяжет ключ, вывести
+    /// не из чего, и обещать игроку passkey нельзя.
+    pub webauthn: Option<Arc<webauthn_rs::Webauthn>>,
 }
 
 impl AppState {
     pub fn http(&self) -> &reqwest::Client {
         &self.http
+    }
+
+    /// Проверка passkey либо внятный отказ.
+    pub fn webauthn(&self) -> Result<&webauthn_rs::Webauthn, crate::error::AppError> {
+        self.webauthn.as_deref().ok_or_else(|| {
+            crate::error::AppError::BadRequest(
+                "passkey недоступен: не заданы публичные адреса сайта и API".into(),
+            )
+        })
     }
 }

@@ -13,6 +13,7 @@ pub mod files;
 pub mod launcher_builder;
 pub mod manifest;
 pub mod mojang_bootstrap;
+pub mod setup;
 pub mod signing;
 pub mod state;
 pub mod telemetry;
@@ -31,8 +32,19 @@ use tower_http::trace::TraceLayer;
 
 /// Точка входа сервера.
 pub async fn run() -> Result<()> {
-    let config = Config::from_env()?;
-    tokio::fs::create_dir_all(&config.data_dir).await.ok();
+    // До подъёма БД мастер знает только это: где слушать, куда подключаться и
+    // где лежат данные. Всё остальное читается уже из БД.
+    let boot = config::Bootstrap::from_env()?;
+    tokio::fs::create_dir_all(&boot.data_dir).await.ok();
+
+    let db = db::connect_and_migrate(&boot.database_url).await?;
+
+    // Боевой инстанс перехода не замечает: его настройки уже заданы в
+    // окружении, и спрашивать его о них заново незачем.
+    setup::migrate_env_if_needed(&db).await?;
+
+    let config = Config::load(boot, &db).await?;
+    announce(&config, &db).await?;
 
     let signer = signing::Signer25519::from_config(&config.signing_key_hex)?;
     if config.is_dev_signing() {
@@ -47,7 +59,6 @@ pub async fn run() -> Result<()> {
     // Ключ создаётся при первом старте и живёт в data_dir рядом с файлами.
     let profile_signer = yggdrasil_sign::ProfileSigner::load_or_create(&config.data_dir)?;
 
-    let db = db::connect_and_migrate(&config.database_url).await?;
     let files = files::FileStore::new(&config.data_dir);
     let http = reqwest::Client::builder()
         .user_agent("noro-master/0.1")
@@ -64,7 +75,9 @@ pub async fn run() -> Result<()> {
         import_jobs: Arc::new(dashmap::DashMap::new()),
         catalog: catalog::HttpCache::default(),
         wrappers: wrapper::WrapperHub::default(),
-        webauthn: Arc::new(api::auth::webauthn::build(&config)?),
+        // Без публичных адресов домен для passkey не вывести. Это не повод не
+        // подняться: инстанс как раз и поднимается, чтобы их задать.
+        webauthn: build_webauthn(&config),
     };
 
     // Фоновый опрос GitHub (если настроен).
@@ -82,6 +95,41 @@ pub async fn run() -> Result<()> {
         app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
     .await?;
+    Ok(())
+}
+
+fn build_webauthn(config: &Config) -> Option<Arc<webauthn_rs::Webauthn>> {
+    if !config.is_usable() {
+        return None;
+    }
+    match api::auth::webauthn::build(config) {
+        Ok(w) => Some(Arc::new(w)),
+        // Не валим старт: без passkey остаётся вход через Discord, а вот
+        // мастер, не поднявшийся из-за опечатки в домене, не оставляет ничего.
+        Err(e) => {
+            tracing::error!(error = %e, "passkey отключён: не собрать WebAuthn");
+            None
+        }
+    }
+}
+
+/// Сказать при старте, в каком состоянии инстанс.
+///
+/// Ненастроенный мастер молчал бы и отвечал 503 на всё подряд — оператор
+/// увидел бы сломанный сайт вместо инструкции.
+async fn announce(config: &Config, db: &sqlx::PgPool) -> Result<()> {
+    if let Some(token) = setup::ensure_token(db, &config.data_dir).await? {
+        tracing::warn!(
+            "инстанс не настроен. Откройте {}/setup и введите токен:\n\n    {token}\n\n\
+             он же лежит в {}",
+            if config.web_url.is_empty() {
+                "http://<адрес сайта>"
+            } else {
+                &config.web_url
+            },
+            config.data_dir.join("setup-token.txt").display(),
+        );
+    }
     Ok(())
 }
 
@@ -297,8 +345,21 @@ fn router(state: AppState) -> Router {
     // Публичное и пользовательское API: тело ограничено. Раньше лимит был снят
     // на всём роутере разом, и аноним мог занять память запросом любого размера
     // на любом эндпоинте. Самая крупная загрузка здесь — скин на 256 КБ.
+    // Визард. Живёт до завершения настройки: после неё `SetupAuth` перестаёт
+    // принимать что-либо, потому что токен сожжён.
+    let setup_api = Router::new()
+        .route("/api/setup/status", get(setup::api::status))
+        .route("/api/setup/settings", post(setup::api::save))
+        .route(
+            "/api/setup/signing-key",
+            post(setup::api::generate_signing_key),
+        )
+        .route("/api/setup/env", get(setup::api::env_block))
+        .route("/api/setup/complete", post(setup::api::complete));
+
     let public_api = Router::new()
         .route("/health", get(api::health::health))
+        .merge(setup_api)
         .merge(yggdrasil)
         .merge(discord)
         .merge(launcher_api)
@@ -312,6 +373,12 @@ fn router(state: AppState) -> Router {
         // Админка заливает сборки, моды и бинарники лаунчера — тут лимит снят
         // осознанно, и маршруты закрыты проверкой прав.
         .merge(admin_api.layer(axum::extract::DefaultBodyLimit::disable()))
+        // Заслонка идёт до всего остального: ненастроенный мастер не должен
+        // делать вид, что работает, — манифесты уехали бы со ссылками в никуда.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            setup::gate::gate,
+        ))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         // WebDAV подключается ПОСЛЕ слоёв: CorsLayer сам отвечает на OPTIONS,

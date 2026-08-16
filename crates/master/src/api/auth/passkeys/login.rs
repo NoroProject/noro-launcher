@@ -16,7 +16,7 @@ pub async fn login_options(
     State(state): State<AppState>,
 ) -> AppResult<Json<ChallengeRes<RequestChallengeResponse>>> {
     let (options, auth_state) = state
-        .webauthn
+        .webauthn()?
         .start_discoverable_authentication()
         .map_err(reject)?;
 
@@ -49,7 +49,7 @@ pub async fn verify(state: &AppState, req: &LoginVerifyReq) -> AppResult<Uuid> {
     let auth_state: DiscoverableAuthentication = serde_json::from_value(raw_state)?;
 
     let (user_id, _) = state
-        .webauthn
+        .webauthn()?
         .identify_discoverable_authentication(&req.credential)
         .map_err(reject)?;
 
@@ -69,7 +69,7 @@ pub async fn verify(state: &AppState, req: &LoginVerifyReq) -> AppResult<Uuid> {
 
     let discoverable: Vec<DiscoverableKey> = keys.iter().map(|(_, pk)| pk.into()).collect();
     let result = state
-        .webauthn
+        .webauthn()?
         .finish_discoverable_authentication(&req.credential, auth_state, &discoverable)
         .map_err(reject)?;
 

@@ -29,7 +29,7 @@ pub async fn register_options(
         .collect();
 
     let (options, reg_state) = state
-        .webauthn
+        .webauthn()?
         .start_passkey_registration(
             profile.id,
             &profile.username,
@@ -74,7 +74,7 @@ pub async fn register_verify(
 
     let reg_state: PasskeyRegistration = serde_json::from_value(raw_state)?;
     let passkey = state
-        .webauthn
+        .webauthn()?
         .finish_passkey_registration(&req.credential, &reg_state)
         .map_err(reject)?;
 
