@@ -22,6 +22,42 @@ pub struct ListQuery {
     pub limit: Option<i64>,
 }
 
+/// Справочник для фильтра: какие события бывают и как они называются.
+///
+/// Реестр из кода, а не `SELECT DISTINCT`: иначе в списке не было бы событий,
+/// которые ещё ни разу не случились, — а искать чаще всего надо именно их.
+pub async fn actions(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+) -> AppResult<Json<serde_json::Value>> {
+    admin.require(PERM_ADMIN_AUDIT)?;
+
+    // Что реально встречается в журнале — чтобы старые события, выпавшие из
+    // реестра, не пропали из фильтра молча.
+    let seen = crate::db::distinct_audit_actions(&state.db).await?;
+
+    let mut items: Vec<serde_json::Value> = crate::audit::actions::ALL
+        .iter()
+        .map(|a| serde_json::json!({ "name": a.name, "group": a.group, "title": a.title }))
+        .collect();
+    for name in seen {
+        if !crate::audit::actions::ALL.iter().any(|a| a.name == name) {
+            items.push(serde_json::json!({
+                "name": name,
+                "group": "Прочее",
+                "title": name,
+            }));
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "actions": items,
+        "groups": crate::audit::actions::GROUPS,
+        "target_kinds": ["user", "role", "build", "server", "admin_token",
+                         "launcher_version", "blocked_file", "integrity_flag"],
+    })))
+}
+
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,

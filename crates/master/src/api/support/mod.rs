@@ -90,6 +90,13 @@ pub async fn upload(
     }
 
     tracing::info!(%id, user = %user.user_id, bytes = clean.len(), "принят бандл логов");
+    crate::audit::record_by_user(
+        &state,
+        user.user_id,
+        "support.bundle.upload",
+        json!({ "bundle_id": id, "voluntary": voluntary, "bytes": clean.len() }),
+    )
+    .await;
     Ok(Json(json!({ "id": id })))
 }
 

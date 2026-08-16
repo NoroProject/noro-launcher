@@ -5,6 +5,7 @@
 //! пути не восстановить, что стало с объектом, а разбирать спорную ситуацию
 //! придётся именно по этому.
 
+pub mod actions;
 pub mod impersonation;
 
 use crate::state::AppState;
@@ -53,6 +54,31 @@ pub fn target(kind: &'static str, id: impl ToString) -> Option<Target> {
         kind,
         id: id.to_string(),
     })
+}
+
+/// Событие, совершённое самим игроком: вход, запуск игры, сверка.
+///
+/// Отдельный хелпер, потому что «кто» тут известен по id, а имя приходится
+/// доставать — и забыть его значит получить в журнале строку без автора.
+pub async fn record_by_user(state: &AppState, user_id: Uuid, action: &str, details: Value) {
+    let username = crate::db::get_user(&state.db, user_id)
+        .await
+        .ok()
+        .flatten()
+        .map(|u| u.mc_username)
+        .unwrap_or_else(|| user_id.to_string());
+
+    record(
+        state,
+        &Actor::User {
+            id: user_id,
+            username,
+        },
+        action,
+        target("user", user_id),
+        details,
+    )
+    .await;
 }
 
 /// Записать событие.

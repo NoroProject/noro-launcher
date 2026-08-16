@@ -76,6 +76,20 @@ pub async fn handle(
                 let saved = crate::db::save_integrity_report(&state.db, user_id, &report).await?;
                 if saved > 0 {
                     tracing::warn!(%user_id, findings = saved, "сверка лаунчера нашла расхождения");
+                    // Одной строкой на отчёт, а не на находку: подробности уже
+                    // лежат в integrity_flags, а журнал не должен ими зарастать.
+                    crate::audit::record_by_user(
+                        state,
+                        user_id,
+                        "integrity.findings",
+                        serde_json::json!({
+                            "count": saved,
+                            "build_version": report.build_version,
+                            "subjects": report.findings.iter().take(10)
+                                .map(|f| f.subject.clone()).collect::<Vec<_>>(),
+                        }),
+                    )
+                    .await;
                 }
             }
         }
@@ -84,6 +98,13 @@ pub async fn handle(
             if let Some(user_id) = *authed_user {
                 let _ = crate::db::record_play_start(&state.db, user_id, server_id).await;
                 super::servers::open_play_session(state, user_id, server_id).await?;
+                crate::audit::record_by_user(
+                    state,
+                    user_id,
+                    "game.start",
+                    serde_json::json!({ "server_id": server_id }),
+                )
+                .await;
             }
         }
 
@@ -104,6 +125,13 @@ pub async fn handle(
                     user_id,
                     server_id,
                     playtime_secs as i64,
+                )
+                .await;
+                crate::audit::record_by_user(
+                    state,
+                    user_id,
+                    "game.stop",
+                    serde_json::json!({ "server_id": server_id, "playtime_secs": playtime_secs }),
                 )
                 .await;
             }

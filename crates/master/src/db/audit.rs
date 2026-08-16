@@ -81,3 +81,12 @@ pub async fn list_audit(pool: &PgPool, f: &AuditFilter, limit: i64) -> Result<Ve
     .await?;
     Ok(rows)
 }
+
+/// Какие события реально встречаются в журнале.
+pub async fn distinct_audit_actions(pool: &PgPool) -> Result<Vec<String>> {
+    Ok(
+        sqlx::query_scalar::<_, String>("SELECT DISTINCT action FROM audit_log ORDER BY action")
+            .fetch_all(pool)
+            .await?,
+    )
+}

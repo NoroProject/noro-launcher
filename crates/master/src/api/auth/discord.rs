@@ -230,6 +230,13 @@ async fn exchange_and_session(
     let (user_id, _is_new) =
         crate::db::find_or_create_user(&state.db, discord_id, username, avatar.as_deref()).await?;
     let session = crate::db::create_session(&state.db, user_id, scope, ttl).await?;
+    crate::audit::record_by_user(
+        state,
+        user_id,
+        "auth.login",
+        serde_json::json!({ "method": "discord", "scope": scope }),
+    )
+    .await;
     Ok((user_id, session))
 }
 

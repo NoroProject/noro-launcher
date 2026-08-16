@@ -98,6 +98,13 @@ pub async fn login_verify(
 
     let session =
         crate::db::create_session(&state.db, user_id, "master", chrono::Duration::days(30)).await?;
+    crate::audit::record_by_user(
+        &state,
+        user_id,
+        "auth.login",
+        serde_json::json!({ "method": "passkey" }),
+    )
+    .await;
     let user_profile = crate::db::load_profile(&state.db, user_id).await?;
 
     Ok(Json(json!({

@@ -13,6 +13,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/agents", get(agents::list))
         .route("/api/admin/audit", get(audit::list))
+        .route("/api/admin/audit/actions", get(audit::actions))
         .route(
             "/api/admin/blocklist",
             get(blocklist::list).post(blocklist::create),
