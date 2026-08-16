@@ -2,7 +2,7 @@
 
 use super::common::{panel, Cx};
 use super::settings_rows::{mono_value, row, stepper};
-use crate::components::checkbox_row;
+use crate::components::{btn, checkbox_row};
 use crate::state::LauncherUI;
 use gpui::{div, prelude::*, px, AnyElement, ClickEvent, SharedString};
 use i18n::t;
@@ -47,10 +47,34 @@ pub fn settings_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 t("settings-crash-reports"),
                 t("settings-crash-reports-hint"),
                 crash_reports_control(ui, cx),
-                false,
+                true,
             ))
         })
+        .child(row(
+            "circle-alert",
+            t("settings-support-bundle"),
+            t("settings-support-bundle-hint"),
+            support_bundle_control(cx),
+            false,
+        ))
         .into_any_element()
+}
+
+/// Кнопка отправки логов.
+///
+/// Инициатива игрока покрывает большую часть случаев, ради которых иначе нужен
+/// был бы админский запрос с согласием, — и не требует ни того, ни другого.
+fn support_bundle_control(cx: &mut Cx) -> AnyElement {
+    btn(
+        "send-support-bundle",
+        t("settings-support-send"),
+        false,
+        cx.listener(|this, _e, _w, cx| {
+            this.send_support_bundle();
+            cx.notify();
+        }),
+    )
+    .into_any_element()
 }
 
 fn crash_reports_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {

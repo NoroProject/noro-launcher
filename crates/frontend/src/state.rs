@@ -1108,6 +1108,15 @@ impl LauncherUI {
             .send(MessageToBackend::SetCrashReports { enabled });
     }
 
+    /// «Сообщить о проблеме»: собрать логи текущего сервера и отправить.
+    ///
+    /// Сервер не указан — backend возьмёт тот, чей манифест уже загружен: логи
+    /// лежат в каталоге инстанса, и без сервера отправлять нечего.
+    pub fn send_support_bundle(&mut self) {
+        self.backend
+            .send(MessageToBackend::SendSupportBundle { server_id: None });
+    }
+
     pub fn set_server_show_console_on_launch(&mut self, server_id: Uuid, enabled: bool) {
         let mut settings = self.server_client_settings(server_id);
         settings.show_console_on_launch = enabled;

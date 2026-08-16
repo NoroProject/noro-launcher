@@ -503,6 +503,10 @@ impl BackendState {
                 crate::translations::refresh(&self.ctx, code);
             }
 
+            MessageToBackend::SendSupportBundle { server_id } => {
+                self.send_support_bundle(server_id);
+            }
+
             MessageToBackend::InstallUpdate {
                 version,
                 modal_action,
@@ -892,6 +896,63 @@ impl BackendState {
             }
             ServerWsMsg::Pong => {}
         }
+    }
+
+    /// «Сообщить о проблеме»: собрать логи и отправить их мастеру.
+    ///
+    /// Работает в фоне: сборка читает файлы с диска, а держать из-за этого
+    /// интерфейс нельзя. Результат приезжает уведомлением.
+    fn send_support_bundle(&self, server_id: Option<Uuid>) {
+        let Some(token) = self.access_token.clone() else {
+            self.notify("notif-sign-in-first", schema::NotifLevel::Error);
+            return;
+        };
+        // Без сервера логов нет: игра пишет их в каталог инстанса.
+        let Some(server_id) = server_id.or_else(|| self.manifests.keys().copied().next()) else {
+            self.notify("notif-support-nothing-to-send", schema::NotifLevel::Warning);
+            return;
+        };
+
+        let ctx = self.ctx.clone();
+        let instance_dir = self.ctx.dirs.instance(&server_id);
+        let master = self.ctx.config.get().master_url;
+        tokio::spawn(async move {
+            match crate::support::send(
+                &ctx.http,
+                &master,
+                &token,
+                &instance_dir,
+                Some(server_id),
+                "",
+            )
+            .await
+            {
+                Ok(id) => {
+                    tracing::info!(%id, "бандл логов отправлен");
+                    ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-support-sent".into(),
+                        args: std::collections::BTreeMap::new(),
+                        level: schema::NotifLevel::Info,
+                    });
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "бандл логов не отправлен");
+                    ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-support-failed".into(),
+                        args: [("reason".to_string(), e.to_string())].into(),
+                        level: schema::NotifLevel::Error,
+                    });
+                }
+            }
+        });
+    }
+
+    fn notify(&self, key: &str, level: schema::NotifLevel) {
+        self.ctx.send(MessageToFrontend::AddNotification {
+            key: key.into(),
+            args: std::collections::BTreeMap::new(),
+            level,
+        });
     }
 }
 

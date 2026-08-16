@@ -160,6 +160,14 @@ pub enum MessageToBackend {
         code: String,
     },
 
+    /// «Сообщить о проблеме»: собрать логи и отправить мастеру.
+    ///
+    /// Инициатива игрока, а не запрос админа — ни согласия, ни гранта здесь не
+    /// нужно, он сам нажал кнопку.
+    SendSupportBundle {
+        server_id: Option<Uuid>,
+    },
+
     // --- Обновление лаунчера ---
     InstallUpdate {
         version: LauncherVersion,
