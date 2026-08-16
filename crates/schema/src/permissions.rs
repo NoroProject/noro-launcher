@@ -54,6 +54,10 @@ pub const PERM_ADMIN_BACKUP: &str = "noro.admin.backup";
 /// и открывать его каждому, у кого есть админка, незачем.
 pub const PERM_ADMIN_AUDIT: &str = "noro.admin.audit";
 
+/// Просмотр и скачивание бандлов логов. Отдельно от `noro.admin.*`: в логах
+/// лежит содержимое чужого компьютера, пусть и очищенное.
+pub const PERM_ADMIN_SUPPORT_LOGS: &str = "noro.admin.support.logs";
+
 pub const PERM_MOD_USERS_BAN: &str = "noro.mod.users.ban";
 
 pub const PERM_LAUNCHER_BETA: &str = "noro.launcher.beta";

@@ -3,8 +3,8 @@
 //! Поддерживает log4j XML формат и классификацию уровней. Санитизация — в
 //! [`crate::redact`]: те же правила нужны и файлам, а не только живому потоку.
 
-use crate::redact::redact;
 use bridge::{GameLogLevel, MessageToFrontend};
+use schema::redact;
 use std::borrow::Cow;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;

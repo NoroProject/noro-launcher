@@ -13,6 +13,7 @@ pub mod models;
 pub mod oauth2;
 pub mod passkeys;
 pub mod queries;
+pub mod support;
 
 use anyhow::{Context, Result};
 use sqlx::postgres::PgPoolOptions;
@@ -28,6 +29,7 @@ pub use mod_suggestions::*;
 pub use oauth2::*;
 pub use passkeys::*;
 pub use queries::*;
+pub use support::*;
 
 /// Подключиться к БД и применить миграции.
 pub async fn connect_and_migrate(database_url: &str) -> Result<PgPool> {

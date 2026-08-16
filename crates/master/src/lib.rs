@@ -87,7 +87,7 @@ pub async fn run() -> Result<()> {
 
 fn router(state: AppState) -> Router {
     use api::{
-        agent, agent_artifact, agent_nodes, auth, cabinet, file_serve, launcher, textures,
+        agent, agent_artifact, agent_nodes, auth, cabinet, file_serve, launcher, support, textures,
         translations,
     };
 
@@ -178,6 +178,9 @@ fn router(state: AppState) -> Router {
         .route("/ws/launcher", get(launcher::ws_handler))
         .route("/api/launcher/version", get(launcher::current_version))
         .route("/api/launcher/downloads", get(launcher::downloads))
+        // Инициатива игрока: кнопка «Сообщить о проблеме» и предложение после
+        // краша. Ни запроса от админа, ни гранта здесь не нужно.
+        .route("/api/launcher/support-bundle", post(support::upload))
         .route("/files/{sha1}", get(file_serve::serve_file))
         .route("/api/textures/default-skin", get(textures::default_skin))
         .route(
@@ -208,6 +211,8 @@ fn router(state: AppState) -> Router {
     let cabinet_api = Router::new()
         .route("/api/me", get(cabinet::me))
         .route("/api/me/username", put(cabinet::set_username))
+        .route("/api/me/support-bundles", get(support::my_bundles))
+        .route("/api/me/support-bundles/{id}", delete(support::delete_mine))
         .route(
             "/api/me/skin",
             post(cabinet::upload_skin).delete(cabinet::delete_skin),

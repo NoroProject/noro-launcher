@@ -687,6 +687,7 @@ dependencies = [
  "discord-rich-presence",
  "ed25519-dalek",
  "fastnbt",
+ "flate2",
  "futures",
  "futures-util",
  "hex",
@@ -6083,6 +6084,8 @@ name = "schema"
 version = "1.6.4"
 dependencies = [
  "chrono",
+ "once_cell",
+ "regex",
  "serde",
  "serde_json",
  "uuid 1.23.2",

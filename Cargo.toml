@@ -125,6 +125,9 @@ once_cell = "1"
 bytes = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
 zip = "2"
+# Разжать logs/*.log.gz, чтобы санитизировать содержимое: отправить сжатый лог
+# как есть значит отправить токен, которого мы в нём не видели.
+flate2 = "1"
 # NBT: servers.dat игрового клиента
 fastnbt = "2"
 walkdir = "2"

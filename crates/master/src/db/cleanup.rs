@@ -40,6 +40,10 @@ async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
     )
     .await?;
 
+    // Бандлы логов старше 30 дней. Сам архив останется осиротевшим blob'ом и
+    // уйдёт при следующей сборке мусора хранилища.
+    let bundles = delete(pool, "DELETE FROM support_bundles WHERE expires_at < NOW()").await?;
+
     // Начатые и брошенные диалоги passkey: их никто уже не заберёт.
     let webauthn = delete(pool, "DELETE FROM webauthn_states WHERE expires_at < NOW()").await?;
 
@@ -51,11 +55,12 @@ async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
     )
     .await?;
 
-    if codes + launcher_codes + webauthn + sessions > 0 {
+    if codes + launcher_codes + webauthn + bundles + sessions > 0 {
         tracing::info!(
             oauth_codes = codes,
             launcher_auth_codes = launcher_codes,
             webauthn_states = webauthn,
+            support_bundles = bundles,
             oauth_sessions = sessions,
             "убраны протухшие строки авторизации"
         );

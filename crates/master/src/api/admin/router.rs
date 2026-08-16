@@ -13,6 +13,11 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/agents", get(agents::list))
         .route("/api/admin/audit", get(audit::list))
         .route("/api/admin/integrity", get(integrity::list))
+        .route("/api/admin/support/bundles", get(crate::api::support::list))
+        .route(
+            "/api/admin/support/bundles/{id}",
+            get(crate::api::support::download),
+        )
         .route("/api/admin/integrity/{id}/review", post(integrity::review))
         .route("/api/admin/permission-nodes", get(permission_nodes::list))
         .merge(catalog_router())

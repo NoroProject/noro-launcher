@@ -42,6 +42,7 @@ url = { workspace = true }
 urlencoding = { workspace = true }
 walkdir = { workspace = true }
 zip = { workspace = true }
+flate2 = { workspace = true }
 fastnbt = { workspace = true }
 discord-rich-presence = { workspace = true }
 futures = { workspace = true }
