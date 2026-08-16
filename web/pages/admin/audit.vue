@@ -1,21 +1,46 @@
 <script setup lang="ts">
 import type { AuditRow } from '~/types/audit'
 
+interface ActionInfo {
+  name: string
+  group: string
+  title: string
+}
+
 const auth = useAuth()
 const notify = useNotify()
 await auth.loadMe()
 
 const action = ref('')
+const targetKind = ref('')
 const targetId = ref('')
 const rows = ref<AuditRow[]>([])
 const pending = ref(false)
 const done = ref(false)
 
+const actions = ref<ActionInfo[]>([])
+const groups = ref<string[]>([])
+const targetKinds = ref<string[]>([])
+
 const PAGE = 50
+
+/** Действия, сгруппированные для `<optgroup>`: плоский список из сорока пунктов не читается. */
+const grouped = computed(() =>
+  groups.value
+    .map((g) => ({ group: g, items: actions.value.filter((a) => a.group === g) }))
+    .filter((g) => g.items.length)
+    .concat(
+      // Всё, чья группа не объявлена, — в конец, а не в никуда.
+      actions.value.some((a) => !groups.value.includes(a.group))
+        ? [{ group: 'Other', items: actions.value.filter((a) => !groups.value.includes(a.group)) }]
+        : []
+    )
+)
 
 function query(beforeId?: number) {
   const p = new URLSearchParams({ limit: String(PAGE) })
-  if (action.value.trim()) p.set('action', action.value.trim())
+  if (action.value) p.set('action', action.value)
+  if (targetKind.value) p.set('target_kind', targetKind.value)
   if (targetId.value.trim()) p.set('target_id', targetId.value.trim())
   if (beforeId) p.set('before_id', String(beforeId))
   return `/api/admin/audit?${p}`
@@ -36,7 +61,36 @@ async function load(more = false) {
   }
 }
 
-onMounted(() => load())
+async function loadActions() {
+  try {
+    const res = await auth.request<{
+      actions: ActionInfo[]
+      groups: string[]
+      target_kinds: string[]
+    }>('/api/admin/audit/actions')
+    actions.value = res.actions
+    groups.value = res.groups
+    targetKinds.value = res.target_kinds
+  } catch {
+    // Фильтр без справочника всё ещё работает по «всем событиям».
+  }
+}
+
+function reset() {
+  action.value = ''
+  targetKind.value = ''
+  targetId.value = ''
+  load()
+}
+
+/** Человеческое имя события — по нему и подписаны строки журнала. */
+const titles = computed(() => Object.fromEntries(actions.value.map((a) => [a.name, a.title])))
+
+watch([action, targetKind], () => load())
+onMounted(() => {
+  loadActions()
+  load()
+})
 </script>
 
 <template>
@@ -47,32 +101,43 @@ onMounted(() => load())
       </AtomButton>
     </template>
 
-    <section class="noro-panel mb-4 grid gap-4 p-4 md:grid-cols-[1fr_1fr_auto]">
+    <section class="noro-panel mb-4 grid gap-4 p-4 md:grid-cols-[1fr_200px_1fr_auto]">
       <label class="block">
-        <span class="noro-label mb-1.5 block">Action prefix</span>
-        <input
-          v-model="action"
-          class="noro-input w-full"
-          placeholder="user, user.ban, build.publish"
-          @keyup.enter="load()"
-        >
+        <span class="noro-label mb-1.5 block">Event</span>
+        <NoroSelect v-model="action" class="w-full">
+          <option value="">All events</option>
+          <optgroup v-for="g in grouped" :key="g.group" :label="g.group">
+            <option v-for="a in g.items" :key="a.name" :value="a.name">{{ a.title }}</option>
+          </optgroup>
+        </NoroSelect>
       </label>
+
       <label class="block">
-        <span class="noro-label mb-1.5 block">Target id</span>
+        <span class="noro-label mb-1.5 block">Target</span>
+        <NoroSelect v-model="targetKind" class="w-full">
+          <option value="">Anything</option>
+          <option v-for="k in targetKinds" :key="k" :value="k">{{ k }}</option>
+        </NoroSelect>
+      </label>
+
+      <label class="block">
+        <span class="noro-label mb-1.5 block">Target id <span class="text-[var(--noro-muted)]">— optional</span></span>
         <input
           v-model="targetId"
           class="noro-input w-full"
-          placeholder="UUID of a user, build or server"
+          placeholder="UUID"
           @keyup.enter="load()"
         >
       </label>
-      <div class="flex items-end">
+
+      <div class="flex items-end gap-2">
         <AtomButton icon="i-lucide-search" :loading="pending" @click="load()">Apply</AtomButton>
+        <AtomButton variant="dark" icon="i-lucide-x" @click="reset">Reset</AtomButton>
       </div>
     </section>
 
     <div v-if="rows.length" class="grid gap-2">
-      <AuditEntry v-for="row in rows" :key="row.id" :row="row" />
+      <AuditEntry v-for="row in rows" :key="row.id" :row="row" :title="titles[row.action]" />
 
       <AtomButton
         v-if="!done"
@@ -90,7 +155,7 @@ onMounted(() => load())
       v-else-if="!pending"
       icon="i-lucide-scroll-text"
       title="Nothing recorded yet"
-      text="Admin actions land here as they happen — role grants, bans, deployments."
+      text="Logins, launches, integrity findings and every admin action land here as they happen."
     />
   </NoroShell>
 </template>

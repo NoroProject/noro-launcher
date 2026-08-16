@@ -62,6 +62,24 @@ const initials = computed(() =>
     (auth.user.value?.username || auth.user.value?.discord_username || "N")[0].toUpperCase()
 );
 
+/**
+ * Позиция скролла меню переживает переход между страницами.
+ *
+ * Оболочка со всем сайдбаром монтируется заново на каждой странице, поэтому
+ * список сам по себе всегда открывается сверху — и админ, работающий с нижними
+ * пунктами, прокручивал его после каждого клика.
+ */
+const navEl = ref<HTMLElement | null>(null);
+const navScroll = useState('noro-sidebar-scroll', () => 0);
+
+onMounted(() => {
+    if (navEl.value) navEl.value.scrollTop = navScroll.value;
+});
+
+function rememberScroll() {
+    if (navEl.value) navScroll.value = navEl.value.scrollTop;
+}
+
 function linkClass(path: string) {
     return activePath.value === path
         ? "noro-nav-link-active"
@@ -81,7 +99,7 @@ function linkClass(path: string) {
             </div>
         </div>
 
-        <nav class="noro-scroll flex-1 overflow-y-auto px-3 py-4">
+        <nav ref="navEl" class="noro-scroll flex-1 overflow-y-auto px-3 py-4" @scroll.passive="rememberScroll">
             <template v-if="inAdminArea">
                 <div v-for="group in adminNavGroups" :key="group.label" class="mb-3">
                     <div class="px-3 pb-2 pt-3 text-xs font-black uppercase tracking-wider text-[var(--noro-blue)]">{{ group.label }}</div>
