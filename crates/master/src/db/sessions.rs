@@ -28,8 +28,11 @@ pub async fn list_sessions(
     current_token: Option<Uuid>,
 ) -> Result<Vec<SessionRow>> {
     Ok(sqlx::query_as::<_, SessionRow>(
+        // COALESCE обязателен: админ смотрит чужие сессии без своего токена, и
+        // сравнение с NULL даёт NULL, а не FALSE — строка переставала
+        // разбираться целиком.
         "SELECT id, scope, created_at, expires_at, impersonated_by,
-                (access_token = $2) AS current
+                COALESCE(access_token = $2, FALSE) AS current
          FROM oauth_sessions
          WHERE user_id = $1 AND expires_at > NOW()
          ORDER BY created_at DESC",
