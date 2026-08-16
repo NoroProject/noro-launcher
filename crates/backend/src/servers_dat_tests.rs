@@ -164,3 +164,92 @@ fn a_missing_file_is_rebuilt_even_when_the_stamp_matches() {
         names(&dir)
     );
 }
+
+// --- Диагностика пропадающих точек Xaero (S0) ----------------------------------
+//
+// Жалоба «карта стирает все точки каждый перезапуск» проверяется здесь, потому
+// что servers.dat — единственное, что лаунчер трогает перед стартом игры.
+//
+// Xaero хранит waypoints в `XaeroWaypoints/Multiplayer_<идентификатор>/`, а
+// идентификатор берёт из записи списка серверов. Значит вопрос ровно один:
+// меняется ли запись между запусками.
+
+/// Идентичность записи — то, по чему Xaero отличает «тот же сервер» от нового.
+fn identity(dir: &Path) -> Vec<(String, String)> {
+    names(dir)
+}
+
+#[test]
+fn the_server_entry_is_identical_across_restarts() {
+    // Если бы запись менялась от запуска к запуску, Xaero каждый раз заводил бы
+    // новую папку — и точки «пропадали» бы, оставаясь на диске.
+    let dir = tempdir();
+    let server = build(vec![node("Main", "play.noro.dev", 25565, false)]);
+
+    sync(&dir, &server).unwrap();
+    let first = identity(&dir);
+
+    for _ in 0..5 {
+        // Файл вообще не переписывается: отпечаток не изменился.
+        assert!(!sync(&dir, &server).unwrap());
+    }
+    assert_eq!(identity(&dir), first);
+}
+
+#[test]
+fn reordered_nodes_from_the_database_do_not_rewrite_the_file() {
+    // Порядок выборки на мастере задан ORDER BY, но даже перестановка не должна
+    // трогать файл: отпечаток считается по отсортированному списку.
+    let dir = tempdir();
+    let a = node("A", "a.noro.dev", 25565, false);
+    let b = node("B", "b.noro.dev", 25565, false);
+
+    sync(&dir, &build(vec![a.clone(), b.clone()])).unwrap();
+    assert!(!sync(&dir, &build(vec![b, a])).unwrap());
+}
+
+#[test]
+fn renaming_the_server_does_change_the_entry() {
+    // Обратная сторона: переименование сервера в админке действительно меняет
+    // запись — и вот тогда Xaero заведёт новую папку. Это единственный
+    // сценарий, при котором точки «пропадают» из-за нас, и он не про синк.
+    let dir = tempdir();
+    sync(
+        &dir,
+        &build(vec![node("Main", "play.noro.dev", 25565, false)]),
+    )
+    .unwrap();
+
+    assert!(sync(
+        &dir,
+        &build(vec![node("Main Server", "play.noro.dev", 25565, false)])
+    )
+    .unwrap());
+    assert_eq!(
+        identity(&dir),
+        vec![("Main Server".into(), "play.noro.dev".into())]
+    );
+}
+
+#[test]
+fn xaero_directories_are_protected_from_the_sync() {
+    // Вторая половина вопроса: даже переписав servers.dat, синк не должен
+    // трогать сами файлы карты. Маски приходят из сборки; проверяем, что
+    // реально используемые пути Xaero под них попадают.
+    let protected: Vec<String> = ["xaero*", "config/xaero*", "xaerominimap*", "xaeroworldmap*"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    for path in [
+        "XaeroWaypoints/Multiplayer_play.noro.dev/waypoints.txt",
+        "xaero/minimap.json",
+        "config/xaerominimap.txt",
+        "XaeroWorldMap/Multiplayer_play.noro.dev/region.zip",
+    ] {
+        assert!(
+            crate::sync::file_sync::is_protected(path, &protected),
+            "{path} должен быть защищён от удаления"
+        );
+    }
+}
