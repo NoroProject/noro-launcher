@@ -113,6 +113,8 @@ pub struct RecommendedClientSettings {
     pub memory_max_mb: u32,
     pub jvm_flags: String,
     pub show_console_on_launch: bool,
+    #[serde(default)]
+    pub fullscreen: bool,
 }
 
 impl Default for RecommendedClientSettings {
@@ -122,6 +124,7 @@ impl Default for RecommendedClientSettings {
             memory_max_mb: 4096,
             jvm_flags: String::new(),
             show_console_on_launch: true,
+            fullscreen: false,
         }
     }
 }

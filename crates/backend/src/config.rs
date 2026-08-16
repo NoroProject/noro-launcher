@@ -20,6 +20,9 @@ pub struct LauncherConfig {
     pub jvm_flags: String,
     /// Открывать ли окно консоли при запуске игры.
     pub show_console_on_launch: bool,
+    /// Запускать ли игры в полноэкранном режиме.
+    #[serde(default)]
+    pub fullscreen: bool,
     /// Отправлять ли отчёты о падениях. Игрок может отказаться — см. telemetry.
     #[serde(default = "default_crash_reports")]
     pub crash_reports: bool,
@@ -38,6 +41,8 @@ pub struct ServerClientSettings {
     pub memory_max_mb: u32,
     pub jvm_flags: String,
     pub show_console_on_launch: bool,
+    #[serde(default)]
+    pub fullscreen: bool,
 }
 
 impl Default for LauncherConfig {
@@ -49,6 +54,7 @@ impl Default for LauncherConfig {
             memory_max_mb: 4096,
             jvm_flags: String::new(),
             show_console_on_launch: true,
+            fullscreen: false,
             crash_reports: default_crash_reports(),
             server_settings: BTreeMap::new(),
             selected_build: BTreeMap::new(),
@@ -87,6 +93,7 @@ impl LauncherConfig {
             memory_max_mb: self.memory_max_mb,
             jvm_flags: self.jvm_flags.clone(),
             show_console_on_launch: self.show_console_on_launch,
+            fullscreen: self.fullscreen,
         }
     }
 
@@ -116,6 +123,7 @@ impl LauncherConfig {
         config.memory_max_mb = settings.memory_max_mb;
         config.jvm_flags = settings.jvm_flags;
         config.show_console_on_launch = settings.show_console_on_launch;
+        config.fullscreen = settings.fullscreen;
         config
     }
 
@@ -140,6 +148,14 @@ impl LauncherConfig {
             .entry(server_id)
             .or_insert(defaults)
             .show_console_on_launch = enabled;
+    }
+
+    pub fn set_server_fullscreen(&mut self, server_id: Uuid, enabled: bool) {
+        let defaults = self.default_client_settings();
+        self.server_settings
+            .entry(server_id)
+            .or_insert(defaults)
+            .fullscreen = enabled;
     }
 
     pub fn reset_server_settings(&mut self, server_id: &Uuid) {
@@ -173,6 +189,19 @@ impl From<&RecommendedClientSettings> for ServerClientSettings {
             memory_max_mb: value.memory_max_mb,
             jvm_flags: value.jvm_flags.clone(),
             show_console_on_launch: value.show_console_on_launch,
+            fullscreen: value.fullscreen,
+        }
+    }
+}
+
+impl From<&ServerClientSettings> for bridge::ClientSettingsState {
+    fn from(s: &ServerClientSettings) -> Self {
+        Self {
+            memory_min_mb: s.memory_min_mb,
+            memory_max_mb: s.memory_max_mb,
+            jvm_flags: s.jvm_flags.clone(),
+            show_console_on_launch: s.show_console_on_launch,
+            fullscreen: s.fullscreen,
         }
     }
 }

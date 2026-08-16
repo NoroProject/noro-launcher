@@ -35,7 +35,12 @@ pub fn push_jvm_args(cmd: &mut Command, ctx: &Substitution<'_>, loader_client_na
     }
 }
 
-pub fn push_game_args(cmd: &mut Command, ctx: &Substitution<'_>, connect: Option<ServerConnect>) {
+pub fn push_game_args(
+    cmd: &mut Command,
+    ctx: &Substitution<'_>,
+    connect: Option<ServerConnect>,
+    fullscreen: bool,
+) {
     if ctx.manifest.game_args.is_empty() {
         for (key, value) in default_game_args(ctx) {
             cmd.arg(key).arg(value);
@@ -51,6 +56,10 @@ pub fn push_game_args(cmd: &mut Command, ctx: &Substitution<'_>, connect: Option
     if let Some(server) = connect {
         cmd.arg("--quickPlayMultiplayer")
             .arg(format!("{}:{}", server.host, server.port));
+    }
+
+    if fullscreen {
+        cmd.arg("--fullscreen");
     }
 }
 

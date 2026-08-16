@@ -12,6 +12,8 @@ pub struct ClientSettingsState {
     pub memory_max_mb: u32,
     pub jvm_flags: String,
     pub show_console_on_launch: bool,
+    #[serde(default)]
+    pub fullscreen: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,6 +125,9 @@ pub enum MessageToBackend {
     SetShowConsoleOnLaunch {
         enabled: bool,
     },
+    SetFullscreen {
+        enabled: bool,
+    },
     /// Игрок разрешил или запретил отправку отчётов о падениях.
     SetCrashReports {
         enabled: bool,
@@ -137,6 +142,10 @@ pub enum MessageToBackend {
         flags: String,
     },
     SetServerShowConsoleOnLaunch {
+        server_id: Uuid,
+        enabled: bool,
+    },
+    SetServerFullscreen {
         server_id: Uuid,
         enabled: bool,
     },
@@ -318,6 +327,7 @@ pub enum MessageToFrontend {
         memory_max_mb: u32,
         jvm_flags: String,
         show_console_on_launch: bool,
+        fullscreen: bool,
         crash_reports: bool,
         /// Вшит ли DSN в эту сборку. Без него переключатель показывать незачем.
         crash_reports_available: bool,

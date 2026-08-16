@@ -182,6 +182,13 @@ fn settings_panel(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             true,
         ))
         .child(setting_row(
+            "maximize",
+            t("settings-fullscreen"),
+            t("settings-fullscreen-hint"),
+            fullscreen(ui, server_id, cx),
+            true,
+        ))
+        .child(setting_row(
             "code",
             t("settings-jvm-flags"),
             t("settings-jvm-hint"),
@@ -393,6 +400,34 @@ fn console(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .text_size(px(12.))
                 .text_color(rgb(TEXT_SECONDARY))
                 .child(t("settings-console-open")),
+        )
+        .into_any_element()
+}
+
+fn fullscreen(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    let enabled = ui.server_client_settings(server_id).fullscreen;
+    div()
+        .flex()
+        .items_center()
+        .gap(px(10.))
+        .child(checkbox_row(
+            SharedString::from(format!("cs-fullscreen-{server_id}")),
+            enabled,
+            true,
+            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                let v = this
+                    .server_client_settings(server_id)
+                    .fullscreen;
+                this.set_server_fullscreen(server_id, !v);
+                cx.notify();
+            }),
+        ))
+        .child(
+            div()
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(12.))
+                .text_color(rgb(TEXT_SECONDARY))
+                .child(t("settings-fullscreen-show")),
         )
         .into_any_element()
 }

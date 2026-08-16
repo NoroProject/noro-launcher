@@ -448,6 +448,10 @@ impl BackendState {
                     .update(|c| c.show_console_on_launch = enabled);
             }
 
+            MessageToBackend::SetFullscreen { enabled } => {
+                self.ctx.config.update(|c| c.fullscreen = enabled);
+            }
+
             MessageToBackend::SetCrashReports { enabled } => {
                 // Применится со следующего запуска: Sentry поднимается до GPUI,
                 // а снять уже установленный хук паники на ходу нельзя.
@@ -475,6 +479,12 @@ impl BackendState {
                 self.ctx
                     .config
                     .update(|c| c.set_server_console(server_id, enabled));
+            }
+
+            MessageToBackend::SetServerFullscreen { server_id, enabled } => {
+                self.ctx
+                    .config
+                    .update(|c| c.set_server_fullscreen(server_id, enabled));
             }
 
             MessageToBackend::ResetServerClientSettings { server_id } => {
@@ -699,6 +709,7 @@ impl BackendState {
                         memory_max_mb: settings.memory_max_mb,
                         jvm_flags: settings.jvm_flags.clone(),
                         show_console_on_launch: settings.show_console_on_launch,
+                        fullscreen: settings.fullscreen,
                     },
                 )
             })
@@ -709,6 +720,7 @@ impl BackendState {
             jvm_flags: c.jvm_flags,
             locale: c.locale.clone(),
             show_console_on_launch: c.show_console_on_launch,
+            fullscreen: c.fullscreen,
             crash_reports: c.crash_reports,
             crash_reports_available: crate::telemetry::is_available(),
             master_url: c.master_url,
@@ -789,6 +801,7 @@ impl BackendState {
                     memory_max_mb: settings.memory_max_mb,
                     jvm_flags: settings.jvm_flags.clone(),
                     show_console_on_launch: settings.show_console_on_launch,
+                    fullscreen: settings.fullscreen,
                 },
             });
     }

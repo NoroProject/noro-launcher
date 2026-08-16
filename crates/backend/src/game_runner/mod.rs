@@ -91,7 +91,7 @@ pub async fn launch(
     );
 
     cmd.arg(&manifest.main_class);
-    args::push_game_args(&mut cmd, &ctx, connect);
+    args::push_game_args(&mut cmd, &ctx, connect, config.fullscreen);
 
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());

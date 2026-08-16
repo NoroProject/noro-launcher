@@ -26,6 +26,13 @@ pub fn settings_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             true,
         ))
         .child(row(
+            "maximize",
+            t("settings-fullscreen"),
+            t("settings-fullscreen-hint"),
+            fullscreen_control(ui, cx),
+            true,
+        ))
+        .child(row(
             "code",
             t("settings-jvm-flags"),
             t("settings-jvm-hint"),
@@ -90,6 +97,20 @@ fn console_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         cx.listener(|this, _e: &ClickEvent, _w, cx| {
             let v = this.config.show_console_on_launch;
             this.set_show_console_on_launch(!v);
+            cx.notify();
+        }),
+    )
+    .into_any_element()
+}
+
+fn fullscreen_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    checkbox_row(
+        SharedString::new_static("g-fullscreen"),
+        ui.config.fullscreen,
+        true,
+        cx.listener(|this, _e: &ClickEvent, _w, cx| {
+            let v = this.config.fullscreen;
+            this.set_fullscreen(!v);
             cx.notify();
         }),
     )

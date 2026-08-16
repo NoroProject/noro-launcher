@@ -87,6 +87,7 @@ pub struct UiConfig {
     pub memory_max_mb: u32,
     pub jvm_flags: String,
     pub show_console_on_launch: bool,
+    pub fullscreen: bool,
     pub crash_reports: bool,
     /// Вшит ли DSN в сборку. Нет — строку настройки не показываем: переключать
     /// было бы нечего, а обещание «мы это шлём» оказалось бы ложным.
@@ -101,6 +102,7 @@ impl Default for UiConfig {
             memory_max_mb: 4096,
             jvm_flags: String::new(),
             show_console_on_launch: true,
+            fullscreen: false,
             crash_reports: true,
             crash_reports_available: false,
             master_url: String::new(),
@@ -359,6 +361,7 @@ impl LauncherUI {
                 memory_max_mb: self.config.memory_max_mb,
                 jvm_flags: self.config.jvm_flags.clone(),
                 show_console_on_launch: self.config.show_console_on_launch,
+                fullscreen: self.config.fullscreen,
             })
     }
 
@@ -622,6 +625,7 @@ impl LauncherUI {
                 memory_max_mb,
                 jvm_flags,
                 show_console_on_launch,
+                fullscreen,
                 crash_reports,
                 crash_reports_available,
                 master_url,
@@ -637,6 +641,7 @@ impl LauncherUI {
                     memory_max_mb,
                     jvm_flags,
                     show_console_on_launch,
+                    fullscreen,
                     crash_reports,
                     crash_reports_available,
                     master_url,
@@ -1089,6 +1094,12 @@ impl LauncherUI {
             .send(MessageToBackend::SetShowConsoleOnLaunch { enabled });
     }
 
+    pub fn set_fullscreen(&mut self, enabled: bool) {
+        self.config.fullscreen = enabled;
+        self.backend
+            .send(MessageToBackend::SetFullscreen { enabled });
+    }
+
     /// Отправка отчётов о падениях. Вступает в силу со следующего запуска:
     /// Sentry поднимается до GPUI, и снять его хук паники на ходу нельзя.
     pub fn set_crash_reports(&mut self, enabled: bool) {
@@ -1103,6 +1114,14 @@ impl LauncherUI {
         self.server_settings.insert(server_id, settings);
         self.backend
             .send(MessageToBackend::SetServerShowConsoleOnLaunch { server_id, enabled });
+    }
+
+    pub fn set_server_fullscreen(&mut self, server_id: Uuid, enabled: bool) {
+        let mut settings = self.server_client_settings(server_id);
+        settings.fullscreen = enabled;
+        self.server_settings.insert(server_id, settings);
+        self.backend
+            .send(MessageToBackend::SetServerFullscreen { server_id, enabled });
     }
 
     pub fn set_server_jvm_flags(&mut self, server_id: Uuid, flags: String) {
