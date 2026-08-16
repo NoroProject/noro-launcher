@@ -35,6 +35,7 @@ const { data: skinPresets, refresh: refreshSkinPresets } = await useAsyncData(`a
   auth.request<SkinPresetItem[]>(`/api/admin/users/${id.value}/skin-presets`), { default: () => [] }
 )
 
+const showImpersonate = ref(false)
 const activeTab = ref<'profile' | 'skin_capes' | 'moderation'>('profile')
 
 const permissions = computed(() =>
@@ -206,6 +207,8 @@ function onSkinFilePicked(e: Event) {
 
       <!-- Tab 1: Profile & Permissions -->
       <div v-if="activeTab === 'profile'" class="grid gap-5 xl:grid-cols-[360px_1fr]">
+        <div class="space-y-5">
+        <UserLauncherPanel :user-id="id" @impersonate="showImpersonate = true" />
         <div class="noro-panel h-fit p-5 space-y-4">
           <div class="flex items-center gap-4">
             <img v-if="user.discord_avatar" :src="user.discord_avatar" alt="" class="size-16 rounded-lg object-cover">
@@ -233,6 +236,7 @@ function onSkinFilePicked(e: Event) {
             @add="addPermission"
             @remove="removePermission"
           />
+        </div>
         </div>
       </div>
 
@@ -466,5 +470,12 @@ function onSkinFilePicked(e: Event) {
         </div>
       </div>
     </div>
+
+    <ImpersonateDialog
+      v-if="user"
+      v-model="showImpersonate"
+      :user-id="id"
+      :username="user.username"
+    />
   </NoroShell>
 </template>

@@ -5,8 +5,8 @@ use axum::Router;
 use super::{
     agents, audit, backup, build_routes, capes, catalog, cores, game_servers, impersonate,
     integrity, launcher, launcher_clients, mod_install, mod_suggestions, news, permission_nodes,
-    roles, servers, settings, stats, storage, tokens, users, versions, wrapper, wrapper_backups,
-    wrapper_fs,
+    roles, servers, settings, stats, storage, tokens, user_launcher, users, versions, wrapper,
+    wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -95,6 +95,18 @@ fn users_router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/users", get(users::list))
         .route("/api/admin/users/{id}", get(users::get))
+        .route(
+            "/api/admin/users/{id}/launcher",
+            get(user_launcher::launcher_status),
+        )
+        .route(
+            "/api/admin/users/{id}/sessions",
+            get(user_launcher::sessions).delete(user_launcher::revoke_sessions),
+        )
+        .route(
+            "/api/admin/users/{id}/sessions/{session_id}",
+            delete(user_launcher::revoke_session),
+        )
         .route("/api/admin/users/{id}/ban", put(users::ban))
         .route("/api/admin/users/{id}/cape", put(users::set_cape))
         .route(

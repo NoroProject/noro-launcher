@@ -55,6 +55,19 @@ pub async fn current_launcher_version_any(pool: &PgPool) -> Result<Option<String
     .await?)
 }
 
+/// Клиент одного игрока — для карточки в админке.
+pub async fn launcher_client(pool: &PgPool, user_id: Uuid) -> Result<Option<LauncherClientRow>> {
+    Ok(sqlx::query_as::<_, LauncherClientRow>(
+        "SELECT c.user_id, u.mc_username, c.version, c.platform, c.last_seen_at
+         FROM launcher_clients c
+         JOIN users u ON u.id = c.user_id
+         WHERE c.user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
 /// Все известные клиенты, свежие сверху.
 pub async fn list_launcher_clients(pool: &PgPool) -> Result<Vec<LauncherClientRow>> {
     Ok(sqlx::query_as::<_, LauncherClientRow>(

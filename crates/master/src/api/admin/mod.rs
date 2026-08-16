@@ -22,6 +22,7 @@ pub mod settings;
 pub mod stats;
 pub mod storage;
 pub mod tokens;
+pub mod user_launcher;
 pub mod users;
 pub mod versions;
 pub mod wrapper;

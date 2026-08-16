@@ -16,6 +16,7 @@ pub mod models;
 pub mod oauth2;
 pub mod passkeys;
 pub mod queries;
+pub mod sessions;
 pub mod support;
 
 use anyhow::{Context, Result};
@@ -35,6 +36,7 @@ pub use mod_suggestions::*;
 pub use oauth2::*;
 pub use passkeys::*;
 pub use queries::*;
+pub use sessions::*;
 pub use support::*;
 
 /// Подключиться к БД и применить миграции.

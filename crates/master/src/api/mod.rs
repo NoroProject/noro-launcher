@@ -5,6 +5,7 @@ pub mod agent_nodes;
 pub mod agent_prefix;
 pub mod auth;
 pub mod cabinet;
+pub mod cabinet_sessions;
 pub mod file_serve;
 pub mod health;
 pub mod launcher;

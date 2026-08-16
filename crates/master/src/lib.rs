@@ -135,8 +135,8 @@ async fn announce(config: &Config, db: &sqlx::PgPool) -> Result<()> {
 
 fn router(state: AppState) -> Router {
     use api::{
-        agent, agent_artifact, agent_nodes, auth, cabinet, file_serve, launcher, support, textures,
-        translations,
+        agent, agent_artifact, agent_nodes, auth, cabinet, cabinet_sessions, file_serve, launcher,
+        support, textures, translations,
     };
 
     // Yggdrasil (authlib-injector) — без авторизации.
@@ -269,6 +269,12 @@ fn router(state: AppState) -> Router {
     let cabinet_api = Router::new()
         .route("/api/me", get(cabinet::me))
         .route("/api/me/username", put(cabinet::set_username))
+        .route("/api/me/sessions", get(cabinet_sessions::list))
+        .route(
+            "/api/me/sessions/others",
+            delete(cabinet_sessions::revoke_others),
+        )
+        .route("/api/me/sessions/{id}", delete(cabinet_sessions::revoke))
         .route("/api/me/recovery-codes", get(auth::recovery::remaining))
         .route(
             "/api/me/recovery-codes/reissue",
