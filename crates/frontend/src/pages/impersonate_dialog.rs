@@ -9,7 +9,7 @@ use crate::components::btn;
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
-use gpui::{div, prelude::*, px, rgb, AnyElement, FontWeight};
+use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
 use i18n::t;
 
 /// Модальный запрос. `None`, если ничего не ждём.
@@ -23,7 +23,7 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
             .flex()
             .items_center()
             .justify_center()
-            .bg(rgb(OVERLAY))
+            .bg(rgba((OVERLAY << 8) | 0xcc))
             .child(
                 div()
                     .w(px(420.))
