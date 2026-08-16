@@ -5,8 +5,8 @@ use axum::Router;
 use super::{
     agents, audit, backup, build_routes, capes, catalog, cores, game_servers, impersonate,
     integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions, news,
-    permission_nodes, roles, servers, settings, stats, storage, tokens, user_launcher, users,
-    versions, wrapper, wrapper_backups, wrapper_fs,
+    permission_nodes, remote, roles, servers, settings, stats, storage, tokens, user_launcher,
+    users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -43,6 +43,11 @@ pub fn router() -> Router<AppState> {
             "/api/admin/users/{id}/request-logs",
             post(log_requests::request),
         )
+        .route(
+            "/api/admin/users/{id}/diagnostics",
+            get(remote::diagnostics).post(remote::request_diagnostics),
+        )
+        .route("/api/admin/users/{id}/action", post(remote::run_action))
         .route(
             "/api/admin/support/bundles/{id}",
             get(crate::api::support::download),

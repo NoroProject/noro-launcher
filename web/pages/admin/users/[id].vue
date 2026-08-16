@@ -37,6 +37,7 @@ const { data: skinPresets, refresh: refreshSkinPresets } = await useAsyncData(`a
 
 const showImpersonate = ref(false)
 const showRequestLogs = ref(false)
+const launcherOnline = ref(false)
 const activeTab = ref<'profile' | 'skin_capes' | 'moderation'>('profile')
 
 const permissions = computed(() =>
@@ -209,7 +210,8 @@ function onSkinFilePicked(e: Event) {
       <!-- Tab 1: Profile & Permissions -->
       <div v-if="activeTab === 'profile'" class="grid gap-5 xl:grid-cols-[360px_1fr]">
         <div class="space-y-5">
-        <UserLauncherPanel :user-id="id" @impersonate="showImpersonate = true" @request-logs="showRequestLogs = true" />
+        <UserLauncherPanel v-model:online="launcherOnline" :user-id="id" @impersonate="showImpersonate = true" @request-logs="showRequestLogs = true" />
+        <DiagnosticsCard :user-id="id" :online="launcherOnline" />
         <div class="noro-panel h-fit p-5 space-y-4">
           <div class="flex items-center gap-4">
             <img v-if="user.discord_avatar" :src="user.discord_avatar" alt="" class="size-16 rounded-lg object-cover">

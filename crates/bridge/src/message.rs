@@ -160,6 +160,13 @@ pub enum MessageToBackend {
         code: String,
     },
 
+    /// Ответ на предложенное действие.
+    RemoteActionAnswer {
+        action: schema::RemoteAction,
+        server_id: Option<Uuid>,
+        accepted: bool,
+    },
+
     /// Ответ на запрос логов.
     LogRequestAnswer {
         request_id: Uuid,
@@ -459,6 +466,13 @@ pub enum MessageToFrontend {
         /// Сколько секунд осталось на решение.
         expires_in_secs: i64,
     },
+    /// Админ просит выполнить действие. Игрок решает.
+    RemoteActionPrompt {
+        action: schema::RemoteAction,
+        server_id: Option<Uuid>,
+        actor_username: String,
+    },
+
     /// Админ просит логи. Игрок решает, отправлять ли.
     LogRequestPrompt {
         request_id: Uuid,

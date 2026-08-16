@@ -7,6 +7,7 @@ const emit = defineEmits<{ impersonate: []; requestLogs: [] }>()
 const auth = useAuth()
 const notify = useNotify()
 
+const online = defineModel<boolean>('online', { default: false })
 const status = ref<LauncherStatus | null>(null)
 const sessions = ref<SessionRow[]>([])
 const pending = ref(false)
@@ -15,6 +16,7 @@ async function load() {
   pending.value = true
   try {
     status.value = await auth.request<LauncherStatus>(`/api/admin/users/${props.userId}/launcher`)
+    online.value = status.value.online
     sessions.value = await auth.request<SessionRow[]>(`/api/admin/users/${props.userId}/sessions`)
   } catch (e) {
     notify.fail(e, 'Failed to load launcher status')

@@ -503,6 +503,16 @@ impl BackendState {
                 crate::translations::refresh(&self.ctx, code);
             }
 
+            MessageToBackend::RemoteActionAnswer {
+                action,
+                server_id,
+                accepted,
+            } => {
+                if accepted {
+                    self.perform_remote_action(action, server_id);
+                }
+            }
+
             MessageToBackend::LogRequestAnswer {
                 request_id,
                 accepted,
@@ -909,6 +919,24 @@ impl BackendState {
                     self.send_optional_mods(*server_id, manifest);
                 }
             }
+            ServerWsMsg::RequestDiagnostics => {
+                let ctx = self.ctx.clone();
+                let master = self.ctx.config.get().master_url;
+                tokio::spawn(async move {
+                    let report =
+                        crate::diagnostics::collect(&ctx.http, &ctx.dirs, &master, None).await;
+                    ctx.ws.send(ClientWsMsg::DiagnosticsReport { report });
+                });
+            }
+
+            ServerWsMsg::RemoteAction {
+                action,
+                server_id,
+                actor_username,
+            } => {
+                self.run_remote_action(action, server_id, actor_username);
+            }
+
             ServerWsMsg::LogRequest {
                 request_id,
                 actor_username,
@@ -936,6 +964,47 @@ impl BackendState {
             }
             ServerWsMsg::Pong => {}
         }
+    }
+
+    /// Выполнить действие, о котором попросил админ.
+    ///
+    /// Всё, что стирает файлы или прерывает работу, сначала спрашивает игрока:
+    /// иначе это уже не поддержка, а управление чужим компьютером.
+    fn run_remote_action(
+        &mut self,
+        action: schema::RemoteAction,
+        server_id: Option<Uuid>,
+        actor_username: String,
+    ) {
+        if action.needs_confirmation() {
+            self.ctx.send(MessageToFrontend::RemoteActionPrompt {
+                action,
+                server_id,
+                actor_username,
+            });
+            return;
+        }
+        self.perform_remote_action(action, server_id);
+    }
+
+    /// Собственно выполнение — после подтверждения либо сразу, если его не надо.
+    pub fn perform_remote_action(&mut self, action: schema::RemoteAction, server_id: Option<Uuid>) {
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match crate::remote_actions::run(&ctx.dirs, action, server_id).await {
+                Ok(outcome) => {
+                    tracing::info!(action = action.as_str(), "{}", outcome.message);
+                    ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-remote-action-done".into(),
+                        args: [("detail".to_string(), outcome.message)].into(),
+                        level: schema::NotifLevel::Info,
+                    });
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, action = action.as_str(), "действие не выполнено")
+                }
+            }
+        });
     }
 
     /// Собрать бандл и показать игроку, что именно уйдёт.

@@ -100,3 +100,31 @@ pub async fn open_integrity_flag_count(pool: &PgPool, user_id: Uuid) -> Result<i
     .fetch_one(pool)
     .await?)
 }
+
+/// Сохранить последнюю диагностику. История не хранится: важно текущее
+/// состояние, а не то, сколько места было на диске в прошлый вторник.
+pub async fn save_diagnostics(
+    pool: &PgPool,
+    user_id: Uuid,
+    report: &serde_json::Value,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO launcher_diagnostics (user_id, report)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) DO UPDATE SET report = $2, at = NOW()",
+    )
+    .bind(user_id)
+    .bind(report)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn latest_diagnostics(pool: &PgPool, user_id: Uuid) -> Result<Option<serde_json::Value>> {
+    Ok(sqlx::query_scalar::<_, serde_json::Value>(
+        "SELECT jsonb_set(report, '{at}', to_jsonb(at)) FROM launcher_diagnostics WHERE user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?)
+}

@@ -98,6 +98,13 @@ pub async fn handle(
             }
         }
 
+        ClientWsMsg::DiagnosticsReport { report } => {
+            if let Some(user_id) = *authed_user {
+                crate::db::save_diagnostics(&state.db, user_id, &serde_json::to_value(&report)?)
+                    .await?;
+            }
+        }
+
         ClientWsMsg::LogRequestResponse {
             request_id,
             accepted,

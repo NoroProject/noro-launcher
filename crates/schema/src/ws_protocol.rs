@@ -48,6 +48,10 @@ pub enum ClientWsMsg {
         server_id: Uuid,
         playtime_secs: u64,
     },
+    /// Диагностика по запросу мастера.
+    DiagnosticsReport {
+        report: crate::integrity::DiagnosticsReport,
+    },
     /// Ответ на запрос логов. `accepted: false` — игрок отказал.
     LogRequestResponse {
         request_id: Uuid,
@@ -73,6 +77,17 @@ pub enum NotifLevel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "t", content = "d")]
 pub enum ServerWsMsg {
+    /// Собрать и прислать диагностику. Личного в ней нет, согласия не нужно.
+    RequestDiagnostics,
+    /// Выполнить действие на стороне лаунчера.
+    RemoteAction {
+        action: crate::integrity::RemoteAction,
+        /// Сборка, к которой относится действие.
+        #[serde(default)]
+        server_id: Option<Uuid>,
+        /// Кто попросил — игрок увидит это в подтверждении.
+        actor_username: String,
+    },
     /// Админ просит логи. Модалка показывает, кто и зачем, а игрок решает.
     ///
     /// `forced` — сбор без согласия: у админа отдельное право на это, а игрок

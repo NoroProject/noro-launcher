@@ -692,6 +692,7 @@ dependencies = [
  "futures-util",
  "hex",
  "keyring",
+ "libc",
  "memchr",
  "once_cell",
  "open",

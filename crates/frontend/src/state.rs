@@ -231,6 +231,15 @@ pub struct LauncherUI {
     pub log_request_prompt: Option<LogRequestPrompt>,
     /// Открыт ли предпросмотр того, что уйдёт.
     pub log_request_preview_open: bool,
+    /// Предложенное админом действие, ждущее решения.
+    pub remote_action_prompt: Option<RemoteActionPrompt>,
+}
+
+/// Действие, о котором просит админ.
+pub struct RemoteActionPrompt {
+    pub action: schema::RemoteAction,
+    pub server_id: Option<Uuid>,
+    pub actor_username: String,
 }
 
 /// Запрос логов от админа.
@@ -354,6 +363,7 @@ impl LauncherUI {
             impersonate_prompt: None,
             log_request_prompt: None,
             log_request_preview_open: false,
+            remote_action_prompt: None,
             impersonating_as: None,
             updating: false,
             toast: None,
@@ -895,6 +905,17 @@ impl LauncherUI {
                     files,
                 });
             }
+            MessageToFrontend::RemoteActionPrompt {
+                action,
+                server_id,
+                actor_username,
+            } => {
+                self.remote_action_prompt = Some(RemoteActionPrompt {
+                    action,
+                    server_id,
+                    actor_username,
+                });
+            }
             MessageToFrontend::ImpersonationChanged { as_username } => {
                 self.impersonate_prompt = None;
                 self.impersonating_as = as_username;
@@ -1186,6 +1207,18 @@ impl LauncherUI {
         };
         self.backend.send(MessageToBackend::LogRequestAnswer {
             request_id: prompt.request_id,
+            accepted,
+        });
+    }
+
+    /// Ответить на предложенное действие.
+    pub fn answer_remote_action(&mut self, accepted: bool) {
+        let Some(prompt) = self.remote_action_prompt.take() else {
+            return;
+        };
+        self.backend.send(MessageToBackend::RemoteActionAnswer {
+            action: prompt.action,
+            server_id: prompt.server_id,
             accepted,
         });
     }

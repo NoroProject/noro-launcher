@@ -16,6 +16,7 @@ pub mod mod_install;
 pub mod mod_suggestions;
 pub mod news;
 pub mod permission_nodes;
+pub mod remote;
 pub mod roles;
 pub mod router;
 pub mod servers;
