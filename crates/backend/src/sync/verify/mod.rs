@@ -57,6 +57,16 @@ pub async fn verify_before_launch(
     let block_launch = blocked.block_launch;
     findings.extend(blocked.findings);
 
+    // Инвентарь несинхронизируемых папок: что игрок положил туда сам.
+    let known: Vec<String> = manifest
+        .verified_files
+        .iter()
+        .map(|f| f.path.clone())
+        .collect();
+    let (inventory_findings, inventory) = crate::sync::inventory::scan(instance_dir, &known).await;
+    findings.extend(inventory_findings);
+    inventory.save(instance_dir).await;
+
     cache.save(instance_dir).await;
 
     IntegrityReport {

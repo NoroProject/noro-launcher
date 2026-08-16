@@ -3,6 +3,7 @@ pub mod downloader;
 pub mod fetch;
 pub mod file_sync;
 pub mod integrity;
+pub mod inventory;
 pub mod merge;
 pub mod plan;
 pub mod verify;
