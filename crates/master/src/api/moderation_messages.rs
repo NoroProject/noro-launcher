@@ -36,15 +36,15 @@ pub struct ModerationMessages {
 impl Default for ModerationMessages {
     fn default() -> Self {
         Self {
-            ban_permanent: "&c&lДОСТУП В СЕТЬ ЗАБЛОКИРОВАН &7(Навсегда)\n\n&7Причина: &f{reason}\n&7Модератор: &f{actor}\n&7Правило: &f{rule}\n&7Дело: &8#{id}\n\n&8Апелляция: https://noro.dalynkaa.dev/support".into(),
-            ban_temporary: "&c&lДОСТУП В СЕТЬ ОГРАНИЧЕН\n\n&7Причина: &f{reason}\n&7Модератор: &f{actor}\n&7Окончание: &e{expires} &7(через &e{duration}&7)\n&7Правило: &f{rule}\n&7Дело: &8#{id}\n\n&8Апелляция: https://noro.dalynkaa.dev/support".into(),
-            server_ban_permanent: "&c&lДОСТУП К СЕРВЕРУ ЗАБЛОКИРОВАН &7(Навсегда)\n\n&7Причина: &f{reason}\n&7Модератор: &f{actor}\n&7Правило: &f{rule}\n&7Дело: &8#{id}\n\n&8Вы можете играть на других серверах сети.".into(),
-            server_ban_temporary: "&c&lДОСТУП К СЕРВЕРУ ВРЕМЕННО ОГРАНИЧЕН\n\n&7Причина: &f{reason}\n&7Модератор: &f{actor}\n&7Окончание: &e{expires} &7(через &e{duration}&7)\n&7Правило: &f{rule}\n&7Дело: &8#{id}\n\n&8На остальных серверах сети доступ сохранен.".into(),
-            mute_permanent: "&c&l[!] &cВаш чат заблокирован навсегда. &7Причина: &f{reason} &7(Выдал: &f{actor}&7)".into(),
-            mute_temporary: "&c&l[!] &cВаш чат заблокирован еще на &e{duration}&c. &7Причина: &f{reason} &7(Выдал: &f{actor}&7)".into(),
-            warn_notice: "&e&l[!] &eВам выдано предупреждение от &f{actor}&e. &7Причина: &f{reason} &7[&f{rule}&7]".into(),
-            broadcast: "&c&l[Модерация] &f{player} &7получил наказание (&c{kind}&7) от &f{actor}&7: &f{reason}".into(),
-            actor_receipt: "&a&l[Успешно] &f{player} &7наказан (&a{kind}&7): &f{reason}".into(),
+            ban_permanent: "#f87171&lДОСТУП В СЕТЬ ЗАБЛОКИРОВАН #94a3b8(Навсегда)\n\n#94a3b8Причина: #f8fafc{reason}\n#94a3b8Модератор: #f8fafc{actor}\n#94a3b8Правило: #f8fafc{rule}\n#94a3b8Дело: #64748b#{id}\n\n#64748bАпелляция: https://noro.dalynkaa.dev/support".into(),
+            ban_temporary: "#f87171&lДОСТУП В СЕТЬ ОГРАНИЧЕН\n\n#94a3b8Причина: #f8fafc{reason}\n#94a3b8Модератор: #f8fafc{actor}\n#94a3b8Окончание: #fbbf24{expires} #94a3b8(через #fbbf24{duration}#94a3b8)\n#94a3b8Правило: #f8fafc{rule}\n#94a3b8Дело: #64748b#{id}\n\n#64748bАпелляция: https://noro.dalynkaa.dev/support".into(),
+            server_ban_permanent: "#f87171&lДОСТУП К СЕРВЕРУ ЗАБЛОКИРОВАН #94a3b8(Навсегда)\n\n#94a3b8Причина: #f8fafc{reason}\n#94a3b8Модератор: #f8fafc{actor}\n#94a3b8Правило: #f8fafc{rule}\n#94a3b8Дело: #64748b#{id}\n\n#64748bВы можете играть на других серверах сети.".into(),
+            server_ban_temporary: "#f87171&lДОСТУП К СЕРВЕРУ ВРЕМЕННО ОГРАНИЧЕН\n\n#94a3b8Причина: #f8fafc{reason}\n#94a3b8Модератор: #f8fafc{actor}\n#94a3b8Окончание: #fbbf24{expires} #94a3b8(через #fbbf24{duration}#94a3b8)\n#94a3b8Правило: #f8fafc{rule}\n#94a3b8Дело: #64748b#{id}\n\n#64748bНа остальных серверах сети доступ сохранен.".into(),
+            mute_permanent: "#f87171&l[!] #f87171Ваш чат заблокирован навсегда. #94a3b8Причина: #f8fafc{reason} #94a3b8(Выдал: #f8fafc{actor}#94a3b8)".into(),
+            mute_temporary: "#f87171&l[!] #f87171Ваш чат заблокирован еще на #fbbf24{duration}#f87171. #94a3b8Причина: #f8fafc{reason} #94a3b8(Выдал: #f8fafc{actor}#94a3b8)".into(),
+            warn_notice: "#fbbf24&l[!] #fbbf24Вам выдано предупреждение от #f8fafc{actor}#fbbf24. #94a3b8Причина: #f8fafc{reason} #94a3b8[#f8fafc{rule}#94a3b8]".into(),
+            broadcast: "#f87171&l[Модерация] #f8fafc{player} #94a3b8получил наказание (#f87171{kind}#94a3b8) от #f8fafc{actor}#94a3b8: #f8fafc{reason}".into(),
+            actor_receipt: "#4ade80&l[Успешно] #f8fafc{player} #94a3b8наказан (#4ade80{kind}#94a3b8): #f8fafc{reason}".into(),
         }
     }
 }

@@ -1,5 +1,6 @@
 package dev.noro.agent.core;
 
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -13,6 +14,7 @@ import java.util.regex.Pattern;
 public final class PrefixFormat {
 
     private static final Pattern HEX = Pattern.compile("#[0-9a-fA-F]{6}");
+    private static final Pattern HEX_COLOR = Pattern.compile("&#?([0-9a-fA-F]{6})|#([0-9a-fA-F]{6})");
     private static final char SECTION = '§';
     private static final String RESET = SECTION + "r";
     private static final String CODES = "0123456789abcdefklmnorABCDEFKLMNOR";
@@ -32,25 +34,37 @@ public final class PrefixFormat {
     }
 
     /**
-     * {@code &c} → {@code §c}. В админке цвета набирают амперсандом: знак
-     * параграфа с клавиатуры не ввести, а в игре работает только он.
-     *
-     * <p>Одинокий амперсанд остаётся собой — {@code Tom & Jerry} не цветовой код.
+     * {@code &c} → {@code §c}, {@code #f87171} → {@code §x§f§8§7§1§7§1}.
+     * В админке цвета набирают амперсандом и hex-кодами.
      */
     public static String legacy(String text) {
         if (text == null) {
             return "";
         }
-        StringBuilder out = new StringBuilder(text.length());
-        for (int i = 0; i < text.length(); i++) {
-            char current = text.charAt(i);
+        Matcher matcher = HEX_COLOR.matcher(text);
+        StringBuilder hexConverted = new StringBuilder(text.length());
+        while (matcher.find()) {
+            String hexStr = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+            StringBuilder replacement = new StringBuilder(14).append(SECTION).append('x');
+            for (int i = 0; i < hexStr.length(); i++) {
+                replacement.append(SECTION).append(Character.toLowerCase(hexStr.charAt(i)));
+            }
+            matcher.appendReplacement(hexConverted, Matcher.quoteReplacement(replacement.toString()));
+        }
+        matcher.appendTail(hexConverted);
+        String s = hexConverted.toString();
+
+        StringBuilder out = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char current = s.charAt(i);
             boolean code = current == '&'
-                    && i + 1 < text.length()
-                    && CODES.indexOf(text.charAt(i + 1)) >= 0;
+                    && i + 1 < s.length()
+                    && CODES.indexOf(s.charAt(i + 1)) >= 0;
             out.append(code ? SECTION : current);
         }
         return out.toString();
     }
+
 
     /**
      * Обратное к {@link #legacy}: снять цветовые коды.

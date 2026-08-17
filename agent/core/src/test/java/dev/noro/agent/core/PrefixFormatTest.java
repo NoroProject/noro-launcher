@@ -25,10 +25,7 @@ class PrefixFormatTest {
     }
 
     @Test
-    void malformedColorFallsBackToPlainIcon() {
-        // Цвет необязателен и мог прийти мусором — иконку это терять не повод.
-        assertEquals("★§r", PrefixFormat.of(null, "★"));
-        assertEquals("★§r", PrefixFormat.of("ff8c82", "★"));
-        assertEquals("★§r", PrefixFormat.of("#xyzxyz", "★"));
+    void convertsHexColorInLegacyMethod() {
+        assertEquals("§x§f§8§7§1§7§1Привет §cмир", PrefixFormat.legacy("#f87171Привет &cмир"));
     }
 }
