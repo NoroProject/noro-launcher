@@ -42,17 +42,17 @@ final class ModJoin {
         // На Forge и NeoForge мастера уже спросили на логине — второй раз за тем
         // же ответом не ходим. На Fabric такой фазы нет, и решение снимается тут.
         if (negotiated != null) {
-            apply(player, name, uuid, negotiated, roleSync);
+            apply(server, player, name, uuid, negotiated, roleSync);
             return;
         }
         // Запрос к мастеру уводим с главного потока, решение возвращаем на него:
         // MinecraftServer сам является Executor'ом.
         CompletableFuture.supplyAsync(() -> AccessGate.check(client, config, uuid, AgentRuntime.LOG))
-                .thenAcceptAsync(decision -> apply(player, name, uuid, decision, roleSync), server);
+                .thenAcceptAsync(decision -> apply(server, player, name, uuid, decision, roleSync), server);
     }
 
     private void apply(
-            ServerPlayer player, String name, UUID uuid, AccessGate.Decision decision, RoleApplier roleSync) {
+            MinecraftServer server, ServerPlayer player, String name, UUID uuid, AccessGate.Decision decision, RoleApplier roleSync) {
         if (!decision.allowed()) {
             // Отказ приходит уже после входа в мир: пред-логин хука без микширования
             // на этих платформах нет. В прокси-топологии проверку надо ставить на
@@ -68,6 +68,11 @@ final class ModJoin {
         moderation.greet(uuid, decision.profile());
         if (roleSync != null && decision.profile() != null) {
             roleSync.apply(uuid, decision.profile());
+        }
+        // ВАЖНО: Права записаны в кэш! Теперь пересылаем дерево команд игроку,
+        // чтобы Brigadier пересчитал requires() с загруженными правами мастера.
+        if (server != null) {
+            server.getPlayerList().sendPlayerPermissionLevel(player);
         }
     }
 }

@@ -24,6 +24,8 @@ export interface Rule {
   code: string;
   title: string;
   description: string;
+  /** Что игрок увидит как причину, когда его наказали по этому пункту. */
+  punish_reason: string;
   sort_order: number;
 }
 
@@ -60,6 +62,8 @@ export interface LocalizedText {
   locale: string;
   title: string;
   description: string;
+  /** Формулировка наказания по пункту. Есть только у правил, не у разделов. */
+  punish_reason?: string;
 }
 
 /** Сервер, у которого свод отличается от общего. */

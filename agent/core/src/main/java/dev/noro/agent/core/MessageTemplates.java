@@ -17,10 +17,18 @@ public record MessageTemplates(
         String serverBanTemporary,
         String mutePermanent,
         String muteTemporary,
+        /** Короткая версия над хотбаром: в actionbar одна строка без переносов. */
+        String muteActionbarPermanent,
+        String muteActionbarTemporary,
+        String warnActionbar,
         String warnNotice,
         /** Пусто — не объявлять о наказании в чат. */
         String broadcast,
-        String actorReceipt) {
+        String actorReceipt,
+        /** Причина, когда модератор назвал правило и ничего не написал. */
+        String reasonByRule,
+        /** База ссылки на свод: приходит с мастера, в шаблонах её нет. */
+        String rulesUrl) {
 
     public static MessageTemplates defaults() {
         return new MessageTemplates(
@@ -32,9 +40,14 @@ public record MessageTemplates(
                         + "\nBy: {actor}\nCase: {id}",
                 "You are muted. Reason: {reason}",
                 "You are muted for another {duration}. Reason: {reason}",
+                "Muted • {reason}",
+                "Muted for another {duration} • {reason}",
+                "Warning • {reason}",
                 "You have been warned by {actor}. Reason: {reason}",
                 "{player} was {kind} by {actor}: {reason}",
-                "{player} was {kind}: {reason}");
+                "{player} was {kind}: {reason}",
+                "Rule violation, {rule}: {rule_title}",
+                "");
     }
 
     /**
@@ -53,11 +66,30 @@ public record MessageTemplates(
                 pick(serverBanTemporary, d.serverBanTemporary),
                 pick(mutePermanent, d.mutePermanent),
                 pick(muteTemporary, d.muteTemporary),
+                pick(muteActionbarPermanent, d.muteActionbarPermanent),
+                pick(muteActionbarTemporary, d.muteActionbarTemporary),
+                pick(warnActionbar, d.warnActionbar),
                 pick(warnNotice, d.warnNotice),
                 // Молчаливое объявление — законный выбор, поэтому здесь пустая
                 // строка сохраняется, а подставляется только отсутствие поля.
                 broadcast == null ? d.broadcast : broadcast,
-                pick(actorReceipt, d.actorReceipt));
+                pick(actorReceipt, d.actorReceipt),
+                pick(reasonByRule, d.reasonByRule),
+                // Адрес свода приходит с мастера и подменять его нечем: пустой
+                // означает «ссылок в текстах не будет», а не «взять чужой».
+                rulesUrl == null ? "" : rulesUrl);
+    }
+
+    /**
+     * Короткая версия для actionbar. Пусто — платформа покажет обычный текст:
+     * лучше длинная строка над хотбаром, чем ничего.
+     */
+    public String actionbar(PunishmentInfo punishment) {
+        boolean permanent = punishment.permanent();
+        if ("mute".equals(punishment.kind())) {
+            return permanent ? muteActionbarPermanent : muteActionbarTemporary;
+        }
+        return "warn".equals(punishment.kind()) ? warnActionbar : screen(punishment);
     }
 
     /** Шаблон под наказание: вид плюс «навсегда или нет». */

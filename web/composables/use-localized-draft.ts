@@ -14,6 +14,7 @@ interface TranslationRow {
   title?: string
   name?: string
   description: string
+  punish_reason?: string
 }
 
 export function useLocalizedDraft() {
@@ -21,7 +22,7 @@ export function useLocalizedDraft() {
   const items = ref<LocalizedText[]>([])
 
   const base = computed(
-    () => items.value.find(i => i.locale === BASE_LOCALE) || { title: '', description: '' },
+    () => items.value.find(i => i.locale === BASE_LOCALE) || { title: '', description: '', punish_reason: '' },
   )
 
   /**
@@ -29,11 +30,16 @@ export function useLocalizedDraft() {
    * Сбой загрузки оставляет вкладки пустыми: сохранить правило важнее, чем
    * показать его переводы, а стереть их пустой формой мешает проверка в submit.
    */
-  async function load(source: { title: string, description: string }, path?: string) {
+  async function load(source: { title: string, description: string, punish_reason?: string }, path?: string) {
     items.value = LOCALES.map(l =>
       l.code === BASE_LOCALE
-        ? { locale: l.code, title: source.title, description: source.description }
-        : { locale: l.code, title: '', description: '' },
+        ? {
+            locale: l.code,
+            title: source.title,
+            description: source.description,
+            punish_reason: source.punish_reason ?? '',
+          }
+        : { locale: l.code, title: '', description: '', punish_reason: '' },
     )
     if (!path) return
     let rows: TranslationRow[] = []
@@ -46,7 +52,12 @@ export function useLocalizedDraft() {
     items.value = items.value.map((item) => {
       const row = rows.find(r => r.locale === item.locale)
       if (!row || item.locale === BASE_LOCALE) return item
-      return { ...item, title: row.title ?? row.name ?? '', description: row.description }
+      return {
+        ...item,
+        title: row.title ?? row.name ?? '',
+        description: row.description,
+        punish_reason: row.punish_reason ?? '',
+      }
     })
   }
 
@@ -54,7 +65,12 @@ export function useLocalizedDraft() {
   function payload() {
     return items.value
       .filter(i => i.locale !== BASE_LOCALE && i.title.trim())
-      .map(i => ({ locale: i.locale, title: i.title.trim(), description: i.description.trim() }))
+      .map(i => ({
+        locale: i.locale,
+        title: i.title.trim(),
+        description: i.description.trim(),
+        punish_reason: (i.punish_reason ?? '').trim(),
+      }))
   }
 
   return { items, base, load, payload }

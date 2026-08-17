@@ -91,8 +91,11 @@ onMounted(() => load())
         </h2>
         <p class="mb-4 text-xs text-[var(--noro-muted)]">{{ t('admin-moderation-vars-lead') }}</p>
         <ul class="grid gap-2 text-xs">
-          <li v-for="name in ['player', 'reason', 'duration', 'expires', 'actor', 'rule', 'id', 'kind']" :key="name">
-            <code class="text-[var(--noro-blue)]">{{ '{' + name + '}' }}</code>
+          <li
+            v-for="name in ['player', 'reason', 'duration', 'expires', 'actor', 'rule', 'rule-title', 'rule-link', 'id', 'kind']"
+            :key="name"
+          >
+            <code class="text-[var(--noro-blue)]">{{ '{' + name.replace('-', '_') + '}' }}</code>
             <span class="ml-2 text-[var(--noro-muted)]">{{ t(`admin-moderation-var-${name}`) }}</span>
           </li>
         </ul>

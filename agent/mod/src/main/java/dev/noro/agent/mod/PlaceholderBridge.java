@@ -69,13 +69,12 @@ final class PlaceholderBridge {
      *             в заголовке таба, который считается один раз на весь сервер
      */
     private static PlaceholderResult result(ProfileCache profiles, UUID uuid, String name, String argument) {
-        if (uuid == null) {
-            return PlaceholderResult.invalid("no player");
-        }
-        String value = PlaceholderValues.resolve(profiles.get(uuid), key(name, argument));
-        // invalid, а не пустая строка: ключ без значения — это ошибка в конфиге
-        // чужого мода, и она должна остаться видимой.
-        return value == null ? PlaceholderResult.invalid("unknown placeholder") : PlaceholderResult.value(value);
+        String value = uuid == null ? null : PlaceholderValues.resolve(profiles.get(uuid), key(name, argument));
+        // Пусто, а не invalid: ключи мы регистрируем сами, и отсутствие значения
+        // означает «игрока нет в кэше» — так бывает у сообщения о выходе и у
+        // строк, которые считаются один раз на весь сервер. invalid вылезал бы
+        // в чужом тексте надписью «[unknown placeholder]».
+        return PlaceholderResult.value(value == null ? "" : value);
     }
 
     /** Единственное обращение к Minecraft: {@code getUUID()} есть на всём диапазоне. */

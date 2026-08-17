@@ -5,7 +5,6 @@ import dev.noro.agent.core.NoroAgentApi;
 import dev.noro.agent.core.PermissionSet;
 import dev.noro.agent.core.PlayerProfile;
 import java.util.UUID;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 
 /**
@@ -48,6 +47,6 @@ final class PaperSender implements CommandSender {
 
     @Override
     public void reply(String message) {
-        sender.sendMessage(LegacyComponentSerializer.legacySection().deserialize(message));
+        sender.sendMessage(PaperText.parse(message));
     }
 }

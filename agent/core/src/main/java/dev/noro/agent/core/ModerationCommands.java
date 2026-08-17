@@ -26,6 +26,16 @@ public final class ModerationCommands {
         this.log = log;
     }
 
+    /**
+     * Готовая причина по пункту свода — для подсказки в командной строке.
+     *
+     * <p>Тот же текст, который уедет мастеру, если модератор ничего не напишет:
+     * подсказка и результат обязаны совпадать, иначе она сбивает с толку.
+     */
+    public String suggestedReason(String ruleCode) {
+        return moderation.reasonForRule(ruleCode);
+    }
+
     /** Право на вид наказания — то же, что проверит мастер. */
     public static String permission(String kind) {
         return "noro.mod.punish." + kind;
@@ -47,17 +57,21 @@ public final class ModerationCommands {
             if (target == null) {
                 return;
             }
+            // Причина по правилу собирается из шаблона мастера: модератор
+            // назвал пункт и не стал ничего дописывать.
+            String reason = parsed.reason().isBlank()
+                    ? moderation.reasonForRule(parsed.ruleCode())
+                    : parsed.reason();
             PunishmentInfo issued = moderation
                     .client()
                     .punish(
                             target.uuid(),
                             kind,
-                            parsed.reason(),
+                            reason,
                             parsed.minutes(),
                             parsed.ruleCode(),
                             sender.uuid());
-            sender.reply("§a"
-                    + MessageRender.render(moderation.templates().actorReceipt(), issued, target.username()));
+            sender.reply(moderation.render(moderation.templates().actorReceipt(), issued, target.username()));
             // Мастер разошлёт это и по живому каналу, но ждать оттуда нельзя:
             // канал мог отвалиться, а наказание уже выдано.
             moderation.applier().apply(target.uuid(), target.username(), issued);
@@ -140,7 +154,7 @@ public final class ModerationCommands {
         String state = row.active() ? "§c" + row.kind() : "§8" + row.kind();
         // У снятого и истёкшего остаток считать нечего: там важно, что оно уже
         // не действует, а не сколько было бы осталось.
-        String term = !row.active() ? "over" : row.permanent() ? "forever" : DurationArg.format(row.minutesLeft());
+        String term = !row.active() ? "over" : DurationArg.remaining(row.left());
         return state + " §7" + term + " §fby " + row.actorLabel() + " §7— " + row.reason();
     }
 }

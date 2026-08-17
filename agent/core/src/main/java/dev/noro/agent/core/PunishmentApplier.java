@@ -48,19 +48,22 @@ public final class PunishmentApplier {
             return;
         }
         MessageTemplates templates = moderation.templates();
-        String text = MessageRender.render(templates.screen(punishment), punishment, targetName);
+        String text = moderation.render(templates.screen(punishment), punishment, targetName);
 
         if (punishment.disconnects()) {
             bridge.kick(target, text);
         } else if ("mute".equals(punishment.kind())) {
             mutes.remember(target, punishment);
             bridge.tell(target, text);
+            // И над хотбаром: игрок в этот момент смотрит в мир, а не в чат.
+            bridge.actionbar(target, moderation.render(templates.actionbar(punishment), punishment, targetName));
         } else {
             bridge.tell(target, text);
+            bridge.actionbar(target, moderation.render(templates.actionbar(punishment), punishment, targetName));
             acknowledge(target, punishment);
         }
 
-        String announcement = MessageRender.render(templates.broadcast(), punishment, targetName);
+        String announcement = moderation.render(templates.broadcast(), punishment, targetName);
         if (!announcement.isBlank()) {
             bridge.announce(announcement);
         }
@@ -85,7 +88,7 @@ public final class PunishmentApplier {
         mutes.remember(uuid, profile.activeMute());
         for (PunishmentInfo warn : profile.pendingWarns()) {
             seen.add(warn.id());
-            bridge.tell(uuid, MessageRender.render(moderation.templates().warnNotice(), warn, profile.username()));
+            bridge.tell(uuid, moderation.render(moderation.templates().warnNotice(), warn, profile.username()));
             acknowledge(uuid, warn);
         }
     }

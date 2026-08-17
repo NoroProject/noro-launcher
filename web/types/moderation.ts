@@ -9,9 +9,13 @@ export interface ModerationMessages {
   server_ban_temporary: string
   mute_permanent: string
   mute_temporary: string
+  mute_actionbar_permanent: string
+  mute_actionbar_temporary: string
+  warn_actionbar: string
   warn_notice: string
   broadcast: string
   actor_receipt: string
+  reason_by_rule: string
 }
 
 interface MessageField {
@@ -43,7 +47,21 @@ export const MODERATION_MESSAGE_FIELDS: MessageField[] = [
   },
   { key: 'mute_permanent', label: 'admin-moderation-mute-perm', hint: 'admin-moderation-mute-perm-hint', rows: 2 },
   { key: 'mute_temporary', label: 'admin-moderation-mute-temp', hint: 'admin-moderation-mute-temp-hint', rows: 2 },
+  {
+    key: 'mute_actionbar_permanent',
+    label: 'admin-moderation-mute-bar-perm',
+    hint: 'admin-moderation-mute-bar-hint',
+    rows: 1,
+  },
+  {
+    key: 'mute_actionbar_temporary',
+    label: 'admin-moderation-mute-bar-temp',
+    hint: 'admin-moderation-mute-bar-hint',
+    rows: 1,
+  },
+  { key: 'warn_actionbar', label: 'admin-moderation-warn-bar', hint: 'admin-moderation-mute-bar-hint', rows: 1 },
   { key: 'warn_notice', label: 'admin-moderation-warn', hint: 'admin-moderation-warn-hint', rows: 2 },
   { key: 'broadcast', label: 'admin-moderation-broadcast', hint: 'admin-moderation-broadcast-hint', rows: 2 },
   { key: 'actor_receipt', label: 'admin-moderation-receipt', hint: 'admin-moderation-receipt-hint', rows: 2 },
+  { key: 'reason_by_rule', label: 'admin-moderation-reason', hint: 'admin-moderation-reason-hint', rows: 1 },
 ]

@@ -72,6 +72,23 @@ public final class DurationArg {
         }
     }
 
+    /**
+     * Остаток словами: {@code 40s}, {@code 1h 35m}, {@code forever}.
+     *
+     * <p>Секунды показываются только на последней минуте — там они и нужны:
+     * иначе на экране висит «ещё 1 минута», и игрок думает, что мут застрял.
+     */
+    public static String remaining(java.time.Duration left) {
+        if (left == null) {
+            return "forever";
+        }
+        long seconds = left.toSeconds();
+        if (seconds < 60) {
+            return Math.max(seconds, 1) + "s";
+        }
+        return format(left.toMinutes());
+    }
+
     /** Минуты словами: {@code 10080} → {@code 7d}, {@code 95} → {@code 1h 35m}. */
     public static String format(long minutes) {
         if (minutes < 0) {

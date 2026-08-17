@@ -38,7 +38,7 @@ watch(() => props.draft, (draft) => {
     max: s.max_minutes ? formatDuration(s.max_minutes) : '',
   }))
   loadText(
-    { title: draft.title || '', description: draft.description || '' },
+    { title: draft.title || '', description: draft.description || '', punish_reason: draft.punish_reason || '' },
     draft.id ? `/api/admin/rules/${draft.id}/translations` : undefined,
   )
 }, { immediate: true })
@@ -54,6 +54,7 @@ function submit() {
     code: form.code.trim(),
     title: base.value.title.trim(),
     description: base.value.description.trim(),
+    punish_reason: (base.value.punish_reason ?? '').trim(),
     category_id: form.category_id || null,
     server_id: form.server_id || null,
     sanctions: sanctions.value.map(s => ({
@@ -99,6 +100,9 @@ function submit() {
         :title-placeholder="t('admin-rule-title-placeholder')"
         :text-label="t('admin-rule-wording')"
         :text-placeholder="t('admin-rule-text-placeholder')"
+        :reason-label="t('admin-rule-punish-reason')"
+        :reason-placeholder="t('admin-rule-punish-reason-placeholder')"
+        :reason-hint="t('admin-rule-punish-reason-hint')"
       />
 
       <AdminSanctionEditor v-model="sanctions" />

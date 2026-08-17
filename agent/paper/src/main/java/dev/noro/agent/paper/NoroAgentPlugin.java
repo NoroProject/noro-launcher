@@ -22,6 +22,7 @@ public final class NoroAgentPlugin extends JavaPlugin {
 
     private HeartbeatTask heartbeat;
     private AgentLink link;
+    private Moderation moderation;
 
     @Override
     public void onEnable() {
@@ -44,7 +45,9 @@ public final class NoroAgentPlugin extends JavaPlugin {
         // Общий с NoroAgentApi: чужие плагины читают профиль оттуда же.
         ProfileCache profiles = NoroAgentApi.cache();
         PaperBridge bridge = new PaperBridge(this);
-        Moderation moderation = new Moderation(new ModerationClient(http), getSLF4JLogger());
+        RuleCatalog rules = new RuleCatalog(http);
+        rules.refresh();
+        moderation = new Moderation(new ModerationClient(http), client, rules, getSLF4JLogger());
         moderation.attach(bridge);
 
         getServer()
@@ -56,7 +59,7 @@ public final class NoroAgentPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(permissions, this);
         getServer().getPluginManager().registerEvents(new ChatGuard(moderation), this);
         PlaceholderSupport.register(this, profiles, getSLF4JLogger());
-        registerCommands(client, moderation, http, bridge);
+        registerCommands(client, moderation, rules, bridge);
 
         heartbeat = new HeartbeatTask(client, new PaperServerStatus(getServer()), config, getSLF4JLogger());
         heartbeat.start();
@@ -80,9 +83,7 @@ public final class NoroAgentPlugin extends JavaPlugin {
     }
 
     private void registerCommands(
-            MasterClient client, Moderation moderation, MasterHttp http, PaperBridge bridge) {
-        RuleCatalog rules = new RuleCatalog(http);
-        rules.refresh();
+            MasterClient client, Moderation moderation, RuleCatalog rules, PaperBridge bridge) {
         ModerationCommand handler = new ModerationCommand(
                 new ModerationCommands(client, moderation, getSLF4JLogger()), bridge, rules);
         for (String name : ModerationCommand.names()) {
@@ -117,6 +118,9 @@ public final class NoroAgentPlugin extends JavaPlugin {
         }
         if (link != null) {
             link.close();
+        }
+        if (moderation != null) {
+            moderation.close();
         }
     }
 }

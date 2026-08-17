@@ -34,15 +34,18 @@ public record PunishmentInfo(
         return revokedAt == null && (expiresAt == null || expiresAt.isAfter(Instant.now()));
     }
 
-    /** Сколько осталось в минутах. Для вечного — {@code -1}. */
-    public long minutesLeft() {
+    /**
+     * Сколько осталось. Для вечного — {@code null}.
+     *
+     * <p>Возвращается длительность, а не минуты: на последней минуте «ещё 1
+     * минута» висит не меняясь, и мут выглядит заглючившим. Секунды видно.
+     */
+    public java.time.Duration left() {
         if (expiresAt == null) {
-            return -1;
+            return null;
         }
-        long left = java.time.Duration.between(Instant.now(), expiresAt).toMinutes();
-        // Меньше минуты — это всё ещё «одна минута», а не «ноль»: ноль в тексте
-        // читается как «уже свободен», хотя игрок ещё нет.
-        return Math.max(left, 1);
+        java.time.Duration left = java.time.Duration.between(Instant.now(), expiresAt);
+        return left.isNegative() ? java.time.Duration.ZERO : left;
     }
 
     /** Выкидывает ли это наказание с сервера. */

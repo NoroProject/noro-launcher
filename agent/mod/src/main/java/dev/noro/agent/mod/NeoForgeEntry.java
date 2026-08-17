@@ -30,6 +30,7 @@
 //$$         if (!runtime.init(FMLPaths.CONFIGDIR.get())) {
 //$$             return;
 //$$         }
+//$$         ModMessageEvents.register(runtime);
 //$$         NeoForge.EVENT_BUS.register(this);
 //$$     }
 //$$
@@ -86,7 +87,7 @@
 //$$     }
 //$$
 //$$     /** Мут: сообщение отменяется до того, как его увидит чей-либо чат-мод. */
-//$$     @SubscribeEvent
+//$$     @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.HIGHEST)
 //$$     public void onChat(ServerChatEvent event) {
 //$$         if (runtime.silenced(event.getPlayer())) {
 //$$             event.setCanceled(true);

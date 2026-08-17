@@ -53,6 +53,17 @@ final class ModBridge implements GameBridge {
     }
 
     @Override
+    public void actionbar(UUID uuid, String message) {
+        onMain(uuid, player -> {
+            //#if MC>=260000
+            //$$ player.sendSystemMessage(text(message));
+            //#else
+            player.displayClientMessage(text(message), true);
+            //#endif
+        });
+    }
+
+    @Override
     public void announce(String message) {
         server.execute(() -> {
             Component component = text(message);

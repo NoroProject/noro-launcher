@@ -3,7 +3,6 @@ package dev.noro.agent.paper;
 import dev.noro.agent.core.ChatCommands;
 import dev.noro.agent.core.Moderation;
 import io.papermc.paper.event.player.AsyncChatEvent;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -39,11 +38,12 @@ final class ChatGuard implements Listener {
     }
 
     private void deny(Player player, org.bukkit.event.Cancellable event) {
-        String notice = moderation.muteNotice(player.getUniqueId(), player.getName());
-        if (notice == null) {
-            return;
+        // Короткая версия: над хотбаром одна строка, длинный чат-текст там
+        // обрезается и читается как мусор.
+        String notice = moderation.muteNotice(player.getUniqueId(), player.getName(), true);
+        if (notice != null) {
+            event.setCancelled(true);
+            player.sendActionBar(PaperText.parse(notice));
         }
-        event.setCancelled(true);
-        player.sendMessage(LegacyComponentSerializer.legacySection().deserialize(notice));
     }
 }

@@ -25,6 +25,9 @@ public interface GameBridge {
     /** Личное сообщение игроку. */
     void tell(UUID uuid, String message);
 
+    /** Сообщение в actionbar над хотбаром игрока. */
+    void actionbar(UUID uuid, String message);
+
     /** Сообщение всем на сервере. */
     void announce(String message);
 }

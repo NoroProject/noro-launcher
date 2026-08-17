@@ -18,7 +18,7 @@ public final class PlaceholderValues {
 
     /** Ключи без хвоста: платформы регистрируют их поимённо. */
     public static final List<String> KEYS = List.of(
-            "username", "uuid", "banned", "allowed",
+            "username", "uuid", "banned", "allowed", "muted", "mute_reason", "mute_notice",
             "prefix", "prefix_plain", "suffix", "suffix_plain",
             "role", "role_name", "role_color", "role_color_legacy", "role_icon", "role_sort",
             "role_prefix", "role_suffix",
@@ -68,6 +68,12 @@ public final class PlaceholderValues {
             case "uuid" -> String.valueOf(profile.uuid());
             case "banned" -> String.valueOf(profile.banned());
             case "allowed" -> String.valueOf(profile.allowed());
+            case "muted" -> String.valueOf(profile.activeMute() != null);
+            case "mute_reason" -> profile.activeMute() == null ? "" : text(profile.activeMute().reason());
+            case "mute_notice" -> {
+                PunishmentInfo mute = profile.activeMute();
+                yield mute == null ? null : MessageRender.render(MessageTemplates.defaults().screen(mute), mute, profile.username());
+            }
             case "skin_url" -> text(profile.skinUrl());
             case "cape_url" -> text(profile.capeUrl());
             case "prefix" -> shown == null ? "" : shown.prefixText();

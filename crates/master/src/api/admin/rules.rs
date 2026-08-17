@@ -41,6 +41,9 @@ pub struct RuleReq {
     pub title: String,
     #[serde(default)]
     pub description: String,
+    /// Формулировка, которую игрок увидит в наказании по этому пункту.
+    #[serde(default)]
+    pub punish_reason: String,
     #[serde(default)]
     pub category_id: Option<Uuid>,
     #[serde(default)]
@@ -269,6 +272,7 @@ fn rule_input(req: &RuleReq) -> AppResult<RuleInput<'_>> {
         code,
         title,
         description: req.description.trim(),
+        punish_reason: req.punish_reason.trim(),
         category_id: req.category_id,
         server_id: req.server_id,
     })

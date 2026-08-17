@@ -23,16 +23,17 @@ import net.minecraft.commands.SharedSuggestionProvider;
 final class ModCommands {
 
     private final ModerationCommands commands;
-    private final GameBridge bridge;
     private final RuleCatalog rules;
+    private final ModSuggestions suggestions;
 
-    ModCommands(ModerationCommands commands, GameBridge bridge, RuleCatalog rules) {
+    ModCommands(ModerationCommands commands, RuleCatalog rules) {
         this.commands = commands;
-        this.bridge = bridge;
         this.rules = rules;
+        this.suggestions = new ModSuggestions(commands, rules);
     }
 
     void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        AgentRuntime.LOG.info("Registering moderation commands in Brigadier: ban, serverban, mute, warn, unban, unmute, history");
         dispatcher.register(punish("ban", "ban"));
         dispatcher.register(punish("serverban", "server_ban"));
         dispatcher.register(punish("mute", "mute"));
@@ -46,10 +47,11 @@ final class ModCommands {
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> punish(String name, String kind) {
+        boolean timed = ModerationCommands.TIMED.contains(kind);
         return Commands.literal(name)
                 .requires(source -> allowed(source, ModerationCommands.permission(kind)))
                 .then(Commands.argument("player", StringArgumentType.word())
-                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(bridge.onlineNames(), builder))
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(onlineNames(context.getSource()), builder))
                         .executes(context -> {
                             commands.punish(
                                     new ModSender(context.getSource()),
@@ -57,10 +59,10 @@ final class ModCommands {
                                     new String[] { StringArgumentType.getString(context, "player") });
                             return 1;
                         })
-                        .then(Commands.argument("args", StringArgumentType.greedyString())
-                                .suggests(this::suggestRules)
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .suggests((context, builder) -> suggestions.suggest(context, builder, timed))
                                 .executes(context -> {
-                                    String rest = StringArgumentType.getString(context, "args");
+                                    String rest = StringArgumentType.getString(context, "reason");
                                     commands.punish(
                                             new ModSender(context.getSource()),
                                             kind,
@@ -74,11 +76,23 @@ final class ModCommands {
         return Commands.literal(name)
                 .requires(source -> allowed(source, permission))
                 .then(Commands.argument("player", StringArgumentType.word())
-                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(bridge.onlineNames(), builder))
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(onlineNames(context.getSource()), builder))
                         .executes(context -> {
                             action.accept(context.getSource(), StringArgumentType.getString(context, "player"));
                             return 1;
                         }));
+    }
+
+    private static java.util.Collection<String> onlineNames(CommandSourceStack source) {
+        if (source == null || source.getServer() == null) {
+            return java.util.List.of();
+        }
+        var players = source.getServer().getPlayerList().getPlayers();
+        java.util.List<String> names = new java.util.ArrayList<>(players.size());
+        for (var player : players) {
+            names.add(player.getScoreboardName());
+        }
+        return names;
     }
 
     /** Ник плюс остаток строки словами — ровно то, что ждёт разбор в core. */
@@ -89,21 +103,6 @@ final class ModCommands {
         args[0] = player;
         System.arraycopy(tail, 0, args, 1, tail.length);
         return args;
-    }
-
-    /**
-     * Подсказка кодов правил: {@code @chat.spam}. Срок Brigadier подсказать не
-     * даст — он внутри жадной строки, и позиции слова там уже нет.
-     */
-    private java.util.concurrent.CompletableFuture<com.mojang.brigadier.suggestion.Suggestions> suggestRules(
-            CommandContext<CommandSourceStack> context, com.mojang.brigadier.suggestion.SuggestionsBuilder builder) {
-        String typed = builder.getRemaining();
-        int space = typed.lastIndexOf(' ');
-        String word = space < 0 ? typed : typed.substring(space + 1);
-        if (!word.startsWith("@")) {
-            return builder.buildFuture();
-        }
-        return SharedSuggestionProvider.suggest(rules.matching(word.substring(1)), builder);
     }
 
     /**

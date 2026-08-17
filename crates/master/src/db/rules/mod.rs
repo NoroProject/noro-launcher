@@ -39,6 +39,9 @@ pub struct RuleRow {
     pub code: String,
     pub title: String,
     pub description: String,
+    /// Готовая формулировка для наказания по этому пункту: её видит игрок в
+    /// бане, а не заголовок правила. Пусто — собирается из шаблона мастера.
+    pub punish_reason: String,
     pub sort_order: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

@@ -22,6 +22,8 @@ pub struct RuleInput<'a> {
     pub code: &'a str,
     pub title: &'a str,
     pub description: &'a str,
+    /// Формулировка для наказания по этому пункту. Пусто — соберётся из шаблона.
+    pub punish_reason: &'a str,
     pub category_id: Option<Uuid>,
     pub server_id: Option<Uuid>,
 }
@@ -97,14 +99,15 @@ pub async fn category_has_ancestor(pool: &PgPool, id: Uuid, candidate: Uuid) -> 
 
 pub async fn create_rule(pool: &PgPool, input: RuleInput<'_>) -> Result<RuleRow> {
     let row = sqlx::query_as::<_, RuleRow>(
-        "INSERT INTO rules (code, title, description, category_id, server_id, sort_order)
-         VALUES ($1, $2, $3, $4, $5,
+        "INSERT INTO rules (code, title, description, punish_reason, category_id, server_id, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6,
                  COALESCE((SELECT MAX(sort_order) + 1 FROM rules), 0))
          RETURNING *",
     )
     .bind(input.code)
     .bind(input.title)
     .bind(input.description)
+    .bind(input.punish_reason)
     .bind(input.category_id)
     .bind(input.server_id)
     .fetch_one(pool)
@@ -115,8 +118,8 @@ pub async fn create_rule(pool: &PgPool, input: RuleInput<'_>) -> Result<RuleRow>
 pub async fn update_rule(pool: &PgPool, id: Uuid, input: RuleInput<'_>) -> Result<RuleRow> {
     let row = sqlx::query_as::<_, RuleRow>(
         "UPDATE rules
-         SET code = $2, title = $3, description = $4, category_id = $5,
-             server_id = $6, updated_at = NOW()
+         SET code = $2, title = $3, description = $4, punish_reason = $5,
+             category_id = $6, server_id = $7, updated_at = NOW()
          WHERE id = $1
          RETURNING *",
     )
@@ -124,6 +127,7 @@ pub async fn update_rule(pool: &PgPool, id: Uuid, input: RuleInput<'_>) -> Resul
     .bind(input.code)
     .bind(input.title)
     .bind(input.description)
+    .bind(input.punish_reason)
     .bind(input.category_id)
     .bind(input.server_id)
     .fetch_one(pool)

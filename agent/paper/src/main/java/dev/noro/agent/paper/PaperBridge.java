@@ -6,7 +6,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -46,6 +45,11 @@ final class PaperBridge implements GameBridge {
     }
 
     @Override
+    public void actionbar(UUID uuid, String message) {
+        onMain(uuid, player -> player.sendActionBar(text(message)));
+    }
+
+    @Override
     public void announce(String message) {
         server.getScheduler().runTask(plugin, () -> server.broadcast(text(message)));
     }
@@ -60,8 +64,8 @@ final class PaperBridge implements GameBridge {
         });
     }
 
-    /** Шаблоны хранятся с {@code §}-кодами — тем же форматом, что и в конфигах. */
+    /** Разбор разметки общий с модами: см. {@link PaperText}. */
     private static Component text(String message) {
-        return LegacyComponentSerializer.legacySection().deserialize(message);
+        return PaperText.parse(message);
     }
 }

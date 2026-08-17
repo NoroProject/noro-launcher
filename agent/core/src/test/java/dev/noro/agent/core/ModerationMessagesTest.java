@@ -8,33 +8,44 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Тексты, которые видит наказанный: подстановка, цвета и выбор шаблона. */
+/** Тексты, которые видит наказанный: подстановка, выбор шаблона, разметка. */
 class ModerationMessagesTest {
 
     private static final UUID CASE = UUID.fromString("1a2b3c4d-0000-0000-0000-000000000000");
 
     private static PunishmentInfo ban(Instant expires) {
         return new PunishmentInfo(
-                CASE, "ban", "cheating", "admin", Instant.parse("2026-08-17T05:00:00Z"), expires, null, "game.cheats");
+                CASE, "ban", "cheating", "admin", Instant.parse("2026-08-17T05:00:00Z"), expires, null, "1.1");
     }
 
     @Test
     void fillsEveryPlaceholder() {
         String text = MessageRender.render(
-                "{player} {kind} by {actor}: {reason} [{rule}] case {id} expires {expires}",
+                "{player} {kind} by {actor}: {reason} [{rule}] {rule_title} case {id}",
                 ban(null),
-                "Steve");
+                "Steve",
+                "Respect other players",
+                null);
 
-        assertEquals("Steve banned by admin: cheating [game.cheats] case 1a2b3c4d expires never", text);
+        assertEquals("Steve banned by admin: cheating [1.1] Respect other players case 1a2b3c4d", text);
     }
 
+    /**
+     * Ссылку на свод собирает агент, но только когда мастер прислал адрес:
+     * угаданный домен в бане живёт годами и ведёт в никуда.
+     */
     @Test
-    void turnsAmpersandIntoSectionSign() {
-        String text = MessageRender.render("&cBanned:&r {reason}", ban(null), "Steve");
+    void linksRuleOnlyWithMasterUrl() {
+        assertEquals(
+                "[1.1](https://noro.example/rules#rule-1.1)",
+                MessageRender.render("{rule_link}", ban(null), "Steve", null, "https://noro.example/rules"));
+        assertEquals("1.1", MessageRender.render("{rule_link}", ban(null), "Steve", null, ""));
+    }
 
-        assertEquals("§cBanned:§r cheating", text);
-        // Одинокий амперсанд — это просто амперсанд, а не начало цвета.
-        assertEquals("tom & jerry", MessageRender.render("tom & jerry", ban(null), "Steve"));
+    /** Шаблон подставляется дословно: агент в него ничего не дописывает. */
+    @Test
+    void doesNotAppendAnythingToTemplate() {
+        assertEquals("banned", MessageRender.render("{kind}", ban(null), "Steve", "title", "https://x/rules"));
     }
 
     @Test
@@ -45,16 +56,28 @@ class ModerationMessagesTest {
         assertEquals(templates.banTemporary(), templates.screen(ban(Instant.now().plusSeconds(3600))));
     }
 
+    /** Над хотбаром — своя короткая строка, а не многострочный экран бана. */
+    @Test
+    void actionbarHasItsOwnText() {
+        MessageTemplates templates = MessageTemplates.defaults();
+        PunishmentInfo mute = new PunishmentInfo(
+                CASE, "mute", "spam", "admin", Instant.now(), Instant.now().plusSeconds(600), null, null);
+
+        assertEquals(templates.muteActionbarTemporary(), templates.actionbar(mute));
+        assertFalse(templates.actionbar(mute).contains("\n"), "в actionbar одна строка");
+    }
+
     /** Мастер мог не прислать поле — экран бана всё равно не должен быть пустым. */
     @Test
     void completesMissingTemplatesWithBuiltIn() {
-        MessageTemplates partial =
-                new MessageTemplates(null, "", null, null, null, null, null, "", null).complete();
+        MessageTemplates partial = new MessageTemplates(
+                null, "", null, null, null, null, null, null, null, null, "", null, null, null);
+        MessageTemplates complete = partial.complete();
 
-        assertEquals(MessageTemplates.defaults().banPermanent(), partial.banPermanent());
-        assertEquals(MessageTemplates.defaults().banTemporary(), partial.banTemporary());
+        assertEquals(MessageTemplates.defaults().banPermanent(), complete.banPermanent());
+        assertEquals(MessageTemplates.defaults().muteActionbarTemporary(), complete.muteActionbarTemporary());
         // Молчаливое объявление — законный выбор, и пустая строка сохраняется.
-        assertEquals("", partial.broadcast());
+        assertEquals("", complete.broadcast());
     }
 
     @Test

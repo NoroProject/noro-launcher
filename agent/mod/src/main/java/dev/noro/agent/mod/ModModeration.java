@@ -37,8 +37,8 @@ final class ModModeration implements AutoCloseable {
         this.http = http;
         this.client = client;
         this.log = log;
-        this.moderation = new Moderation(new ModerationClient(http), log);
         this.rules = new RuleCatalog(http);
+        this.moderation = new Moderation(new ModerationClient(http), client, rules, log);
     }
 
     /** Сервер запустился: с этого момента есть кого кикать и кому писать. */
@@ -52,7 +52,7 @@ final class ModModeration implements AutoCloseable {
 
     /** Дерево команд собирается на каждом лоадере своим событием. */
     void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
-        new ModCommands(new ModerationCommands(client, moderation, log), bridge, rules).register(dispatcher);
+        new ModCommands(new ModerationCommands(client, moderation, log), rules).register(dispatcher);
     }
 
     /** Вход игрока: мут в силе, непрочитанные предупреждения показаны. */
@@ -71,11 +71,11 @@ final class ModModeration implements AutoCloseable {
      *     показан
      */
     boolean silenced(ServerPlayer player) {
-        String notice = moderation.muteNotice(player.getUUID(), player.getScoreboardName());
+        String notice = moderation.muteNotice(player.getUUID(), player.getScoreboardName(), true);
         if (notice == null) {
             return false;
         }
-        bridge.tell(player.getUUID(), notice);
+        bridge.actionbar(player.getUUID(), notice);
         return true;
     }
 
@@ -84,5 +84,6 @@ final class ModModeration implements AutoCloseable {
         if (link != null) {
             link.close();
         }
+        moderation.close();
     }
 }

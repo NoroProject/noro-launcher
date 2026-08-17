@@ -13,6 +13,10 @@ defineProps<{
   titlePlaceholder: string
   textLabel: string
   textPlaceholder: string
+  /** Подпись поля формулировки наказания. Не задана — поля нет (у разделов). */
+  reasonLabel?: string
+  reasonPlaceholder?: string
+  reasonHint?: string
 }>()
 
 const items = defineModel<LocalizedText[]>({ required: true })
@@ -29,7 +33,7 @@ const translated = (code: string) => {
  * Замена всего массива, а не правка поля на месте: элементы приходят через
  * модель, и мутация вглубь не всегда доходит до родителя.
  */
-function set(field: 'title' | 'description', value: string) {
+function set(field: 'title' | 'description' | 'punish_reason', value: string) {
   items.value = items.value.map(item =>
     item.locale === active.value ? { ...item, [field]: value } : item,
   )
@@ -77,6 +81,17 @@ function set(field: 'title' | 'description', value: string) {
         :placeholder="active === BASE_LOCALE ? textPlaceholder : base?.description"
         @input="set('description', ($event.target as HTMLTextAreaElement).value)"
       />
+    </label>
+
+    <label v-if="reasonLabel" class="block">
+      <span class="noro-label">{{ reasonLabel }}</span>
+      <input
+        :value="current?.punish_reason"
+        class="noro-input w-full"
+        :placeholder="active === BASE_LOCALE ? reasonPlaceholder : base?.punish_reason"
+        @input="set('punish_reason', ($event.target as HTMLInputElement).value)"
+      >
+      <span v-if="reasonHint" class="mt-2 block text-xs text-[var(--noro-muted)]">{{ reasonHint }}</span>
     </label>
   </div>
 </template>

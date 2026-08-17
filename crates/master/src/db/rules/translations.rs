@@ -16,6 +16,8 @@ pub struct RuleTranslationRow {
     pub locale: String,
     pub title: String,
     pub description: String,
+    #[serde(default)]
+    pub punish_reason: String,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
@@ -41,6 +43,9 @@ pub struct TranslationInput {
     pub title: String,
     #[serde(default)]
     pub description: String,
+    /// Формулировка наказания на этом языке. Игрок читает её в бане.
+    #[serde(default)]
+    pub punish_reason: String,
 }
 
 pub async fn rule_translations(pool: &PgPool, locale: &str) -> Result<Vec<RuleTranslationRow>> {
@@ -116,15 +121,17 @@ pub async fn replace_rule_translations(
         .await?;
     for item in items.iter().filter(|i| !i.title.trim().is_empty()) {
         sqlx::query(
-            "INSERT INTO rule_translations (rule_id, locale, title, description)
-             VALUES ($1, $2, $3, $4)
+            "INSERT INTO rule_translations (rule_id, locale, title, description, punish_reason)
+             VALUES ($1, $2, $3, $4, $5)
              ON CONFLICT (rule_id, locale) DO UPDATE
-                 SET title = EXCLUDED.title, description = EXCLUDED.description",
+                 SET title = EXCLUDED.title, description = EXCLUDED.description,
+                     punish_reason = EXCLUDED.punish_reason",
         )
         .bind(rule_id)
         .bind(item.locale.trim())
         .bind(item.title.trim())
         .bind(item.description.trim())
+        .bind(item.punish_reason.trim())
         .execute(&mut *tx)
         .await?;
     }
@@ -182,6 +189,11 @@ pub fn apply_locale(
             rule.title = tr.title.clone();
             if !tr.description.is_empty() {
                 rule.description = tr.description.clone();
+            }
+            // Пустой перевод не затирает исходную формулировку: лучше причина
+            // на языке свода, чем пустая строка в бане.
+            if !tr.punish_reason.is_empty() {
+                rule.punish_reason = tr.punish_reason.clone();
             }
         }
     }
