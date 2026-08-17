@@ -46,6 +46,7 @@ final class ModPermissions {
         AccessGate.Decision decision = AccessGate.check(client, config, uuid, AgentRuntime.LOG);
         if (decision.profile() != null) {
             byPlayer.put(uuid, PermissionSet.of(decision.profile().permissions()));
+            NoroAgentApi.cache().remember(uuid, decision.profile());
         }
         negotiated.put(uuid, decision);
     }

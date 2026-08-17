@@ -50,6 +50,13 @@ final class ModCommands {
                 .requires(source -> allowed(source, ModerationCommands.permission(kind)))
                 .then(Commands.argument("player", StringArgumentType.word())
                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(bridge.onlineNames(), builder))
+                        .executes(context -> {
+                            commands.punish(
+                                    new ModSender(context.getSource()),
+                                    kind,
+                                    new String[] { StringArgumentType.getString(context, "player") });
+                            return 1;
+                        })
                         .then(Commands.argument("args", StringArgumentType.greedyString())
                                 .suggests(this::suggestRules)
                                 .executes(context -> {

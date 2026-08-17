@@ -36,15 +36,15 @@ pub struct ModerationMessages {
 impl Default for ModerationMessages {
     fn default() -> Self {
         Self {
-            ban_permanent: "You are banned from this network.\n\nReason: {reason}\nBy: {actor}\nCase: {id}".into(),
-            ban_temporary: "You are banned from this network.\n\nReason: {reason}\nExpires: {expires} (in {duration})\nBy: {actor}\nCase: {id}".into(),
-            server_ban_permanent: "You are banned from this server.\n\nReason: {reason}\nBy: {actor}\nCase: {id}".into(),
-            server_ban_temporary: "You are banned from this server.\n\nReason: {reason}\nExpires: {expires} (in {duration})\nBy: {actor}\nCase: {id}".into(),
-            mute_permanent: "You are muted. Reason: {reason}".into(),
-            mute_temporary: "You are muted for another {duration}. Reason: {reason}".into(),
-            warn_notice: "You have been warned by {actor}. Reason: {reason}".into(),
-            broadcast: "{player} was {kind} by {actor}: {reason}".into(),
-            actor_receipt: "{player} was {kind}: {reason}".into(),
+            ban_permanent: "&c&lДОСТУП В СЕТЬ ЗАБЛОКИРОВАН &7(Навсегда)\n\n&7Причина: &f{reason}\n&7Модератор: &f{actor}\n&7Правило: &f{rule}\n&7Дело: &8#{id}\n\n&8Апелляция: https://noro.dalynkaa.dev/support".into(),
+            ban_temporary: "&c&lДОСТУП В СЕТЬ ОГРАНИЧЕН\n\n&7Причина: &f{reason}\n&7Модератор: &f{actor}\n&7Окончание: &e{expires} &7(через &e{duration}&7)\n&7Правило: &f{rule}\n&7Дело: &8#{id}\n\n&8Апелляция: https://noro.dalynkaa.dev/support".into(),
+            server_ban_permanent: "&c&lДОСТУП К СЕРВЕРУ ЗАБЛОКИРОВАН &7(Навсегда)\n\n&7Причина: &f{reason}\n&7Модератор: &f{actor}\n&7Правило: &f{rule}\n&7Дело: &8#{id}\n\n&8Вы можете играть на других серверах сети.".into(),
+            server_ban_temporary: "&c&lДОСТУП К СЕРВЕРУ ВРЕМЕННО ОГРАНИЧЕН\n\n&7Причина: &f{reason}\n&7Модератор: &f{actor}\n&7Окончание: &e{expires} &7(через &e{duration}&7)\n&7Правило: &f{rule}\n&7Дело: &8#{id}\n\n&8На остальных серверах сети доступ сохранен.".into(),
+            mute_permanent: "&c&l[!] &cВаш чат заблокирован навсегда. &7Причина: &f{reason} &7(Выдал: &f{actor}&7)".into(),
+            mute_temporary: "&c&l[!] &cВаш чат заблокирован еще на &e{duration}&c. &7Причина: &f{reason} &7(Выдал: &f{actor}&7)".into(),
+            warn_notice: "&e&l[!] &eВам выдано предупреждение от &f{actor}&e. &7Причина: &f{reason} &7[&f{rule}&7]".into(),
+            broadcast: "&c&l[Модерация] &f{player} &7получил наказание (&c{kind}&7) от &f{actor}&7: &f{reason}".into(),
+            actor_receipt: "&a&l[Успешно] &f{player} &7наказан (&a{kind}&7): &f{reason}".into(),
         }
     }
 }
