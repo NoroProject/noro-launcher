@@ -53,6 +53,7 @@ pub fn router() -> Router<AppState> {
             get(settings::list).put(settings::save),
         )
         .route("/api/admin/settings/env", get(settings::export_env))
+        .route("/api/admin/settings/hero-image", post(settings::upload_hero_image))
         .route("/api/admin/diagnostics", get(settings::diagnostics))
         .route(
             "/api/admin/users/{id}/impersonate",

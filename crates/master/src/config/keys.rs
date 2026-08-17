@@ -26,6 +26,7 @@ keys! {
     INSTANCE_NAME   => "instance_name",   "NORO_INSTANCE_NAME";
     ALLOWED_ORIGINS => "allowed_origins", "NORO_ALLOWED_ORIGINS";
     FILES_CDN_URL   => "files_cdn_url",   "NORO_FILES_CDN_URL";
+    HERO_IMAGE_URL  => "hero_image_url",  "NORO_HERO_IMAGE_URL";
     DISCORD_CLIENT_ID => "discord_client_id", "DISCORD_CLIENT_ID";
     GITHUB_REPO     => "github_repo",     "NORO_GITHUB_REPO";
     GITHUB_REF      => "github_ref",      "NORO_GITHUB_REF";

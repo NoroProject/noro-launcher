@@ -9,6 +9,7 @@ pub mod cabinet_sessions;
 pub mod file_serve;
 pub mod health;
 pub mod launcher;
+pub mod public_settings;
 pub mod range;
 pub mod rate_limit;
 pub mod rules;

@@ -269,6 +269,7 @@ fn router(state: AppState) -> Router {
         // Витрина проекта: список серверов с онлайном, как на любом сайте
         // модового проекта.
         .route("/api/servers", get(api::servers::list))
+        .route("/api/public/settings", get(api::public_settings::get_public_settings))
         .route("/api/rules", get(api::rules::list))
         .route("/api/rules/scopes", get(api::rules::scopes))
         .route(

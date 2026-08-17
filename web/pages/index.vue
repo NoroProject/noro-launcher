@@ -5,6 +5,8 @@ const auth = useAuth()
 const { t } = useT()
 const { servers, online, pending } = usePublicServers()
 
+const { data: publicSettings } = await useFetch<{ hero_image_url: string; instance_name: string }>('/api/public/settings')
+
 const target = computed(() => (auth.loggedIn.value ? '/cabinet' : '/login'))
 /** На главной — витрина, а не полный список: остальное на своей странице. */
 const featured = computed(() => servers.value.slice(0, 3))
@@ -69,7 +71,7 @@ const features = computed(() => [
         <!-- Render Container -->
         <div class="relative overflow-hidden rounded-3xl border border-[var(--noro-border)] bg-[var(--noro-panel)] p-2 shadow-2xl transition-all duration-500 group-hover:border-[var(--noro-cream)]">
           <img
-            src="/hero-character.jpg"
+            :src="publicSettings?.hero_image_url || '/hero-character.jpg'"
             alt="Minecraft 3D Character Render"
             class="h-auto w-full rounded-2xl object-cover transition-transform duration-700 group-hover:scale-[1.02]"
           >

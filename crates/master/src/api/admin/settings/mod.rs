@@ -13,7 +13,7 @@ use crate::audit;
 use crate::config::keys;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use axum::extract::State;
+use axum::extract::{Multipart, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -141,4 +141,79 @@ pub async fn export_env(State(state): State<AppState>, admin: AdminAuth) -> AppR
         lines.push(format!("{}={}", k.env, value));
     }
     Ok(Json(json!({ "env": lines.join("\n") })))
+}
+
+/// Загрузка баннера/иллюстрации главного экрана (Hero Render).
+pub async fn upload_hero_image(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    mut multipart: Multipart,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_SETTINGS_EDIT)?;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?
+    {
+        let name = field.name().unwrap_or_default();
+        if name != "image" && name != "file" {
+            continue;
+        }
+        let raw = field
+            .bytes()
+            .await
+            .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        let data = tokio::task::spawn_blocking(move || fit_hero_image(&raw))
+            .await
+            .map_err(|e| AppError::Other(e.into()))?
+            .map_err(|e| AppError::BadRequest(format!("invalid image: {e}")))?;
+        let stored = state
+            .files
+            .put_bytes(&data)
+            .await
+            .map_err(AppError::Other)?;
+        let url = if let Some(s3) = &state.config.s3 {
+            crate::files::s3::put(state.http(), s3, &stored.sha1, &data)
+                .await
+                .map_err(AppError::Other)?
+        } else {
+            state.config.file_url(&stored.sha1)
+        };
+
+        let mut values = BTreeMap::new();
+        values.insert(
+            keys::HERO_IMAGE_URL.name.to_string(),
+            Value::String(url.clone()),
+        );
+        crate::db::set_settings(&state.db, &values, admin.user_id()).await?;
+
+        audit::record(
+            &state,
+            &admin.actor,
+            audit::actions::SETTINGS_UPDATE,
+            None,
+            json!({ "hero_image_url": url }),
+        )
+        .await;
+
+        return Ok(Json(json!({ "ok": true, "url": url })));
+    }
+    Err(AppError::BadRequest("missing the image field".into()))
+}
+
+fn fit_hero_image(data: &[u8]) -> Result<Vec<u8>, image::ImageError> {
+    let img = match image::load_from_memory(data) {
+        Ok(i) => i,
+        Err(_) => return Ok(data.to_vec()),
+    };
+    let img = if img.width() > 2048 || img.height() > 2048 {
+        img.resize(2048, 2048, image::imageops::FilterType::Lanczos3)
+    } else {
+        img
+    };
+    let mut out = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut out);
+    let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut cursor, 92);
+    img.write_with_encoder(encoder)?;
+    Ok(out)
 }

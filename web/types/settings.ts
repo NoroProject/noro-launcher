@@ -39,6 +39,11 @@ export const SETTING_LABELS: Record<string, { label: string; hint?: string; sect
     hint: 'Comma-separated. Empty means any origin is accepted.',
     section: 'Auth',
   },
+  hero_image_url: {
+    label: 'Hero illustration URL',
+    hint: 'Main page character render image URL (updated instantly without restart when uploaded).',
+    section: 'General',
+  },
   discord_client_id: { label: 'Discord client ID', section: 'Auth' },
   files_cdn_url: { label: 'CDN URL for files', section: 'Storage' },
   github_repo: { label: 'GitHub repository', section: 'Integrations' },
