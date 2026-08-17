@@ -1,13 +1,7 @@
 <script setup lang="ts">
-/**
- * Скачивание дампа БД мастера.
- *
- * Обычной ссылкой не обойтись: эндпоинт требует Bearer-токен, а `<a href>` его
- * не отправит. Поэтому запрос идёт через fetch, а файл отдаётся браузеру
- * временной blob-ссылкой.
- */
 const api = useApi();
 const notify = useNotify();
+const { t } = useT();
 const busy = ref(false);
 
 async function download() {
@@ -48,11 +42,10 @@ async function download() {
             :loading="busy"
             @click="download"
         >
-            Download database backup
+            {{ t('admin-dash-backup-btn') }}
         </AtomButton>
         <p class="text-xs text-[var(--noro-muted)]">
-            A pg_restore archive of the master database — accounts, permissions,
-            skins and capes. Keep it off this machine.
+            {{ t('admin-dash-backup-hint') }}
         </p>
     </div>
 </template>

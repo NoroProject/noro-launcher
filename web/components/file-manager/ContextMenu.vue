@@ -1,16 +1,16 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   x: number
   y: number
   isFolder: boolean
   hasSelection: boolean
   isText?: boolean
-  /** Текущий режим синхронизации цели — чтобы отметить его в подменю. */
   syncMode?: SyncMode
+  modeHint?: Record<SyncMode, string>
 }>()
 
-// Подменю раскрывается по наведению, как в проводнике.
 const syncOpen = ref(false)
+const { t } = useT()
 
 const emit = defineEmits<{
   open: []
@@ -51,28 +51,26 @@ onUnmounted(() => {
       @click.stop
     >
       <button v-if="isFolder" class="fm-ctx-item" @click="emit('open')">
-        <UIcon name="i-lucide-folder-open" class="size-4" /> Open
+        <UIcon name="i-lucide-folder-open" class="size-4" /> {{ t('admin-fm-open') }}
       </button>
       <button v-if="!isFolder && isText" class="fm-ctx-item" @click="emit('edit')">
-        <UIcon name="i-lucide-file-edit" class="size-4" /> Edit
+        <UIcon name="i-lucide-file-edit" class="size-4" /> {{ t('admin-fm-edit') }}
       </button>
       <button v-if="!isFolder" class="fm-ctx-item" @click="emit('download')">
-        <UIcon name="i-lucide-download" class="size-4" /> Download
+        <UIcon name="i-lucide-download" class="size-4" /> {{ t('admin-fm-download') }}
       </button>
       <button v-if="hasSelection" class="fm-ctx-item" @click="emit('rename')">
-        <UIcon name="i-lucide-pencil" class="size-4" /> Rename
+        <UIcon name="i-lucide-pencil" class="size-4" /> {{ t('admin-fm-rename') }}
       </button>
       <button v-if="hasSelection" class="fm-ctx-item" @click="emit('copy')">
-        <UIcon name="i-lucide-copy" class="size-4" /> Copy Path
+        <UIcon name="i-lucide-copy" class="size-4" /> {{ t('admin-fm-copy-path') }}
       </button>
       <template v-if="hasSelection">
         <div class="fm-ctx-sep" />
-        <!-- Режим ставится и отсюда: на плитках метки нет, да и списком
-             попадать в одну букву неудобно. -->
         <div class="relative" @mouseenter="syncOpen = true" @mouseleave="syncOpen = false">
           <button class="fm-ctx-item w-full justify-between">
             <span class="flex items-center gap-2">
-              <UIcon name="i-lucide-refresh-cw" class="size-4" /> Sync mode
+              <UIcon name="i-lucide-refresh-cw" class="size-4" /> {{ t('admin-fm-sync-mode') }}
             </span>
             <UIcon name="i-lucide-chevron-right" class="size-3.5" />
           </button>
@@ -88,7 +86,7 @@ onUnmounted(() => {
                 class="size-4"
                 :class="syncMode === mode ? 'text-[var(--noro-cream)]' : 'opacity-30'"
               />
-              {{ MODE_HINT[mode] }}
+              {{ modeHint ? modeHint[mode] : mode }}
             </button>
           </div>
         </div>
@@ -96,15 +94,15 @@ onUnmounted(() => {
 
       <div class="fm-ctx-sep" />
       <button class="fm-ctx-item" @click="emit('newFolder')">
-        <UIcon name="i-lucide-folder-plus" class="size-4" /> New Folder
+        <UIcon name="i-lucide-folder-plus" class="size-4" /> {{ t('admin-fm-new-folder') }}
       </button>
       <button class="fm-ctx-item" @click="emit('upload')">
-        <UIcon name="i-lucide-upload" class="size-4" /> Upload Files
+        <UIcon name="i-lucide-upload" class="size-4" /> {{ t('admin-fm-upload') }}
       </button>
       <template v-if="hasSelection">
         <div class="fm-ctx-sep" />
         <button class="fm-ctx-item danger" @click="emit('delete')">
-          <UIcon name="i-lucide-trash-2" class="size-4" /> Delete
+          <UIcon name="i-lucide-trash-2" class="size-4" /> {{ t('admin-fm-delete') }}
         </button>
       </template>
     </div>

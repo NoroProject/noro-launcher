@@ -4,7 +4,8 @@ Core rules are consolidated in **[INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
 
 ## Core Mandates
 - **Simplicity First.** Avoid cleverness.
-- **Surgical Edits.** Use `replace` for targeted changes.
-- **Validation.** Always run `cargo check` or `bun run build`.
+- **Strict i18n Localization.** ALL user-facing UI text, headings, labels, button titles, empty states, input placeholders, and field hints MUST be localized via Fluent FTL keys (`useT()` / `t(...)`). Hardcoding UI strings in `.vue` or `.rs` files is strictly forbidden.
+- **Surgical Edits.** Use targeted replacements.
+- **Validation.** Always run `cargo check` / `cargo test -p i18n` and `bun run typecheck`.
 - **File Limits.** Enforce ≤150 lines per file.
 - **4-pt Grid.** Strictly adhere to the 4-pt grid for all UI dimensions.

@@ -19,8 +19,13 @@ const emit = defineEmits<{
     "update:compatibleOnly": [value: boolean];
 }>();
 
+const { t } = useT();
 const tab = ref<"versions" | "about" | "gallery">("versions");
-const TABS = ["versions", "about", "gallery"] as const;
+const TABS = computed(() => [
+    { id: "versions", label: t("admin-mods-tab-versions") },
+    { id: "about", label: t("admin-mods-tab-about") },
+    { id: "gallery", label: t("admin-mods-tab-gallery") },
+]);
 </script>
 
 <template>
@@ -35,7 +40,7 @@ const TABS = ["versions", "about", "gallery"] as const;
             <div class="min-w-0 flex-1">
                 <h2 class="truncate font-bold text-[var(--noro-cream)] text-base" :title="hit.title">{{ hit.title }}</h2>
                 <p class="mt-0.5 truncate text-xs text-[var(--noro-muted)]">
-                    {{ hit.author }} · {{ compactNumber(hit.downloads) }} downloads
+                    {{ hit.author }} · {{ compactNumber(hit.downloads) }} {{ t('admin-mods-downloads-count') }}
                 </p>
             </div>
             <AtomButton variant="ghost" size="sm" icon="i-lucide-x" aria-label="Close" class="shrink-0" @click="emit('close')" />
@@ -49,7 +54,7 @@ const TABS = ["versions", "about", "gallery"] as const;
                 icon="i-lucide-external-link"
                 :href="hit.page_url"
             >
-                Page
+                {{ t('admin-mods-page') }}
             </AtomButton>
             <AtomButton
                 v-if="project?.source_url"
@@ -58,7 +63,7 @@ const TABS = ["versions", "about", "gallery"] as const;
                 icon="i-lucide-code"
                 :href="project.source_url"
             >
-                Source
+                {{ t('admin-mods-source') }}
             </AtomButton>
             <AtomButton
                 v-if="project?.issues_url"
@@ -67,21 +72,21 @@ const TABS = ["versions", "about", "gallery"] as const;
                 icon="i-lucide-bug"
                 :href="project.issues_url"
             >
-                Issues
+                {{ t('admin-mods-issues') }}
             </AtomButton>
         </div>
 
         <nav class="flex gap-1 rounded-[var(--noro-r-sm)] bg-[var(--noro-bg-deep)] p-1 shrink-0">
             <button
-                v-for="name in TABS"
-                :key="name"
+                v-for="item in TABS"
+                :key="item.id"
                 type="button"
                 class="flex-1 rounded-[var(--noro-r-sm)] px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors"
-                :class="tab === name
+                :class="tab === item.id
                     ? 'bg-[var(--noro-cream)] text-[var(--noro-on-cream)] shadow-sm'
                     : 'text-[var(--noro-muted)] hover:bg-[var(--noro-panel)] hover:text-[var(--noro-text)]'"
-                @click="tab = name"
-            >{{ name }}</button>
+                @click="tab = item.id as 'versions' | 'about' | 'gallery'"
+            >{{ item.label }}</button>
         </nav>
 
         <div v-if="loading" class="py-8 text-center text-sm text-[var(--noro-muted)] shrink-0">
@@ -97,13 +102,13 @@ const TABS = ["versions", "about", "gallery"] as const;
                         class="rounded accent-[var(--noro-cream)]"
                         @change="emit('update:compatibleOnly', ($event.target as HTMLInputElement).checked)"
                     >
-                    <span>Only versions matching this pack</span>
+                    <span>{{ t('admin-mods-matching-only') }}</span>
                 </label>
                 <div v-if="loadingVersions" class="py-8 text-center">
                     <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin text-[var(--noro-blue)]" />
                 </div>
                 <div v-else-if="!versions.length" class="py-8 text-center text-sm text-[var(--noro-muted)]">
-                    No matching versions.
+                    {{ t('admin-mods-no-versions') }}
                 </div>
                 <div v-else class="noro-scroll flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1.5 w-full">
                     <ModsVersionRow
@@ -130,7 +135,7 @@ const TABS = ["versions", "about", "gallery"] as const;
                     class="w-full rounded-[var(--noro-r-sm)]"
                 >
                 <p v-if="!project?.gallery?.length" class="text-sm text-[var(--noro-muted)] py-4 text-center">
-                    No screenshots.
+                    {{ t('admin-mods-no-screenshots') }}
                 </p>
             </div>
         </div>

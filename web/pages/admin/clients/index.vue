@@ -2,6 +2,8 @@
 import type { ServerRow } from "~/types/api";
 
 const auth = useAuth();
+const { t } = useT();
+const can = (perm: string) => auth.hasPermission(perm)
 
 const notify = useNotify()
 const { minecraft, loader, loading, loadMinecraft, loadLoader } =
@@ -75,8 +77,8 @@ async function createServer() {
 
 <template>
     <NoroShell
-        title="SERVERS"
-        subtitle="Server profiles, order, and launch metadata"
+        :title="t('admin-servers-title')"
+        :subtitle="t('admin-servers-subtitle')"
     >
         <template #actions>
             <AtomButton
@@ -85,14 +87,15 @@ async function createServer() {
               :loading="pending"
               @click="refresh()"
             >
-              Refresh
+              {{ t('cabinet-apps-refresh') }}
             </AtomButton>
             <AtomButton
+              v-if="can('noro.admin.servers.edit')"
               icon="i-lucide-plus"
               variant="primary"
               @click="showCreate = true"
             >
-              New server
+              {{ t('admin-servers-new') }}
             </AtomButton>
         </template>
 
@@ -109,16 +112,16 @@ async function createServer() {
             <table v-if="servers?.length" class="noro-table w-full">
                 <thead>
                     <tr>
-                        <th class="px-5 py-3 text-left">Server</th>
+                        <th class="px-5 py-3 text-left">{{ t('cabinet-launcher-title') }}</th>
                         <th
                             class="px-5 py-3 text-left text-xs uppercase text-[var(--noro-muted)]"
                         >
-                            Stack
+                            {{ t('admin-servers-col-stack') }}
                         </th>
                         <th
                             class="px-5 py-3 text-left text-xs uppercase text-[var(--noro-muted)]"
                         >
-                            Status
+                            {{ t('admin-servers-col-status') }}
                         </th>
                         <th class="px-5 py-3" />
                     </tr>
@@ -148,7 +151,7 @@ async function createServer() {
                                         {{ server.name }}
                                     </div>
                                     <div class="text-xs text-[var(--noro-muted)] truncate">
-                                        {{ server.description || "No description" }}
+                                        {{ server.description || "—" }}
                                     </div>
                                 </div>
                             </div>
@@ -172,14 +175,14 @@ async function createServer() {
                                     "
                                     variant="subtle"
                                     >{{
-                                        server.active ? "active" : "off"
+                                        server.active ? t('admin-users-active') : "off"
                                     }}</UBadge
                                 >
                                 <UBadge
                                     v-if="server.limited"
                                     color="warning"
                                     variant="subtle"
-                                    >limited</UBadge
+                                    >{{ t('admin-set-limited') }}</UBadge
                                 >
                             </div>
                         </td>
@@ -189,9 +192,7 @@ async function createServer() {
                               icon="i-lucide-settings-2"
                               :to="`/admin/clients/${server.id}`"
                               class="!min-h-9 !min-w-9 !px-2"
-                            >
-
-                            </AtomButton>
+                            />
                         </td>
                     </tr>
                 </tbody>
@@ -199,21 +200,21 @@ async function createServer() {
             <div v-else class="p-12">
                 <EmptyState
                     icon="i-lucide-server"
-                    title="No servers yet"
-                    text="Create your first server profile to get started."
+                    :title="t('admin-servers-empty-title')"
+                    :text="t('admin-servers-empty-text')"
                 />
             </div>
         </section>
 
         <AtomModal
             v-model="showCreate"
-            title="NEW SERVER"
-            subtitle="Create a server and its first build profile"
+            :title="t('admin-servers-create-title')"
+            :subtitle="t('admin-servers-create-subtitle')"
         >
             <form class="grid gap-5" @submit.prevent="createServer">
                 <div class="grid gap-3">
                     <label
-                        ><span class="noro-label">Server Name</span
+                        ><span class="noro-label">{{ t('admin-servers-name') }}</span
                         ><input
                             v-model="form.name"
                             class="noro-input"
@@ -221,7 +222,7 @@ async function createServer() {
                             required
                     /></label>
                     <p class="text-xs text-[var(--noro-muted)]">
-                        Addresses are set per game server once the pack exists.
+                        {{ t('admin-servers-name-hint') }}
                     </p>
                 </div>
 
@@ -230,14 +231,14 @@ async function createServer() {
                         <h3
                             class="text-xs font-bold uppercase tracking-wider text-[var(--noro-muted)]"
                         >
-                            Initial Build Configuration
+                            {{ t('admin-servers-initial-build') }}
                         </h3>
                         <UCheckbox v-model="form.create_build" />
                     </div>
 
                     <div v-if="form.create_build" class="grid gap-3">
                         <label
-                            ><span class="noro-label">Build Version</span
+                            ><span class="noro-label">{{ t('admin-servers-build-version') }}</span
                             ><input
                                 v-model="form.build_version"
                                 class="noro-input"
@@ -269,16 +270,13 @@ async function createServer() {
                         v-else
                         class="py-2 text-center text-xs italic text-[var(--noro-muted)]"
                     >
-                        You can create builds later in the server settings.
+                        {{ t('admin-servers-create-later') }}
                     </div>
                 </div>
 
-                <!-- AtomButton, а не UButton: тема Nuxt UI не знает про
-                     кремовый токен и красила кнопку в серый — она читалась
-                     как выключенная. -->
                 <div class="flex justify-end gap-3 pt-2">
                     <AtomButton variant="ghost" @click="showCreate = false">
-                        Cancel
+                        {{ t('web-rules-cancel') }}
                     </AtomButton>
                     <AtomButton
                       :loading="creating"
@@ -286,7 +284,7 @@ async function createServer() {
                       variant="primary"
                       icon="i-lucide-plus"
                     >
-                      Create Server
+                      {{ t('admin-servers-create-btn') }}
                     </AtomButton>
                 </div>
             </form>

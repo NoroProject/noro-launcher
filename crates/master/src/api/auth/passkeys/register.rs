@@ -64,11 +64,11 @@ pub async fn register_verify(
 ) -> AppResult<Json<Value>> {
     let (owner, raw_state) = crate::db::take_webauthn_state(&state.db, req.state_id, "register")
         .await?
-        .ok_or_else(|| AppError::BadRequest("Срок действия испытания истёк".into()))?;
+        .ok_or_else(|| AppError::BadRequest("The challenge has expired".into()))?;
 
     if owner != Some(user.user_id) {
         return Err(AppError::Forbidden(
-            "Недействительный пользователь для испытания".into(),
+            "Invalid user for this challenge".into(),
         ));
     }
 

@@ -38,7 +38,7 @@ impl AppState {
     pub fn webauthn(&self) -> Result<&webauthn_rs::Webauthn, crate::error::AppError> {
         self.webauthn.as_deref().ok_or_else(|| {
             crate::error::AppError::BadRequest(
-                "passkey недоступен: не заданы публичные адреса сайта и API".into(),
+                "passkeys need the public website and API addresses to be set".into(),
             )
         })
     }

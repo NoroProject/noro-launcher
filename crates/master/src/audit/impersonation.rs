@@ -56,7 +56,7 @@ pub async fn layer(State(state): State<AppState>, req: Request, next: Next) -> R
                 id: actor_id,
                 username,
             },
-            "impersonate.action",
+            crate::audit::actions::IMPERSONATE_ACTION,
             crate::audit::target("user", target_id),
             json!({
                 "method": method,

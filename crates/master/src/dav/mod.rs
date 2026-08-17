@@ -119,7 +119,7 @@ async fn authorize(
         parts.headers.insert(header::AUTHORIZATION, value);
     }
     match <AdminAuth as FromRequestParts<AppState>>::from_request_parts(parts, state).await {
-        Ok(admin) if admin.require(schema::PERM_ADMIN_BUILDS).is_ok() => Ok(()),
+        Ok(admin) if admin.require(schema::PERM_BUILDS_EDIT).is_ok() => Ok(()),
         _ => Err(unauthorized()),
     }
 }

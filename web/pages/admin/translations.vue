@@ -5,6 +5,8 @@ interface LocaleInfo { locale: string, sha1: string }
 interface Catalog { locale: string, sha1: string, ftl: string, builtin: string }
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 await auth.loadMe()
 
 const LOCALES = [
@@ -111,7 +113,7 @@ await load(active.value)
 </script>
 
 <template>
-  <NoroShell title="TRANSLATIONS" subtitle="Launcher text">
+  <NoroShell :title="t('admin-i18n-title')" :subtitle="t('admin-i18n-subtitle')">
     <div class="grid gap-4">
       <section class="noro-panel p-6">
         <div class="flex flex-wrap items-center gap-2">
@@ -126,20 +128,19 @@ await load(active.value)
             {{ loc.label }}
           </AtomButton>
           <span class="noro-label ml-auto">
-            {{ changedCount }} of {{ builtin.size }} changed
+            {{ t('admin-i18n-changed-count', { count: changedCount, total: builtin.size }) }}
           </span>
         </div>
 
         <p class="mt-4 text-sm leading-6 text-[var(--noro-muted)]">
-          Leave a field empty to use the built-in text shown next to it. Only what you
-          fill in is sent to launchers, so untouched keys keep working after updates.
+          {{ t('admin-i18n-hint') }}
         </p>
 
         <div class="mt-4 flex flex-wrap items-center gap-3">
-          <input v-model="search" class="noro-input max-w-xs" placeholder="Search key or text">
+          <input v-model="search" class="noro-input max-w-xs" :placeholder="t('admin-i18n-search-placeholder')">
           <label class="flex cursor-pointer items-center gap-2 text-sm text-[var(--noro-muted)]">
             <input v-model="onlyChanged" type="checkbox" class="size-4">
-            Only changed
+            {{ t('admin-i18n-only-changed') }}
           </label>
         </div>
       </section>
@@ -149,9 +150,9 @@ await load(active.value)
           <table class="noro-table">
             <thead class="sticky top-0 z-10">
               <tr>
-                <th class="w-[220px]">Key</th>
-                <th class="w-[38%]">Built-in</th>
-                <th>Override</th>
+                <th class="w-[220px]">{{ t('admin-i18n-col-key') }}</th>
+                <th class="w-[38%]">{{ t('admin-i18n-col-builtin') }}</th>
+                <th>{{ t('admin-i18n-col-override') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -183,7 +184,7 @@ await load(active.value)
               </tr>
               <tr v-if="!rows.length">
                 <td colspan="3" class="py-10 text-center text-sm text-[var(--noro-muted)]">
-                  Nothing matches the filter.
+                  {{ t('admin-i18n-no-match') }}
                 </td>
               </tr>
             </tbody>
@@ -191,16 +192,16 @@ await load(active.value)
         </div>
       </section>
 
-      <section class="noro-panel flex flex-wrap items-center gap-3 p-4">
+      <section v-if="can('noro.admin.translations.edit')" class="noro-panel flex flex-wrap items-center gap-3 p-4">
         <AtomButton
           variant="primary"
           icon="i-lucide-save"
           :disabled="busy || !dirty"
           @click="save"
         >
-          {{ busy ? 'Saving…' : 'Save' }}
+          {{ busy ? t('web-rules-save') : t('cabinet-save') }}
         </AtomButton>
-        <span v-if="dirty" class="noro-label text-[var(--noro-amber)]">Unsaved changes</span>
+        <span v-if="dirty" class="noro-label text-[var(--noro-amber)]">{{ t('admin-i18n-unsaved') }}</span>
         <AtomButton
           v-if="changedCount"
           variant="ghost"
@@ -209,7 +210,7 @@ await load(active.value)
           @click="resetAll"
           class="ml-auto text-[var(--noro-danger)]"
         >
-          Reset all to built-in
+          {{ t('admin-i18n-reset-all') }}
         </AtomButton>
       </section>
 

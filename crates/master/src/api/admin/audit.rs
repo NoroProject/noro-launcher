@@ -6,7 +6,8 @@ use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::{Query, State};
 use axum::Json;
-use schema::PERM_ADMIN_AUDIT;
+use schema::PERM_AUDIT;
+
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -30,7 +31,7 @@ pub async fn actions(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_AUDIT)?;
+    admin.require(PERM_AUDIT)?;
 
     // Что реально встречается в журнале — чтобы старые события, выпавшие из
     // реестра, не пропали из фильтра молча.
@@ -44,7 +45,7 @@ pub async fn actions(
         if !crate::audit::actions::ALL.iter().any(|a| a.name == name) {
             items.push(serde_json::json!({
                 "name": name,
-                "group": "Прочее",
+                "group": "Other",
                 "title": name,
             }));
         }
@@ -63,7 +64,7 @@ pub async fn list(
     admin: AdminAuth,
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<Vec<AuditRow>>> {
-    admin.require(PERM_ADMIN_AUDIT)?;
+    admin.require(PERM_AUDIT)?;
     let filter = AuditFilter {
         actor_id: q.actor_id,
         action: q.action.filter(|s| !s.is_empty()),

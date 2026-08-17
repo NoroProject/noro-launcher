@@ -24,6 +24,8 @@ const {
     applyAsset,
 } = await useAdminServerEditor();
 
+const { t } = useT();
+
 const builds = computed(() => buildsData.data.value || []);
 const buildsPending = buildsData.pending;
 const buildsError = buildsData.error;
@@ -59,11 +61,11 @@ const buildEditor = useAdminBuildEditor(
 <template>
     <NoroShell
         :title="server?.name || 'SERVER'"
-        subtitle="Server profile & assembly control surface"
+        :subtitle="t('admin-servers-subtitle')"
     >
         <template #actions>
             <AtomButton to="/admin/clients" icon="i-lucide-arrow-left" variant="dark">
-                Clients
+                {{ t('nav-admin-servers') }}
             </AtomButton>
             <AtomButton
                 icon="i-lucide-refresh-cw"
@@ -71,11 +73,11 @@ const buildEditor = useAdminBuildEditor(
                 :loading="buildsPending"
                 @click="refreshBuilds()"
             >
-                Refresh
+                {{ t('cabinet-apps-refresh') }}
             </AtomButton>
         </template>
 
-        <EmptyState v-if="!server" icon="i-lucide-search-x" title="Server not found" />
+        <EmptyState v-if="!server" icon="i-lucide-search-x" :title="t('admin-servers-empty-title')" />
         <div v-else class="grid gap-6">
             <!-- Hero Panel -->
             <section class="noro-hero-panel overflow-hidden">
@@ -96,16 +98,16 @@ const buildEditor = useAdminBuildEditor(
                                 {{ server.name }}
                             </h2>
                             <p class="mt-2 text-sm text-[var(--noro-muted)]">
-                                {{ form.description || "No description" }}
+                                {{ form.description || t('admin-servers-empty-text') }}
                             </p>
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <UBadge :color="form.active ? 'success' : 'neutral'" variant="subtle">
-                            {{ form.active ? "active" : "offline" }}
+                            {{ form.active ? t('admin-users-active') : "off" }}
                         </UBadge>
                         <UBadge v-if="form.limited" color="warning" variant="subtle">
-                            limited
+                            {{ t('admin-set-limited') }}
                         </UBadge>
                         <UBadge color="neutral" variant="subtle">
                             {{ form.modloader }} {{ form.mc_version }}
@@ -175,8 +177,8 @@ const buildEditor = useAdminBuildEditor(
                 <EmptyState
                     v-if="!selectedBuildId"
                     icon="i-lucide-box"
-                    title="No builds created yet"
-                    text="Create a build version to manage files, import modpacks, and release to clients."
+                    :title="t('admin-servers-empty-title')"
+                    :text="t('admin-servers-create-subtitle')"
                 />
                 <div v-else class="grid gap-5">
                     <UAlert
@@ -187,11 +189,10 @@ const buildEditor = useAdminBuildEditor(
                         :description="buildEditor.message.value"
                     />
 
-                    <!-- Import progress notification -->
                     <div v-if="buildEditor.importProgress.value && !buildEditor.importProgress.value.done" class="noro-panel p-5 bg-noro-blue/10 border-noro-blue/30">
                         <h3 class="text-sm font-bold text-noro-blue mb-2 flex items-center gap-2">
                             <UIcon name="i-lucide-loader-2" class="animate-spin" />
-                            Importing Modpack...
+                            {{ t('admin-import-title') }}...
                         </h3>
                         <div class="mb-1 text-xs text-noro-muted flex justify-between">
                             <span class="truncate pr-4">{{ buildEditor.importProgress.value.current_file }}</span>

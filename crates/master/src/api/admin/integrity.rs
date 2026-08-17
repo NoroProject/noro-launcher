@@ -7,7 +7,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use schema::PERM_ADMIN_USERS;
+use schema::{PERM_INTEGRITY_REVIEW, PERM_INTEGRITY_VIEW};
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -26,7 +27,7 @@ pub async fn list(
     admin: AdminAuth,
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<Vec<IntegrityFlagRow>>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_INTEGRITY_VIEW)?;
     let rows =
         crate::db::list_integrity_flags(&state.db, q.user_id, q.open, q.limit.unwrap_or(100))
             .await?;
@@ -39,15 +40,17 @@ pub async fn review(
     admin: AdminAuth,
     Path(id): Path<i64>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_INTEGRITY_REVIEW)?;
     let ok = crate::db::review_integrity_flag(&state.db, id, admin.user_id()).await?;
     if !ok {
-        return Err(AppError::NotFound("флаг не найден или уже разобран".into()));
+        return Err(AppError::NotFound(
+            "flag not found or already reviewed".into(),
+        ));
     }
     audit::record(
         &state,
         &admin.actor,
-        "integrity.review",
+        audit::actions::INTEGRITY_REVIEW,
         target("integrity_flag", id),
         json!({}),
     )

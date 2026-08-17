@@ -1,28 +1,24 @@
 <script setup lang="ts">
 const auth = useAuth()
+const { t } = useT()
 await auth.loadMe()
 
 const sessionRows = computed(() => [
-  ['User', auth.user.value?.username || 'Player'],
+  [t('cabinet-player'), auth.user.value?.username || 'Player'],
   ['Discord', auth.user.value?.discord_username || 'Unknown'],
   ['Minecraft UUID', auth.user.value?.uuid || 'Not loaded']
 ])
 </script>
 
 <template>
-  <!--
-    Блок «Master Server» убран: адрес мастера — внутренняя настройка развёртывания,
-    игроку он ничего не даёт, а упоминание NUXT_PUBLIC_MASTER_URL выносило наружу
-    кухню сборки. В лаунчере эту же настройку убрали по той же причине.
-  -->
-  <NoroShell title="SETTINGS" subtitle="Your account">
+  <NoroShell :title="t('nav-cabinet-settings')" subtitle="Your account">
     <template #actions>
-      <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">Cabinet</AtomButton>
+      <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">{{ t('nav-cabinet-home') }}</AtomButton>
     </template>
 
     <div class="grid gap-4">
       <section class="noro-panel p-6">
-        <h2 class="noro-label mb-4">Account</h2>
+        <h2 class="noro-label mb-4">{{ t('cabinet-settings-account') }}</h2>
         <div class="grid gap-2 text-sm">
           <div
             v-for="[label, value] in sessionRows"
@@ -36,11 +32,11 @@ const sessionRows = computed(() => [
       </section>
 
       <section class="noro-panel p-6">
-        <h2 class="noro-label mb-2">Session</h2>
+        <h2 class="noro-label mb-2">{{ t('cabinet-settings-session') }}</h2>
         <p class="mb-4 text-sm text-[var(--noro-muted)]">
-          Signing out only affects this browser. The launcher keeps its own session.
+          {{ t('cabinet-settings-signout-hint') }}
         </p>
-        <AtomButton variant="secondary" icon="i-lucide-log-out" @click="auth.signOut()">Sign out</AtomButton>
+        <AtomButton variant="secondary" icon="i-lucide-log-out" @click="auth.signOut()">{{ t('profile-sign-out') }}</AtomButton>
       </section>
     </div>
   </NoroShell>

@@ -28,7 +28,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 /// Отдельно от `noro.admin.*`: это вход в чужой аккаунт, а не правка карточки.
-pub const PERM_IMPERSONATE: &str = "noro.admin.impersonate";
+pub use schema::PERM_IMPERSONATE;
 
 #[derive(Deserialize)]
 pub struct StartReq {
@@ -45,12 +45,12 @@ pub async fn start(
     admin.require(PERM_IMPERSONATE)?;
     let actor_id = admin
         .user_id()
-        .ok_or_else(|| AppError::Forbidden("нужен вход пользователем, не admin-токен".into()))?;
+        .ok_or_else(|| AppError::Forbidden("sign in as a user, not with an admin token".into()))?;
 
     let reason = req.reason.trim();
     if reason.len() < 3 {
         return Err(AppError::BadRequest(
-            "нужна причина: она единственное, что потом объяснит, зачем это было".into(),
+            "a reason is required: it is the only thing that will explain this later".into(),
         ));
     }
 
@@ -65,13 +65,13 @@ pub async fn start(
             .is_some()
         {
             return Err(AppError::Forbidden(
-                "из сессии impersonation новый вход не выдаётся".into(),
+                "an impersonation session cannot start another sign-in".into(),
             ));
         }
     }
     if !can_impersonate(&actor, &target) {
         return Err(AppError::Forbidden(
-            "цель должна иметь права строго внутри ваших".into(),
+            "the target's permissions must be strictly within yours".into(),
         ));
     }
     if !crate::db::step_up_active(&state.db, actor_id).await? {
@@ -94,7 +94,7 @@ pub async fn start(
     audit::record(
         &state,
         &admin.actor,
-        "impersonate.request",
+        audit::actions::IMPERSONATE_REQUEST,
         audit::target("user", target_id),
         json!({ "grant_id": grant.id, "reason": reason }),
     )
@@ -117,9 +117,9 @@ pub async fn status(
     admin.require(PERM_IMPERSONATE)?;
     let grant = crate::db::get_grant(&state.db, grant_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("грант".into()))?;
+        .ok_or_else(|| AppError::NotFound("grant".into()))?;
     if Some(grant.actor_id) != admin.user_id() {
-        return Err(AppError::Forbidden("это не ваш грант".into()));
+        return Err(AppError::Forbidden("this grant is not yours".into()));
     }
     Ok(Json(json!({ "status": grant.status() })))
 }

@@ -3,6 +3,7 @@ import type { UserProfile } from '~/types/api'
 import type { CapeRow } from '~/types/cape'
 
 const auth = useAuth()
+const { t } = useT()
 await auth.loadMe()
 
 const MAX_BYTES = 256 * 1024
@@ -233,18 +234,18 @@ async function selectCape(capeId: string | null) {
 </script>
 
 <template>
-  <NoroShell title="SKINS & CAPES" subtitle="Modrinth & Pandora style skin manager">
+  <NoroShell :title="t('skin-title')" :subtitle="t('skin-subtitle')">
     <template #actions>
-      <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">Cabinet</AtomButton>
+      <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">{{ t('web-nav-cabinet') }}</AtomButton>
     </template>
 
     <div class="grid gap-6 xl:grid-cols-[340px_1fr] items-start">
       <!-- Left Column: 3D Character Preview -->
       <section class="noro-panel bg-[var(--noro-bg-deep)] p-5 space-y-4">
         <div class="flex items-center justify-between">
-          <h2 class="noro-label">3D Character</h2>
+          <h2 class="noro-label">{{ t('skin-3d-character') }}</h2>
           <UBadge :color="currentSkinUrl ? 'success' : 'neutral'" variant="subtle">
-            {{ currentSkinUrl ? 'Custom Skin' : 'Default' }}
+            {{ currentSkinUrl ? t('skin-custom-badge') : t('skin-default-badge') }}
           </UBadge>
         </div>
 
@@ -257,7 +258,7 @@ async function selectCape(capeId: string | null) {
             class="w-full justify-center text-xs text-[var(--noro-danger)]"
             @click="resetSkin"
           >
-            Reset to Default
+            {{ t('skin-reset-default') }}
           </AtomButton>
         </div>
       </section>
@@ -274,9 +275,9 @@ async function selectCape(capeId: string | null) {
             <div>
               <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
                 <UIcon name="i-lucide-bookmark" class="size-4 text-[var(--noro-cream)]" />
-                Your skins and presets
+                {{ t('skin-your-skins') }}
               </h2>
-              <p class="text-xs text-[var(--noro-muted)]">Click the plus card to pick a file and create a preset</p>
+              <p class="text-xs text-[var(--noro-muted)]">{{ t('skin-drop-hint') }}</p>
             </div>
           </div>
 
@@ -291,8 +292,8 @@ async function selectCape(capeId: string | null) {
               <div class="flex size-12 items-center justify-center rounded-full bg-[var(--noro-blue)]/20 text-[var(--noro-blue)] group-hover:scale-110 transition-transform">
                 <UIcon name="i-lucide-plus" class="size-7" />
               </div>
-              <span class="mt-3 text-xs font-bold text-[var(--noro-text)]">New skin</span>
-              <span class="text-[10px] text-[var(--noro-muted)]">Upload a .PNG file</span>
+              <span class="mt-3 text-xs font-bold text-[var(--noro-text)]">{{ t('skin-new-skin') }}</span>
+              <span class="text-[10px] text-[var(--noro-muted)]">{{ t('skin-upload-png') }}</span>
               <input ref="input" type="file" accept="image/png" class="hidden" @change="onPick">
             </label>
 
@@ -310,7 +311,7 @@ async function selectCape(capeId: string | null) {
                 <button
                   type="button"
                   class="size-6 place-items-center rounded bg-black/60 text-white hover:bg-[var(--noro-blue)] flex items-center justify-center"
-                  title="Rename"
+                  :title="t('web-rules-scope-general')"
                   @click.stop="startRename(skin, $event)"
                 >
                   <UIcon name="i-lucide-pencil" class="size-3" />
@@ -318,7 +319,7 @@ async function selectCape(capeId: string | null) {
                 <button
                   type="button"
                   class="size-6 place-items-center rounded bg-black/60 text-white hover:bg-red-600 flex items-center justify-center"
-                  title="Delete"
+                  :title="t('web-rules-scope-general')"
                   @click.stop="deleteSavedSkin(skin.id)"
                 >
                   <UIcon name="i-lucide-x" class="size-3" />
@@ -341,8 +342,8 @@ async function selectCape(capeId: string | null) {
               </template>
 
               <SkinCard3D :skin-url="skin.skin_url" :width="100" :height="125" />
-              <UBadge v-if="currentSkinUrl === skin.skin_url" color="primary" variant="subtle" class="text-[10px]">Equipped</UBadge>
-              <span v-else class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-text)] font-semibold">Equip</span>
+              <UBadge v-if="currentSkinUrl === skin.skin_url" color="primary" variant="subtle" class="text-[10px]">{{ t('skin-equipped') }}</UBadge>
+              <span v-else class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-text)] font-semibold">{{ t('skin-equip') }}</span>
             </div>
           </div>
         </section>
@@ -352,9 +353,9 @@ async function selectCape(capeId: string | null) {
           <div>
             <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
               <UIcon name="i-lucide-sparkles" class="size-4 text-[var(--noro-cream)]" />
-              Official Minecraft skins
+              {{ t('skin-official-skins') }}
             </h2>
-            <p class="text-xs text-[var(--noro-muted)]">Standard Mojang characters</p>
+            <p class="text-xs text-[var(--noro-muted)]">{{ t('skin-mojang-desc') }}</p>
           </div>
 
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -366,7 +367,7 @@ async function selectCape(capeId: string | null) {
             >
               <span class="text-xs font-bold text-[var(--noro-text)]">{{ preset.name }}</span>
               <SkinCard3D :preset="preset.id" />
-              <span class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-cream)] font-bold">Equip</span>
+              <span class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-cream)] font-bold">{{ t('skin-equip') }}</span>
             </div>
           </div>
         </section>
@@ -377,11 +378,11 @@ async function selectCape(capeId: string | null) {
             <div>
               <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
                 <UIcon name="i-lucide-layers" class="size-4 text-[var(--noro-cream)]" />
-                Your available capes
+                {{ t('skin-available-capes') }}
               </h2>
-              <p class="text-xs text-[var(--noro-muted)]">Pick a cape for your character</p>
+              <p class="text-xs text-[var(--noro-muted)]">{{ t('skin-pick-cape-desc') }}</p>
             </div>
-            <UBadge color="neutral" variant="subtle">{{ capes.length }} capes</UBadge>
+            <UBadge color="neutral" variant="subtle">{{ t('skin-capes-count', { count: capes.length }) }}</UBadge>
           </div>
 
           <div v-if="capes.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -394,7 +395,7 @@ async function selectCape(capeId: string | null) {
               @click="selectCape(null)"
             >
               <UIcon name="i-lucide-x" class="size-6 text-[var(--noro-muted)] group-hover:text-[var(--noro-text)]" />
-              <span class="mt-1 text-[11px] font-bold text-[var(--noro-muted)]">No cape</span>
+              <span class="mt-1 text-[11px] font-bold text-[var(--noro-muted)]">{{ t('skin-no-cape') }}</span>
             </div>
 
             <!-- Capes Cards -->
@@ -417,8 +418,8 @@ async function selectCape(capeId: string | null) {
           <EmptyState
             v-else
             icon="i-lucide-shield-off"
-            title="No capes available"
-            description="You have no capes yet. Ask an administrator to grant you cape access."
+            :title="t('skin-no-capes-title')"
+            :text="t('skin-no-capes-desc')"
           />
         </section>
       </div>

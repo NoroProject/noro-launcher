@@ -11,6 +11,7 @@ const emit = defineEmits<{
   save: [ignored: string[], user: string[]]
 }>()
 
+const { t } = useT()
 const ignoredText = ref('')
 const userText = ref('')
 const activeTab = ref<'ignored' | 'user'>('ignored')
@@ -77,15 +78,14 @@ function close() {
       <div
         class="w-full max-w-2xl rounded-xl border border-[var(--noro-border)] bg-[var(--noro-panel)] p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh]"
       >
-        <!-- Header -->
         <div class="flex items-center justify-between border-b border-[var(--noro-border-soft)] pb-4">
           <div class="flex items-center gap-3">
             <div class="flex size-9 items-center justify-center rounded-lg bg-[var(--noro-bg)] text-[var(--noro-blue)]">
               <UIcon name="i-lucide-route" class="size-5" />
             </div>
             <div>
-              <h3 class="font-bold text-[var(--noro-text)] text-base">Edit Sync Rules</h3>
-              <p class="text-xs text-[var(--noro-muted)]">Manually edit paths to ignore or keep player modifications</p>
+              <h3 class="font-bold text-[var(--noro-text)] text-base">{{ t('admin-syncmodal-title') }}</h3>
+              <p class="text-xs text-[var(--noro-muted)]">{{ t('admin-syncmodal-subtitle') }}</p>
             </div>
           </div>
           <button
@@ -96,7 +96,6 @@ function close() {
           </button>
         </div>
 
-        <!-- Tab selection -->
         <div class="flex gap-2 border-b border-[var(--noro-border-soft)] pb-2">
           <button
             class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2"
@@ -104,7 +103,7 @@ function close() {
             @click="activeTab = 'ignored'"
           >
             <UIcon name="i-lucide-eye-off" class="size-4" />
-            Ignored Paths (Unmanaged)
+            {{ t('admin-syncmodal-ignored-paths') }}
           </button>
           <button
             class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2"
@@ -112,13 +111,12 @@ function close() {
             @click="activeTab = 'user'"
           >
             <UIcon name="i-lucide-user" class="size-4" />
-            User Overrides (User Managed)
+            {{ t('admin-syncmodal-user-overrides') }}
           </button>
         </div>
 
-        <!-- Quick Presets -->
         <div class="flex flex-wrap items-center gap-1.5 text-xs">
-          <span class="text-[var(--noro-muted)] mr-1 font-medium">Quick Add:</span>
+          <span class="text-[var(--noro-muted)] mr-1 font-medium">{{ t('admin-syncmodal-quick-add') }}</span>
           <button
             v-for="p in presets"
             :key="p.path"
@@ -129,14 +127,13 @@ function close() {
           </button>
         </div>
 
-        <!-- Textarea editor -->
         <div class="flex-1 flex flex-col min-h-[220px]">
           <div class="mb-2 text-xs text-[var(--noro-muted)]">
             <template v-if="activeTab === 'ignored'">
-              Files and folders in this list will <b>never</b> be downloaded or deleted by the launcher sync. Folders must end with <code>/</code> (e.g. <code>xaerominimap/</code>).
+              {{ t('admin-syncmodal-ignored-hint') }}
             </template>
             <template v-else>
-              Files in this list are downloaded once on first install, then <b>never overwritten</b> by launcher sync.
+              {{ t('admin-syncmodal-user-hint') }}
             </template>
           </div>
 
@@ -154,13 +151,12 @@ function close() {
           />
         </div>
 
-        <!-- Actions -->
         <div class="flex items-center justify-end gap-3 border-t border-[var(--noro-border-soft)] pt-4">
           <button
             class="px-4 py-2 rounded-lg text-xs font-semibold text-[var(--noro-muted)] hover:text-[var(--noro-text)] hover:bg-[var(--noro-bg)] transition"
             @click="close"
           >
-            Cancel
+            {{ t('web-rules-cancel') }}
           </button>
           <button
             class="px-5 py-2 rounded-lg text-xs font-bold bg-[var(--noro-blue)] text-black hover:opacity-90 transition flex items-center gap-2 disabled:opacity-50"
@@ -169,7 +165,7 @@ function close() {
           >
             <UIcon v-if="saving" name="i-lucide-loader-2" class="size-4 animate-spin" />
             <UIcon v-else name="i-lucide-check" class="size-4" />
-            Save Rules
+            {{ t('admin-syncmodal-save') }}
           </button>
         </div>
       </div>

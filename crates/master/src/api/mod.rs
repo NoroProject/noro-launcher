@@ -11,6 +11,8 @@ pub mod health;
 pub mod launcher;
 pub mod range;
 pub mod rate_limit;
+pub mod rules;
+pub mod servers;
 pub mod skin_render;
 pub mod skin_render_3d;
 pub mod skin_render_math;

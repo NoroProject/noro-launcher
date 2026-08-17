@@ -6,12 +6,13 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use schema::{Role, PERM_ADMIN_ROLES};
+use schema::{Role, PERM_ROLES_EDIT, PERM_ROLES_VIEW};
+
 use serde::Deserialize;
 use uuid::Uuid;
 
 pub async fn list(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Vec<Role>>> {
-    admin.require(PERM_ADMIN_ROLES)?;
+    admin.require(PERM_ROLES_VIEW)?;
     Ok(Json(crate::db::list_roles(&state.db).await?))
 }
 
@@ -31,7 +32,7 @@ pub async fn create(
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_ROLES)?;
+    admin.require(PERM_ROLES_EDIT)?;
     let id = crate::db::create_role(
         &state.db,
         &req.name,
@@ -44,7 +45,7 @@ pub async fn create(
     audit::record(
         &state,
         &admin.actor,
-        "role.create",
+        audit::actions::ROLE_CREATE,
         target("role", id),
         serde_json::json!({ "name": req.name, "display_name": req.display_name }),
     )
@@ -77,7 +78,7 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateReq>,
 ) -> AppResult<Json<Role>> {
-    admin.require(PERM_ADMIN_ROLES)?;
+    admin.require(PERM_ROLES_EDIT)?;
     if let Some(parent) = req.parent_id {
         reject_cycle(&state, id, parent).await?;
     }
@@ -96,7 +97,7 @@ pub async fn update(
     audit::record(
         &state,
         &admin.actor,
-        "role.update",
+        audit::actions::ROLE_UPDATE,
         target("role", id),
         serde_json::json!({
             "display_name": req.display_name,
@@ -133,7 +134,7 @@ pub async fn update(
 async fn reject_cycle(state: &AppState, role: Uuid, parent: Uuid) -> AppResult<()> {
     if role == parent {
         return Err(AppError::BadRequest(
-            "роль не может наследовать саму себя".into(),
+            "a role cannot inherit from itself".into(),
         ));
     }
     let links = crate::db::role_parent_links(&state.db).await?;
@@ -142,7 +143,7 @@ async fn reject_cycle(state: &AppState, role: Uuid, parent: Uuid) -> AppResult<(
         let Some(node) = current else { return Ok(()) };
         if node == role {
             return Err(AppError::BadRequest(
-                "цикл наследования: эта роль уже выше по цепочке".into(),
+                "inheritance loop: this role is already further up the chain".into(),
             ));
         }
         current = links
@@ -158,12 +159,12 @@ pub async fn delete(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_ROLES)?;
+    admin.require(PERM_ROLES_EDIT)?;
     crate::db::delete_role(&state.db, id).await?;
     audit::record(
         &state,
         &admin.actor,
-        "role.delete",
+        audit::actions::ROLE_DELETE,
         target("role", id),
         serde_json::json!({}),
     )
@@ -192,12 +193,12 @@ pub async fn add_permission(
     Path(id): Path<Uuid>,
     Json(req): Json<PermReq>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_ROLES)?;
+    admin.require(PERM_ROLES_EDIT)?;
     crate::db::add_role_permission(&state.db, id, &req.permission, req.server_id).await?;
     audit::record(
         &state,
         &admin.actor,
-        "role.permission.add",
+        audit::actions::ROLE_PERM_ADD,
         target("role", id),
         serde_json::json!({ "permission": req.permission, "server_id": req.server_id }),
     )
@@ -211,12 +212,12 @@ pub async fn remove_permission(
     Path((id, perm)): Path<(Uuid, String)>,
     Query(scope): Query<PermScope>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_ROLES)?;
+    admin.require(PERM_ROLES_EDIT)?;
     crate::db::remove_role_permission(&state.db, id, &perm, scope.server_id).await?;
     audit::record(
         &state,
         &admin.actor,
-        "role.permission.remove",
+        audit::actions::ROLE_PERM_REMOVE,
         target("role", id),
         serde_json::json!({ "permission": perm, "server_id": scope.server_id }),
     )

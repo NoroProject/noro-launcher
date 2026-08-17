@@ -59,9 +59,7 @@ pub async fn save(
     for (key, value) in req.settings {
         let known = keys::ALL.iter().any(|k| k.name == key);
         if !known {
-            return Err(AppError::BadRequest(format!(
-                "неизвестная настройка: {key}"
-            )));
+            return Err(AppError::BadRequest(format!("unknown setting: {key}")));
         }
         values.insert(key, Value::String(value.trim().to_string()));
     }
@@ -131,7 +129,7 @@ pub async fn create_root(
     Json(req): Json<RootReq>,
 ) -> AppResult<Json<Value>> {
     if crate::db::root_exists(&state.db).await? {
-        return Err(AppError::Conflict("root-аккаунт уже существует".into()));
+        return Err(AppError::Conflict("the root account already exists".into()));
     }
     let name = req.username.trim();
     if name.is_empty()
@@ -139,7 +137,7 @@ pub async fn create_root(
         || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
     {
         return Err(AppError::BadRequest(
-            "имя: до 16 символов, латиница, цифры и подчёркивание".into(),
+            "username: up to 16 latin letters, digits and underscores".into(),
         ));
     }
 
@@ -171,13 +169,13 @@ pub async fn complete(State(state): State<AppState>, _auth: SetupAuth) -> AppRes
     };
     if !filled(keys::PUBLIC_URL.name) || !filled(keys::WEB_URL.name) {
         return Err(AppError::BadRequest(
-            "не заданы публичные адреса сайта и API".into(),
+            "the public website and API addresses are not set".into(),
         ));
     }
     // Без операторского аккаунта завершённая настройка означала бы инстанс,
     // в который никто не может войти.
     if !crate::db::root_exists(&state.db).await? {
-        return Err(AppError::BadRequest("не создан root-аккаунт".into()));
+        return Err(AppError::BadRequest("no root account created yet".into()));
     }
     crate::db::complete_setup(&state.db).await?;
     super::token::burn_token_file(&state.config.data_dir).await;

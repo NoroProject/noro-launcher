@@ -38,7 +38,7 @@ pub async fn resolve_skin_bytes(state: &AppState, q: &RenderQuery) -> AppResult<
     if let Some(p) = &q.preset {
         return preset_bytes(p)
             .map(<[u8]>::to_vec)
-            .ok_or_else(|| AppError::NotFound(format!("пресет скина {p}")));
+            .ok_or_else(|| AppError::NotFound(format!("skin preset {p}")));
     }
 
     if let Some(u) = &q.url {
@@ -66,7 +66,7 @@ pub async fn resolve_skin_bytes(state: &AppState, q: &RenderQuery) -> AppResult<
                     .is_some_and(|n| n.eq_ignore_ascii_case(name))
                 || u.discord_id.as_deref() == Some(name)
         })
-        .ok_or_else(|| AppError::NotFound(format!("игрок {name}")))?;
+        .ok_or_else(|| AppError::NotFound(format!("player {name}")))?;
 
     match &user.skin_url {
         // Скин не установлен — это не ошибка, у игрока дефолтная текстура.
@@ -78,7 +78,7 @@ pub async fn resolve_skin_bytes(state: &AppState, q: &RenderQuery) -> AppResult<
 async fn fetch(url: &str) -> AppResult<Vec<u8>> {
     let resp = reqwest::get(url)
         .await
-        .map_err(|e| AppError::BadRequest(format!("не скачать скин {url}: {e}")))?;
+        .map_err(|e| AppError::BadRequest(format!("could not download the skin {url}: {e}")))?;
     if !resp.status().is_success() {
         return Err(AppError::BadRequest(format!(
             "скин {url} отдан со статусом {}",
@@ -88,5 +88,5 @@ async fn fetch(url: &str) -> AppResult<Vec<u8>> {
     resp.bytes()
         .await
         .map(|b| b.to_vec())
-        .map_err(|e| AppError::BadRequest(format!("не прочитать скин {url}: {e}")))
+        .map_err(|e| AppError::BadRequest(format!("could not read the skin {url}: {e}")))
 }

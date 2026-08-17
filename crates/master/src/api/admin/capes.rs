@@ -6,7 +6,8 @@ use crate::state::AppState;
 use axum::extract::{Multipart, Path, State};
 use axum::Json;
 use bytes::Bytes;
-use schema::{CapeRow, PERM_ADMIN_USERS};
+use schema::{CapeRow, PERM_CAPES_EDIT, PERM_CAPES_VIEW};
+
 use uuid::Uuid;
 
 const MAX_CAPE_BYTES: usize = 512 * 1024;
@@ -15,7 +16,7 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<Vec<CapeRow>>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_CAPES_VIEW)?;
     Ok(Json(crate::db::list_capes(&state.db).await?))
 }
 
@@ -24,7 +25,7 @@ pub async fn upload(
     admin: AdminAuth,
     mut multipart: Multipart,
 ) -> AppResult<Json<CapeRow>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_CAPES_EDIT)?;
     let mut name: Option<String> = None;
     let mut data: Option<Bytes> = None;
     while let Some(field) = multipart
@@ -81,7 +82,7 @@ pub async fn delete(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_CAPES_EDIT)?;
     if !crate::db::delete_cape(&state.db, id).await? {
         return Err(AppError::NotFound("cape".into()));
     }

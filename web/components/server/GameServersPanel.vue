@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import type { GameServerForm } from "~/types/game-server";
 
-/**
- * Игровые сервера сборки. Одна сборка — несколько инстансов: их онлайн
- * складывается в карточку лаунчера, и каждый получает свой секрет для агента.
- */
 const props = defineProps<{ serverId: string }>();
 
 const gs = useGameServers(props.serverId);
+const { t } = useT();
 const adding = ref(false);
 function blank(): GameServerForm {
     return { name: "", mc_host: "", mc_port: 25565, sort_order: 0, kind: "server" };
@@ -15,11 +12,6 @@ function blank(): GameServerForm {
 
 const form = reactive<GameServerForm>(blank());
 
-/**
- * Прокси и бэкенды видят одних игроков, поэтому в сумму идут только бэкенды.
- * Прокси считается сам по себе, лишь когда бэкендов не завели — та же логика,
- * что на мастере.
- */
 const totalOnline = computed(() => {
     const live = gs.items.value.filter(i => i.live);
     const backends = live.filter(i => i.kind !== "proxy");
@@ -40,10 +32,9 @@ onMounted(gs.load);
     <section class="grid gap-4">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
-                <h2 class="text-xl font-black text-white">Game servers</h2>
+                <h2 class="text-xl font-black text-white">{{ t('admin-gs-title') }}</h2>
                 <p class="text-sm text-[var(--noro-muted)]">
-                    Instances running this pack. Backends report the player count
-                    and run the agent; a proxy is where players connect.
+                    {{ t('admin-gs-subtitle') }}
                 </p>
             </div>
             <div class="flex items-center gap-3">
@@ -51,7 +42,7 @@ onMounted(gs.load);
                     {{ totalOnline }} online
                 </span>
                 <AtomButton icon="i-lucide-plus" variant="primary" @click="adding = !adding">
-                    Add server
+                    {{ t('admin-gs-add') }}
                 </AtomButton>
             </div>
         </div>
@@ -66,26 +57,26 @@ onMounted(gs.load);
 
         <form v-if="adding" class="noro-panel grid gap-3 p-5 md:grid-cols-[1fr_1fr_110px_130px_auto]" @submit.prevent="submit">
             <label class="min-w-0">
-                <span class="noro-label">Name</span>
+                <span class="noro-label">{{ t('admin-roles-name') }}</span>
                 <input v-model="form.name" class="noro-input mt-2" placeholder="Survival" autocomplete="off">
             </label>
             <label class="min-w-0">
-                <span class="noro-label">Host</span>
+                <span class="noro-label">{{ t('admin-gs-host') }}</span>
                 <input v-model="form.mc_host" class="noro-input mt-2" placeholder="10.0.0.5" autocomplete="off">
             </label>
             <label class="min-w-0">
-                <span class="noro-label">Port</span>
+                <span class="noro-label">{{ t('admin-gs-port') }}</span>
                 <input v-model.number="form.mc_port" type="number" class="noro-input mt-2">
             </label>
             <label class="min-w-0">
-                <span class="noro-label">Type</span>
+                <span class="noro-label">{{ t('admin-punish-kind') }}</span>
                 <NoroSelect v-model="form.kind" class="mt-2">
-                    <option value="server">Backend</option>
-                    <option value="proxy">Proxy</option>
+                    <option value="server">{{ t('admin-gs-backend') }}</option>
+                    <option value="proxy">{{ t('admin-gs-proxy') }}</option>
                 </NoroSelect>
             </label>
             <AtomButton type="submit" icon="i-lucide-check" variant="primary" class="self-end">
-                Create
+                {{ t('admin-gs-create') }}
             </AtomButton>
         </form>
 
@@ -105,8 +96,8 @@ onMounted(gs.load);
             <EmptyState
                 v-else
                 icon="i-lucide-server-cog"
-                title="No game servers registered"
-                text="Add one to get an agent secret and see the online count."
+                :title="t('admin-gs-empty-title')"
+                :text="t('admin-gs-empty-text')"
             />
         </div>
 

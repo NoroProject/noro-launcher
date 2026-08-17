@@ -18,7 +18,7 @@ fn api_key(state: &AppState) -> AppResult<&str> {
         .config
         .curseforge_api_key
         .as_deref()
-        .ok_or_else(|| AppError::BadRequest("CURSEFORGE_API_KEY не задан".into()))
+        .ok_or_else(|| AppError::BadRequest("CURSEFORGE_API_KEY is not set".into()))
 }
 
 pub async fn search(state: &AppState, q: &SearchQuery) -> AppResult<SearchPage> {
@@ -104,7 +104,7 @@ pub async fn download_url(state: &AppState, project_id: u64, file_id: u64) -> Ap
     resp["data"]
         .as_str()
         .map(String::from)
-        .ok_or_else(|| AppError::BadRequest("мод запретил стороннее скачивание".into()))
+        .ok_or_else(|| AppError::BadRequest("the mod forbids third-party downloads".into()))
 }
 
 pub async fn file_meta(
@@ -119,5 +119,5 @@ pub async fn file_meta(
 
 fn numeric(id: &str) -> AppResult<u64> {
     id.parse()
-        .map_err(|_| AppError::BadRequest(format!("id CurseForge должен быть числом, а не {id}")))
+        .map_err(|_| AppError::BadRequest(format!("a CurseForge id must be a number, not {id}")))
 }

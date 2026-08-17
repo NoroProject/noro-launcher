@@ -6,6 +6,7 @@ use crate::state::AppState;
 use axum::extract::{Multipart, State};
 use axum::Json;
 use schema::UserProfile;
+
 use serde::Deserialize;
 
 pub async fn me(user: AuthUser) -> Json<UserProfile> {
@@ -171,7 +172,7 @@ pub async fn list_capes(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<Vec<schema::CapeRow>>> {
-    let is_admin = user.profile.has_permission(schema::PERM_ADMIN_USERS);
+    let is_admin = user.profile.has_permission(schema::PERM_USERS_VIEW);
     if is_admin {
         Ok(Json(crate::db::list_capes(&state.db).await?))
     } else {
@@ -186,7 +187,7 @@ pub async fn set_cape(
     user: AuthUser,
     Json(req): Json<schema::SelectCapeReq>,
 ) -> AppResult<Json<UserProfile>> {
-    let is_admin = user.profile.has_permission(schema::PERM_ADMIN_USERS);
+    let is_admin = user.profile.has_permission(schema::PERM_USERS_VIEW);
     let cape_url = match req.cape_id {
         Some(cape_id) => {
             if !is_admin {
@@ -298,4 +299,12 @@ pub async fn delete_skin_preset(
         .map_err(|e| AppError::Other(e.into()))?;
 
     Ok(Json(()))
+}
+
+pub async fn punishments(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Vec<crate::db::punishments::PunishmentRow>>> {
+    crate::db::expire_punishments(&state.db).await?;
+    Ok(Json(crate::db::list_punishments(&state.db, user.user_id).await?))
 }

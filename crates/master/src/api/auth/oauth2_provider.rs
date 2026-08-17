@@ -54,7 +54,7 @@ pub async fn accept_authorize(
 ) -> AppResult<Json<Value>> {
     let app = crate::db::get_oauth_app_by_client_id(&state.db, &form.client_id)
         .await?
-        .ok_or_else(|| AppError::BadRequest("Приложение не найдено".into()))?;
+        .ok_or_else(|| AppError::BadRequest("Application not found".into()))?;
 
     crate::db::authorize_app_for_user(&state.db, user.user_id, app.id, &form.scopes).await?;
     let code = crate::db::create_oauth_code(
@@ -97,17 +97,19 @@ pub async fn token_endpoint(
 ) -> AppResult<Json<Value>> {
     if req.grant_type != "authorization_code" {
         return Err(AppError::BadRequest(
-            "Поддерживается только grant_type=authorization_code".into(),
+            "Only grant_type=authorization_code is supported".into(),
         ));
     }
 
     let Some(code) = req.code else {
-        return Err(AppError::BadRequest("Не указан code".into()));
+        return Err(AppError::BadRequest("No code given".into()));
     };
 
     let (user_id, _app_id, _redirect_uri, scopes) = crate::db::take_oauth_code(&state.db, code)
         .await?
-        .ok_or_else(|| AppError::Unauthorized("Код авторизации недействителен или истёк".into()))?;
+        .ok_or_else(|| {
+            AppError::Unauthorized("The authorization code is invalid or expired".into())
+        })?;
 
     let session =
         crate::db::create_session(&state.db, user_id, &scopes, chrono::Duration::days(30)).await?;

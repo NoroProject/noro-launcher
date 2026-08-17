@@ -6,9 +6,10 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
-use schema::PERM_ADMIN_SERVERS;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use schema::PERM_CORES_EDIT;
 
 #[derive(Deserialize)]
 pub struct ListQuery {
@@ -34,7 +35,7 @@ pub async fn list(
     admin: AdminAuth,
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<Vec<ServerCoreResp>>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_CORES_EDIT)?;
     let rows = crate::db::list_server_cores(&state.db, q.server_id).await?;
     Ok(Json(
         rows.into_iter().map(|row| with_url(&state, row)).collect(),
@@ -47,7 +48,7 @@ pub async fn upload(
     admin: AdminAuth,
     mut multipart: Multipart,
 ) -> AppResult<Json<ServerCoreResp>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_CORES_EDIT)?;
     let mut server_id: Option<Uuid> = None;
     let mut version: Option<String> = None;
     let mut data: Option<bytes::Bytes> = None;
@@ -66,7 +67,7 @@ pub async fn upload(
                     .map_err(|e| AppError::BadRequest(e.to_string()))?;
                 server_id = Some(
                     raw.parse()
-                        .map_err(|_| AppError::BadRequest("server_id должен быть UUID".into()))?,
+                        .map_err(|_| AppError::BadRequest("server_id must be a UUID".into()))?,
                 );
             }
             Some("version") => {
@@ -90,8 +91,9 @@ pub async fn upload(
         }
     }
 
-    let server_id = server_id.ok_or_else(|| AppError::BadRequest("нет поля server_id".into()))?;
-    let data = data.ok_or_else(|| AppError::BadRequest("нет поля file".into()))?;
+    let server_id =
+        server_id.ok_or_else(|| AppError::BadRequest("missing the server_id field".into()))?;
+    let data = data.ok_or_else(|| AppError::BadRequest("missing the file field".into()))?;
     let version = version
         .filter(|v| !v.trim().is_empty())
         .or(filename)
@@ -116,7 +118,7 @@ pub async fn upload(
         .await?
         .into_iter()
         .find(|row| row.id == id)
-        .ok_or_else(|| AppError::NotFound("ядро сервера".into()))?;
+        .ok_or_else(|| AppError::NotFound("server core".into()))?;
     Ok(Json(with_url(&state, row)))
 }
 
@@ -125,10 +127,10 @@ pub async fn activate(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<ServerCoreResp>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_CORES_EDIT)?;
     let row = crate::db::activate_server_core(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("ядро сервера".into()))?;
+        .ok_or_else(|| AppError::NotFound("server core".into()))?;
     Ok(Json(with_url(
         &state,
         ServerCoreRow {
@@ -143,7 +145,7 @@ pub async fn delete(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_CORES_EDIT)?;
     crate::db::delete_server_core(&state.db, id).await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }

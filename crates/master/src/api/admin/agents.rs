@@ -9,7 +9,8 @@ use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::State;
 use axum::Json;
-use schema::PERM_ADMIN_SERVERS;
+use schema::PERM_ADMIN_AGENTS;
+
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -28,7 +29,7 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<Vec<AgentFile>>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_ADMIN_AGENTS)?;
 
     let dir = state.config.data_dir.join("agents");
     let mut files = Vec::new();

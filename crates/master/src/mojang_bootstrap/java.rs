@@ -4,6 +4,7 @@ use super::BootstrapCtx;
 use anyhow::{anyhow, Context, Result};
 use futures::stream::{self, StreamExt};
 use schema::ArtifactKind;
+
 use serde_json::Value;
 
 /// Стабильный «манифест манифестов» java-рантаймов Mojang.

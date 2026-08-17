@@ -8,6 +8,7 @@ interface ActionInfo {
 }
 
 const auth = useAuth()
+const { t } = useT()
 const notify = useNotify()
 await auth.loadMe()
 
@@ -94,18 +95,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <NoroShell title="AUDIT" subtitle="Who changed what, and when">
+  <NoroShell :title="t('admin-audit-title')" :subtitle="t('admin-audit-subtitle')">
     <template #actions>
       <AtomButton icon="i-lucide-refresh-cw" variant="dark" :loading="pending" @click="load()">
-        Refresh
+        {{ t('cabinet-apps-refresh') }}
       </AtomButton>
     </template>
 
     <section class="noro-panel mb-4 grid gap-4 p-4 md:grid-cols-[1fr_200px_1fr_auto]">
       <label class="block">
-        <span class="noro-label mb-1.5 block">Event</span>
+        <span class="noro-label mb-1.5 block">{{ t('admin-audit-event') }}</span>
         <NoroSelect v-model="action" class="w-full">
-          <option value="">All events</option>
+          <option value="">{{ t('admin-audit-all-events') }}</option>
           <optgroup v-for="g in grouped" :key="g.group" :label="g.group">
             <option v-for="a in g.items" :key="a.name" :value="a.name">{{ a.title }}</option>
           </optgroup>
@@ -113,26 +114,26 @@ onMounted(() => {
       </label>
 
       <label class="block">
-        <span class="noro-label mb-1.5 block">Target</span>
+        <span class="noro-label mb-1.5 block">{{ t('admin-audit-target') }}</span>
         <NoroSelect v-model="targetKind" class="w-full">
-          <option value="">Anything</option>
+          <option value="">{{ t('admin-audit-anything') }}</option>
           <option v-for="k in targetKinds" :key="k" :value="k">{{ k }}</option>
         </NoroSelect>
       </label>
 
       <label class="block">
-        <span class="noro-label mb-1.5 block">Target id <span class="text-[var(--noro-muted)]">— optional</span></span>
+        <span class="noro-label mb-1.5 block">{{ t('admin-audit-target-id') }} <span class="text-[var(--noro-muted)]">— {{ t('admin-audit-optional') }}</span></span>
         <input
           v-model="targetId"
           class="noro-input w-full"
-          placeholder="UUID"
+          :placeholder="t('admin-audit-uuid-placeholder')"
           @keyup.enter="load()"
         >
       </label>
 
       <div class="flex items-end gap-2">
-        <AtomButton icon="i-lucide-search" :loading="pending" @click="load()">Apply</AtomButton>
-        <AtomButton variant="dark" icon="i-lucide-x" @click="reset">Reset</AtomButton>
+        <AtomButton icon="i-lucide-search" :loading="pending" @click="load()">{{ t('admin-audit-apply') }}</AtomButton>
+        <AtomButton variant="dark" icon="i-lucide-x" @click="reset">{{ t('admin-audit-reset') }}</AtomButton>
       </div>
     </section>
 
@@ -147,15 +148,15 @@ onMounted(() => {
         class="mt-2"
         @click="load(true)"
       >
-        Load more
+        {{ t('admin-audit-load-more') }}
       </AtomButton>
     </div>
 
     <EmptyState
       v-else-if="!pending"
       icon="i-lucide-scroll-text"
-      title="Nothing recorded yet"
-      text="Logins, launches, integrity findings and every admin action land here as they happen."
+      :title="t('admin-audit-empty-title')"
+      :text="t('admin-audit-empty-text')"
     />
   </NoroShell>
 </template>

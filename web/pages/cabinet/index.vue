@@ -3,6 +3,7 @@ import type { UserProfile } from '~/types/api'
 
 const auth = useAuth()
 const notify = useNotify()
+const { t } = useT()
 await auth.loadMe()
 
 const username = ref(auth.user.value?.username || '')
@@ -89,7 +90,7 @@ onMounted(() => loadPasskeys())
 </script>
 
 <template>
-  <NoroShell title="CABINET" subtitle="Profile and access">
+  <NoroShell :title="t('cabinet-title')" :subtitle="t('cabinet-subtitle')">
     <div class="grid gap-4">
       <!-- Profile & Username -->
       <section class="noro-panel p-6">
@@ -108,7 +109,7 @@ onMounted(() => loadPasskeys())
           </div>
           <div class="min-w-0">
             <h2 class="noro-pixel truncate text-2xl text-[var(--noro-cream)]">
-              {{ auth.user.value?.username || 'Player' }}
+              {{ auth.user.value?.username || t('cabinet-player') }}
             </h2>
             <p class="mt-2 truncate text-sm text-[var(--noro-muted)]">
               @{{ auth.user.value?.discord_username || 'discord' }}
@@ -118,10 +119,10 @@ onMounted(() => loadPasskeys())
 
         <form class="mt-6 grid gap-3 md:grid-cols-[1fr_auto]" @submit.prevent="saveUsername">
           <label class="min-w-0">
-            <span class="noro-label">Minecraft name</span>
+            <span class="noro-label">{{ t('cabinet-mc-name') }}</span>
             <input v-model="username" class="noro-input mt-2" maxlength="16" autocomplete="off">
             <span class="mt-2 block text-xs text-[var(--noro-muted)]">
-              Shown to other players in game. Up to 16 characters.
+              {{ t('cabinet-mc-name-hint') }}
             </span>
           </label>
           <AtomButton
@@ -132,7 +133,7 @@ onMounted(() => loadPasskeys())
             :disabled="saving || !hasChanges"
             class="self-start md:mt-[26px]"
           >
-            Save
+            {{ t('cabinet-save') }}
           </AtomButton>
         </form>
         <UAlert
@@ -141,7 +142,7 @@ onMounted(() => loadPasskeys())
           color="success"
           variant="subtle"
           icon="i-lucide-check"
-          description="Profile updated"
+          :description="t('cabinet-profile-updated')"
         />
       </section>
 
@@ -151,12 +152,12 @@ onMounted(() => loadPasskeys())
           <div>
             <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
               <UIcon name="i-lucide-key-round" class="size-4 text-[var(--noro-blue)]" />
-              Ключи доступа Passkeys (WebAuthn)
+              {{ t('cabinet-passkeys-title') }}
             </h2>
-            <p class="text-xs text-[var(--noro-muted)]">Беспарольный вход через Touch ID, Face ID или аппаратные ключи безопасности</p>
+            <p class="text-xs text-[var(--noro-muted)]">{{ t('cabinet-passkeys-lead') }}</p>
           </div>
           <AtomButton variant="secondary" icon="i-lucide-plus" @click="addPasskey">
-            Добавить Passkey
+            {{ t('cabinet-passkeys-add') }}
           </AtomButton>
         </div>
 
@@ -171,15 +172,15 @@ onMounted(() => loadPasskeys())
               <div>
                 <div class="font-bold text-[var(--noro-text)]">{{ pk.name }}</div>
                 <div class="text-[10px] text-[var(--noro-muted)]">
-                  Создан {{ new Date(pk.created_at).toLocaleDateString() }}
+                  {{ t('cabinet-passkeys-created', { date: new Date(pk.created_at).toLocaleDateString() }) }}
                   ·
-                  {{ pk.last_used_at ? `вход ${new Date(pk.last_used_at).toLocaleDateString()}` : 'ни разу не использован' }}
+                  {{ pk.last_used_at ? t('cabinet-passkeys-used', { date: new Date(pk.last_used_at).toLocaleDateString() }) : t('cabinet-passkeys-unused') }}
                 </div>
               </div>
             </div>
             <button
               class="rounded p-1 text-[var(--noro-muted)] hover:bg-red-500/20 hover:text-red-400 transition"
-              title="Удалить"
+              :title="t('web-rules-scope-general')"
               @click="removePasskey(pk.id)"
             >
               <UIcon name="i-lucide-trash-2" class="size-4" />
@@ -190,21 +191,21 @@ onMounted(() => loadPasskeys())
         <EmptyState
           v-else
           icon="i-lucide-shield-off"
-          title="Нет привязанных ключей Passkey"
-          text="Добавьте ключ Touch ID или Face ID для быстрой авторизации без Discord"
+          :title="t('cabinet-passkeys-none-title')"
+          :text="t('cabinet-passkeys-none-text')"
         />
       </section>
 
       <!-- Launcher Download -->
       <section class="noro-panel p-6">
-        <h2 class="mb-4 font-bold text-[var(--noro-text)]">Launcher</h2>
+        <h2 class="mb-4 font-bold text-[var(--noro-text)]">{{ t('cabinet-launcher-title') }}</h2>
         <LauncherDownload compact />
       </section>
 
       <!-- Roles & Permissions -->
       <section class="grid gap-4 xl:grid-cols-2">
         <div class="noro-panel p-6">
-          <h2 class="noro-label mb-4">Roles &mdash; {{ roles.length }}</h2>
+          <h2 class="noro-label mb-4">{{ t('cabinet-roles-title', { count: roles.length }) }}</h2>
           <div v-if="roles.length" class="grid gap-2">
             <div
               v-for="role in roles"
@@ -230,20 +231,20 @@ onMounted(() => loadPasskeys())
                 </div>
               </div>
               <span class="shrink-0 text-xs text-[var(--noro-muted)]">
-                {{ role.permissions.length }} perms
+                {{ t('cabinet-perms-count', { count: role.permissions.length }) }}
               </span>
             </div>
           </div>
           <EmptyState
             v-else
             icon="i-lucide-shield"
-            title="No roles yet"
-            text="Server access is granted through roles."
+            :title="t('cabinet-roles-none-title')"
+            :text="t('cabinet-roles-none-text')"
           />
         </div>
 
         <div class="noro-panel p-6">
-          <h2 class="noro-label mb-4">Direct permissions &mdash; {{ permissions.length }}</h2>
+          <h2 class="noro-label mb-4">{{ t('cabinet-direct-perms-title', { count: permissions.length }) }}</h2>
           <div v-if="permissions.length" class="flex flex-wrap gap-2">
             <code
               v-for="perm in permissions"
@@ -256,8 +257,8 @@ onMounted(() => loadPasskeys())
           <EmptyState
             v-else
             icon="i-lucide-key"
-            title="Nothing granted directly"
-            text="That is normal &mdash; access usually comes from roles."
+            :title="t('cabinet-direct-none-title')"
+            :text="t('cabinet-direct-none-text')"
           />
         </div>
       </section>

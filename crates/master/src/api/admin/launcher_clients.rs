@@ -5,7 +5,8 @@ use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::State;
 use axum::Json;
-use schema::PERM_ADMIN_LAUNCHER;
+use schema::PERM_LAUNCHER_CLIENTS;
+
 use std::collections::BTreeMap;
 
 #[derive(serde::Serialize)]
@@ -26,7 +27,7 @@ pub async fn clients(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<ClientsReport>> {
-    admin.require(PERM_ADMIN_LAUNCHER)?;
+    admin.require(PERM_LAUNCHER_CLIENTS)?;
 
     let clients = crate::db::list_launcher_clients(&state.db).await?;
     let current_version = crate::db::current_launcher_version_any(&state.db).await?;

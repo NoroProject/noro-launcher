@@ -15,33 +15,24 @@ const emit = defineEmits<{
   remove: [entries: PermissionEntry[]]
 }>()
 
+const { t } = useT()
 const node = ref('')
-/** Пустая строка — «на всех сборках». Иначе список выбранных сборок. */
 const picked = ref<string[]>([])
 const global = ref(true)
 
-/** Каталог узлов зависит от сборки; берём первую выбранную как образец. */
 const catalogFor = computed(() => (global.value ? '' : picked.value[0] || ''))
 const { suggestions, pending, error } = usePermissionNodes(catalogFor)
 
-/** Контексты, в которые уйдёт право. Глобальный перекрывает все остальные. */
 const targets = computed<(string | null)[]>(() =>
   global.value ? [null] : picked.value.slice()
 )
 
-/** Пояснения к уже выданным правам берём из того же каталога. */
 const labels = computed(() => new Map(suggestions.value.map(item => [item.node, item.label])))
 
-/** Дубликатом считаем только те контексты, где право уже есть. */
 const fresh = computed(() => targets.value.filter(server =>
   !props.entries.some(e => e.permission === node.value.trim() && e.server_id === server)
 ))
 
-/**
- * Одна строка на право, а не на выдачу: право живёт сразу в нескольких
- * контекстах, и раскладка по контекстам разносила его копии по разным местам
- * списка — понять, где оно вообще действует, было нельзя.
- */
 const rows = computed(() => {
   const byPermission = new Map<string, (string | null)[]>()
   for (const entry of props.entries) {
@@ -62,14 +53,11 @@ function add() {
   node.value = ''
 }
 
-/** Клик по чипу: где право уже есть — снимаем, где нет — выдаём. */
 function toggle(permission: string, serverId: string | null) {
   const entry = { permission, server_id: serverId }
   const granted = props.entries.some(
     e => e.permission === permission && e.server_id === serverId
   )
-  // Две ветки, а не имя события выражением: с вычисленным именем перегрузка
-  // `emit` не выводится и типы событий перестают проверяться вовсе.
   if (granted) {
     emit('remove', [entry])
   } else {
@@ -77,7 +65,6 @@ function toggle(permission: string, serverId: string | null) {
   }
 }
 
-/** Крестик снимает право целиком — во всех контекстах сразу. */
 function removeAll(permission: string) {
   emit('remove', props.entries.filter(e => e.permission === permission))
 }
@@ -88,12 +75,10 @@ function removeAll(permission: string) {
     <h2 class="text-xl font-black text-[var(--noro-text)]">{{ title }}</h2>
     <p class="mt-1 text-sm text-[var(--noro-muted)]">{{ subtitle }}</p>
 
-    <!-- Две строки, а не одна: чипы контекста растут по числу сборок, и держать
-         их в колонке рядом с полем — значит ломать раскладку на третьей сборке. -->
     <div class="mt-4 grid gap-3">
       <AdminPermissionContextPicker v-model:global="global" v-model:picked="picked" :servers="servers" />
       <div>
-        <span class="noro-label">Permission</span>
+        <span class="noro-label">{{ t('admin-perm-permission') }}</span>
         <div class="mt-1 flex items-start gap-2">
           <div class="min-w-0 flex-1">
             <AdminPermissionInput
@@ -111,20 +96,20 @@ function removeAll(permission: string) {
             @click="add"
             class="shrink-0"
           >
-            Add
+            {{ t('admin-perm-add') }}
           </AtomButton>
         </div>
       </div>
     </div>
 
     <p v-if="error" class="mt-3 text-xs text-[var(--noro-amber)]">
-      Suggestions unavailable: {{ error }}. Permissions can still be typed by hand.
+      {{ t('admin-perm-suggestions-unavailable', { error: String(error) }) }}
     </p>
     <p v-else-if="node.trim() && !fresh.length" class="mt-3 text-xs text-[var(--noro-amber)]">
-      Already granted everywhere you picked.
+      {{ t('admin-perm-already-granted') }}
     </p>
     <p v-else-if="!global && !picked.length" class="mt-3 text-xs text-[var(--noro-muted)]">
-      Pick at least one build, or grant it on all of them.
+      {{ t('admin-perm-pick-build') }}
     </p>
 
     <div class="mt-5 grid gap-2">
@@ -141,7 +126,7 @@ function removeAll(permission: string) {
       />
 
       <p v-if="!entries.length" class="rounded-lg bg-[var(--noro-input)] px-3 py-4 text-center text-sm text-[var(--noro-muted)]">
-        No permissions granted yet.
+        {{ t('admin-perm-no-permissions') }}
       </p>
     </div>
   </section>

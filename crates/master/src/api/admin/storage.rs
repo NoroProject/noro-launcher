@@ -6,7 +6,7 @@ use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::State;
 use axum::Json;
-use schema::PERM_ADMIN_STORAGE;
+use schema::PERM_STORAGE;
 
 /// `GET /api/admin/storage/orphans` — только посчитать, ничего не трогая.
 ///
@@ -16,7 +16,7 @@ pub async fn scan_orphans(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<crate::files::gc::Report>> {
-    admin.require(PERM_ADMIN_STORAGE)?;
+    admin.require(PERM_STORAGE)?;
     let report = crate::files::gc::collect(&state.db, &state.files, false).await?;
     Ok(Json(report))
 }
@@ -29,12 +29,12 @@ pub async fn delete_orphans(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<crate::files::gc::Report>> {
-    admin.require(PERM_ADMIN_STORAGE)?;
+    admin.require(PERM_STORAGE)?;
     let report = crate::files::gc::collect(&state.db, &state.files, true).await?;
     audit::record(
         &state,
         &admin.actor,
-        "storage.gc",
+        audit::actions::STORAGE_GC,
         None,
         serde_json::json!({
             "orphan_count": report.orphan_count,

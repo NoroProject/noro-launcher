@@ -60,7 +60,7 @@ pub async fn artifact(
         .join(format!("{platform}-{mc_version}.jar"));
     if !path.is_file() {
         return Err(AppError::NotFound(format!(
-            "агент для {platform} {mc_version} не собран"
+            "no agent built for {platform} {mc_version}"
         )));
     }
 
@@ -102,9 +102,7 @@ fn safe_segment(raw: &str) -> AppResult<String> {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b'_');
     if !ok {
-        return Err(AppError::BadRequest(format!(
-            "недопустимое значение: {raw}"
-        )));
+        return Err(AppError::BadRequest(format!("unacceptable value: {raw}")));
     }
     Ok(raw.to_ascii_lowercase())
 }

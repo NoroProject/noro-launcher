@@ -9,6 +9,8 @@ interface Note {
 const props = defineProps<{ userId: string }>()
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 const notify = useNotify()
 
 const rows = ref<Note[]>([])
@@ -49,18 +51,20 @@ onMounted(() => load())
 
 <template>
   <section class="noro-panel p-5 space-y-4">
-    <h3 class="text-lg font-black text-[var(--noro-text)]">Notes</h3>
-    <p class="text-xs text-[var(--noro-muted)]">Admins only — the player never sees these.</p>
+    <h3 class="text-lg font-black text-[var(--noro-text)]">{{ t('admin-notes-title') }}</h3>
+    <p class="text-xs text-[var(--noro-muted)]">{{ t('admin-notes-subtitle') }}</p>
 
     <div class="grid gap-2">
       <textarea
         v-model="body"
         rows="3"
         class="noro-input w-full resize-y"
-        placeholder="What happened"
+        :placeholder="t('admin-notes-placeholder')"
       />
       <div>
-        <AtomButton icon="i-lucide-plus" :loading="busy" :disabled="!body.trim()" @click="add">Add</AtomButton>
+        <AtomButton v-if="can('noro.admin.users.notes.write')" icon="i-lucide-plus" :loading="busy" :disabled="!body.trim()" @click="add">
+          {{ t('admin-notes-add') }}
+        </AtomButton>
       </div>
     </div>
 
@@ -76,9 +80,9 @@ onMounted(() => load())
             {{ n.author_label }} · {{ new Date(n.created_at).toLocaleString() }}
           </div>
         </div>
-        <AtomButton variant="dark" icon="i-lucide-trash-2" class="!min-h-8 !px-2" @click="remove(n.id)" />
+        <AtomButton v-if="can('noro.admin.users.notes.delete')" variant="dark" icon="i-lucide-trash-2" class="!min-h-8 !px-2" @click="remove(n.id)" />
       </div>
     </div>
-    <p v-else class="text-xs text-[var(--noro-muted)]">No notes yet.</p>
+    <p v-else class="text-xs text-[var(--noro-muted)]">{{ t('admin-notes-empty') }}</p>
   </section>
 </template>

@@ -10,9 +10,10 @@ const emit = defineEmits<{
   'open-manager': []
 }>()
 
+const { t } = useT()
+
 const preview = computed(() => {
   if (!props.files?.length) return []
-  // Show first 10 non-core files for useful preview (fills space better)
   return props.files
     .filter(f => !f.path.startsWith('assets/') && !f.path.startsWith('libraries/'))
     .slice(0, 10)
@@ -26,13 +27,13 @@ const hasCore = computed(() => total.value > preview.value.length)
   <div class="noro-panel p-4">
     <div class="flex items-center justify-between mb-3">
       <div>
-        <div class="font-bold text-[var(--noro-text)]">Build Files</div>
+        <div class="font-bold text-[var(--noro-text)]">{{ t('admin-filesummary-title') }}</div>
         <div class="text-xs text-[var(--noro-muted)]">
-          {{ total }} files{{ hasCore ? ' (core assets hidden in preview)' : '' }}
+          {{ t('admin-filesummary-count', { count: total }) }}{{ hasCore ? ` ${t('admin-filesummary-hidden')}` : '' }}
         </div>
       </div>
       <AtomButton variant="primary" @click="emit('open-manager')">
-        Open File Manager
+        {{ t('admin-filesummary-open') }}
       </AtomButton>
     </div>
 
@@ -48,7 +49,7 @@ const hasCore = computed(() => total.value > preview.value.length)
     </div>
 
     <div v-else class="text-xs text-[var(--noro-muted)] italic p-2">
-      No files yet. Use the panels on the right to add.
+      {{ t('admin-filesummary-empty') }}
     </div>
   </div>
 </template>

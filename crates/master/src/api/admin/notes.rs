@@ -6,7 +6,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
-use schema::PERM_ADMIN_USERS;
+use schema::{PERM_USERS_JOURNAL, PERM_USERS_NOTES_DELETE, PERM_USERS_NOTES_VIEW, PERM_USERS_NOTES_WRITE};
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -16,7 +17,7 @@ pub async fn list(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Vec<NoteRow>>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_NOTES_VIEW)?;
     Ok(Json(crate::db::list_notes(&state.db, id).await?))
 }
 
@@ -31,10 +32,10 @@ pub async fn add(
     Path(id): Path<Uuid>,
     Json(req): Json<AddReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_NOTES_WRITE)?;
     let body = req.body.trim();
     if body.is_empty() {
-        return Err(AppError::BadRequest("пустая заметка".into()));
+        return Err(AppError::BadRequest("the note is empty".into()));
     }
     let row = crate::db::add_note(
         &state.db,
@@ -54,9 +55,9 @@ pub async fn delete(
     admin: AdminAuth,
     Path((_id, note_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_NOTES_DELETE)?;
     if !crate::db::delete_note(&state.db, note_id).await? {
-        return Err(AppError::NotFound("заметка".into()));
+        return Err(AppError::NotFound("note".into()));
     }
     Ok(Json(json!({ "ok": true })))
 }
@@ -67,7 +68,7 @@ pub async fn play_sessions(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Vec<PlaySessionRow>>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_JOURNAL)?;
     Ok(Json(
         crate::db::list_play_sessions(&state.db, id, 50).await?,
     ))

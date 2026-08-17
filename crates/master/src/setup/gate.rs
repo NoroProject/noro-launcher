@@ -31,7 +31,7 @@ pub async fn gate(State(state): State<AppState>, req: Request, next: Next) -> Re
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({
                 "error": "setup_required",
-                "message": "инстанс не настроен — откройте /setup",
+                "message": "this instance is not configured yet — open /setup",
             })),
         )
             .into_response(),

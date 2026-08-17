@@ -25,5 +25,5 @@ pub struct ChallengeRes<T> {
 /// уезжают в лог, наружу — одна формулировка.
 fn reject(err: webauthn_rs::prelude::WebauthnError) -> AppError {
     tracing::warn!(error = %err, "проверка WebAuthn не пройдена");
-    AppError::Unauthorized("Ключ не подошёл".into())
+    AppError::Unauthorized("That key did not match".into())
 }

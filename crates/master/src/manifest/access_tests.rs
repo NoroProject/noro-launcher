@@ -3,9 +3,8 @@
 //! принимает клиент, а он открытый.
 
 use super::*;
-use schema::{
-    ArtifactKind, FileEntry, FileSide, Modloader, OptionalMod, RecommendedClientSettings,
-};
+use schema::{ArtifactKind, FileEntry, FileSide, Modloader, OptionalMod, RecommendedClientSettings};
+
 use uuid::Uuid;
 
 fn server_id() -> Uuid {

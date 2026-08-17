@@ -12,9 +12,8 @@ const props = defineProps<{
     creating: boolean;
 }>();
 
-/** Копия наследует загрузчик и версии — спрашивать их второй раз незачем. */
+const { t } = useT();
 const isCopy = computed(() => Boolean(props.form.copy_from));
-
 const open = defineModel<boolean>({ required: true });
 
 defineEmits<{
@@ -23,23 +22,23 @@ defineEmits<{
 </script>
 
 <template>
-    <AtomModal v-model="open" title="NEW BUILD" subtitle="Version, Minecraft, and loader metadata">
+    <AtomModal v-model="open" :title="t('admin-modal-new-build')" :subtitle="t('admin-modal-new-build-sub')">
         <form class="grid gap-4" @submit.prevent="$emit('create')">
             <label v-if="builds.length">
-                <span class="noro-label">Copy from</span>
+                <span class="noro-label">{{ t('admin-modal-copy-from') }}</span>
                 <NoroSelect v-model="form.copy_from">
-                    <option value="">Start empty</option>
+                    <option value="">{{ t('admin-modal-start-empty') }}</option>
                     <option v-for="build in builds" :key="build.id" :value="build.id">
                         {{ build.version }} — {{ build.mc_version }} {{ build.modloader }}
                     </option>
                 </NoroSelect>
                 <span class="mt-1 block text-xs text-[var(--noro-muted)]">
-                    Carries over every file and setting. Nothing is re-uploaded.
+                    {{ t('admin-modal-copy-hint') }}
                 </span>
             </label>
 
             <label>
-                <span class="noro-label">Build version</span>
+                <span class="noro-label">{{ t('admin-modal-build-version') }}</span>
                 <input
                     v-model="form.version"
                     class="noro-input"
@@ -61,15 +60,16 @@ defineEmits<{
                     :options="modloaders"
                 />
                 <AtomSelect
+                    v-if="form.modloader !== 'vanilla'"
                     v-model="form.modloader_version"
                     label="Loader version"
                     :options="loaderOptions"
-                    placeholder="Optional for vanilla"
+                    :placeholder="t('admin-modal-optional-vanilla')"
                 />
             </template>
             <div class="flex justify-end gap-3 pt-2">
-                <AtomButton type="button" @click="open = false">Cancel</AtomButton>
-                <AtomButton type="submit" variant="primary" :disabled="creating" icon="i-lucide-plus">Create</AtomButton>
+                <AtomButton type="button" @click="open = false">{{ t('web-rules-cancel') }}</AtomButton>
+                <AtomButton type="submit" variant="primary" :disabled="creating" icon="i-lucide-plus">{{ t('admin-servers-create-btn') }}</AtomButton>
             </div>
         </form>
     </AtomModal>

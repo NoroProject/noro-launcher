@@ -4,7 +4,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use schema::{OptionalMod, PERM_ADMIN_BUILDS};
+use schema::{OptionalMod, PERM_MODS_VIEW};
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -62,7 +63,7 @@ pub async fn list_suggestions(
     admin: AdminAuth,
     Query(q): Query<ListSuggestionsQuery>,
 ) -> AppResult<Json<Vec<ModSuggestionRow>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_MODS_VIEW)?;
     let rows = crate::db::list_mod_suggestions(&state.db, q.server_id, q.status.as_deref()).await?;
     Ok(Json(rows))
 }
@@ -73,10 +74,10 @@ pub async fn approve_suggestion(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_MODS_VIEW)?;
     let suggestion = crate::db::get_mod_suggestion(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("заявка".into()))?;
+        .ok_or_else(|| AppError::NotFound("request".into()))?;
 
     if suggestion.status == "approved" {
         return Ok(Json(json!({ "ok": true, "already_approved": true })));
@@ -141,10 +142,10 @@ pub async fn accept_suggestion(
     Path(id): Path<Uuid>,
     Json(req): Json<AcceptSuggestionReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_MODS_VIEW)?;
     let suggestion = crate::db::get_mod_suggestion(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("заявка".into()))?;
+        .ok_or_else(|| AppError::NotFound("request".into()))?;
 
     if suggestion.status == "approved" {
         return Ok(Json(json!({ "ok": true, "already_approved": true })));
@@ -157,12 +158,12 @@ pub async fn accept_suggestion(
             builds
                 .first()
                 .map(|b| b.id)
-                .ok_or_else(|| AppError::BadRequest("у сервера нет доступных сборок".into()))?
+                .ok_or_else(|| AppError::BadRequest("the server has no available builds".into()))?
         }
     };
     let build = crate::db::get_build(&state.db, bid)
         .await?
-        .ok_or_else(|| AppError::NotFound("сборка".into()))?;
+        .ok_or_else(|| AppError::NotFound("build".into()))?;
 
     let source = crate::catalog::source_for_project(
         &state,
@@ -225,7 +226,7 @@ pub async fn reject_suggestion(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_MODS_VIEW)?;
     let updated = crate::db::update_mod_suggestion_status(&state.db, id, "rejected").await?;
     Ok(Json(json!({ "ok": true, "suggestion": updated })))
 }

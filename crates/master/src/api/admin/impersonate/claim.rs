@@ -32,7 +32,7 @@ pub async fn claim(
     let grant = crate::db::consume_grant(&state.db, req.grant_id, user.user_id)
         .await?
         .ok_or_else(|| {
-            AppError::Forbidden("грант не найден, не подтверждён или уже использован".into())
+            AppError::Forbidden("grant not found, not approved or already used".into())
         })?;
 
     // Права могли измениться между запросом и подтверждением — проверяем ещё
@@ -41,7 +41,7 @@ pub async fn claim(
     let target = crate::db::load_profile(&state.db, grant.target_id).await?;
     if !super::can_impersonate(&actor, &target) {
         return Err(AppError::Forbidden(
-            "права изменились: цель больше не внутри ваших".into(),
+            "permissions changed: the target is no longer within yours".into(),
         ));
     }
 
@@ -59,7 +59,7 @@ pub async fn claim(
             id: actor.id,
             username: actor.username.clone(),
         },
-        "impersonate.start",
+        audit::actions::IMPERSONATE_START,
         audit::target("user", grant.target_id),
         json!({
             "grant_id": grant.id,

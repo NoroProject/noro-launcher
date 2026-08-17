@@ -7,6 +7,7 @@ const props = defineProps<{
 }>()
 
 defineEmits<{ deploy: [id: string], deployMany: [ids: string[], kind: string] }>()
+const { t } = useT()
 
 /**
  * Одна версия даёт десять строк: пять платформ, и у каждой две разновидности —
@@ -55,7 +56,13 @@ function toggle(version: string) {
 <template>
   <table class="noro-table">
     <thead>
-      <tr><th>Platform</th><th>Kind</th><th>SHA256</th><th>Current</th><th /></tr>
+      <tr>
+        <th>{{ t('admin-launchver-plat') }}</th>
+        <th>{{ t('admin-launchver-kind') }}</th>
+        <th>SHA256</th>
+        <th>{{ t('admin-launchver-curr') }}</th>
+        <th />
+      </tr>
     </thead>
     <tbody v-for="group in groups" :key="group.version">
       <tr>
@@ -68,11 +75,9 @@ function toggle(version: string) {
               />
               <span class="text-[var(--noro-text)]">{{ group.version }}</span>
               <span class="text-xs font-normal text-[var(--noro-muted)]">
-                {{ group.items.length }} builds
+                {{ t('admin-launchver-builds', { count: group.items.length }) }}
               </span>
             </button>
-            <!-- Пять платформ одного вида разом: раскликивать их по одной ради
-                 одного релиза — то ещё занятие. -->
             <AtomButton
               v-if="group.core.length"
               variant="secondary"
@@ -81,7 +86,7 @@ function toggle(version: string) {
               :loading="busy === 'deploy-core'"
               @click="$emit('deployMany', group.core, 'core')"
             >
-              Deploy core
+              {{ t('admin-launchver-deploy-core') }}
             </AtomButton>
             <AtomButton
               v-if="group.bootstrapper.length"
@@ -91,7 +96,7 @@ function toggle(version: string) {
               :loading="busy === 'deploy-bootstrapper'"
               @click="$emit('deployMany', group.bootstrapper, 'bootstrapper')"
             >
-              Deploy bootstrap
+              {{ t('admin-launchver-deploy-boot') }}
             </AtomButton>
           </div>
         </th>
@@ -104,13 +109,10 @@ function toggle(version: string) {
           <td><code class="text-xs text-[var(--noro-muted)]">{{ version.sha256.slice(0, 16) }}...</code></td>
           <td>
             <UBadge :color="version.is_current ? 'success' : 'neutral'" variant="subtle">
-              {{ version.is_current ? 'current' : 'stored' }}
+              {{ version.is_current ? t('admin-launchver-is-curr') : t('admin-launchver-stored') }}
             </UBadge>
           </td>
           <td class="text-right">
-            <!-- У выкаченного деплоить нечего: кнопка остаётся только у остальных.
-                 Core и bootstrapper переезжают порознь — установщик можно держать
-                 на старой версии, пока он копит репутацию SmartScreen. -->
             <AtomButton
               v-if="!version.is_current"
               variant="primary"
@@ -119,7 +121,7 @@ function toggle(version: string) {
               :loading="busy === `deploy-${version.id}`"
               @click="$emit('deploy', version.id)"
             >
-              Deploy
+              {{ t('admin-launchver-deploy') }}
             </AtomButton>
           </td>
         </tr>

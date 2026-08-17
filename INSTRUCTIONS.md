@@ -1563,7 +1563,7 @@ Before marking any task complete, verify:
 ### Both
 
 - [ ] Solution is the **simplest** that works — no unnecessary abstractions.
-- [ ] All visible text is English.
+- [ ] **Strict i18n Localization:** All visible text, labels, titles, buttons, input placeholders, and hints are localized via Fluent FTL keys (`useT()` / `t(...)`) in both `ru.ftl` and `en.ftl`.
 - [ ] No inline magic numbers or colors.
 - [ ] Loading, empty, and error states are handled.
 - [ ] If the fix touched auth or permissions — manually tested the auth flow.
@@ -1592,7 +1592,6 @@ Before marking any task complete, verify:
 ❌ Dimensions not on 4-pt grid: padding: 5px, height: 45px
 ❌ Fonts below 12px
 ❌ Primary action buttons below 40px height
-❌ Cyrillic text in the UI (pixel fonts don't support it)
 ```
 
 ### 26.3 Async & Threading
@@ -1637,7 +1636,7 @@ Before marking any task complete, verify:
 ### 26.7 UI Copy & Text
 
 ```
-❌ Cyrillic in visible UI text (pixel fonts don't support it)
+❌ Hardcoded English or Russian strings in UI code (all text, placeholders, and hints MUST use Fluent i18n keys)
 ❌ Jargon in player-facing strings ("UUID", "Yggdrasil", "ed25519")
 ❌ No feedback after a user action
 ❌ Missing empty/loading/error states

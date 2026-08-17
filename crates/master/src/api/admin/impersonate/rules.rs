@@ -5,7 +5,7 @@
 //! правом impersonate входит в аккаунт другого админа и получает его права.
 //! Поэтому правило жёсткое и проверяется на сервере при каждом гранте.
 
-use schema::{permission_matches, UserProfile};
+use schema::{UserProfile, permission_matches};
 
 /// Строго ли права цели покрываются правами актора.
 ///

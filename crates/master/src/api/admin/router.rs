@@ -5,7 +5,7 @@ use axum::Router;
 use super::{
     agents, audit, backup, blocklist, build_routes, capes, catalog, cores, game_servers,
     impersonate, integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions,
-    news, notes, permission_nodes, punishments, remote, roles, servers, settings, stats, storage,
+    news, notes, permission_nodes, punishments, remote, roles, rules, servers, settings, stats, storage,
     tokens, user_launcher, users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
@@ -14,6 +14,35 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/agents", get(agents::list))
         .route("/api/admin/audit", get(audit::list))
         .route("/api/admin/audit/actions", get(audit::actions))
+        .route(
+            "/api/admin/rules",
+            get(rules::list_rules).post(rules::create_rule),
+        )
+        .route("/api/admin/rules/reorder", put(rules::reorder_rules))
+        .route(
+            "/api/admin/rules/categories",
+            get(rules::list_categories).post(rules::create_category),
+        )
+        .route(
+            "/api/admin/rules/categories/reorder",
+            put(rules::reorder_categories),
+        )
+        .route(
+            "/api/admin/rules/categories/{id}",
+            put(rules::update_category).delete(rules::delete_category),
+        )
+        .route(
+            "/api/admin/rules/categories/{id}/translations",
+            get(rules::category_translations),
+        )
+        .route(
+            "/api/admin/rules/{id}",
+            put(rules::update_rule).delete(rules::delete_rule),
+        )
+        .route(
+            "/api/admin/rules/{id}/translations",
+            get(rules::rule_translations),
+        )
         .route(
             "/api/admin/blocklist",
             get(blocklist::list).post(blocklist::create),
@@ -45,6 +74,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/integrity", get(integrity::list))
         .route("/api/admin/support/bundles", get(crate::api::support::list))
         .route("/api/admin/support/requests", get(log_requests::list))
+        .route("/api/admin/support/requests/{id}", delete(log_requests::cancel))
         .route(
             "/api/admin/users/{id}/request-logs",
             post(log_requests::request),

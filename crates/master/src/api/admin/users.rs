@@ -6,7 +6,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
-use schema::{UserProfile, PERM_ADMIN_USERS, PERM_MOD_USERS_BAN};
+use schema::{UserProfile, PERM_PUNISH_BAN, PERM_USERS_CAPES, PERM_USERS_PERMISSIONS, PERM_USERS_ROLES, PERM_USERS_SKIN, PERM_USERS_VIEW};
+
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -21,7 +22,7 @@ pub async fn list(
     admin: AdminAuth,
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<Vec<UserProfile>>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_VIEW)?;
     let rows = crate::db::list_users(
         &state.db,
         q.limit.unwrap_or(100).min(500),
@@ -40,10 +41,10 @@ pub async fn get(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_VIEW)?;
     let row = crate::db::get_user(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("пользователь".into()))?;
+        .ok_or_else(|| AppError::NotFound("user".into()))?;
     Ok(Json(crate::db::profile_from_row(&state.db, row).await?))
 }
 
@@ -59,16 +60,20 @@ pub async fn ban(
     Path(id): Path<Uuid>,
     Json(req): Json<BanReq>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_MOD_USERS_BAN)?;
+    admin.require(PERM_PUNISH_BAN)?;
     // Инстанс, оставшийся без операторского входа, чинится только руками в БД.
     if req.banned && crate::db::is_root_user(&state.db, id).await? {
-        return Err(AppError::Forbidden("root нельзя забанить".into()));
+        return Err(AppError::Forbidden("root cannot be banned".into()));
     }
     crate::db::set_user_ban(&state.db, id, req.banned, req.reason.as_deref()).await?;
     audit::record(
         &state,
         &admin.actor,
-        if req.banned { "user.ban" } else { "user.unban" },
+        if req.banned {
+            crate::audit::actions::USER_BAN
+        } else {
+            crate::audit::actions::USER_UNBAN
+        },
         target("user", id),
         serde_json::json!({ "reason": req.reason }),
     )
@@ -88,12 +93,12 @@ pub async fn add_role(
     admin: AdminAuth,
     Path((id, role_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_ROLES)?;
     crate::db::add_user_role(&state.db, id, role_id, admin.user_id()).await?;
     audit::record(
         &state,
         &admin.actor,
-        "user.role.add",
+        audit::actions::USER_ROLE_ADD,
         target("user", id),
         serde_json::json!({ "role_id": role_id }),
     )
@@ -106,12 +111,12 @@ pub async fn remove_role(
     admin: AdminAuth,
     Path((id, role_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_ROLES)?;
     crate::db::remove_user_role(&state.db, id, role_id).await?;
     audit::record(
         &state,
         &admin.actor,
-        "user.role.remove",
+        audit::actions::USER_ROLE_REMOVE,
         target("user", id),
         serde_json::json!({ "role_id": role_id }),
     )
@@ -138,7 +143,7 @@ pub async fn add_permission(
     Path(id): Path<Uuid>,
     Json(req): Json<PermReq>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_PERMISSIONS)?;
     crate::db::add_user_permission(
         &state.db,
         id,
@@ -150,7 +155,7 @@ pub async fn add_permission(
     audit::record(
         &state,
         &admin.actor,
-        "user.permission.add",
+        audit::actions::USER_PERM_ADD,
         target("user", id),
         serde_json::json!({ "permission": req.permission, "server_id": req.server_id }),
     )
@@ -164,12 +169,12 @@ pub async fn remove_permission(
     Path((id, perm)): Path<(Uuid, String)>,
     Query(scope): Query<PermScope>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_PERMISSIONS)?;
     crate::db::remove_user_permission(&state.db, id, &perm, scope.server_id).await?;
     audit::record(
         &state,
         &admin.actor,
-        "user.permission.remove",
+        audit::actions::USER_PERM_REMOVE,
         target("user", id),
         serde_json::json!({ "permission": perm, "server_id": scope.server_id }),
     )
@@ -187,7 +192,7 @@ pub async fn set_cape(
     Path(id): Path<Uuid>,
     Json(req): Json<CapeReq>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_CAPES)?;
     let cape_url = match req.cape_id {
         Some(cape_id) => Some(
             crate::db::get_cape_url(&state.db, cape_id)
@@ -205,7 +210,7 @@ pub async fn get_capes(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<schema::UserCapesData>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_CAPES)?;
     let granted_cape_ids = crate::db::list_user_granted_cape_ids(&state.db, id).await?;
     Ok(Json(schema::UserCapesData { granted_cape_ids }))
 }
@@ -216,7 +221,7 @@ pub async fn set_granted_capes(
     Path(id): Path<Uuid>,
     Json(req): Json<schema::SetUserCapesReq>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_CAPES)?;
     crate::db::set_user_granted_capes(&state.db, id, &req.granted_cape_ids).await?;
     let active_cape_url = match req.active_cape_id {
         Some(cape_id) => crate::db::get_cape_url(&state.db, cape_id).await?,
@@ -232,7 +237,7 @@ pub async fn upload_skin_for_user(
     Path(id): Path<Uuid>,
     mut multipart: Multipart,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_SKIN)?;
     while let Some(field) = multipart
         .next_field()
         .await
@@ -267,7 +272,7 @@ pub async fn delete_skin_for_user(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_SKIN)?;
     crate::db::set_skin(&state.db, id, None).await?;
     notify_user(&state, id).await
 }
@@ -284,7 +289,7 @@ pub async fn list_skin_presets_for_user(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Vec<SkinPresetItem>>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_SKIN)?;
     let rows = sqlx::query_as::<_, SkinPresetItem>(
         "SELECT id, name, skin_url FROM user_skin_presets WHERE user_id = $1 ORDER BY created_at DESC",
     )
@@ -307,7 +312,7 @@ pub async fn select_skin_preset_for_user(
     Path(id): Path<Uuid>,
     Json(req): Json<SelectSkinPresetReq>,
 ) -> AppResult<Json<UserProfile>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_SKIN)?;
     crate::db::set_skin(&state.db, id, Some(&req.skin_url)).await?;
     notify_user(&state, id).await
 }
@@ -317,7 +322,7 @@ pub async fn delete_skin_preset_for_user(
     admin: AdminAuth,
     Path((id, preset_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<()>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_SKIN)?;
     sqlx::query("DELETE FROM user_skin_presets WHERE id = $1 AND user_id = $2")
         .bind(preset_id)
         .bind(id)

@@ -7,6 +7,7 @@ use crate::state::AppState;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use schema::UserProfile;
+
 use uuid::Uuid;
 
 fn bearer(parts: &Parts) -> Option<String> {
@@ -33,16 +34,16 @@ impl FromRequestParts<AppState> for AuthUser {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         let token =
-            bearer(parts).ok_or_else(|| AppError::Unauthorized("нет Bearer-токена".into()))?;
+            bearer(parts).ok_or_else(|| AppError::Unauthorized("missing bearer token".into()))?;
         let token_uuid =
-            Uuid::parse_str(&token).map_err(|_| AppError::Unauthorized("неверный токен".into()))?;
+            Uuid::parse_str(&token).map_err(|_| AppError::Unauthorized("invalid token".into()))?;
         let row = crate::db::user_by_access_token(&state.db, token_uuid)
             .await?
-            .ok_or_else(|| AppError::Unauthorized("сессия не найдена или истекла".into()))?;
+            .ok_or_else(|| AppError::Unauthorized("session not found or expired".into()))?;
         let user_id = row.id;
         let profile = crate::db::profile_from_row(&state.db, row).await?;
         if profile.banned {
-            return Err(AppError::Forbidden("аккаунт заблокирован".into()));
+            return Err(AppError::Forbidden("account is banned".into()));
         }
         Ok(AuthUser { user_id, profile })
     }
@@ -75,7 +76,9 @@ impl AdminAuth {
         if has {
             Ok(())
         } else {
-            Err(AppError::Forbidden(format!("нужно право {perm}")))
+            Err(AppError::Forbidden(format!(
+                "the {perm} permission is required"
+            )))
         }
     }
 }
@@ -88,7 +91,7 @@ impl FromRequestParts<AppState> for AdminAuth {
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
         let token =
-            bearer(parts).ok_or_else(|| AppError::Unauthorized("нет Bearer-токена".into()))?;
+            bearer(parts).ok_or_else(|| AppError::Unauthorized("missing bearer token".into()))?;
 
         // Сначала пробуем как admin-токен.
         if let Some(t) = admin_token_auth(state, &token).await? {
@@ -113,7 +116,7 @@ impl FromRequestParts<AppState> for AdminAuth {
             }
         }
 
-        Err(AppError::Unauthorized("неверный токен".into()))
+        Err(AppError::Unauthorized("invalid token".into()))
     }
 }
 

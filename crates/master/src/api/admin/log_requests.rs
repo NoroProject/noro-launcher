@@ -11,7 +11,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use schema::{PERM_ADMIN_SUPPORT_LOGS, PERM_ADMIN_SUPPORT_LOGS_FORCE};
+use schema::{PERM_SUPPORT_FORCE, PERM_SUPPORT_LOGS, PERM_SUPPORT_REQUEST};
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -32,15 +33,16 @@ pub async fn request(
     Path(target_id): Path<Uuid>,
     Json(req): Json<RequestReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SUPPORT_LOGS)?;
+    admin.require(PERM_SUPPORT_REQUEST)?;
     if req.forced {
-        admin.require(PERM_ADMIN_SUPPORT_LOGS_FORCE)?;
+        admin.require(PERM_SUPPORT_FORCE)?;
     }
 
     let reason = req.reason.trim();
     if reason.len() < 3 {
         return Err(AppError::BadRequest(
-            "нужна причина: игрок увидит её в модалке, и она же останется в аудите".into(),
+            "a reason is required: the player sees it in the dialog and it stays in the audit log"
+                .into(),
         ));
     }
 
@@ -63,6 +65,7 @@ pub async fn request(
             actor_username: admin.actor.label(),
             reason: reason.to_string(),
             forced: req.forced,
+            server_id: req.server_id,
             expires_at: row.expires_at,
         },
     );
@@ -72,9 +75,9 @@ pub async fn request(
         &state,
         &admin.actor,
         if req.forced {
-            "support.logs.force"
+            crate::audit::actions::LOGS_FORCE
         } else {
-            "support.logs.request"
+            crate::audit::actions::LOGS_REQUEST
         },
         audit::target("user", target_id),
         json!({ "request_id": row.id, "reason": reason, "username": target.username }),
@@ -99,11 +102,33 @@ pub async fn list(
     admin: AdminAuth,
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<Vec<LogRequestRow>>> {
-    admin.require(PERM_ADMIN_SUPPORT_LOGS)?;
+    admin.require(PERM_SUPPORT_LOGS)?;
     // Протухшие помечаем при чтении: фонового прохода ради пяти минут заводить
     // незачем, а «ожидает ответа» на неделю — это враньё в интерфейсе.
     crate::db::expire_log_requests(&state.db).await?;
     Ok(Json(
         crate::db::list_log_requests(&state.db, q.user_id, q.limit.unwrap_or(50)).await?,
     ))
+}
+
+pub async fn cancel(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_SUPPORT_REQUEST)?;
+    let row = crate::db::cancel_log_request(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("log request not found or not pending".into()))?;
+
+    audit::record(
+        &state,
+        &admin.actor,
+        crate::audit::actions::LOGS_CANCEL,
+        audit::target("user", row.target_id),
+        json!({ "request_id": id, "reason": row.reason }),
+    )
+    .await;
+
+    Ok(Json(json!({ "ok": true })))
 }

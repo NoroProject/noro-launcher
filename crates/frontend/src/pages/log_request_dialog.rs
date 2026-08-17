@@ -21,6 +21,10 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
         .collect::<Vec<_>>()
         .join("\n");
 
+    let is_open = ui.log_request_preview_open;
+    let icon_prefix = if is_open { "▼ " } else { "▶ " };
+    let toggle_label = format!("{icon_prefix}{}", t("logreq-preview"));
+
     Some(
         div()
             .absolute()
@@ -31,7 +35,7 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
             .bg(rgba((OVERLAY << 8) | 0xcc))
             .child(
                 div()
-                    .w(px(520.))
+                    .w(px(500.))
                     .overflow_hidden()
                     .bg(rgb(BG_PANEL))
                     .border_1()
@@ -71,16 +75,45 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                             .text_color(rgb(TEXT_MUTED))
                             .child(t("logreq-not-collected")),
                     )
-                    .child(if ui.log_request_preview_open {
-                        preview(&prompt.preview)
-                    } else {
+                    // Раскрывающийся компонент предпросмотра
+                    .child(
                         div()
-                            .text_size(px(11.))
-                            .font_family(FONT_PIXEL_ALT)
-                            .text_color(rgb(TEXT_SECONDARY))
-                            .child(files)
-                            .into_any_element()
-                    })
+                            .flex()
+                            .flex_col()
+                            .rounded(px(6.))
+                            .bg(rgb(BG_INPUT))
+                            .border_1()
+                            .border_color(rgb(BORDER))
+                            .child(
+                                div()
+                                    .id("logreq-preview-toggle")
+                                    .p(px(8.))
+                                    .cursor_pointer()
+                                    .text_size(px(11.))
+                                    .font_family(FONT_PIXEL_ALT)
+                                    .text_color(rgb(TEXT_SECONDARY))
+                                    .hover(|s| s.text_color(rgb(TEXT_PRIMARY)))
+                                    .child(toggle_label)
+                                    .on_click(cx.listener(|this, _e, _w, cx| {
+                                        this.log_request_preview_open = !this.log_request_preview_open;
+                                        cx.notify();
+                                    })),
+                            )
+                            .when(is_open, |d| {
+                                d.child(
+                                    div()
+                                        .h(px(180.))
+                                        .overflow_hidden()
+                                        .p(px(8.))
+                                        .border_t_1()
+                                        .border_color(rgb(BORDER))
+                                        .text_size(px(10.))
+                                        .font_family(FONT_PIXEL_ALT)
+                                        .text_color(rgb(TEXT_MUTED))
+                                        .child(preview(&prompt.preview, &files)),
+                                )
+                            }),
+                    )
                     .child(buttons(ui, cx)),
             )
             .into_any_element(),
@@ -88,17 +121,16 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
 }
 
 /// Ровно тот текст, который уедет.
-fn preview(text: &str) -> AnyElement {
+fn preview(text: &str, files_summary: &str) -> AnyElement {
+    let content = if text.trim().is_empty() {
+        files_summary.to_string()
+    } else {
+        text.chars().take(3000).collect::<String>()
+    };
+
     div()
-        .h(px(240.))
-        .overflow_hidden()
-        .bg(rgb(BG_INPUT))
-        .rounded(px(6.))
-        .p(px(12.))
-        .text_size(px(10.))
-        .font_family(FONT_PIXEL_ALT)
-        .text_color(rgb(TEXT_SECONDARY))
-        .child(text.chars().take(4000).collect::<String>())
+        .size_full()
+        .child(content)
         .into_any_element()
 }
 
@@ -108,47 +140,42 @@ fn buttons(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()
         .flex()
         .gap(px(8.))
-        .child(btn(
-            "logreq-preview",
-            t("logreq-preview"),
-            false,
-            cx.listener(|this, _e, _w, cx| {
-                this.log_request_preview_open = !this.log_request_preview_open;
-                cx.notify();
-            }),
-        ))
-        // Принудительный сбор уже произошёл — предлагать «отправить» было бы
-        // враньём, и остаётся только закрыть окно.
         .when(!forced, |d| {
-            d.child(btn(
-                "logreq-send",
-                t("logreq-send"),
-                true,
-                cx.listener(|this, _e, _w, cx| {
-                    this.answer_log_request(true);
-                    cx.notify();
-                }),
-            ))
-            .child(btn(
-                "logreq-decline",
-                t("logreq-decline"),
-                false,
-                cx.listener(|this, _e, _w, cx| {
-                    this.answer_log_request(false);
-                    cx.notify();
-                }),
-            ))
+            d.child(
+                div().flex_1().child(btn(
+                    "logreq-send",
+                    t("logreq-send"),
+                    true,
+                    cx.listener(|this, _e, _w, cx| {
+                        this.answer_log_request(true);
+                        cx.notify();
+                    }),
+                )),
+            )
+            .child(
+                div().flex_1().child(btn(
+                    "logreq-decline",
+                    t("logreq-decline"),
+                    false,
+                    cx.listener(|this, _e, _w, cx| {
+                        this.answer_log_request(false);
+                        cx.notify();
+                    }),
+                )),
+            )
         })
         .when(forced, |d| {
-            d.child(btn(
-                "logreq-close",
-                t("logreq-close"),
-                false,
-                cx.listener(|this, _e, _w, cx| {
-                    this.dismiss_log_request();
-                    cx.notify();
-                }),
-            ))
+            d.child(
+                div().flex_1().child(btn(
+                    "logreq-close",
+                    t("logreq-close"),
+                    false,
+                    cx.listener(|this, _e, _w, cx| {
+                        this.dismiss_log_request();
+                        cx.notify();
+                    }),
+                )),
+            )
         })
         .into_any_element()
 }

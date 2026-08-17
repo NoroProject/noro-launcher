@@ -2,6 +2,7 @@
 const props = defineProps<{ userId: string; online: boolean }>()
 
 const auth = useAuth()
+const { t } = useT()
 const notify = useNotify()
 
 const data = ref<Record<string, any> | null>(null)
@@ -17,7 +18,6 @@ async function request() {
   busy.value = true
   try {
     await auth.request(`/api/admin/users/${props.userId}/diagnostics`, { method: 'POST' })
-    // Лаунчер отвечает по WS — даём ему секунду и перечитываем.
     setTimeout(load, 1500)
     notify.ok('Requested')
   } catch (e) {
@@ -60,15 +60,14 @@ onMounted(() => load())
 <template>
   <section class="noro-panel p-5 space-y-4">
     <div class="flex items-center justify-between">
-      <h3 class="text-lg font-black text-[var(--noro-text)]">Diagnostics</h3>
+      <h3 class="text-lg font-black text-[var(--noro-text)]">{{ t('admin-diag-title') }}</h3>
       <AtomButton variant="dark" icon="i-lucide-activity" :loading="busy" :disabled="!online" @click="request">
-        Collect
+        {{ t('admin-diag-collect') }}
       </AtomButton>
     </div>
 
     <p class="text-xs text-[var(--noro-muted)]">
-      Versions, hardware and link speed — nothing personal, so the player is not
-      asked. Closes half of the "it won't start" tickets without a single log file.
+      {{ t('admin-diag-subtitle') }}
     </p>
 
     <dl v-if="data" class="grid gap-1 text-xs">
@@ -77,17 +76,17 @@ onMounted(() => load())
         <dd class="truncate text-right text-[var(--noro-text)]">{{ v }}</dd>
       </div>
     </dl>
-    <p v-else class="text-xs text-[var(--noro-muted)]">Nothing collected yet.</p>
+    <p v-else class="text-xs text-[var(--noro-muted)]">{{ t('admin-diag-empty') }}</p>
 
     <div class="flex flex-wrap gap-2">
       <AtomButton variant="dark" class="!min-h-8" :disabled="!online" @click="action('verify_integrity')">
-        Verify files
+        {{ t('admin-diag-verify') }}
       </AtomButton>
       <AtomButton variant="dark" class="!min-h-8" :disabled="!online" @click="action('clear_asset_cache')">
-        Clear assets
+        {{ t('admin-diag-clear-assets') }}
       </AtomButton>
       <AtomButton variant="dark" class="!min-h-8" :disabled="!online" @click="action('restart_launcher')">
-        Restart launcher
+        {{ t('admin-diag-restart-launcher') }}
       </AtomButton>
     </div>
   </section>

@@ -1,67 +1,28 @@
 <script setup lang="ts">
-interface Option {
-  key: string
-  fallback: string
-  required?: boolean
-  note: string
-}
+const { t } = useT()
+
+const RAW_OPTIONS = [
+  { key: 'master-url', fallback: '—', required: true },
+  { key: 'secret', fallback: '—', required: true },
+  { key: 'server-jar', fallback: '—', required: true },
+  { key: 'signing-public-key', fallbackKey: 'admin-wrapper-fb-fetch-pin' },
+  { key: 'server-dir', fallback: '.' },
+  { key: 'java', fallback: 'java' },
+  { key: 'jvm-args', fallback: '-Xmx4G' },
+  { key: 'server-args', fallback: 'nogui' },
+  { key: 'platform', fallbackKey: 'admin-wrapper-fb-detected' },
+  { key: 'mc-version', fallbackKey: 'admin-wrapper-fb-detected' },
+]
 
 /** Полный набор ключей noro-wrapper.properties — то же, что читает WrapperConfig. */
-const OPTIONS: Option[] = [
-  {
-    key: 'master-url',
-    fallback: '—',
-    required: true,
-    note: 'Master node address. A trailing slash is stripped.',
-  },
-  {
-    key: 'secret',
-    fallback: '—',
-    required: true,
-    note: 'Agent secret for this game server, issued in the build admin panel under Game servers. Must start with noroagent_. Lives only here — the wrapper hands it to the server process through an environment variable.',
-  },
-  {
-    key: 'server-jar',
-    fallback: '—',
-    required: true,
-    note: 'Server jar, relative to server-dir. Starts with @ for an args file instead — NeoForge and Forge launch that way: @libraries/net/neoforged/neoforge/21.1.248/unix_args.txt',
-  },
-  {
-    key: 'signing-public-key',
-    fallback: 'fetch and pin',
-    note: 'Master ed25519 key, hex. Empty means fetch once and pin to noro/signing-key.pub; a later change becomes a hard error. Set it explicitly in production — a pinned key here is the real trust anchor.',
-  },
-  {
-    key: 'server-dir',
-    fallback: '.',
-    note: 'Server directory. Everything else resolves against it, and the agent goes into its plugins/ or mods/.',
-  },
-  {
-    key: 'java',
-    fallback: 'java',
-    note: 'Java binary. Point it at a specific JDK when the default one is the wrong version for this Minecraft release.',
-  },
-  {
-    key: 'jvm-args',
-    fallback: '-Xmx4G',
-    note: 'JVM arguments, split on whitespace. Accepts an @-file: NeoForge keeps its own as @user_jvm_args.txt.',
-  },
-  {
-    key: 'server-args',
-    fallback: 'nogui',
-    note: 'Arguments passed after the jar or args file. Set empty to pass none.',
-  },
-  {
-    key: 'platform',
-    fallback: 'detected',
-    note: 'paper, fabric, neoforge or forge. Overrides detection — needed when several loader versions sit in libraries/ and the guess is ambiguous.',
-  },
-  {
-    key: 'mc-version',
-    fallback: 'detected',
-    note: 'Minecraft version, e.g. 1.21.1. Overrides detection.',
-  },
-]
+const OPTIONS = computed(() =>
+  RAW_OPTIONS.map(opt => ({
+    key: opt.key,
+    fallback: opt.fallbackKey ? t(opt.fallbackKey) : opt.fallback,
+    required: opt.required,
+    note: t(`admin-wrapper-opt-${opt.key}`),
+  }))
+)
 </script>
 
 <template>
@@ -72,7 +33,7 @@ const OPTIONS: Option[] = [
       </div>
       <div>
         <h3 class="text-lg font-black text-white">noro-wrapper.properties</h3>
-        <p class="text-sm text-[var(--noro-muted)]">Every option the wrapper reads.</p>
+        <p class="text-sm text-[var(--noro-muted)]">{{ t('admin-wrapper-subtitle') }}</p>
       </div>
     </div>
 
@@ -80,9 +41,9 @@ const OPTIONS: Option[] = [
       <table class="w-full border-collapse text-sm">
         <thead>
           <tr class="border-b border-[var(--noro-border)] text-left text-xs uppercase text-[var(--noro-muted)]">
-            <th class="py-2 pr-4 font-bold">Key</th>
-            <th class="py-2 pr-4 font-bold">Default</th>
-            <th class="py-2 font-bold">Meaning</th>
+            <th class="py-2 pr-4 font-bold">{{ t('admin-wrapper-key') }}</th>
+            <th class="py-2 pr-4 font-bold">{{ t('admin-wrapper-default') }}</th>
+            <th class="py-2 font-bold">{{ t('admin-wrapper-meaning') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -95,7 +56,7 @@ const OPTIONS: Option[] = [
               {{ option.key }}
             </td>
             <td class="py-3 pr-4 text-xs whitespace-nowrap">
-              <span v-if="option.required" class="font-bold text-[var(--noro-amber)]">required</span>
+              <span v-if="option.required" class="font-bold text-[var(--noro-amber)]">{{ t('admin-wrapper-required') }}</span>
               <span v-else class="font-mono text-[var(--noro-muted)]">{{ option.fallback }}</span>
             </td>
             <td class="py-3 text-[var(--noro-muted)]">{{ option.note }}</td>

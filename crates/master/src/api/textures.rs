@@ -33,7 +33,7 @@ pub async fn preset_skin_endpoint(Path(name): Path<String>) -> AppResult<Respons
     // Неизвестный пресет — 404, а не молчаливый Стив: иначе опечатка в имени
     // выглядит как рабочая ссылка и живёт в вёрстке годами.
     let bytes =
-        preset_bytes(&clean).ok_or_else(|| AppError::NotFound(format!("пресет скина {clean}")))?;
+        preset_bytes(&clean).ok_or_else(|| AppError::NotFound(format!("skin preset {clean}")))?;
     Ok(png(bytes.to_vec(), "public, max-age=31536000, immutable"))
 }
 
@@ -45,7 +45,7 @@ pub async fn render_endpoint(
     // Скачали, но это не картинка — ошибка на нашей стороне или у источника.
     // Подменять её Стивом значит списать битую текстуру на «у игрока нет скина».
     let skin = image::load_from_memory(&skin_bytes)
-        .map_err(|e| AppError::BadRequest(format!("скин не разобрать как изображение: {e}")))?;
+        .map_err(|e| AppError::BadRequest(format!("the skin is not a readable image: {e}")))?;
 
     let scale = q.scale.unwrap_or(10).clamp(1, 64);
     let overlay = q.overlay.unwrap_or(true);

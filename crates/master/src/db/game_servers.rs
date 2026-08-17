@@ -3,6 +3,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schema::GameServerEntry;
+
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 

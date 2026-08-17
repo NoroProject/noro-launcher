@@ -12,13 +12,15 @@ const emit = defineEmits<{
     "update:sort": [value: string];
 }>();
 
-const SORTS = [
-    { id: "relevance", label: "Relevance" },
-    { id: "downloads", label: "Downloads" },
-    { id: "follows", label: "Followers" },
-    { id: "updated", label: "Recently updated" },
-    { id: "newest", label: "Newest" },
-];
+const { t } = useT();
+
+const SORTS = computed(() => [
+    { id: "relevance", label: t("admin-mods-sort-relevance") },
+    { id: "downloads", label: t("admin-mods-sort-downloads") },
+    { id: "follows", label: t("admin-mods-sort-follows") },
+    { id: "updated", label: t("admin-mods-sort-updated") },
+    { id: "newest", label: t("admin-mods-sort-newest") },
+]);
 
 /** Прокси для `v-model` селекта: сортировка живёт у родителя. */
 const sortModel = computed({
@@ -52,7 +54,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onHotkey));
                 ref="field"
                 :value="modelValue"
                 class="noro-input !pl-10"
-                placeholder="Search mods…  ( / )"
+                :placeholder="t('admin-mods-search-placeholder')"
                 autocomplete="off"
                 @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
             >
@@ -70,7 +72,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onHotkey));
         </NoroSelect>
 
         <p class="text-xs text-[var(--noro-muted)] sm:col-span-2">
-            {{ props.total ? `${compactNumber(props.total)} result(s)` : "No results yet" }}
+            {{ props.total ? t('admin-mods-results-count', { count: compactNumber(props.total) }) : t('admin-mods-results-none') }}
         </p>
     </div>
 </template>

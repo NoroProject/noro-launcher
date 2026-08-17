@@ -7,7 +7,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, State};
 use axum::Json;
-use schema::PERM_ADMIN_SERVERS;
+use schema::{PERM_SERVERS_DELETE, PERM_SERVERS_EDIT, PERM_SERVERS_VIEW};
+
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -58,7 +59,7 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<Vec<ServerRow>>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_VIEW)?;
     Ok(Json(crate::db::list_servers(&state.db, false).await?))
 }
 
@@ -76,7 +77,7 @@ pub async fn create(
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_EDIT)?;
 
     let mut tx = state.db.begin().await?;
 
@@ -126,7 +127,7 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateReq>,
 ) -> AppResult<Json<ServerRow>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_EDIT)?;
     sqlx::query(
         "UPDATE servers SET name=$2, description=$3, modloader=$4,
          mc_version=$5, active=$6, limited=$7, sort_order=$8 WHERE id=$1",
@@ -143,11 +144,11 @@ pub async fn update(
     .await?;
     let row = crate::db::get_server(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("сервер".into()))?;
+        .ok_or_else(|| AppError::NotFound("server".into()))?;
     audit::record(
         &state,
         &admin.actor,
-        "server.update",
+        audit::actions::SERVER_UPDATE,
         target("server", id),
         serde_json::json!({
             "name": req.name,
@@ -165,12 +166,12 @@ pub async fn delete(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_DELETE)?;
     crate::db::delete_server(&state.db, id).await?;
     audit::record(
         &state,
         &admin.actor,
-        "server.delete",
+        audit::actions::SERVER_DELETE,
         target("server", id),
         serde_json::json!({}),
     )
@@ -223,7 +224,7 @@ async fn upload_image(
             return Ok(Json(serde_json::json!({ "url": url })));
         }
     }
-    Err(AppError::BadRequest("нет поля image".into()))
+    Err(AppError::BadRequest("missing the image field".into()))
 }
 
 pub async fn upload_icon(
@@ -232,7 +233,7 @@ pub async fn upload_icon(
     Path(id): Path<Uuid>,
     multipart: Multipart,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_EDIT)?;
     upload_image(&state, id, AssetKind::Icon, multipart).await
 }
 
@@ -242,7 +243,7 @@ pub async fn upload_background(
     Path(id): Path<Uuid>,
     multipart: Multipart,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_EDIT)?;
     upload_image(&state, id, AssetKind::Background, multipart).await
 }
 
@@ -256,7 +257,7 @@ pub async fn reorder(
     admin: AdminAuth,
     Json(req): Json<ReorderReq>,
 ) -> AppResult<Json<serde_json::Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_EDIT)?;
     for (i, id) in req.order.iter().enumerate() {
         sqlx::query("UPDATE servers SET sort_order = $2 WHERE id = $1")
             .bind(id)

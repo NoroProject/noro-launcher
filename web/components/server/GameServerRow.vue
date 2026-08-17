@@ -8,6 +8,7 @@ const emit = defineEmits<{
     save: [form: GameServerForm];
 }>();
 
+const { t } = useT();
 const editing = ref(false);
 const draft = reactive<GameServerForm>({
     name: props.item.name,
@@ -19,13 +20,12 @@ const draft = reactive<GameServerForm>({
 
 const isProxy = computed(() => props.item.kind === "proxy");
 
-/** «Никогда» отличается от «давно»: первое значит, что агент так и не завёлся. */
 const lastSeen = computed(() => {
-    if (!props.item.last_seen_at) return "never seen";
+    if (!props.item.last_seen_at) return t('admin-gs-never-seen');
     const mins = Math.floor((Date.now() - Date.parse(props.item.last_seen_at)) / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    return `${Math.floor(mins / 60)}h ago`;
+    if (mins < 1) return t('admin-gs-just-now');
+    if (mins < 60) return t('admin-gs-ago', { time: `${mins}m` });
+    return t('admin-gs-ago', { time: `${Math.floor(mins / 60)}h` });
 });
 
 function save() {
@@ -38,9 +38,6 @@ function save() {
     <div class="grid gap-3 px-5 py-4 transition hover:bg-white/5">
         <div v-if="!editing" class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex min-w-0 items-center gap-3">
-                <!-- Индикатор сидит на иконке, а не отдельной точкой слева: у
-                     офлайн-сервера она красилась в muted и оставляла пустой
-                     отступ, из-за чего строка выглядела съехавшей. -->
                 <div class="relative shrink-0">
                     <img
                         v-if="item.icon_url"
@@ -57,16 +54,16 @@ function save() {
                     <span
                         class="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[var(--noro-panel)]"
                         :class="item.live ? 'bg-[var(--noro-success)]' : 'bg-[var(--noro-muted)]'"
-                        :title="item.live ? 'Online' : 'Offline'"
+                        :title="item.live ? t('web-rules-status-online') : t('web-rules-status-offline')"
                     />
                 </div>
                 <div class="min-w-0">
                     <div class="flex items-center gap-2">
                         <span class="truncate text-sm font-bold text-white">{{ item.name }}</span>
-                        <UBadge v-if="isProxy" color="info" variant="subtle" size="sm">proxy</UBadge>
+                        <UBadge v-if="isProxy" color="info" variant="subtle" size="sm">{{ t('admin-gs-proxy') }}</UBadge>
                     </div>
                     <div class="truncate text-xs text-[var(--noro-muted)]">
-                        {{ item.mc_host || "no address" }}:{{ item.mc_port }}
+                        {{ item.mc_host || t('admin-gs-no-address') }}:{{ item.mc_port }}
                         <span v-if="item.version"> &middot; {{ item.version }}</span>
                     </div>
                 </div>
@@ -79,13 +76,13 @@ function save() {
                     <div class="text-xs text-[var(--noro-muted)]">{{ lastSeen }}</div>
                 </div>
                 <div class="flex items-center gap-1">
-                    <UTooltip v-if="!isProxy" text="Control: console, files, mods">
+                    <UTooltip v-if="!isProxy" :text="t('admin-gs-control-tooltip')">
                         <AtomButton icon="i-lucide-sliders-horizontal" variant="ghost" :to="manageTo" />
                     </UTooltip>
-                    <UTooltip text="Edit">
+                    <UTooltip :text="t('profile-edit')">
                         <AtomButton icon="i-lucide-pencil" variant="ghost" @click="editing = true" />
                     </UTooltip>
-                    <UTooltip text="Issue a new secret &mdash; the old one stops working">
+                    <UTooltip :text="t('admin-gs-rotate-tooltip')">
                         <AtomButton
                             icon="i-lucide-key-round"
                             variant="ghost"
@@ -93,7 +90,7 @@ function save() {
                             @click="emit('rotate')"
                         />
                     </UTooltip>
-                    <UTooltip text="Delete">
+                    <UTooltip :text="t('admin-blocklist-act-delete')">
                         <AtomButton
                             icon="i-lucide-trash-2"
                             variant="ghost"
@@ -106,14 +103,14 @@ function save() {
         </div>
 
         <form v-else class="grid gap-3 md:grid-cols-[1fr_1fr_110px_130px_auto_auto]" @submit.prevent="save">
-            <input v-model="draft.name" class="noro-input" placeholder="Name">
-            <input v-model="draft.mc_host" class="noro-input" placeholder="Host">
+            <input v-model="draft.name" class="noro-input" :placeholder="t('admin-roles-name')">
+            <input v-model="draft.mc_host" class="noro-input" :placeholder="t('admin-gs-host')">
             <input v-model.number="draft.mc_port" type="number" class="noro-input">
             <NoroSelect v-model="draft.kind">
-                <option value="server">Backend</option>
-                <option value="proxy">Proxy</option>
+                <option value="server">{{ t('admin-gs-backend') }}</option>
+                <option value="proxy">{{ t('admin-gs-proxy') }}</option>
             </NoroSelect>
-            <AtomButton type="submit" icon="i-lucide-check" variant="primary">Save</AtomButton>
+            <AtomButton type="submit" icon="i-lucide-check" variant="primary">{{ t('web-rules-save') }}</AtomButton>
             <AtomButton icon="i-lucide-x" variant="ghost" @click="editing = false" />
         </form>
     </div>

@@ -11,6 +11,10 @@ const emit = defineEmits<{
     select: [id: string];
     create: [];
 }>();
+
+const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 </script>
 
 <template>
@@ -21,11 +25,11 @@ const emit = defineEmits<{
             </div>
             <div class="min-w-0">
                 <div class="flex items-center gap-2">
-                    <h3 class="font-bold text-sm text-[var(--noro-text)] uppercase tracking-wider">Active Build</h3>
-                    <span v-if="builds.length" class="text-xs text-[var(--noro-muted)]">({{ builds.length }} total)</span>
+                    <h3 class="font-bold text-sm text-[var(--noro-text)] uppercase tracking-wider">{{ t('admin-build-active') }}</h3>
+                    <span v-if="builds.length" class="text-xs text-[var(--noro-muted)]">({{ t('admin-build-total', { count: builds.length }) }})</span>
                 </div>
                 <p class="text-xs text-[var(--noro-muted)] truncate">
-                    Select assembly build version to configure files, import packs, and publish.
+                    {{ t('admin-build-subtitle') }}
                 </p>
             </div>
         </div>
@@ -47,19 +51,20 @@ const emit = defineEmits<{
                             variant="subtle"
                             size="xs"
                         >
-                            {{ b.published ? 'live' : 'draft' }}
+                            {{ b.published ? t('admin-build-live') : t('admin-build-draft') }}
                         </UBadge>
                     </button>
                 </div>
             </template>
 
             <AtomButton
+                v-if="can('noro.admin.builds.edit')"
                 variant="primary"
                 size="sm"
                 icon="i-lucide-plus"
                 @click="emit('create')"
             >
-                New Build
+                {{ t('admin-build-new') }}
             </AtomButton>
         </div>
     </div>

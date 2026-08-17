@@ -10,6 +10,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@fluent/bundle": "^0.19.1",
     "@iconify-json/lucide": "^1.2.64",
     "@nuxt/ui": "^3.3.7",
     "@sentry/nuxt": "^10.70.0",

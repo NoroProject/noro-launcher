@@ -3,6 +3,7 @@ const fileUpload = defineModel<File | null>("fileUpload", { required: true });
 const filePath = defineModel<string>("filePath", { required: true });
 const props = withDefaults(defineProps<{ busy?: string | null }>(), {});
 defineEmits<{ upload: [] }>();
+const { t } = useT();
 
 const isDragOver = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -51,11 +52,11 @@ const fileSize = computed(() => {
                 <UIcon name="i-lucide-file-up" class="size-6" />
             </div>
             <div>
-                <h2 class="font-bold text-[var(--noro-text)]">Manual Upload</h2>
+                <h2 class="font-bold text-[var(--noro-text)]">{{ t('admin-manual-title') }}</h2>
                 <p
                     class="text-[10px] text-[var(--noro-muted)] uppercase tracking-wider"
                 >
-                    Direct Artifact injection
+                    {{ t('admin-manual-subtitle') }}
                 </p>
             </div>
         </div>
@@ -88,7 +89,7 @@ const fileSize = computed(() => {
                         <p
                             class="font-bold text-[var(--noro-text)] uppercase tracking-wider text-[10px]"
                         >
-                            Drop File Here
+                            {{ t('admin-manual-drop') }}
                         </p>
                     </div>
 
@@ -111,7 +112,7 @@ const fileSize = computed(() => {
             </div>
 
             <div>
-                <span class="noro-label-xs mb-2 block">Destination Path</span>
+                <span class="noro-label-xs mb-2 block">{{ t('admin-manual-path') }}</span>
                 <div class="relative group">
                     <div
                         class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
@@ -138,7 +139,7 @@ const fileSize = computed(() => {
                     block
                     @click="$emit('upload')"
                 >
-                    Add to Build
+                    {{ t('admin-manual-add') }}
                 </AtomButton>
                 <AtomButton
                     v-if="fileUpload"

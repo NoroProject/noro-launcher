@@ -2,6 +2,8 @@
 import type { AdminTokenRow } from '~/types/api'
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 
 const notify = useNotify()
 await auth.loadMe()
@@ -52,7 +54,7 @@ async function revoke(id: string) {
 </script>
 
 <template>
-  <NoroShell title="TOKENS" subtitle="Tokens for CLI and CI">
+  <NoroShell :title="t('admin-tokens-title')" :subtitle="t('admin-tokens-subtitle')">
     <template #actions>
       <AtomButton
         icon="i-lucide-refresh-cw"
@@ -60,9 +62,9 @@ async function revoke(id: string) {
         :loading="pending"
         @click="refresh()"
       >
-        Refresh
+        {{ t('cabinet-apps-refresh') }}
       </AtomButton>
-      <AtomButton variant="primary" icon="i-lucide-plus" @click="showCreate = true">New token</AtomButton>
+      <AtomButton v-if="can('noro.admin.launcher.tokens')" variant="primary" icon="i-lucide-plus" @click="showCreate = true">{{ t('admin-tokens-new-token') }}</AtomButton>
     </template>
 
     <UAlert
@@ -71,13 +73,20 @@ async function revoke(id: string) {
       color="warning"
       variant="subtle"
       icon="i-lucide-key-round"
-      title="Secret is shown once"
+      :title="t('admin-tokens-secret-once')"
       :description="createdSecret"
     />
 
     <section class="noro-panel overflow-hidden">
       <table v-if="tokens?.length" class="noro-table">
-        <thead><tr><th>Name</th><th>Permissions</th><th>Last used</th><th /></tr></thead>
+        <thead>
+          <tr>
+            <th>{{ t('admin-roles-name') }}</th>
+            <th>{{ t('admin-roles-col-perms') }}</th>
+            <th>{{ t('admin-tokens-last-used') }}</th>
+            <th />
+          </tr>
+        </thead>
         <tbody>
           <tr v-for="token in tokens" :key="token.id">
             <td class="font-semibold text-[var(--noro-text)]">
@@ -97,29 +106,27 @@ async function revoke(id: string) {
                 :disabled="busy === token.id"
                 @click="revoke(token.id)"
                 class="!min-h-8 !px-2"
-              >
-
-              </AtomButton>
+              />
             </td>
           </tr>
         </tbody>
       </table>
-      <EmptyState v-else icon="i-lucide-key-round" title="No tokens yet" text="Create a CLI token from the toolbar." />
+      <EmptyState v-else icon="i-lucide-key-round" :title="t('admin-tokens-empty-title')" :text="t('admin-tokens-empty-text')" />
     </section>
 
-    <AtomModal v-model="showCreate" title="NEW TOKEN" subtitle="Secret will be shown once">
+    <AtomModal v-model="showCreate" :title="t('admin-tokens-modal-title')" :subtitle="t('admin-tokens-modal-subtitle')">
       <form class="grid gap-3" @submit.prevent="createToken">
-        <label><span class="noro-label">Name</span><input v-model="form.name" class="noro-input" required></label>
-        <label><span class="noro-label">Permissions, one per line</span><textarea v-model="form.permissions" class="noro-input min-h-28" /></label>
+        <label><span class="noro-label">{{ t('admin-roles-name') }}</span><input v-model="form.name" class="noro-input" required></label>
+        <label><span class="noro-label">{{ t('admin-tokens-perms-label') }}</span><textarea v-model="form.permissions" class="noro-input min-h-28" /></label>
         <div class="flex justify-end gap-3 pt-2">
-          <AtomButton variant="secondary" @click="showCreate = false">Cancel</AtomButton>
+          <AtomButton variant="secondary" @click="showCreate = false">{{ t('web-rules-cancel') }}</AtomButton>
           <AtomButton
             variant="primary"
             icon="i-lucide-plus"
             :disabled="busy === 'create'"
             type="submit"
           >
-            Create
+            {{ t('admin-notes-add') }}
           </AtomButton>
         </div>
       </form>

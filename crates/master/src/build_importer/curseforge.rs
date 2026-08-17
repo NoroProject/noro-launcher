@@ -135,15 +135,18 @@ pub async fn import(
                     }
                     Err(e) => {
                         let msg = e.to_string();
-                        if msg.contains("нет downloadUrl") {
+                        if msg.contains("no downloadUrl") {
                             if let Some(mut prog) = state.import_jobs.get_mut(&job_id) {
-                                prog.warnings.push(format!("Внимание: Мод {}/{} запретил стороннее скачивание. Установите его вручную.", project_id, file_id));
+                                prog.warnings.push(format!(
+                                    "Mod {}/{} forbids third-party downloads — install it by hand.",
+                                    project_id, file_id
+                                ));
                             }
                         } else {
                             tracing::warn!("CF файл {project_id}/{file_id}: {e}");
                             if let Some(mut prog) = state.import_jobs.get_mut(&job_id) {
                                 prog.warnings
-                                    .push(format!("Ошибка мода {}/{}: {}", project_id, file_id, e));
+                                    .push(format!("Mod {}/{} failed: {}", project_id, file_id, e));
                             }
                         }
                     }
@@ -198,7 +201,7 @@ async fn resolve_cf_file(
     let data = &resp["data"];
     let download_url = data["downloadUrl"]
         .as_str()
-        .ok_or_else(|| anyhow!("нет downloadUrl (мод запретил стороннее скачивание)"))?
+        .ok_or_else(|| anyhow!("no downloadUrl (the mod forbids third-party downloads)"))?
         .to_string();
     // Имя файла попадает в mods/ сборки. «mod.jar» для каждого безымянного
     // ответа означал бы, что второй такой мод затирает первый.

@@ -5,6 +5,7 @@ use super::BootstrapCtx;
 use anyhow::{Context, Result};
 use futures::stream::{self, StreamExt};
 use schema::ArtifactKind;
+
 use serde_json::Value;
 
 const RESOURCES_BASE: &str = "https://resources.download.minecraft.net";

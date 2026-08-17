@@ -7,7 +7,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
-use schema::PERM_ADMIN_BUILDS;
+use schema::{PERM_BLOCKLIST_EDIT, PERM_BLOCKLIST_VIEW};
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -16,7 +17,7 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<Vec<BlockedFileRow>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BLOCKLIST_VIEW)?;
     Ok(Json(crate::db::list_blocked_files(&state.db).await?))
 }
 
@@ -39,7 +40,7 @@ pub async fn create(
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BLOCKLIST_EDIT)?;
 
     let pattern = req
         .pattern
@@ -51,22 +52,24 @@ pub async fn create(
         .filter(|s| !s.is_empty());
     // Пустое правило матчило бы всё подряд и снесло игроку каталог.
     if pattern.is_none() && sha1.is_none() {
-        return Err(AppError::BadRequest("нужна маска либо sha1".into()));
+        return Err(AppError::BadRequest(
+            "either a glob or a sha1 is required".into(),
+        ));
     }
     if let Some(h) = &sha1 {
         if h.len() != 40 || !h.chars().all(|c| c.is_ascii_hexdigit()) {
-            return Err(AppError::BadRequest("sha1 — это 40 hex-символов".into()));
+            return Err(AppError::BadRequest("sha1 is 40 hex characters".into()));
         }
     }
     if req.reason.trim().len() < 3 {
         return Err(AppError::BadRequest(
-            "нужна причина: она попадёт админу во флаг".into(),
+            "a reason is required: it lands in the flag an admin will read".into(),
         ));
     }
 
     let action = req.action.as_deref().unwrap_or("delete");
     if !matches!(action, "delete" | "flag" | "block_launch") {
-        return Err(AppError::BadRequest("неизвестное действие".into()));
+        return Err(AppError::BadRequest("unknown action".into()));
     }
 
     let row = crate::db::create_blocked_file(
@@ -83,7 +86,7 @@ pub async fn create(
     audit::record(
         &state,
         &admin.actor,
-        "blocklist.add",
+        audit::actions::BLOCKLIST_ADD,
         audit::target("blocked_file", row.id),
         json!({ "pattern": row.pattern, "sha1": row.sha1, "action": row.action }),
     )
@@ -97,14 +100,14 @@ pub async fn delete(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BLOCKLIST_EDIT)?;
     if !crate::db::delete_blocked_file(&state.db, id).await? {
-        return Err(AppError::NotFound("правило".into()));
+        return Err(AppError::NotFound("rule".into()));
     }
     audit::record(
         &state,
         &admin.actor,
-        "blocklist.remove",
+        audit::actions::BLOCKLIST_REMOVE,
         audit::target("blocked_file", id),
         json!({}),
     )

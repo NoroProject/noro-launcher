@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const auth = useAuth()
+const { t } = useT()
 await auth.loadMe()
 
 const { data: stats, pending, refresh, error } = await useAsyncData('admin-stats', () =>
@@ -7,10 +8,10 @@ const { data: stats, pending, refresh, error } = await useAsyncData('admin-stats
 )
 
 const cards = computed(() => [
-  { label: 'Users', value: stats.value?.users ?? 0, icon: 'i-lucide-users', tone: 'blue' as const },
-  { label: 'Servers', value: stats.value?.servers ?? 0, icon: 'i-lucide-server', tone: 'green' as const },
-  { label: 'Builds', value: stats.value?.builds ?? 0, icon: 'i-lucide-package', tone: 'amber' as const },
-  { label: 'Launchers online', value: stats.value?.online_launchers ?? 0, icon: 'i-lucide-radio', tone: 'magenta' as const }
+  { label: t('admin-dash-card-users'), value: stats.value?.users ?? 0, icon: 'i-lucide-users', tone: 'blue' as const },
+  { label: t('admin-dash-card-servers'), value: stats.value?.servers ?? 0, icon: 'i-lucide-server', tone: 'green' as const },
+  { label: t('admin-dash-card-builds'), value: stats.value?.builds ?? 0, icon: 'i-lucide-package', tone: 'amber' as const },
+  { label: t('admin-dash-card-online'), value: stats.value?.online_launchers ?? 0, icon: 'i-lucide-radio', tone: 'magenta' as const }
 ])
 
 const fileStoreGb = computed(() => {
@@ -20,7 +21,7 @@ const fileStoreGb = computed(() => {
 </script>
 
 <template>
-  <NoroShell title="ADMIN" subtitle="Master server operations dashboard">
+  <NoroShell :title="t('admin-dash-title')" :subtitle="t('admin-dash-subtitle')">
     <template #actions>
       <AtomButton
         icon="i-lucide-refresh-cw"
@@ -28,7 +29,7 @@ const fileStoreGb = computed(() => {
         :loading="pending"
         @click="refresh()"
       >
-        Refresh
+        {{ t('cabinet-apps-refresh') }}
       </AtomButton>
     </template>
 
@@ -48,13 +49,13 @@ const fileStoreGb = computed(() => {
     <div class="mt-5 grid gap-5 xl:grid-cols-[1fr_420px]">
       <section class="noro-panel p-5">
         <div class="mb-4 flex items-center justify-between">
-          <h2 class="font-bold text-[var(--noro-text)]">Data state</h2>
+          <h2 class="font-bold text-[var(--noro-text)]">{{ t('admin-dash-data-state') }}</h2>
           <UIcon name="i-lucide-database" class="size-5 text-[var(--noro-cream)]" />
         </div>
         <div class="grid gap-3">
           <div class="rounded-lg bg-[var(--noro-input)] p-4 flex items-center justify-between">
             <div>
-              <div class="text-xs font-bold uppercase tracking-wider text-[var(--noro-muted)]">FileStore Storage</div>
+              <div class="text-xs font-bold uppercase tracking-wider text-[var(--noro-muted)]">{{ t('admin-dash-filestore') }}</div>
               <div class="mt-1 text-2xl font-black text-[var(--noro-text)]">{{ fileStoreGb }}</div>
             </div>
             <UIcon name="i-lucide-hard-drive" class="size-8 text-[var(--noro-blue)]" />
@@ -64,11 +65,11 @@ const fileStoreGb = computed(() => {
       </section>
 
       <section class="noro-panel p-5">
-        <h2 class="mb-4 font-bold text-[var(--noro-text)]">Quick actions</h2>
+        <h2 class="mb-4 font-bold text-[var(--noro-text)]">{{ t('admin-dash-quick-actions') }}</h2>
         <div class="grid gap-2">
-          <QuickAction to="/admin/clients" icon="i-lucide-plus" label="Create client" primary />
-          <QuickAction to="/admin/news" icon="i-lucide-newspaper" label="Publish news" />
-          <QuickAction to="/admin/launcher" icon="i-lucide-rocket" label="Deploy launcher" />
+          <QuickAction to="/admin/clients" icon="i-lucide-plus" :label="t('admin-dash-create-client')" primary />
+          <QuickAction to="/admin/news" icon="i-lucide-newspaper" :label="t('admin-dash-publish-news')" />
+          <QuickAction to="/admin/launcher" icon="i-lucide-rocket" :label="t('admin-dash-deploy-launcher')" />
         </div>
       </section>
     </div>

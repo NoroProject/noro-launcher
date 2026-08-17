@@ -5,13 +5,14 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use schema::PERM_ADMIN_BUILDS;
+
 use serde::Deserialize;
 use serde_json::{json, Value};
+use schema::PERM_LAUNCHER_PUBLISH;
 
 /// Версии Minecraft (release/snapshot) из манифеста Mojang.
 pub async fn minecraft(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_LAUNCHER_PUBLISH)?;
     let manifest: Value = get_json(
         &state,
         "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json",
@@ -30,7 +31,7 @@ pub async fn minecraft(State(state): State<AppState>, admin: AdminAuth) -> AppRe
 fn array<'a>(value: &'a Value, source: &str) -> AppResult<&'a Vec<Value>> {
     value
         .as_array()
-        .ok_or_else(|| AppError::Other(anyhow::anyhow!("{source} вернул ответ неожиданного вида")))
+        .ok_or_else(|| AppError::Other(anyhow::anyhow!("{source} returned an unexpected shape")))
 }
 
 #[derive(Deserialize)]
@@ -45,18 +46,14 @@ pub async fn loader(
     Path(kind): Path<String>,
     Query(q): Query<LoaderQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_LAUNCHER_PUBLISH)?;
     let versions = match kind.as_str() {
         "fabric" => fabric_like(&state, "https://meta.fabricmc.net/v2", &q.mc).await?,
         "quilt" => fabric_like(&state, "https://meta.quiltmc.org/v3", &q.mc).await?,
         "neoforge" => neoforge(&state, &q.mc).await?,
         "forge" => forge(&state, &q.mc).await?,
         "vanilla" => vec![],
-        other => {
-            return Err(AppError::BadRequest(format!(
-                "неизвестный загрузчик: {other}"
-            )))
-        }
+        other => return Err(AppError::BadRequest(format!("unknown modloader: {other}"))),
     };
     Ok(Json(json!({ "versions": versions })))
 }

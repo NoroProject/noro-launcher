@@ -10,7 +10,9 @@ use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::{Query, State};
 use axum::Json;
-use schema::{PERM_ADMIN_ROLES, PERM_ADMIN_SERVERS, PERM_ADMIN_USERS};
+
+use schema::{PERM_ROLES_VIEW, PERM_SERVERS_VIEW, PERM_USERS_VIEW};
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -27,6 +29,8 @@ pub struct Suggestion {
     pub source: &'static str,
     /// Человекочитаемое пояснение; у игровых узлов его нет.
     pub label: Option<String>,
+    /// Раздел для группировки в редакторе ролей.
+    pub group: Option<&'static str>,
 }
 
 pub async fn list(
@@ -35,14 +39,14 @@ pub async fn list(
     Query(query): Query<NodesQuery>,
 ) -> AppResult<Json<Vec<Suggestion>>> {
     // Подсказками пользуются и на экране ролей, и на экране пользователя,
-    // поэтому одного PERM_ADMIN_SERVERS мало: иначе редактор ролей получал бы
+    // поэтому одного права на серверы мало: иначе редактор ролей получал бы
     // 403 и молча терял автодополнение.
-    if [PERM_ADMIN_SERVERS, PERM_ADMIN_ROLES, PERM_ADMIN_USERS]
+    if [PERM_ROLES_VIEW, PERM_USERS_VIEW, PERM_SERVERS_VIEW]
         .iter()
         .all(|perm| admin.require(perm).is_err())
     {
         return Err(crate::error::AppError::Forbidden(
-            "нужно право на роли, пользователей или серверы".into(),
+            "a permission over roles, users or servers is required".into(),
         ));
     }
     let mut out = builtin();
@@ -53,6 +57,7 @@ pub async fn list(
                 node: schema::perm_server_join(&server.id.to_string()),
                 source: "launcher",
                 label: Some(format!("Join build \u{201c}{}\u{201d}", server.name)),
+                group: Some("Access"),
             });
         }
     }
@@ -68,6 +73,7 @@ pub async fn list(
             node: format!("noro.build.{}.*", server.id),
             source: "launcher",
             label: Some(format!("All builds of \u{201c}{}\u{201d}", server.name)),
+            group: Some("Access"),
         });
         for b in builds {
             out.push(Suggestion {
@@ -79,6 +85,7 @@ pub async fn list(
                     b.version,
                     if b.published { "" } else { " (preview)" }
                 )),
+                group: Some("Access"),
             });
         }
     }
@@ -91,6 +98,7 @@ pub async fn list(
                 node,
                 source: "game",
                 label: None,
+                group: Some("Game"),
             });
         }
     }
@@ -114,34 +122,51 @@ async fn optional_mod_nodes(state: &AppState) -> AppResult<Vec<Suggestion>> {
                 node: schema::perm_optional_mod(&build.server_id.to_string(), &opt.name),
                 source: "launcher",
                 label: Some(format!("Optional mod \u{201c}{}\u{201d}", opt.name)),
+                group: Some("Access"),
             });
         }
     }
     Ok(out)
 }
 
+/// Встроенные узлы приходят из реестра прав: список в двух местах разъезжался
+/// бы ровно до первого нового права, и админ узнавал бы о нём из чужого кода.
 fn builtin() -> Vec<Suggestion> {
-    [
-        (schema::PERM_SUPERADMIN, "Everything, no limits"),
-        (schema::PERM_ADMIN_ALL, "Full admin panel"),
-        (schema::PERM_ADMIN_USERS, "Users"),
-        (schema::PERM_ADMIN_SERVERS, "Builds and game servers"),
-        (schema::PERM_ADMIN_BUILDS, "Build files"),
-        (schema::PERM_ADMIN_NEWS, "News"),
-        (schema::PERM_ADMIN_ROLES, "Roles"),
-        (schema::PERM_ADMIN_LAUNCHER, "Launcher builds"),
-        (
-            schema::PERM_ADMIN_WRAPPER,
-            "Game server control: files, console, power",
-        ),
-        (schema::PERM_MOD_USERS_BAN, "Ban players"),
-        (schema::PERM_LAUNCHER_BETA, "Launcher beta channel"),
-    ]
-    .into_iter()
-    .map(|(node, label)| Suggestion {
-        node: node.to_string(),
+    let mut out = vec![
+        Suggestion {
+            node: schema::PERM_SUPERADMIN.to_string(),
+            source: "launcher",
+            label: Some("Everything, no limits".into()),
+            group: Some("Panel"),
+        },
+        Suggestion {
+            node: schema::PERM_ADMIN_ALL.to_string(),
+            source: "launcher",
+            label: Some("Full admin panel".into()),
+            group: Some("Panel"),
+        },
+    ];
+    // Ветку целиком («все права на игроков») выдают чаще, чем перечисляют узлы
+    // по одному, поэтому шаблоны веток тоже попадают в подсказки.
+    let mut branches: Vec<&str> = schema::ALL_NODES
+        .iter()
+        .filter_map(|n| n.name.rsplit_once('.').map(|(prefix, _)| prefix))
+        .collect();
+    branches.sort_unstable();
+    branches.dedup();
+    for prefix in branches {
+        out.push(Suggestion {
+            node: format!("{prefix}.*"),
+            source: "launcher",
+            label: Some(format!("Everything under {prefix}")),
+            group: Some("Branches"),
+        });
+    }
+    out.extend(schema::ALL_NODES.iter().map(|node| Suggestion {
+        node: node.name.to_string(),
         source: "launcher",
-        label: Some(label.to_string()),
-    })
-    .collect()
+        label: Some(node.title.to_string()),
+        group: Some(node.group),
+    }));
+    out
 }

@@ -12,15 +12,17 @@ defineEmits<{
     refresh: [];
     create: [];
 }>();
+
+const { t } = useT();
 </script>
 
 <template>
     <section class="grid gap-4">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
-                <h2 class="text-xl font-black text-white">Builds</h2>
+                <h2 class="text-xl font-black text-white">{{ t('admin-builds-title') }}</h2>
                 <p class="text-sm text-[var(--noro-muted)]">
-                    Manage game versions, files, mods, and publish state.
+                    {{ t('admin-builds-subtitle') }}
                 </p>
             </div>
         </div>
@@ -37,10 +39,10 @@ defineEmits<{
             <table v-if="builds.length" class="noro-table">
                 <thead>
                     <tr>
-                        <th>Build</th>
+                        <th>{{ t('admin-builds-col-build') }}</th>
                         <th>Minecraft</th>
                         <th>Modloader</th>
-                        <th>Status</th>
+                        <th>{{ t('admin-builds-col-status') }}</th>
                         <th />
                     </tr>
                 </thead>
@@ -54,7 +56,7 @@ defineEmits<{
                                 :color="build.published ? 'success' : 'neutral'"
                                 variant="subtle"
                             >
-                                {{ build.published ? "published" : "draft" }}
+                                {{ build.published ? t('admin-builds-published') : t('admin-builds-draft') }}
                             </UBadge>
                         </td>
                         <td class="text-right">
@@ -70,8 +72,8 @@ defineEmits<{
             <EmptyState
                 v-else
                 icon="i-lucide-package"
-                title="No builds yet"
-                text="Create the first build from the toolbar."
+                :title="t('admin-builds-empty-title')"
+                :text="t('admin-builds-empty-text')"
             />
         </div>
     </section>

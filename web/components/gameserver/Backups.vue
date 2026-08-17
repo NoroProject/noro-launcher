@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const auth = useAuth()
+const canBackups = computed(() => auth.hasPermission('noro.admin.wrapper.backups'))
 /** Управление бэкапами серверной директории. */
 const props = defineProps<{
     gameServerId: string;
@@ -48,6 +50,7 @@ function formatDate(ts: number) {
                 </p>
             </div>
             <AtomButton
+                v-if="canBackups"
                 variant="dark"
                 icon="i-lucide-refresh-cw"
                 :disabled="!enabled || backups.loading.value"

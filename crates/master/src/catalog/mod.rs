@@ -36,7 +36,7 @@ pub fn provider_of(name: &str) -> AppResult<Provider> {
         "modrinth" => Ok(Provider::Modrinth),
         "curseforge" => Ok(Provider::Curseforge),
         other => Err(AppError::BadRequest(format!(
-            "неизвестный провайдер каталога: {other}"
+            "unknown catalog provider: {other}"
         ))),
     }
 }
@@ -62,7 +62,7 @@ pub async fn fetch_json(
         // об ошибке идёт только начало.
         let head: String = body.chars().take(200).collect();
         return Err(AppError::BadRequest(format!(
-            "каталог ответил {status}: {head}"
+            "the catalog answered {status}: {head}"
         )));
     }
     let value: Value = serde_json::from_str(&body).map_err(|e| AppError::Other(e.into()))?;
@@ -82,7 +82,7 @@ pub async fn search(state: &AppState, q: &SearchQuery) -> AppResult<SearchPage> 
     let mr = unwrap_or_note(mr, "modrinth", &mut failed);
     let cf = unwrap_or_note(cf, "curseforge", &mut failed);
     if failed.len() == 2 {
-        return Err(AppError::BadRequest("ни один каталог не ответил".into()));
+        return Err(AppError::BadRequest("no catalog answered".into()));
     }
 
     Ok(SearchPage {
@@ -172,7 +172,7 @@ pub async fn source_for_project(
     .await?;
     let ver = vers
         .first()
-        .ok_or_else(|| AppError::BadRequest("нет совместимых версий".into()))?;
+        .ok_or_else(|| AppError::BadRequest("no compatible versions".into()))?;
 
     match provider {
         Provider::Modrinth => Ok(ModSource::Modrinth {
@@ -181,11 +181,11 @@ pub async fn source_for_project(
         Provider::Curseforge => {
             let pid: u64 = project_id
                 .parse()
-                .map_err(|_| AppError::BadRequest("некорректный CurseForge project_id".into()))?;
+                .map_err(|_| AppError::BadRequest("invalid CurseForge project_id".into()))?;
             let fid: u64 = ver
                 .id
                 .parse()
-                .map_err(|_| AppError::BadRequest("некорректный CurseForge file_id".into()))?;
+                .map_err(|_| AppError::BadRequest("invalid CurseForge file_id".into()))?;
             Ok(ModSource::Curseforge {
                 project_id: pid,
                 file_id: fid,

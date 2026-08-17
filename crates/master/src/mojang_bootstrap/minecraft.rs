@@ -5,6 +5,7 @@ use super::platform::Platform;
 use super::{assets, java, BootstrapCtx};
 use anyhow::{anyhow, Context, Result};
 use schema::ArtifactKind;
+
 use serde_json::Value;
 
 const VERSION_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";

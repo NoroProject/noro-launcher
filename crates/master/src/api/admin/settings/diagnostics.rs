@@ -4,7 +4,7 @@
 //! ломает сразу, а всплывает через месяц, когда лаунчер с боевым ключом
 //! перестаёт принимать манифесты.
 
-use super::PERM_ADMIN_SETTINGS;
+use super::PERM_SETTINGS_VIEW;
 use crate::api::auth::AdminAuth;
 use crate::error::AppResult;
 use crate::state::AppState;
@@ -41,7 +41,7 @@ pub async fn diagnostics(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SETTINGS)?;
+    admin.require(PERM_SETTINGS_VIEW)?;
     let cfg = &state.config;
 
     let mut checks = vec![

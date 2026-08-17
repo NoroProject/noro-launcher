@@ -1,4 +1,7 @@
 <script setup lang="ts">
+const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 import type { BuildRow } from "~/types/api";
 
 const props = withDefaults(
@@ -31,11 +34,11 @@ const isDraft = computed(() => !props.build?.published);
                 <UIcon name="i-lucide-rocket" class="size-6" />
             </div>
             <div>
-                <h2 class="font-bold text-[var(--noro-text)]">Release Build</h2>
+                <h2 class="font-bold text-[var(--noro-text)]">{{ t('admin-publish-title') }}</h2>
                 <p
                     class="text-xs text-[var(--noro-muted)] uppercase tracking-wider"
                 >
-                    Bootstrap & Signature
+                    {{ t('admin-publish-subtitle') }}
                 </p>
             </div>
         </div>
@@ -61,7 +64,7 @@ const isDraft = computed(() => !props.build?.published);
                                 : 'text-[var(--noro-green)]'
                         "
                     >
-                        {{ isDraft ? "Draft Mode" : "Live Release" }}
+                        {{ isDraft ? t('admin-publish-draft') : t('admin-publish-live') }}
                     </span>
                 </div>
                 <UTooltip
@@ -80,14 +83,14 @@ const isDraft = computed(() => !props.build?.published);
 
             <div class="grid gap-1.5">
                 <AtomButton
-                    v-if="isDraft"
+                    v-if="isDraft && can('noro.admin.builds.publish')"
                     icon="i-lucide-zap"
                     variant="primary"
                     block
                     :disabled="busy === 'publish' || buildPending"
                     @click="$emit('publish')"
                 >
-                    Publish Build
+                    {{ t('admin-publish-btn') }}
                 </AtomButton>
 
                 <AtomButton
@@ -97,7 +100,7 @@ const isDraft = computed(() => !props.build?.published);
                     :disabled="busy === 'rebuild'"
                     @click="$emit('rebuild')"
                 >
-                    Rebuild Version
+                    {{ t('admin-publish-rebuild') }}
                 </AtomButton>
 
                 <UTooltip
@@ -110,7 +113,7 @@ const isDraft = computed(() => !props.build?.published);
                         :disabled="busy === 'rebuild-clean'"
                         @click="$emit('rebuildClean')"
                     >
-                        Rebuild from Scratch
+                        {{ t('admin-publish-scratch') }}
                     </AtomButton>
                 </UTooltip>
 
@@ -120,9 +123,10 @@ const isDraft = computed(() => !props.build?.published);
                         variant="dark"
                         block
                         :disabled="isDraft || busy === 'unpublish'"
+                        v-if="can('noro.admin.builds.publish')"
                         @click="$emit('unpublish')"
                     >
-                        Revert to Draft
+                        {{ t('admin-publish-revert') }}
                     </AtomButton>
                     <AtomButton
                         icon="i-lucide-trash-2"
@@ -131,7 +135,7 @@ const isDraft = computed(() => !props.build?.published);
                         :disabled="busy === 'delete'"
                         @click="$emit('delete')"
                     >
-                        Delete Build
+                        {{ t('admin-publish-delete') }}
                     </AtomButton>
                 </div>
             </div>

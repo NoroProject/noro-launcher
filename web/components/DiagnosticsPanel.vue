@@ -2,6 +2,7 @@
 import type { DiagnosticCheck } from '~/types/settings'
 
 defineProps<{ checks: DiagnosticCheck[] }>()
+const { t } = useT()
 
 const CLASS: Record<DiagnosticCheck['level'], string> = {
   ok: 'text-[var(--noro-blue)]',
@@ -18,9 +19,9 @@ const ICON: Record<DiagnosticCheck['level'], string> = {
 
 <template>
   <section class="noro-panel h-fit p-6">
-    <h2 class="mb-1 text-lg font-black text-[var(--noro-text)]">Diagnostics</h2>
+    <h2 class="mb-1 text-lg font-black text-[var(--noro-text)]">{{ t('admin-diag-title') }}</h2>
     <p class="mb-4 text-xs text-[var(--noro-muted)]">
-      Things that otherwise only ever show up as one line in the startup log.
+      {{ t('admin-diag-panel-desc') }}
     </p>
     <ul class="grid gap-3">
       <li v-for="c in checks" :key="c.id" class="flex gap-3">

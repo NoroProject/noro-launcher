@@ -163,6 +163,8 @@ pub struct LauncherUI {
     pub preset_images: std::collections::HashMap<String, std::sync::Arc<gpui::Image>>,
     pub custom_presets: Vec<SavedSkinPreset>,
     pub cape_selector_open: bool,
+    /// Раскрыт ли список версий сборки в нижней панели.
+    pub build_picker_open: bool,
     pub avatar_image: Option<Arc<Image>>,
     pub avatar_loading: bool,
     /// Язык интерфейса. Сам каталог живёт в глобальном состоянии i18n.
@@ -315,6 +317,7 @@ impl LauncherUI {
             preset_images: std::collections::HashMap::new(),
             custom_presets: Vec::new(),
             cape_selector_open: false,
+            build_picker_open: false,
             avatar_image: None,
             avatar_loading: false,
             locale: i18n::Locale::default(),

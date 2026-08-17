@@ -41,12 +41,12 @@ impl FromRequestParts<AppState> for AgentAuth {
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "))
             .map(str::trim)
-            .ok_or_else(|| AppError::Unauthorized("нет Bearer-токена".into()))?;
+            .ok_or_else(|| AppError::Unauthorized("missing bearer token".into()))?;
 
         let hash = hash_agent_secret(secret);
         let game_server = crate::db::game_server_by_token_hash(&state.db, &hash)
             .await?
-            .ok_or_else(|| AppError::Unauthorized("неизвестный секрет агента".into()))?;
+            .ok_or_else(|| AppError::Unauthorized("unknown agent secret".into()))?;
         Ok(AgentAuth { game_server })
     }
 }

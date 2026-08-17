@@ -104,6 +104,8 @@ pub enum RemoteAction {
     ReinstallBuild,
     /// Перезапустить лаунчер.
     RestartLauncher,
+    /// Закрыть запущенный процесс игры.
+    KillGame,
 }
 
 impl RemoteAction {
@@ -121,6 +123,7 @@ impl RemoteAction {
             RemoteAction::ClearAssetCache => "clear_asset_cache",
             RemoteAction::ReinstallBuild => "reinstall_build",
             RemoteAction::RestartLauncher => "restart_launcher",
+            RemoteAction::KillGame => "kill_game",
         }
     }
 }

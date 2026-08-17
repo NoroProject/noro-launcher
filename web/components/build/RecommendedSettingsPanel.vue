@@ -10,6 +10,7 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ save: [] }>();
+const { t } = useT();
 </script>
 
 <template>
@@ -19,9 +20,9 @@ defineEmits<{ save: [] }>();
                 <UIcon name="i-lucide-sliders-horizontal" class="size-5" />
             </div>
             <div>
-                <h2 class="font-bold text-[var(--noro-text)]">Recommended Client Settings</h2>
+                <h2 class="font-bold text-[var(--noro-text)]">{{ t('admin-recom-title') }}</h2>
                 <p class="text-[10px] uppercase tracking-wider text-[var(--noro-muted)]">
-                    Defaults sent to launcher for this build
+                    {{ t('admin-recom-subtitle') }}
                 </p>
             </div>
         </div>
@@ -29,19 +30,19 @@ defineEmits<{ save: [] }>();
         <div class="grid gap-4 p-5">
             <div class="grid gap-3 sm:grid-cols-2">
                 <label>
-                    <span class="noro-label-xs">Min Memory</span>
+                    <span class="noro-label-xs">{{ t('admin-recom-min-mem') }}</span>
                     <input v-model.number="form.memoryMin" class="noro-input-sm mt-1 w-full" type="number" min="512" step="512" />
                 </label>
                 <label>
-                    <span class="noro-label-xs">Max Memory</span>
+                    <span class="noro-label-xs">{{ t('admin-recom-max-mem') }}</span>
                     <input v-model.number="form.memoryMax" class="noro-input-sm mt-1 w-full" type="number" min="512" step="512" />
                 </label>
             </div>
 
-            <UCheckbox v-model="form.showConsole" label="Show console window on launch" />
+            <UCheckbox v-model="form.showConsole" :label="t('admin-recom-show-console')" />
 
             <label>
-                <span class="noro-label-xs">JVM Flags</span>
+                <span class="noro-label-xs">{{ t('admin-recom-jvm-flags') }}</span>
                 <textarea
                     v-model="form.jvmFlags"
                     class="noro-input-sm mt-1 min-h-20 w-full font-mono"
@@ -56,7 +57,7 @@ defineEmits<{ save: [] }>();
                 block
                 @click="$emit('save')"
             >
-                Save Recommendations
+                {{ t('admin-recom-save') }}
             </AtomButton>
         </div>
     </section>

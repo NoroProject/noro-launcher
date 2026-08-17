@@ -5,23 +5,24 @@ withDefaults(defineProps<{
 }>(), {})
 
 const { downloads, pending, primary, others, label, href, size } = useLauncherDownloads()
+const { t } = useT()
 const showAll = ref(false)
 </script>
 
 <template>
   <section :class="compact ? '' : 'noro-panel p-6'">
     <div v-if="!compact" class="mb-4">
-      <h2 class="noro-pixel text-2xl text-[var(--noro-cream)]">GET THE LAUNCHER</h2>
+      <h2 class="noro-pixel text-2xl text-[var(--noro-cream)]">{{ t('web-download-title') }}</h2>
       <p class="mt-2 text-sm text-[var(--noro-muted)]">
-        Sign in with Discord, pick a server, and the launcher syncs the rest.
+        {{ t('web-download-lead') }}
       </p>
     </div>
 
-    <div v-if="pending" class="text-sm text-[var(--noro-muted)]">Loading builds…</div>
+    <div v-if="pending" class="text-sm text-[var(--noro-muted)]">{{ t('web-download-loading') }}</div>
 
     <!-- Пока релиза нет, кнопка вела бы в никуда. Честнее сказать прямо. -->
     <div v-else-if="!downloads.length" class="text-sm text-[var(--noro-muted)]">
-      No launcher build published yet.
+      {{ t('web-download-none') }}
     </div>
 
     <template v-else>
@@ -36,7 +37,7 @@ const showAll = ref(false)
           :href="href(primary)"
           download
         >
-          Download for {{ label(primary.platform) }}
+          {{ t('web-download-for', { platform: label(primary.platform) }) }}
         </AtomButton>
         <span class="text-xs text-[var(--noro-muted)]">
           v{{ primary.version }} · {{ size(primary.size) }}
@@ -51,7 +52,7 @@ const showAll = ref(false)
           :icon="showAll ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
           @click="showAll = !showAll"
         >
-          Other platforms
+          {{ t('web-download-other') }}
         </AtomButton>
 
         <div v-if="showAll || !primary" :class="primary ? 'mt-3 grid gap-2' : 'grid gap-2'">
@@ -69,7 +70,7 @@ const showAll = ref(false)
       </div>
 
       <p v-if="!compact" class="mt-4 text-xs text-[var(--noro-muted)]">
-        Every build is signed — the launcher checks the signature before it runs.
+        {{ t('web-download-signed') }}
       </p>
     </template>
   </section>

@@ -8,7 +8,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
-use schema::{OptionalMod, PERM_ADMIN_BUILDS};
+use schema::{OptionalMod, PERM_BUILDS_DELETE, PERM_BUILDS_EDIT, PERM_BUILDS_IMPORT, PERM_BUILDS_PUBLISH, PERM_BUILDS_VIEW};
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -22,7 +23,7 @@ pub(super) fn broadcast_builds_changed(state: &AppState, server_id: Uuid) {
 pub(super) async fn build_server_id(state: &AppState, id: Uuid) -> AppResult<Uuid> {
     let build = crate::db::get_build(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("сборка".into()))?;
+        .ok_or_else(|| AppError::NotFound("build".into()))?;
     Ok(build.server_id)
 }
 
@@ -36,7 +37,7 @@ pub async fn list(
     admin: AdminAuth,
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<Vec<BuildRow>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_VIEW)?;
     Ok(Json(crate::db::list_builds(&state.db, q.server_id).await?))
 }
 
@@ -45,10 +46,10 @@ pub async fn get(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_VIEW)?;
     let build = crate::db::get_build(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("сборка".into()))?;
+        .ok_or_else(|| AppError::NotFound("build".into()))?;
     let files = crate::db::build_files(&state.db, id).await?;
     Ok(Json(json!({ "build": build, "file_count": files.len() })))
 }
@@ -67,7 +68,7 @@ pub async fn create(
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let id = crate::db::create_build(
         &state.db,
         req.server_id,
@@ -96,16 +97,16 @@ pub async fn duplicate(
     Path(id): Path<Uuid>,
     Json(req): Json<DuplicateReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
 
     let version = req.version.trim();
     if version.is_empty() {
-        return Err(AppError::BadRequest("версия не может быть пустой".into()));
+        return Err(AppError::BadRequest("version cannot be empty".into()));
     }
 
     let server_id = crate::db::build_server_id(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("сборка не найдена".into()))?;
+        .ok_or_else(|| AppError::NotFound("build not found".into()))?;
 
     let new_id = crate::db::duplicate_build(&state.db, id, version).await?;
     broadcast_builds_changed(&state, server_id);
@@ -120,13 +121,13 @@ pub async fn publish(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_PUBLISH)?;
     let manifest = rebuild_manifest(&state, id, false).await?;
     crate::db::set_build_published(&state.db, id, true).await?;
     audit::record(
         &state,
         &admin.actor,
-        "build.publish",
+        audit::actions::BUILD_PUBLISH,
         target("build", id),
         json!({ "summary": crate::manifest::manifest_summary(&manifest) }),
     )
@@ -145,7 +146,7 @@ pub async fn rebuild(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let manifest = rebuild_manifest(&state, id, false).await?;
     broadcast_builds_changed(&state, manifest.server_id);
 
@@ -165,7 +166,7 @@ pub async fn rebuild_clean(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let manifest = rebuild_manifest(&state, id, true).await?;
     broadcast_builds_changed(&state, manifest.server_id);
 
@@ -183,7 +184,7 @@ async fn rebuild_manifest(
 ) -> AppResult<schema::BuildManifest> {
     let build = crate::db::get_build(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("сборка".into()))?;
+        .ok_or_else(|| AppError::NotFound("build".into()))?;
 
     let log = |msg: &str| {
         tracing::info!(target: "bootstrap", "{msg}");
@@ -209,13 +210,13 @@ pub async fn unpublish(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_PUBLISH)?;
     let server_id = build_server_id(&state, id).await?;
     crate::db::set_build_published(&state.db, id, false).await?;
     audit::record(
         &state,
         &admin.actor,
-        "build.unpublish",
+        audit::actions::BUILD_UNPUBLISH,
         target("build", id),
         json!({}),
     )
@@ -236,7 +237,7 @@ pub async fn set_versions(
     Path(id): Path<Uuid>,
     Json(req): Json<SetVersionsReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let server_id = build_server_id(&state, id).await?;
     sqlx::query("UPDATE builds SET mc_version = $1, modloader_version = $2 WHERE id = $3")
         .bind(&req.mc_version)
@@ -254,7 +255,7 @@ pub async fn delete(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_DELETE)?;
     let server_id = build_server_id(&state, id).await?;
     crate::db::delete_build(&state.db, id).await?;
     broadcast_builds_changed(&state, server_id);
@@ -268,7 +269,7 @@ pub async fn list_files(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Vec<BuildFileRow>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     Ok(Json(crate::db::build_files(&state.db, id).await?))
 }
 
@@ -279,7 +280,7 @@ pub async fn upload_file(
     Path(id): Path<Uuid>,
     mut multipart: Multipart,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let mut path: Option<String> = None;
     let mut data: Option<bytes::Bytes> = None;
     let mut filename: Option<String> = None;
@@ -311,12 +312,12 @@ pub async fn upload_file(
         }
     }
 
-    let data = data.ok_or_else(|| AppError::BadRequest("нет поля file".into()))?;
+    let data = data.ok_or_else(|| AppError::BadRequest("missing the file field".into()))?;
     // Путь: явный, иначе mods/<filename>.
     let path = path
         .filter(|p| !p.is_empty())
         .or_else(|| filename.map(|f| format!("mods/{f}")))
-        .ok_or_else(|| AppError::BadRequest("не указан путь".into()))?;
+        .ok_or_else(|| AppError::BadRequest("no path given".into()))?;
 
     let stored = state
         .files
@@ -346,7 +347,7 @@ pub async fn delete_file(
     admin: AdminAuth,
     Path((id, file_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let server_id = build_server_id(&state, id).await?;
     crate::db::delete_build_file(&state.db, file_id).await?;
     broadcast_builds_changed(&state, server_id);
@@ -360,12 +361,12 @@ pub async fn get_file_content(
     Path(id): Path<Uuid>,
     Query(q): Query<FileContentQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let files = crate::db::build_files(&state.db, id).await?;
     let file = files
         .into_iter()
         .find(|f| f.path == q.path)
-        .ok_or_else(|| AppError::NotFound("файл".into()))?;
+        .ok_or_else(|| AppError::NotFound("file".into()))?;
 
     // Ограничение размера для текстового редактора
     if file.size > 512 * 1024 {
@@ -403,13 +404,13 @@ pub async fn get_file_icon(
     Path(id): Path<Uuid>,
     Query(q): Query<FileContentQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let clean = clean_path(&q.path)?;
     let files = crate::db::build_files(&state.db, id).await?;
     let file = files
         .into_iter()
         .find(|f| f.path == clean)
-        .ok_or_else(|| AppError::NotFound("файл".into()))?;
+        .ok_or_else(|| AppError::NotFound("file".into()))?;
 
     let cache_dir = state.config.data_dir.join("cache").join("mod_icons");
     let cache_file = cache_dir.join(format!("{}.txt", file.sha1));
@@ -449,7 +450,7 @@ pub async fn update_file_content(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateFileContentReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let data = req.content.as_bytes();
     if data.len() > 512 * 1024 {
         return Err(AppError::BadRequest("content too large".into()));
@@ -484,7 +485,7 @@ pub async fn delete_files_by_prefix(
     Path(id): Path<Uuid>,
     Query(q): Query<FileContentQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let prefix = if q.path.ends_with('/') {
         q.path.clone()
     } else {
@@ -517,13 +518,13 @@ pub async fn move_files(
     Path(id): Path<Uuid>,
     Json(req): Json<MoveReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let from = clean_path(&req.from)?;
     let to = clean_path(&req.to)?;
     // Переезд папки внутрь себя оставил бы её файлы без пути наверх.
     if to == from || to.starts_with(&format!("{from}/")) {
         return Err(AppError::BadRequest(
-            "путь назначения внутри исходного".into(),
+            "the destination path is inside the source".into(),
         ));
     }
 
@@ -534,7 +535,7 @@ pub async fn move_files(
         .filter(|f| f.path == from || f.path.starts_with(&prefix))
         .collect();
     if targets.is_empty() {
-        return Err(AppError::NotFound(format!("файлов по пути {from} нет")));
+        return Err(AppError::NotFound(format!("no files under {from}")));
     }
 
     for file in &targets {
@@ -562,7 +563,7 @@ pub async fn move_files(
 fn clean_path(raw: &str) -> AppResult<String> {
     let path = raw.trim().trim_matches('/');
     if path.is_empty() || path.split('/').any(|part| part == ".." || part.is_empty()) {
-        return Err(AppError::BadRequest(format!("некорректный путь: {raw}")));
+        return Err(AppError::BadRequest(format!("invalid path: {raw}")));
     }
     Ok(path.to_string())
 }
@@ -585,7 +586,7 @@ pub async fn import_mrpack(
     Path(id): Path<Uuid>,
     multipart: Multipart,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_IMPORT)?;
     let server_id = build_server_id(&state, id).await?;
     let bytes = crate::build_importer::read_upload(multipart)
         .await
@@ -617,7 +618,7 @@ pub async fn import_curseforge(
     Path(id): Path<Uuid>,
     multipart: Multipart,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_IMPORT)?;
     let server_id = build_server_id(&state, id).await?;
     let bytes = crate::build_importer::read_upload(multipart)
         .await
@@ -650,7 +651,7 @@ pub async fn import_instance_zip(
     Path(id): Path<Uuid>,
     multipart: Multipart,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_IMPORT)?;
     let server_id = build_server_id(&state, id).await?;
     let bytes = crate::build_importer::read_upload(multipart)
         .await
@@ -682,7 +683,7 @@ pub async fn import_progress(
     admin: AdminAuth,
     Path((_build_id, job_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<crate::build_importer::ImportProgress>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     if let Some(prog) = state.import_jobs.get(&job_id) {
         Ok(Json(prog.clone()))
     } else {
@@ -735,7 +736,7 @@ pub(super) async fn append_optional_mod(
 ) -> AppResult<()> {
     let build = crate::db::get_build(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("сборка".into()))?;
+        .ok_or_else(|| AppError::NotFound("build".into()))?;
     let mut mods: Vec<OptionalMod> =
         serde_json::from_value(build.optional_mods).unwrap_or_default();
     mods.push(new_mod);
@@ -753,10 +754,10 @@ pub async fn get_optional(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Vec<OptionalMod>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let build = crate::db::get_build(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("сборка".into()))?;
+        .ok_or_else(|| AppError::NotFound("build".into()))?;
     let mods: Vec<OptionalMod> = serde_json::from_value(build.optional_mods).unwrap_or_default();
     Ok(Json(mods))
 }
@@ -768,7 +769,7 @@ pub async fn set_optional(
     Path(id): Path<Uuid>,
     Json(mut mods): Json<Vec<OptionalMod>>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     fill_optional_icons(&state, &mut mods).await;
     let val = serde_json::to_value(&mods).map_err(|e| AppError::Other(e.into()))?;
     sqlx::query("UPDATE builds SET optional_mods = $2 WHERE id = $1")
@@ -792,7 +793,7 @@ pub async fn set_allow_suggestions(
     Path(id): Path<Uuid>,
     Json(req): Json<AllowSuggestionsReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     sqlx::query("UPDATE builds SET allow_optional_mod_suggestions = $2 WHERE id = $1")
         .bind(id)
         .bind(req.allow)
@@ -862,7 +863,7 @@ pub async fn set_recommended_settings(
     Path(id): Path<Uuid>,
     Json(req): Json<RecommendedSettingsReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let min = req.memory_min_mb.clamp(512, 65536);
     let max = req.memory_max_mb.clamp(min, 65536);
     sqlx::query(
@@ -888,7 +889,7 @@ pub async fn set_paths(
     Path(id): Path<Uuid>,
     Json(req): Json<PathsReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     sqlx::query("UPDATE builds SET unmanaged_paths=$2, user_managed_paths=$3 WHERE id=$1")
         .bind(id)
         .bind(serde_json::to_value(&req.unmanaged_paths).unwrap())
@@ -916,7 +917,7 @@ pub async fn list_installed_mods(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Vec<InstalledModItem>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_BUILDS_EDIT)?;
     let files = crate::db::build_files(&state.db, id).await?;
     let mut result = Vec::new();
 

@@ -13,7 +13,8 @@ use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use futures_util::Stream;
-use schema::PERM_ADMIN_WRAPPER;
+use schema::{PERM_WRAPPER_COMMAND, PERM_WRAPPER_CONSOLE, PERM_WRAPPER_POWER, PERM_WRAPPER_VIEW};
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::convert::Infallible;
@@ -25,7 +26,7 @@ pub async fn status(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<WrapperState>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_VIEW)?;
     Ok(Json(state.wrappers.state(id)))
 }
 
@@ -41,7 +42,7 @@ pub async fn power(
     Path(id): Path<Uuid>,
     Json(req): Json<PowerReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_POWER)?;
     ops::power(&state, id, &req.action).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -57,7 +58,7 @@ pub async fn command(
     Path(id): Path<Uuid>,
     Json(req): Json<CommandReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_COMMAND)?;
     ops::command(&state, id, &req.line).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -74,7 +75,7 @@ pub async fn console(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<ConsoleBacklog>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_CONSOLE)?;
     let lines = state
         .wrappers
         .get(id)
@@ -94,7 +95,7 @@ pub async fn console_stream(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_CONSOLE)?;
     let rx = state.wrappers.require(id)?.subscribe();
 
     let stream = futures_util::stream::unfold(rx, |mut rx| async move {

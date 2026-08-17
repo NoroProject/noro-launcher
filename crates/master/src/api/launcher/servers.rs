@@ -3,6 +3,7 @@
 use super::messages::Tx;
 use crate::state::AppState;
 use schema::{ServerEntry, ServerWsMsg};
+
 use uuid::Uuid;
 
 /// Серверы, которые игрок вправе увидеть.
@@ -20,7 +21,7 @@ pub async fn visible_servers(
     };
     let is_admin = match &user_profile {
         Some(p) => {
-            p.has_permission(schema::PERM_ADMIN_SERVERS)
+            p.has_permission(schema::PERM_SERVERS_VIEW)
                 || p.has_permission(schema::PERM_ADMIN_ALL)
                 || p.has_permission(schema::PERM_SUPERADMIN)
         }

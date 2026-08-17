@@ -6,6 +6,7 @@ const props = defineProps<{ buildId: string }>()
 const emit = defineEmits<{ changed: [] }>()
 const auth = useAuth()
 const notify = useNotify()
+const { t } = useT()
 
 // ─── State ───
 const files = ref<BuildFileRow[]>([])
@@ -417,6 +418,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         v-if="viewMode === 'list'"
         :items="currentItems"
         :rule="rules.ruleFor"
+        :mode-hint="rules.MODE_HINT.value"
         @toggle-rule="toggleRule"
         :selected="selected"
         :sort-key="sortKey"
@@ -436,6 +438,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         v-else
         :items="currentItems"
         :rule="rules.ruleFor"
+        :mode-hint="rules.MODE_HINT.value"
         @toggle-rule="toggleRule"
         :selected="selected"
         :renaming-id="renamingId"
@@ -452,19 +455,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 
     <!-- Status bar -->
     <div class="flex items-center justify-between px-3 py-1.5 border-t border-[var(--noro-border-soft)] text-xs text-[var(--noro-muted)]">
-      <span>{{ currentItems.length }} items</span>
+      <span>{{ currentItems.length }} {{ t('admin-fm-items') }}</span>
       <div class="flex items-center gap-3">
         <button class="hover:text-[var(--noro-text)] transition flex items-center gap-1 font-mono" @click="rulesModalOpen = true">
           <UIcon name="i-lucide-route" class="size-3.5 text-[var(--noro-blue)]" />
-          {{ rules.count.value }} rules
+          {{ rules.count.value }} {{ t('admin-sync-rules-btn') }}
         </button>
-        <span v-if="selected.size">{{ selected.size }} selected</span>
+        <span v-if="selected.size">{{ selected.size }} {{ t('admin-fm-items') }}</span>
       </div>
     </div>
 
     <!-- Drop overlay -->
     <div v-if="dragging" class="fm-drop-overlay">
-      <UIcon name="i-lucide-upload" class="size-6 mr-2" /> Drop files to upload
+      <UIcon name="i-lucide-upload" class="size-6 mr-2" /> {{ t('admin-import-drop') }}
     </div>
 
     <!-- Context menu -->
@@ -475,6 +478,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
       :is-folder="ctxItem?.type === 'folder'"
       :is-text="ctxIsText"
       :sync-mode="ctxItem ? rules.ruleFor(ctxItem.path).mode : undefined"
+      :mode-hint="rules.MODE_HINT.value"
       @set-sync="setSyncFromMenu"
       :has-selection="selected.size > 0"
       @open="openItem(ctxItem!); closeCtx()"

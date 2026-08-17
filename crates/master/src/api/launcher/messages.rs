@@ -2,6 +2,7 @@
 
 use crate::state::AppState;
 use schema::{ClientWsMsg, ServerWsMsg};
+
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -81,7 +82,7 @@ pub async fn handle(
                     crate::audit::record_by_user(
                         state,
                         user_id,
-                        "integrity.findings",
+                        crate::audit::actions::INTEGRITY_FINDINGS,
                         serde_json::json!({
                             "count": saved,
                             "build_version": report.build_version,
@@ -101,7 +102,7 @@ pub async fn handle(
                 crate::audit::record_by_user(
                     state,
                     user_id,
-                    "game.start",
+                    crate::audit::actions::GAME_START,
                     serde_json::json!({ "server_id": server_id }),
                 )
                 .await;
@@ -130,7 +131,7 @@ pub async fn handle(
                 crate::audit::record_by_user(
                     state,
                     user_id,
-                    "game.stop",
+                    crate::audit::actions::GAME_STOP,
                     serde_json::json!({ "server_id": server_id, "playtime_secs": playtime_secs }),
                 )
                 .await;
@@ -198,6 +199,20 @@ async fn authenticate(
                 tracing::warn!(error = %e, "не удалось записать версию лаунчера");
             }
             let _ = tx.send(ServerWsMsg::AuthOk { user: profile });
+
+            // Отправляем накопившиеся запросы логов из очереди при входе
+            if let Ok(pending_requests) = crate::db::list_pending_for_user(&state.db, user_id).await {
+                for req in pending_requests {
+                    let _ = tx.send(ServerWsMsg::LogRequest {
+                        request_id: req.id,
+                        actor_username: req.actor_label,
+                        reason: req.reason,
+                        forced: req.forced,
+                        server_id: req.server_id,
+                        expires_at: req.expires_at,
+                    });
+                }
+            }
         }
         Some(_) => {
             let _ = tx.send(ServerWsMsg::AuthFail {

@@ -10,6 +10,8 @@ interface BlockedFile {
 }
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 const notify = useNotify()
 await auth.loadMe()
 
@@ -61,43 +63,50 @@ onMounted(() => load())
 </script>
 
 <template>
-  <NoroShell title="BLOCKLIST" subtitle="Files that must not be in a game folder">
+  <NoroShell :title="t('admin-blocklist-title')" :subtitle="t('admin-blocklist-subtitle')">
     <NoroNote class="mb-4">
-      SHA1 is defeated by changing one byte, a name mask by renaming. Both catch
-      the lazy, not the motivated — real coverage comes from the server side,
-      where an agent verifies the mod set over its own channel. The list ships
-      inside the signed manifest, so it cannot be swapped out on the client.
+      {{ t('admin-blocklist-note') }}
     </NoroNote>
 
     <section class="noro-panel mb-4 grid gap-4 p-4 md:grid-cols-[1fr_1fr_1fr_140px_auto]">
       <label class="block">
-        <span class="noro-label mb-1.5 block">Name mask</span>
-        <input v-model="pattern" class="noro-input w-full" placeholder="*xray*">
+        <span class="noro-label mb-1.5 block">{{ t('admin-blocklist-mask') }}</span>
+        <input v-model="pattern" class="noro-input w-full" :placeholder="t('admin-blocklist-mask-placeholder')">
       </label>
       <label class="block">
-        <span class="noro-label mb-1.5 block">SHA1</span>
-        <input v-model="sha1" class="noro-input w-full font-mono" placeholder="40 hex chars">
+        <span class="noro-label mb-1.5 block">{{ t('admin-blocklist-sha1') }}</span>
+        <input v-model="sha1" class="noro-input w-full font-mono" :placeholder="t('admin-blocklist-sha1-placeholder')">
       </label>
       <label class="block">
-        <span class="noro-label mb-1.5 block">Reason</span>
-        <input v-model="reason" class="noro-input w-full" placeholder="Known xray pack">
+        <span class="noro-label mb-1.5 block">{{ t('admin-blocklist-reason') }}</span>
+        <input v-model="reason" class="noro-input w-full" :placeholder="t('admin-blocklist-reason-placeholder')">
       </label>
       <label class="block">
-        <span class="noro-label mb-1.5 block">Action</span>
+        <span class="noro-label mb-1.5 block">{{ t('admin-blocklist-action') }}</span>
         <NoroSelect v-model="action" class="w-full">
-          <option value="delete">Delete</option>
-          <option value="flag">Flag only</option>
-          <option value="block_launch">Block launch</option>
+          <option value="delete">{{ t('admin-blocklist-act-delete') }}</option>
+          <option value="flag">{{ t('admin-blocklist-act-flag') }}</option>
+          <option value="block_launch">{{ t('admin-blocklist-act-block') }}</option>
         </NoroSelect>
       </label>
       <div class="flex items-end">
-        <AtomButton icon="i-lucide-plus" :loading="pending" @click="add">Add</AtomButton>
+        <AtomButton v-if="can('noro.admin.blocklist.edit')" icon="i-lucide-plus" :loading="pending" @click="add">
+          {{ t('admin-notes-add') }}
+        </AtomButton>
       </div>
     </section>
 
     <section v-if="rows.length" class="noro-panel overflow-x-auto">
       <table class="noro-table">
-        <thead><tr><th>Mask</th><th>SHA1</th><th>Reason</th><th>Action</th><th /></tr></thead>
+        <thead>
+          <tr>
+            <th>{{ t('admin-blocklist-mask') }}</th>
+            <th>{{ t('admin-blocklist-sha1') }}</th>
+            <th>{{ t('admin-blocklist-reason') }}</th>
+            <th>{{ t('admin-blocklist-action') }}</th>
+            <th />
+          </tr>
+        </thead>
         <tbody>
           <tr v-for="r in rows" :key="r.id">
             <td class="font-mono text-xs">{{ r.pattern || '—' }}</td>
@@ -109,10 +118,12 @@ onMounted(() => load())
                 :class="r.action === 'block_launch'
                   ? 'bg-[color-mix(in_srgb,var(--noro-magenta)_16%,transparent)] text-[var(--noro-magenta)]'
                   : 'bg-[var(--noro-input)] text-[var(--noro-muted)]'"
-              >{{ r.action }}</span>
+              >
+                {{ r.action === 'delete' ? t('admin-blocklist-act-delete') : r.action === 'flag' ? t('admin-blocklist-act-flag') : t('admin-blocklist-act-block') }}
+              </span>
             </td>
             <td class="text-right">
-              <AtomButton variant="dark" icon="i-lucide-trash-2" class="!min-h-8 !px-2" @click="remove(r.id)" />
+              <AtomButton v-if="can('noro.admin.blocklist.edit')" variant="dark" icon="i-lucide-trash-2" class="!min-h-8 !px-2" @click="remove(r.id)" />
             </td>
           </tr>
         </tbody>
@@ -122,8 +133,8 @@ onMounted(() => load())
     <EmptyState
       v-else
       icon="i-lucide-shield-x"
-      title="Nothing blocked"
-      text="Add a mask or a hash — the rules ship inside the signed manifest."
+      :title="t('admin-blocklist-empty-title')"
+      :text="t('admin-blocklist-empty-text')"
     />
   </NoroShell>
 </template>

@@ -20,6 +20,7 @@ pub mod oauth2;
 pub mod passkeys;
 pub mod punishments;
 pub mod queries;
+pub mod rules;
 pub mod sessions;
 pub mod support;
 
@@ -44,6 +45,7 @@ pub use oauth2::*;
 pub use passkeys::*;
 pub use punishments::*;
 pub use queries::*;
+pub use rules::*;
 pub use sessions::*;
 pub use support::*;
 

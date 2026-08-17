@@ -2,6 +2,8 @@
 import type { CapeRow } from '~/types/cape'
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 const notify = useNotify()
 await auth.loadMe()
 
@@ -95,19 +97,18 @@ async function deleteCape(id: string) {
 </script>
 
 <template>
-  <NoroShell title="CAPES" subtitle="Cape Catalog & Cosmetics Management">
+  <NoroShell :title="t('admin-capes-title')" :subtitle="t('admin-capes-subtitle')">
     <template #actions>
       <AtomButton
+        v-if="can('noro.admin.capes.edit')"
         icon="i-lucide-refresh-cw"
         variant="dark"
         :loading="pending"
         @click="refresh()"
       >
-        Refresh
+        {{ t('cabinet-apps-refresh') }}
       </AtomButton>
     </template>
-
-
 
     <UAlert v-if="error" class="mb-5" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
     <UAlert v-if="message" class="mb-5" color="success" variant="subtle" icon="i-lucide-check" :description="message" />
@@ -115,18 +116,18 @@ async function deleteCape(id: string) {
     <div class="grid gap-6 xl:grid-cols-[340px_1fr]">
       <!-- Upload Panel -->
       <section class="noro-panel flex flex-col p-6">
-        <h2 class="text-xl font-black text-[var(--noro-text)]">Add New Cape</h2>
+        <h2 class="text-xl font-black text-[var(--noro-text)]">{{ t('admin-capes-add-title') }}</h2>
         <p class="mt-1 text-xs text-[var(--noro-muted)]">
-          Upload 64x32 or 22x17 Minecraft cape PNG textures.
+          {{ t('admin-capes-add-subtitle') }}
         </p>
 
         <form class="mt-5 grid gap-4" @submit.prevent="uploadCape">
           <label class="block">
-            <span class="noro-label mb-1.5 block">Cape Name</span>
+            <span class="noro-label mb-1.5 block">{{ t('admin-capes-name-label') }}</span>
             <input
               v-model="name"
               class="noro-input w-full"
-              placeholder="e.g. Mojang 2011, Cherry Blossom"
+              :placeholder="t('admin-capes-name-placeholder')"
               maxlength="48"
             >
           </label>
@@ -144,9 +145,9 @@ async function deleteCape(id: string) {
             <div v-if="!preview" class="grid place-items-center gap-2">
               <UIcon name="i-lucide-upload-cloud" class="size-8 text-[var(--noro-cream)] transition-transform group-hover:scale-110" />
               <span class="text-xs font-bold text-[var(--noro-text)]">
-                {{ file ? file.name : 'Drop PNG file here or click to browse' }}
+                {{ file ? file.name : t('admin-capes-dropzone') }}
               </span>
-              <span class="text-[10px] text-[var(--noro-muted)]">PNG texture up to 512 KB</span>
+              <span class="text-[10px] text-[var(--noro-muted)]">{{ t('admin-capes-dropzone-hint') }}</span>
             </div>
 
             <div v-else class="flex flex-col items-center gap-2">
@@ -160,20 +161,21 @@ async function deleteCape(id: string) {
           </label>
 
           <AtomButton
+            v-if="can('noro.admin.capes.edit')"
             variant="primary"
             icon="i-lucide-upload"
             type="submit"
             :disabled="busy || !file || !name.trim()"
             class="mt-2 w-full justify-center"
           >
-            {{ busy ? 'Uploading…' : 'Upload Cape' }}
+            {{ busy ? t('admin-capes-uploading') : t('admin-capes-upload-btn') }}
           </AtomButton>
         </form>
       </section>
 
       <!-- Cape Catalog Minimal Grid -->
       <section class="noro-panel p-6">
-        <h2 class="noro-label mb-4">Cape Catalog Grid</h2>
+        <h2 class="noro-label mb-4">{{ t('admin-capes-grid-title') }}</h2>
 
         <div v-if="capes?.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           <UTooltip
@@ -220,8 +222,8 @@ async function deleteCape(id: string) {
         <EmptyState
           v-else
           icon="i-lucide-flag"
-          title="No capes in catalog"
-          text="Upload PNG cape textures to make them available for players to equip."
+          :title="t('admin-capes-empty-title')"
+          :text="t('admin-capes-empty-text')"
           class="min-h-[280px]"
         />
       </section>

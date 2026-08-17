@@ -5,6 +5,8 @@ import { toPermissionEntries } from '~/types/permissions'
 
 const route = useRoute()
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 await auth.loadMe()
 
 const id = computed(() => String(route.params.id))
@@ -60,7 +62,6 @@ async function run(name: string, action: () => Promise<void>) {
 }
 
 async function save() {
-  // Пустая строка из <select> — это «без родителя», а не роль с пустым id.
   const body = { ...form, parent_id: form.parent_id || null }
   await run('save', () => auth.request(`/api/admin/roles/${id.value}`, { method: 'PUT', body }))
 }
@@ -84,66 +85,64 @@ async function removePermission(entries: PermissionEntry[]) {
 </script>
 
 <template>
-  <NoroShell :title="role?.display_name || 'ROLE'" :subtitle="role?.name">
+  <NoroShell :title="role?.display_name || t('admin-roles-title')" :subtitle="role?.name">
     <template #actions>
-      <AtomButton variant="ghost" icon="i-lucide-arrow-left" :to="'/admin/roles'">Back</AtomButton>
+      <AtomButton variant="ghost" icon="i-lucide-arrow-left" :to="'/admin/roles'">{{ t('admin-role-back') }}</AtomButton>
     </template>
 
-    <EmptyState v-if="!role" icon="i-lucide-search-x" title="Role not found" />
+    <EmptyState v-if="!role" icon="i-lucide-search-x" :title="t('cabinet-roles-none-title')" />
 
     <div v-else class="grid gap-5 xl:grid-cols-[380px_1fr]">
       <form class="noro-panel grid gap-3 p-5" @submit.prevent="save">
-        <label><span class="noro-label">Display name</span><input v-model="form.display_name" class="noro-input" required></label>
-        <label><span class="noro-label">Color</span><input v-model="form.color" class="noro-input" type="color"></label>
-        <label><span class="noro-label">Order</span><input v-model.number="form.sort_order" class="noro-input" type="number"></label>
+        <label><span class="noro-label">{{ t('admin-roles-display-name') }}</span><input v-model="form.display_name" class="noro-input" required></label>
+        <label><span class="noro-label">{{ t('admin-roles-color') }}</span><input v-model="form.color" class="noro-input" type="color"></label>
+        <label><span class="noro-label">{{ t('admin-roles-order') }}</span><input v-model.number="form.sort_order" class="noro-input" type="number"></label>
         <label>
           <span class="noro-label">Icon</span>
           <input v-model="form.icon" class="noro-input" maxlength="8" placeholder="★">
           <span class="mt-2 block text-xs text-[var(--noro-muted)]">
-            A single character shown next to the name. Unicode works everywhere &mdash;
-            in the cabinet, in the launcher and in game chat.
+            {{ t('admin-role-icon-hint') }}
           </span>
         </label>
         <label>
-          <span class="noro-label">Inherits from</span>
+          <span class="noro-label">{{ t('admin-role-inherits-label') }}</span>
           <NoroSelect v-model="form.parent_id">
-            <option value="">Nothing — own permissions only</option>
+            <option value="">{{ t('admin-role-inherits-none') }}</option>
             <option v-for="item in parentOptions" :key="item.id" :value="item.id">
               {{ item.display_name }}
             </option>
           </NoroSelect>
           <span class="mt-2 block text-xs text-[var(--noro-muted)]">
-            Everything the parent grants applies here too, all the way up the chain.
-            A role cannot inherit from one that already inherits from it.
+            {{ t('admin-role-inherits-hint') }}
           </span>
         </label>
         <label>
-          <span class="noro-label">LuckPerms group</span>
+          <span class="noro-label">{{ t('admin-role-lp-label') }}</span>
           <input v-model="form.lp_group" class="noro-input" placeholder="vip">
           <span class="mt-2 block text-xs text-[var(--noro-muted)]">
-            Links this role to a group in game. Leave empty if the role should not
-            reach the server. Two roles cannot point at the same group.
+            {{ t('admin-role-lp-hint') }}
           </span>
         </label>
-        <UCheckbox v-model="form.is_default" label="Default role" />
+        <UCheckbox v-model="form.is_default" :label="t('admin-roles-is-default')" />
         <div class="flex gap-2">
           <AtomButton
+            v-if="can('noro.admin.roles.edit')"
             variant="primary"
             icon="i-lucide-save"
             :loading="busy === 'save'"
             type="submit"
             :disabled="busy === 'save'"
           >
-            Save
+            {{ t('cabinet-save') }}
           </AtomButton>
-          <AtomButton variant="danger" :loading="busy === 'delete'" icon="i-lucide-trash-2" @click="removeRole">Delete</AtomButton>
+          <AtomButton v-if="can('noro.admin.roles.edit')" variant="danger" :loading="busy === 'delete'" icon="i-lucide-trash-2" @click="removeRole">{{ t('admin-blocklist-act-delete') }}</AtomButton>
         </div>
       </form>
 
       <div class="grid gap-5">
         <AdminPermissionEditor
-          title="Role permissions"
-          subtitle="Everyone in this role gets them. Pick the builds a permission applies to, or all of them."
+          :title="t('admin-role-perms-title')"
+          :subtitle="t('admin-role-perms-subtitle')"
           :entries="permissions"
           :servers="servers"
           :busy="busy"

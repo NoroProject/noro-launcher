@@ -15,13 +15,14 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::http::header;
 use axum::response::Response;
-use schema::PERM_ADMIN_BACKUP;
+use schema::PERM_BACKUP;
+
 use tokio::process::Command;
 
 /// `GET /api/admin/backup` — дамп в формате `custom` (уже сжат, разворачивается
 /// через `pg_restore`).
 pub async fn download(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Response> {
-    admin.require(PERM_ADMIN_BACKUP)?;
+    admin.require(PERM_BACKUP)?;
 
     let mut child = Command::new("pg_dump")
         .arg("--format=custom")
@@ -40,7 +41,7 @@ pub async fn download(State(state): State<AppState>, admin: AdminAuth) -> AppRes
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| AppError::Other(anyhow::anyhow!("pg_dump без stdout")))?;
+        .ok_or_else(|| AppError::Other(anyhow::anyhow!("pg_dump produced no stdout")))?;
 
     // Ошибки pg_dump уходят в лог: тело ответа уже начало отдаваться, и
     // сообщить о них в HTTP-статусе нельзя.

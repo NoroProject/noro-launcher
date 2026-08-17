@@ -4,6 +4,7 @@
  * выбирается в момент установки.
  */
 const auth = useAuth();
+const { t } = useT();
 await auth.loadMe();
 
 // Контекст приходит ссылкой со страницы сборки или игрового сервера: цель
@@ -15,7 +16,7 @@ const gameServerId = computed(() => (route.query.gs as string) || undefined);
 </script>
 
 <template>
-    <NoroShell title="MOD CATALOG" subtitle="Modrinth and CurseForge in one place">
+    <NoroShell :title="t('admin-mods-title')" :subtitle="t('admin-mods-subtitle')">
         <ModsBrowser
             :server-id="serverId"
             :build-id="buildId"

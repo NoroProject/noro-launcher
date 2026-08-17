@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const route = useRoute()
 const auth = useAuth()
+const { t } = useT()
 
 definePageMeta({
   layout: false
@@ -25,7 +26,7 @@ const errorMsg = ref<string | null>(null)
 
 onMounted(async () => {
   if (!clientId.value || !redirectUri.value) {
-    errorMsg.value = 'Отсутствуют обязательные параметры: client_id и redirect_uri'
+    errorMsg.value = 'Missing required query parameters: client_id and redirect_uri'
     return
   }
 
@@ -50,7 +51,7 @@ onMounted(async () => {
         id: 'noro_launcher',
         client_id: clientId.value,
         name: clientId.value === 'noro_launcher' ? 'Noro Launcher' : clientId.value,
-        description: 'Доступ к вашему игровому профилю и скинам Noro Network',
+        description: t('cabinet-apps-default-desc'),
         icon_url: null,
         is_official: true
       }
@@ -60,7 +61,7 @@ onMounted(async () => {
       id: clientId.value,
       client_id: clientId.value,
       name: clientId.value === 'noro_launcher' ? 'Noro Launcher' : clientId.value,
-      description: 'Доступ к вашему игровому профилю и скинам Noro Network',
+      description: t('cabinet-apps-default-desc'),
       icon_url: null,
       is_official: true
     }
@@ -112,7 +113,7 @@ function onDeny() {
     <div class="noro-panel relative z-10 w-full max-w-md border border-[var(--noro-border)] bg-[var(--noro-panel)]/90 p-8 shadow-2xl backdrop-blur-xl md:p-10">
       <div v-if="busy && !appInfo" class="flex flex-col items-center justify-center gap-4 py-12">
         <UIcon name="i-lucide-loader-2" class="size-8 animate-spin text-[var(--noro-magenta)]" />
-        <span class="text-sm font-semibold text-[var(--noro-muted)]">Загрузка информации о приложении...</span>
+        <span class="text-sm font-semibold text-[var(--noro-muted)]">{{ t('oauth-loading-app') }}</span>
       </div>
 
       <template v-else>
@@ -124,14 +125,14 @@ function onDeny() {
 
           <div class="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--noro-magenta)]/30 bg-[var(--noro-magenta)]/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--noro-magenta)]">
             <UIcon name="i-lucide-badge-check" class="size-3.5" />
-            Официальное приложение
+            {{ t('oauth-official-app') }}
           </div>
 
           <h1 class="noro-pixel text-2xl text-[var(--noro-cream)]">
             {{ appInfo?.name || clientId }}
           </h1>
           <p class="mt-2 text-xs leading-relaxed text-[var(--noro-muted)]">
-            {{ appInfo?.description || 'Приложение запрашивает доступ к вашему аккаунту Noro Network.' }}
+            {{ appInfo?.description || t('oauth-app-access-request') }}
           </p>
         </div>
 
@@ -141,16 +142,16 @@ function onDeny() {
           </div>
           <div class="min-w-0 flex-1">
             <div class="truncate text-sm font-bold text-[var(--noro-cream)]">{{ auth.user.value.username }}</div>
-            <div class="truncate text-xs text-[var(--noro-muted)]">Discord: {{ auth.user.value.discord_username || 'Подключён' }}</div>
+            <div class="truncate text-xs text-[var(--noro-muted)]">{{ t('oauth-discord-connected') }}</div>
           </div>
           <UIcon name="i-lucide-check-circle-2" class="size-5 text-[var(--noro-green)]" />
         </div>
 
         <div class="mb-6 rounded-xl border border-[var(--noro-border)] bg-[var(--noro-bg)]/60 p-4">
-          <div class="mb-2 text-[10px] font-black uppercase tracking-wider text-[var(--noro-muted)]">Запрашиваемые разрешения</div>
+          <div class="mb-2 text-[10px] font-black uppercase tracking-wider text-[var(--noro-muted)]">{{ t('oauth-requested-permissions') }}</div>
           <div class="flex items-center gap-2.5 text-xs font-semibold text-[var(--noro-text)]">
             <UIcon name="i-lucide-user-check" class="size-4 text-[var(--noro-magenta)]" />
-            <span>Профиль пользователя и игровой ник ({{ scope }})</span>
+            <span>{{ t('oauth-scope-profile', { scope }) }}</span>
           </div>
         </div>
 
@@ -170,7 +171,7 @@ function onDeny() {
             :disabled="busy"
             @click="onDeny"
           >
-            Отклонить
+            {{ t('oauth-deny') }}
           </button>
 
           <button
@@ -180,7 +181,7 @@ function onDeny() {
             @click="onAuthorize"
           >
             <UIcon v-if="busy" name="i-lucide-loader-2" class="size-4 animate-spin" />
-            <span v-else>Разрешить доступ</span>
+            <span v-else>{{ t('oauth-allow') }}</span>
           </button>
         </div>
       </template>

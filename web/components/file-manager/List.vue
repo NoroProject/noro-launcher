@@ -2,10 +2,8 @@
 export interface FmItem {
   type: 'folder' | 'file'
   name: string
-  /** Полный путь от корня сборки; у папок — с косой чертой на конце. */
   path: string
   id?: string
-  /** Адрес в контент-адресуемом хранилище: по нему файл и скачивается. */
   sha1?: string
   size?: number
   kind?: string
@@ -14,14 +12,16 @@ export interface FmItem {
 
 const props = defineProps<{
   items: FmItem[]
-  /** Режим синхронизации пути с учётом наследования от папок. */
   rule: (path: string) => RuleState
   selected: Set<string>
   sortKey: string
   sortAsc: boolean
   renamingId: string | null
   renameValue: string
+  modeHint?: Record<SyncMode, string>
 }>()
+
+const { t } = useT()
 
 const emit = defineEmits<{
   select: [id: string, ev: MouseEvent]
@@ -46,12 +46,12 @@ function fmtSize(b?: number) {
   return `${(b / 1048576).toFixed(1)} MB`
 }
 
-const cols = [
-  { key: 'name', label: 'Name', cls: '' },
-  { key: 'sync', label: 'Sync', cls: 'w-16 text-center' },
-  { key: 'size', label: 'Size', cls: 'w-24 text-right' },
-  { key: 'kind', label: 'Kind', cls: 'w-28' },
-]
+const cols = computed(() => [
+  { key: 'name', label: t('admin-fm-col-name'), cls: '' },
+  { key: 'sync', label: t('admin-fm-col-sync'), cls: 'w-16 text-center' },
+  { key: 'size', label: t('admin-fm-col-size'), cls: 'w-24 text-right' },
+  { key: 'kind', label: t('admin-fm-col-kind'), cls: 'w-28' },
+])
 
 const MODE_CLASS: Record<SyncMode, string> = {
   sync: 'text-[var(--noro-cream)]',
@@ -59,10 +59,10 @@ const MODE_CLASS: Record<SyncMode, string> = {
   user: 'text-[var(--noro-magenta)]',
 }
 
-/** Подпись как у прав доступа: буква режима плюс откуда он взялся. */
 function ruleTitle(path: string) {
   const r = props.rule(path)
-  return r.from ? `${MODE_HINT[r.mode]} (inherited from ${r.from})` : MODE_HINT[r.mode]
+  const hint = props.modeHint ? props.modeHint[r.mode] : r.mode
+  return r.from ? `${hint} (inherited from ${r.from})` : hint
 }
 
 function sortIcon(key: string) {
@@ -111,11 +111,6 @@ function iconColor(it: FmItem) {
         </tr>
       </thead>
       <tbody>
-        <!--
-          .stop у contextmenu обязателен: без него событие всплывает к
-          обработчику фона, который сбрасывает выделение, и меню открывается
-          без действий над файлом. В Grid.vue это уже учтено.
-        -->
         <tr
           v-for="it in items"
           :key="itemKey(it)"
@@ -145,9 +140,6 @@ function iconColor(it: FmItem) {
             </span>
           </td>
           <td class="text-center">
-            <!-- Режим синхронизации, как права доступа: клик перебирает по кругу.
-                 Унаследованное от папки показано приглушённо — первый клик по
-                 нему задаёт файлу собственное правило. -->
             <button
               class="font-mono text-xs font-bold hover:opacity-100"
               :class="[MODE_CLASS[rule(it.path).mode], rule(it.path).from ? 'opacity-40' : '']"
@@ -158,15 +150,15 @@ function iconColor(it: FmItem) {
             </button>
           </td>
           <td class="text-right text-[var(--noro-muted)]">
-            {{ it.type === 'file' ? fmtSize(it.size) : `${it.count} items` }}
+            {{ it.type === 'file' ? fmtSize(it.size) : `${it.count} ${t('admin-fm-items')}` }}
           </td>
           <td class="text-[var(--noro-muted)]">
-            {{ it.type === 'folder' ? 'Folder' : (it.kind || 'File') }}
+            {{ it.type === 'folder' ? t('admin-fm-folder') : (it.kind || 'File') }}
           </td>
         </tr>
         <tr v-if="!items.length">
           <td colspan="4" class="text-center text-[var(--noro-muted)] py-8">
-            Empty folder
+            {{ t('admin-fm-empty') }}
           </td>
         </tr>
       </tbody>

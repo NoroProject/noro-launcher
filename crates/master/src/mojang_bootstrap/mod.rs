@@ -18,6 +18,7 @@ mod processor_java;
 use crate::state::AppState;
 use anyhow::{Context, Result};
 use schema::{ArtifactKind, Modloader};
+
 use std::str::FromStr;
 
 /// Контекст одной операции bootstrap для конкретной сборки.

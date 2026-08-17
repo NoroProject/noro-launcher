@@ -10,7 +10,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
-use schema::{RemoteAction, PERM_ADMIN_USERS};
+use schema::{RemoteAction, PERM_USERS_LAUNCHER};
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -21,9 +22,9 @@ pub async fn request_diagnostics(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_LAUNCHER)?;
     if !state.ws.is_user_connected(id) {
-        return Err(AppError::BadRequest("лаунчер не в сети".into()));
+        return Err(AppError::BadRequest("launcher is offline".into()));
     }
     state
         .ws
@@ -37,7 +38,7 @@ pub async fn diagnostics(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_LAUNCHER)?;
     Ok(Json(
         match crate::db::latest_diagnostics(&state.db, id).await? {
             Some(v) => v,
@@ -60,9 +61,9 @@ pub async fn run_action(
     Path(id): Path<Uuid>,
     Json(req): Json<ActionReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_LAUNCHER)?;
     if !state.ws.is_user_connected(id) {
-        return Err(AppError::BadRequest("лаунчер не в сети".into()));
+        return Err(AppError::BadRequest("launcher is offline".into()));
     }
 
     state.ws.send_to_user(
@@ -77,7 +78,7 @@ pub async fn run_action(
     audit::record(
         &state,
         &admin.actor,
-        "user.remote_action",
+        audit::actions::REMOTE_ACTION,
         audit::target("user", id),
         json!({ "action": req.action.as_str(), "server_id": req.server_id }),
     )

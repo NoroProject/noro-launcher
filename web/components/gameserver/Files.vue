@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const auth = useAuth()
+const can = (perm: string) => auth.hasPermission(perm)
 import type { GameServer } from "~/types/game-server";
 import type { ServerEntry } from "~/types/wrapper";
 
@@ -170,7 +172,8 @@ watch(
                     >{{ crumb.label }}</button>
                 </template>
             </nav>
-            <form class="flex gap-2" @submit.prevent="createFolder">
+            <!-- Создание папки — запись на машине, отдельно от просмотра. -->
+            <form v-if="can('noro.admin.wrapper.files')" class="flex gap-2" @submit.prevent="createFolder">
                 <input
                     v-model="newFolder"
                     class="noro-input h-9 w-40 text-xs"

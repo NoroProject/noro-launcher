@@ -59,7 +59,7 @@ async fn from_modrinth(state: &AppState, version_id: &str) -> AppResult<Resolved
         .iter()
         .find(|f| f["primary"].as_bool() == Some(true))
         .or_else(|| files.first())
-        .ok_or_else(|| AppError::BadRequest("у версии Modrinth нет файлов".into()))?;
+        .ok_or_else(|| AppError::BadRequest("this Modrinth version has no files".into()))?;
 
     let stored = state
         .files

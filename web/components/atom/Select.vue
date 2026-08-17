@@ -17,7 +17,9 @@ const emit = defineEmits<{
 
 const open = ref(false)
 const query = ref('')
-const dropUp = ref(false)
+
+const anchor = ref<HTMLElement | null>(null)
+const { style: popupStyle } = useAnchoredPopup(anchor, open)
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
@@ -44,23 +46,16 @@ function commit() {
 
 function focusInput(event: FocusEvent) {
   open.value = true
-  const input = event.target as HTMLInputElement
-  updateDropDirection(input)
-  input.select()
-}
-
-function updateDropDirection(input: HTMLInputElement) {
-  const rect = input.getBoundingClientRect()
-  const below = window.innerHeight - rect.bottom
-  dropUp.value = below < 280 && rect.top > below
+  ;(event.target as HTMLInputElement).select()
 }
 </script>
 
 <template>
-  <label class="relative block">
+  <label class="block">
     <span class="noro-label">{{ label }}</span>
     <div class="relative">
       <input
+        ref="anchor"
         v-model="query"
         class="noro-input pr-10"
         :placeholder="placeholder"
@@ -75,24 +70,26 @@ function updateDropDirection(input: HTMLInputElement) {
         :class="loading ? 'animate-spin' : ''"
       />
     </div>
-    <div
-      v-if="open"
-      class="absolute z-50 max-h-64 w-full overflow-auto rounded-lg bg-[var(--noro-input)] p-1"
-      :class="dropUp ? 'bottom-full mb-2' : 'mt-2'"
-      @mousedown.prevent
-    >
-      <button
-        v-for="option in filtered"
-        :key="option"
-        type="button"
-        class="block w-full rounded px-3 py-1.5 text-left text-sm text-[var(--noro-text)] hover:bg-[var(--noro-cream)] hover:text-[var(--noro-on-cream)] focus:bg-[var(--noro-cream)] focus:text-[var(--noro-on-cream)]"
-        @click="select(option)"
+    <Teleport to="body">
+      <div
+        v-if="open"
+        class="noro-scroll z-[60] overflow-auto rounded-lg border border-[var(--noro-border)] bg-[var(--noro-input)] p-1"
+        :style="popupStyle"
+        @mousedown.prevent
       >
-        {{ option }}
-      </button>
-      <div v-if="!filtered.length" class="px-3 py-3 text-sm text-[var(--noro-muted)]">
-        No matches. Press tab to keep typed value.
+        <button
+          v-for="option in filtered"
+          :key="option"
+          type="button"
+          class="block w-full rounded px-3 py-1.5 text-left text-sm text-[var(--noro-text)] hover:bg-[var(--noro-cream)] hover:text-[var(--noro-on-cream)] focus:bg-[var(--noro-cream)] focus:text-[var(--noro-on-cream)]"
+          @click="select(option)"
+        >
+          {{ option }}
+        </button>
+        <div v-if="!filtered.length" class="px-3 py-3 text-sm text-[var(--noro-muted)]">
+          No matches. Press tab to keep typed value.
+        </div>
       </div>
-    </div>
+    </Teleport>
   </label>
 </template>

@@ -15,6 +15,7 @@ defineEmits<{
     "update:allowSuggestions": [value: boolean];
 }>();
 
+const { t } = useT();
 const expanded = ref<Record<number, boolean>>({});
 
 function toggleExpand(index: number) {
@@ -38,9 +39,9 @@ function setFiles(mod: OptionalMod, value: string) {
                     <UIcon name="i-lucide-package-plus" class="size-6" />
                 </div>
                 <div>
-                    <h2 class="font-bold text-[var(--noro-text)]">Optional Mods</h2>
+                    <h2 class="font-bold text-[var(--noro-text)]">{{ t('admin-optmods-title') }}</h2>
                     <p class="text-xs text-[var(--noro-muted)] uppercase tracking-wider">
-                        {{ optionalMods?.length || 0 }} mods configured
+                        {{ t('admin-optmods-configured', { count: optionalMods?.length || 0 }) }}
                     </p>
                 </div>
             </div>
@@ -48,7 +49,7 @@ function setFiles(mod: OptionalMod, value: string) {
             <div class="flex items-center gap-4">
                 <AtomToggle
                     :model-value="allowSuggestions"
-                    label="Allow Mod Suggestions"
+                    :label="t('admin-optmods-allow-suggestions')"
                     :loading="busy === 'optional-toggle'"
                     @update:model-value="$emit('update:allowSuggestions', $event)"
                 />
@@ -61,7 +62,7 @@ function setFiles(mod: OptionalMod, value: string) {
                     size="sm"
                     @click="$emit('save')"
                 >
-                    Save Optional Mods
+                    {{ t('admin-optmods-save') }}
                 </AtomButton>
             </div>
         </div>
@@ -71,8 +72,8 @@ function setFiles(mod: OptionalMod, value: string) {
                 <div class="mx-auto mb-2 grid size-10 place-items-center rounded-lg bg-[var(--noro-input)]">
                     <UIcon name="i-lucide-box-select" class="size-5 text-[var(--noro-cream)]" />
                 </div>
-                <div class="text-sm font-bold text-[var(--noro-text)]">No optional mods</div>
-                <p class="mt-1 max-w-[220px] text-[10px] text-[var(--noro-muted)]">Players can enable optional components.</p>
+                <div class="text-sm font-bold text-[var(--noro-text)]">{{ t('admin-optmods-empty-title') }}</div>
+                <p class="mt-1 max-w-[220px] text-[10px] text-[var(--noro-muted)]">{{ t('admin-optmods-empty-text') }}</p>
             </div>
 
             <div v-else class="grid gap-3">
@@ -81,7 +82,6 @@ function setFiles(mod: OptionalMod, value: string) {
                     :key="index"
                     class="group flex flex-col rounded-xl border border-[var(--noro-border)] bg-black/20 transition-all hover:border-[var(--noro-cream)]/40 overflow-hidden"
                 >
-                    <!-- Collapsed Header / Summary Bar -->
                     <div
                         class="flex items-center justify-between gap-3 p-4 cursor-pointer select-none bg-black/10 hover:bg-black/30 transition-colors"
                         @click="toggleExpand(index)"
@@ -94,14 +94,14 @@ function setFiles(mod: OptionalMod, value: string) {
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2">
                                     <span class="font-bold text-sm text-[var(--noro-text)] truncate">
-                                        {{ mod.name || 'Untitled Optional Mod' }}
+                                        {{ mod.name || t('admin-optmods-untitled') }}
                                     </span>
                                     <UBadge v-if="mod.category" color="neutral" variant="subtle" size="xs" class="shrink-0">
                                         {{ mod.category }}
                                     </UBadge>
                                 </div>
                                 <p class="text-xs text-[var(--noro-muted)] truncate mt-0.5">
-                                    {{ mod.description || 'No description provided.' }}
+                                    {{ mod.description || '—' }}
                                 </p>
                             </div>
                         </div>
@@ -124,14 +124,12 @@ function setFiles(mod: OptionalMod, value: string) {
                         </div>
                     </div>
 
-                    <!-- Expanded Edit Fields Form -->
                     <div v-if="expanded[index]" class="p-5 border-t border-[var(--noro-border)]/40 grid gap-4 bg-black/20">
                         <div class="grid gap-4 md:grid-cols-3">
-                            <!-- Primary Info -->
                             <div class="md:col-span-2 grid gap-4">
                                 <div class="grid gap-4 sm:grid-cols-2">
                                     <label class="block">
-                                        <span class="noro-label-xs">Display Name</span>
+                                        <span class="noro-label-xs">{{ t('admin-optmods-display-name') }}</span>
                                         <input
                                             v-model="mod.name"
                                             class="noro-input-sm mt-1 w-full"
@@ -139,7 +137,7 @@ function setFiles(mod: OptionalMod, value: string) {
                                         />
                                     </label>
                                     <label class="block">
-                                        <span class="noro-label-xs">Category</span>
+                                        <span class="noro-label-xs">{{ t('admin-optmods-category') }}</span>
                                         <input
                                             v-model="mod.category"
                                             class="noro-input-sm mt-1 w-full"
@@ -147,7 +145,7 @@ function setFiles(mod: OptionalMod, value: string) {
                                         />
                                     </label>
                                     <label class="block">
-                                        <span class="noro-label-xs">Author</span>
+                                        <span class="noro-label-xs">{{ t('admin-optmods-author') }}</span>
                                         <input
                                             v-model="mod.author"
                                             class="noro-input-sm mt-1 w-full"
@@ -155,7 +153,7 @@ function setFiles(mod: OptionalMod, value: string) {
                                         />
                                     </label>
                                     <label class="block">
-                                        <span class="noro-label-xs">Icon URL</span>
+                                        <span class="noro-label-xs">{{ t('admin-optmods-icon-url') }}</span>
                                         <input
                                             v-model="mod.icon_url"
                                             class="noro-input-sm mt-1 w-full font-mono"
@@ -165,7 +163,7 @@ function setFiles(mod: OptionalMod, value: string) {
                                 </div>
 
                                 <label class="block">
-                                    <span class="noro-label-xs">Files (CSV)</span>
+                                    <span class="noro-label-xs">{{ t('admin-optmods-files-csv') }}</span>
                                     <input
                                         class="noro-input-sm mt-1 w-full font-mono"
                                         :value="mod.files.join(', ')"
@@ -175,25 +173,22 @@ function setFiles(mod: OptionalMod, value: string) {
                                 </label>
                             </div>
 
-                            <!-- Config & Meta -->
                             <div class="flex flex-col gap-4 rounded-lg bg-black/20 p-4 border border-[var(--noro-border)]/30">
-                                <span class="noro-label-xs uppercase tracking-widest text-[var(--noro-muted)]">Behavior</span>
+                                <span class="noro-label-xs uppercase tracking-widest text-[var(--noro-muted)]">{{ t('admin-optmods-behavior') }}</span>
                                 <div class="grid gap-3">
-                                    <UCheckbox v-model="mod.enabled_by_default" label="Enabled by default" class="text-xs" />
-                                    <UCheckbox v-model="mod.visible" label="Visible in UI" class="text-xs" />
-                                    <UCheckbox v-model="mod.limited" label="Restricted access" class="text-xs" />
+                                    <UCheckbox v-model="mod.enabled_by_default" :label="t('admin-optmods-enabled-default')" class="text-xs" />
+                                    <UCheckbox v-model="mod.visible" :label="t('admin-optmods-visible')" class="text-xs" />
+                                    <UCheckbox v-model="mod.limited" :label="t('admin-optmods-restricted')" class="text-xs" />
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Description -->
                         <div class="pt-2">
                             <label class="block">
-                                <span class="noro-label-xs">Description</span>
+                                <span class="noro-label-xs">{{ t('admin-blocklist-reason') }}</span>
                                 <textarea
                                     v-model="mod.description"
                                     class="noro-input-sm mt-1 w-full min-h-[60px] resize-none"
-                                    placeholder="What does this mod do? This will be shown in the launcher."
                                 />
                             </label>
                         </div>
@@ -201,7 +196,6 @@ function setFiles(mod: OptionalMod, value: string) {
                 </div>
             </div>
 
-            <!-- Bottom Save Bar -->
             <div v-if="optionalMods?.length" class="mt-6 flex justify-end">
                 <AtomButton
                     variant="primary"
@@ -210,7 +204,7 @@ function setFiles(mod: OptionalMod, value: string) {
                     size="md"
                     @click="$emit('save')"
                 >
-                    Save Optional Mods
+                    {{ t('admin-optmods-save') }}
                 </AtomButton>
             </div>
         </div>

@@ -2,6 +2,8 @@
 import { INTEGRITY_LABELS, type IntegrityFlag } from '~/types/integrity'
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 const notify = useNotify()
 await auth.loadMe()
 
@@ -41,28 +43,33 @@ onMounted(() => load())
 </script>
 
 <template>
-  <NoroShell title="INTEGRITY" subtitle="What launchers found before starting the game">
+  <NoroShell :title="t('admin-integrity-title')" :subtitle="t('admin-integrity-subtitle')">
     <template #actions>
       <AtomButton icon="i-lucide-refresh-cw" variant="dark" :loading="pending" @click="load()">
-        Refresh
+        {{ t('cabinet-apps-refresh') }}
       </AtomButton>
     </template>
 
     <NoroNote class="mb-4">
-      Client-side signal, not proof: the launcher is open source and a patched
-      build reports whatever it likes. Treat these as a reason to look, never as
-      grounds for an automatic ban.
+      {{ t('admin-integrity-note') }}
     </NoroNote>
 
     <label class="mb-4 flex items-center gap-2 text-xs text-[var(--noro-muted)]">
       <input v-model="onlyOpen" type="checkbox" class="size-4">
-      Unreviewed only
+      {{ t('admin-integrity-unreviewed-only') }}
     </label>
 
     <section v-if="rows.length" class="noro-panel overflow-x-auto">
       <table class="noro-table">
         <thead>
-          <tr><th>When</th><th>Finding</th><th>Subject</th><th>Build</th><th>Player</th><th /></tr>
+          <tr>
+            <th>{{ t('admin-integrity-col-when') }}</th>
+            <th>{{ t('admin-integrity-col-finding') }}</th>
+            <th>{{ t('admin-integrity-col-subject') }}</th>
+            <th>{{ t('admin-integrity-col-build') }}</th>
+            <th>{{ t('admin-integrity-col-player') }}</th>
+            <th />
+          </tr>
         </thead>
         <tbody>
           <tr v-for="row in rows" :key="row.id">
@@ -74,7 +81,7 @@ onMounted(() => load())
                   ? 'bg-[color-mix(in_srgb,var(--noro-magenta)_16%,transparent)] text-[var(--noro-magenta)]'
                   : 'bg-[color-mix(in_srgb,var(--noro-muted)_16%,transparent)] text-[var(--noro-muted)]'"
               >{{ INTEGRITY_LABELS[row.kind] }}</span>
-              <span v-if="row.repaired" class="ml-2 text-[10px] text-[var(--noro-muted)]">repaired</span>
+              <span v-if="row.repaired" class="ml-2 text-[10px] text-[var(--noro-muted)]">{{ t('admin-integrity-repaired') }}</span>
             </td>
             <td class="font-mono text-xs">
               {{ row.subject }}
@@ -82,22 +89,22 @@ onMounted(() => load())
             </td>
             <td class="whitespace-nowrap text-xs">
               {{ row.build_version || '—' }}
-              <div class="text-[10px] text-[var(--noro-muted)]">launcher {{ row.launcher_version || '—' }}</div>
+              <div class="text-[10px] text-[var(--noro-muted)]">{{ t('admin-integrity-launcher') }} {{ row.launcher_version || '—' }}</div>
             </td>
             <td>
               <NuxtLink :to="`/admin/users/${row.user_id}`" class="text-xs underline hover:text-[var(--noro-cream)]">
-                open card
+                {{ t('admin-integrity-open-card') }}
               </NuxtLink>
             </td>
             <td class="text-right">
               <AtomButton
-                v-if="!row.reviewed_at"
+                v-if="!row.reviewed_at && can('noro.admin.integrity.review')"
                 variant="dark"
                 icon="i-lucide-check"
                 class="!min-h-8 !px-2"
                 @click="review(row.id)"
               />
-              <span v-else class="text-[10px] text-[var(--noro-muted)]">reviewed</span>
+              <span v-else class="text-[10px] text-[var(--noro-muted)]">{{ t('admin-integrity-reviewed') }}</span>
             </td>
           </tr>
         </tbody>
@@ -107,8 +114,8 @@ onMounted(() => load())
     <EmptyState
       v-else-if="!pending"
       icon="i-lucide-shield-check"
-      title="Nothing flagged"
-      text="Launchers verify mods and configs against the signed manifest before every launch."
+      :title="t('admin-integrity-empty-title')"
+      :text="t('admin-integrity-empty-text')"
     />
   </NoroShell>
 </template>

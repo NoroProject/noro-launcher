@@ -92,7 +92,7 @@ impl FromRequestParts<AppState> for SetupAuth {
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "))
             .map(str::trim)
-            .ok_or_else(|| AppError::Unauthorized("нет setup-токена".into()))?;
+            .ok_or_else(|| AppError::Unauthorized("missing setup token".into()))?;
 
         if verify_token(&state.db, token)
             .await
@@ -100,7 +100,9 @@ impl FromRequestParts<AppState> for SetupAuth {
         {
             Ok(SetupAuth)
         } else {
-            Err(AppError::Unauthorized("setup-токен не подошёл".into()))
+            Err(AppError::Unauthorized(
+                "the setup token did not match".into(),
+            ))
         }
     }
 }

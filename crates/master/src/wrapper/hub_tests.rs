@@ -92,7 +92,7 @@ async fn call_without_a_reader_fails_immediately() {
         .await
         .unwrap_err()
         .to_string();
-    assert!(error.contains("отключился"), "{error}");
+    assert!(error.contains("disconnected"), "{error}");
 }
 
 #[test]

@@ -10,7 +10,8 @@ use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use schema::PERM_ADMIN_BUILDS;
+use schema::PERM_MODS_VIEW;
+
 use serde::{Deserialize, Serialize};
 
 pub async fn search(
@@ -66,7 +67,7 @@ pub async fn categories(
     admin: AdminAuth,
     Query(q): Query<CategoryQuery>,
 ) -> AppResult<Json<Vec<Category>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_MODS_VIEW)?;
     let provider = catalog::provider_of(&q.provider)?;
     Ok(Json(
         catalog::categories(&state, provider, &q.project_type).await?,
@@ -86,7 +87,7 @@ pub async fn providers(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<Providers>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_MODS_VIEW)?;
     Ok(Json(Providers {
         modrinth: true,
         curseforge: state.config.curseforge_api_key.is_some(),

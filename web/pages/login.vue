@@ -2,6 +2,7 @@
 const route = useRoute()
 const auth = useAuth()
 const notify = useNotify()
+const { t } = useT()
 
 const busy = ref(false)
 const message = ref<string | null>(null)
@@ -77,11 +78,14 @@ onMounted(async () => {
   <div class="grid min-h-screen place-items-center px-4">
     <div class="noro-panel grid w-full max-w-5xl overflow-hidden p-0 md:grid-cols-[420px_1fr]">
       <section class="p-8 md:p-12">
-        <div class="mb-12 flex items-center gap-3">
-          <div class="grid size-12 place-items-center rounded-lg">
-            <img src="/icon.png" />
+        <div class="mb-12 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="grid size-12 place-items-center rounded-lg">
+              <img src="/icon.png" />
+            </div>
+            <div class="text-xs font-black uppercase tracking-wider text-[var(--noro-muted)]">{{ t('login-secure-login') }}</div>
           </div>
-          <div class="text-xs font-black uppercase tracking-wider text-[var(--noro-muted)]">Secure login</div>
+          <LocaleSwitch />
         </div>
 
         <div>
@@ -99,7 +103,7 @@ onMounted(async () => {
 
         <div class="mt-8 space-y-3">
           <NuxtLink :to="loginHref" class="noro-cta block w-full px-6 py-4 text-center font-bold">
-            {{ busy || auth.loading.value ? 'WAITING...' : 'SIGN IN WITH DISCORD' }}
+            {{ busy || auth.loading.value ? t('login-waiting') : t('login-discord') }}
           </NuxtLink>
 
           <button
@@ -109,7 +113,7 @@ onMounted(async () => {
             @click="loginWithPasskey"
           >
             <UIcon name="i-lucide-key-round" class="size-4 text-[var(--noro-blue)]" />
-            SIGN IN WITH PASSKEY
+            {{ t('login-passkey') }}
           </button>
 
           <!-- Не «аварийный вариант»: passkey нельзя привязать по http:// без
@@ -120,21 +124,21 @@ onMounted(async () => {
             class="w-full py-2 text-[11px] font-bold uppercase tracking-wider text-[var(--noro-muted)] hover:text-[var(--noro-cream)] transition"
             @click="showRecovery = true"
           >
-            Use a recovery code
+            {{ t('login-recovery-toggle') }}
           </button>
 
           <form v-else class="grid gap-2 rounded-lg border border-[var(--noro-border)] p-4" @submit.prevent="loginWithRecovery">
-            <input v-model="recoveryUser" class="noro-input w-full" placeholder="Username" autocomplete="username">
+            <input v-model="recoveryUser" class="noro-input w-full" :placeholder="t('login-username-placeholder')" autocomplete="username">
             <input v-model="recoveryCode" class="noro-input w-full font-mono" placeholder="XXXX-XXXX-XXXX">
             <button
               type="submit"
               class="noro-cta w-full px-6 py-3 text-center text-xs font-bold"
               :disabled="busy || !recoveryUser.trim() || !recoveryCode.trim()"
             >
-              SIGN IN
+              {{ t('login-submit') }}
             </button>
             <p class="text-[10px] text-[var(--noro-muted)]">
-              Each code works once. After signing in, bind a passkey — that is what the next login should rest on.
+              {{ t('login-recovery-hint') }}
             </p>
           </form>
         </div>

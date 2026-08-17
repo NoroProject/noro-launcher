@@ -2,6 +2,7 @@
 import type { AgentFile } from '~/types/agent'
 
 const props = defineProps<{ agents: AgentFile[] }>()
+const { t } = useT()
 
 const ICONS: Record<string, string> = {
   paper: 'i-lucide-file-text',
@@ -46,23 +47,22 @@ function sizeKb(bytes: number) {
         <UIcon name="i-lucide-package" class="size-5" />
       </div>
       <div>
-        <h3 class="text-lg font-black text-white">Agents</h3>
+        <h3 class="text-lg font-black text-white">{{ t('admin-agent-title') }}</h3>
         <p class="text-sm text-[var(--noro-muted)]">
-          The wrapper installs these itself — download one only to place it by hand.
+          {{ t('admin-agent-lead') }}
         </p>
       </div>
     </div>
 
     <p v-if="!groups.length" class="text-sm text-[var(--noro-amber)]">
-      Nothing built yet. Run <code>./gradlew collectAgents</code> in <code>agent/</code> and copy
-      <code>agent/build/agents/</code> into <code>{NORO_DATA_DIR}/agents/</code>.
+      {{ t('admin-agent-not-built') }}
     </p>
 
     <div v-for="group in groups" :key="group.platform" class="mb-5 last:mb-0">
       <div class="mb-2 flex items-center gap-2">
         <UIcon :name="ICONS[group.platform] || 'i-lucide-box'" class="size-4 text-[var(--noro-muted)]" />
         <h4 class="font-bold text-[var(--noro-text)] capitalize">{{ group.platform }}</h4>
-        <span class="text-xs text-[var(--noro-muted)]">{{ group.files.length }} versions</span>
+        <span class="text-xs text-[var(--noro-muted)]">{{ t('admin-agent-versions-count', { count: group.files.length }) }}</span>
       </div>
       <div class="flex flex-wrap gap-2">
         <a

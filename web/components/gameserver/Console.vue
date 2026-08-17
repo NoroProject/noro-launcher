@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const auth = useAuth()
+const canCommand = computed(() => auth.hasPermission('noro.admin.wrapper.command'))
 /** Живой лог сервера и строка ввода команд. */
 const props = defineProps<{ gameServerId: string; enabled: boolean }>();
 const emit = defineEmits<{ command: [line: string] }>();
@@ -91,7 +93,9 @@ watch(
             </p>
         </div>
 
-        <form class="flex shrink-0 gap-2" @submit.prevent="submit">
+        <!-- Ввод команды — это выполнение чего угодно на машине, поэтому
+             отдельно от права просто читать консоль. -->
+        <form v-if="canCommand" class="flex shrink-0 gap-2" @submit.prevent="submit">
             <input
                 v-model="input"
                 class="noro-input flex-1 font-mono"

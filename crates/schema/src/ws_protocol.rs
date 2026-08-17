@@ -98,6 +98,7 @@ pub enum ServerWsMsg {
         actor_username: String,
         reason: String,
         forced: bool,
+        server_id: Option<Uuid>,
         expires_at: chrono::DateTime<chrono::Utc>,
     },
     /// Админ нажал «Login as» в вебе — лаунчер спрашивает подтверждение.

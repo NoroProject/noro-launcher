@@ -40,11 +40,11 @@ pub async fn upload(
     body: Bytes,
 ) -> AppResult<Json<Value>> {
     if body.is_empty() {
-        return Err(AppError::BadRequest("пустой бандл".into()));
+        return Err(AppError::BadRequest("the bundle is empty".into()));
     }
     if body.len() > MAX_BUNDLE_BYTES {
         return Err(AppError::BadRequest(format!(
-            "бандл больше {} МБ",
+            "the bundle is over {} MB",
             MAX_BUNDLE_BYTES / 1024 / 1024
         )));
     }
@@ -52,7 +52,7 @@ pub async fn upload(
     // Второй проход санитизации: клиента можно подменить, и логи от
     // подменённого клиента не должны попасть во вьювер вместе с токенами.
     let clean = resanitize::resanitize_zip(&body)
-        .map_err(|e| AppError::BadRequest(format!("бандл не разобрать: {e}")))?;
+        .map_err(|e| AppError::BadRequest(format!("the bundle could not be read: {e}")))?;
 
     let stored = state
         .files
@@ -67,7 +67,7 @@ pub async fn upload(
         Some(rid) => {
             if !crate::db::request_open_for(&state.db, rid, user.user_id).await? {
                 return Err(AppError::Forbidden(
-                    "запрос не найден, не принят или истёк".into(),
+                    "the request was not found, not accepted or has expired".into(),
                 ));
             }
             false
@@ -93,7 +93,7 @@ pub async fn upload(
     crate::audit::record_by_user(
         &state,
         user.user_id,
-        "support.bundle.upload",
+        crate::audit::actions::BUNDLE_UPLOAD,
         json!({ "bundle_id": id, "voluntary": voluntary, "bytes": clean.len() }),
     )
     .await;
@@ -112,7 +112,7 @@ pub async fn list(
     admin: AdminAuth,
     Query(q): Query<ListQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(schema::PERM_ADMIN_SUPPORT_LOGS)?;
+    admin.require(schema::PERM_SUPPORT_LOGS)?;
     let rows = crate::db::list_support_bundles(&state.db, q.user_id, q.limit.unwrap_or(50)).await?;
     Ok(Json(json!(rows)))
 }
@@ -123,10 +123,10 @@ pub async fn download(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
-    admin.require(schema::PERM_ADMIN_SUPPORT_LOGS)?;
+    admin.require(schema::PERM_SUPPORT_DOWNLOAD)?;
     let row = crate::db::get_support_bundle(&state.db, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("бандл".into()))?;
+        .ok_or_else(|| AppError::NotFound("bundle".into()))?;
 
     let bytes = tokio::fs::read(state.files.path_for(&row.file_sha1))
         .await
@@ -160,7 +160,7 @@ pub async fn delete_mine(
     let ok = crate::db::delete_support_bundle(&state.db, id, Some(user.user_id), true).await?;
     if !ok {
         return Err(AppError::NotFound(
-            "бандл не найден или удалить его нельзя".into(),
+            "bundle not found, or it cannot be deleted".into(),
         ));
     }
     Ok(Json(json!({ "ok": true })))

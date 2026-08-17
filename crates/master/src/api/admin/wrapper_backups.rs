@@ -9,7 +9,8 @@ use crate::state::AppState;
 use crate::wrapper::ops;
 use axum::extract::{Path, State};
 use axum::Json;
-use schema::PERM_ADMIN_WRAPPER;
+use schema::PERM_WRAPPER_BACKUPS;
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -19,7 +20,7 @@ pub async fn list(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_BACKUPS)?;
     Ok(Json(ops::backup_list(&state, id).await?))
 }
 
@@ -35,7 +36,7 @@ pub async fn create(
     Path(id): Path<Uuid>,
     Json(req): Json<CreateReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_BACKUPS)?;
     Ok(Json(ops::backup_create(&state, id, &req.name).await?))
 }
 
@@ -44,7 +45,7 @@ pub async fn restore(
     admin: AdminAuth,
     Path((id, name)): Path<(Uuid, String)>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_BACKUPS)?;
     Ok(Json(ops::backup_restore(&state, id, &name).await?))
 }
 
@@ -53,7 +54,7 @@ pub async fn delete(
     admin: AdminAuth,
     Path((id, name)): Path<(Uuid, String)>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_BACKUPS)?;
     ops::backup_delete(&state, id, &name).await?;
     Ok(Json(json!({ "ok": true })))
 }

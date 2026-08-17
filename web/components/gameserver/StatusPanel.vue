@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const auth = useAuth()
+const canPower = computed(() => auth.hasPermission('noro.admin.wrapper.power'))
 import type { PowerAction, WrapperState } from "~/types/wrapper";
 
 /** Состояние машины и кнопки питания. */
@@ -36,7 +38,8 @@ const uptime = computed(() => {
                     {{ phase.label }}
                 </span>
             </div>
-            <div class="flex flex-wrap gap-2">
+            <!-- Питание машины — отдельное право: рестарт роняет игроков. -->
+            <div v-if="canPower" class="flex flex-wrap gap-2">
                 <AtomButton
                     variant="primary"
                     size="sm"

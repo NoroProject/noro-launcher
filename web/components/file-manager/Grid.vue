@@ -3,12 +3,14 @@ import type { FmItem } from './List.vue'
 
 const props = defineProps<{
   items: FmItem[]
-  /** Режим синхронизации пути с учётом наследования от папок. */
   rule: (path: string) => RuleState
   selected: Set<string>
   renamingId: string | null
   renameValue: string
+  modeHint?: Record<SyncMode, string>
 }>()
+
+const { t } = useT()
 
 const emit = defineEmits<{
   select: [id: string, ev: MouseEvent]
@@ -29,7 +31,8 @@ const MODE_CLASS: Record<SyncMode, string> = {
 
 function ruleTitle(path: string) {
   const r = props.rule(path)
-  return r.from ? `${MODE_HINT[r.mode]} (inherited from ${r.from})` : MODE_HINT[r.mode]
+  const hint = props.modeHint ? props.modeHint[r.mode] : r.mode
+  return r.from ? `${hint} (inherited from ${r.from})` : hint
 }
 
 function itemKey(it: FmItem) {
@@ -79,8 +82,6 @@ function iconColor(it: FmItem) {
       @dblclick="emit('open', it)"
       @contextmenu.prevent.stop="emit('context', it, $event)"
     >
-      <!-- Режим синхронизации в углу плитки: буква та же, что в списке,
-           приглушённая — значит унаследована от папки. -->
       <button
         class="absolute right-1.5 top-1.5 font-mono text-xs font-bold"
         :class="[MODE_CLASS[rule(it.path).mode], rule(it.path).from ? 'opacity-40' : '']"
@@ -107,7 +108,7 @@ function iconColor(it: FmItem) {
       <template v-else>
         <span class="fm-grid-name">{{ it.name }}</span>
         <span class="text-[0.65rem] text-[var(--noro-muted)]">
-          {{ it.type === 'folder' ? `${it.count} items` : fmtSize(it.size) }}
+          {{ it.type === 'folder' ? `${it.count} ${t('admin-fm-items')}` : fmtSize(it.size) }}
         </span>
       </template>
     </div>
@@ -115,7 +116,7 @@ function iconColor(it: FmItem) {
       v-if="!items.length"
       class="col-span-full text-center text-[var(--noro-muted)] py-12"
     >
-      Empty folder
+      {{ t('admin-fm-empty') }}
     </div>
   </div>
 </template>

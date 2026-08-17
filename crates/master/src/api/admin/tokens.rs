@@ -77,7 +77,7 @@ pub async fn create(
     audit::record(
         &state,
         &admin.actor,
-        "admin_token.create",
+        audit::actions::ADMIN_TOKEN_CREATE,
         target("admin_token", id),
         json!({ "name": req.name, "permissions": perms }),
     )
@@ -97,7 +97,7 @@ pub async fn delete(
     audit::record(
         &state,
         &admin.actor,
-        "admin_token.delete",
+        audit::actions::ADMIN_TOKEN_DELETE,
         target("admin_token", id),
         json!({}),
     )

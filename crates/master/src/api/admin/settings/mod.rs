@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 
 /// Право на правку настроек. Отдельно: настройки решают, куда игроки ходят за
 /// файлами и кто пускает их внутрь.
-pub const PERM_ADMIN_SETTINGS: &str = "noro.admin.settings";
+pub use schema::{PERM_SETTINGS_EDIT, PERM_SETTINGS_VIEW};
 
 #[derive(Serialize)]
 pub struct SettingItem {
@@ -34,7 +34,7 @@ pub struct SettingItem {
 
 /// Текущие настройки.
 pub async fn list(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SETTINGS)?;
+    admin.require(PERM_SETTINGS_VIEW)?;
     let stored = crate::db::all_settings(&state.db).await?;
 
     let items: Vec<SettingItem> = keys::ALL
@@ -76,7 +76,7 @@ pub async fn save(
     admin: AdminAuth,
     Json(req): Json<SaveReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SETTINGS)?;
+    admin.require(PERM_SETTINGS_EDIT)?;
 
     let before = crate::db::all_settings(&state.db).await?;
     let mut values: BTreeMap<String, Value> = BTreeMap::new();
@@ -84,9 +84,7 @@ pub async fn save(
 
     for (key, value) in req.settings {
         if !keys::ALL.iter().any(|k| k.name == key) {
-            return Err(AppError::BadRequest(format!(
-                "неизвестная настройка: {key}"
-            )));
+            return Err(AppError::BadRequest(format!("unknown setting: {key}")));
         }
         let value = value.trim().to_string();
         let old = before
@@ -107,7 +105,7 @@ pub async fn save(
     audit::record(
         &state,
         &admin.actor,
-        "settings.update",
+        audit::actions::SETTINGS_UPDATE,
         None,
         Value::Object(diff.clone()),
     )
@@ -124,7 +122,7 @@ pub async fn save(
 
 /// Экспорт в `.env` — чтобы конфиг можно было увезти обратно в compose.
 pub async fn export_env(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SETTINGS)?;
+    admin.require(PERM_SETTINGS_VIEW)?;
     let stored = crate::db::all_settings(&state.db).await?;
 
     let mut lines = vec![

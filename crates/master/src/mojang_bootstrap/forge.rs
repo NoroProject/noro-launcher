@@ -10,6 +10,7 @@ use super::maven::maven_to_path;
 use super::BootstrapCtx;
 use anyhow::{anyhow, bail, Context, Result};
 use schema::{ArtifactKind, Modloader};
+
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Read;

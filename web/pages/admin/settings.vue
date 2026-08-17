@@ -7,6 +7,8 @@ import {
 } from '~/types/settings'
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 const notify = useNotify()
 await auth.loadMe()
 
@@ -34,8 +36,6 @@ async function load() {
 async function save() {
   pending.value = true
   try {
-    // Отправляем только то, что правится: значения из окружения всё равно
-    // побеждают, и запись их в БД создала бы иллюзию, что они оттуда.
     const editable = Object.fromEntries(
       (data.value?.settings ?? [])
         .filter((s) => !s.from_env)
@@ -76,10 +76,10 @@ onMounted(() => load())
 </script>
 
 <template>
-  <NoroShell title="SETTINGS" subtitle="Instance configuration">
+  <NoroShell :title="t('admin-settings-title')" :subtitle="t('admin-settings-subtitle')">
     <template #actions>
-      <AtomButton icon="i-lucide-download" variant="dark" @click="exportEnv">Export .env</AtomButton>
-      <AtomButton icon="i-lucide-save" :loading="pending" @click="save">Save</AtomButton>
+      <AtomButton icon="i-lucide-download" variant="dark" @click="exportEnv">{{ t('admin-settings-export-env') }}</AtomButton>
+      <AtomButton v-if="can('noro.admin.settings.edit')" icon="i-lucide-save" :loading="pending" @click="save">{{ t('cabinet-save') }}</AtomButton>
     </template>
 
     <UAlert
@@ -88,14 +88,16 @@ onMounted(() => load())
       color="warning"
       variant="subtle"
       icon="i-lucide-rotate-ccw"
-      title="Restart required"
-      description="Settings are read once at startup. Nothing changes until the master restarts — and restarting drops launcher connections and interrupts downloads, so pick the moment yourself."
+      :title="t('admin-settings-restart-title')"
+      :description="t('admin-settings-restart-desc')"
     />
 
     <div class="grid gap-4 xl:grid-cols-[1fr_360px]">
       <div class="grid gap-4">
         <section v-for="name in SECTIONS" :key="name" class="noro-panel p-6">
-          <h2 class="mb-4 text-lg font-black text-[var(--noro-text)]">{{ name }}</h2>
+          <h2 class="mb-4 text-lg font-black text-[var(--noro-text)]">
+            {{ name === 'General' ? t('admin-settings-sec-general') : name === 'Auth' ? t('admin-settings-sec-auth') : name === 'Storage' ? t('admin-settings-sec-storage') : t('admin-settings-sec-integrations') }}
+          </h2>
           <div class="grid gap-4">
             <SettingsField
               v-for="item in inSection(name)"
@@ -107,10 +109,9 @@ onMounted(() => load())
         </section>
 
         <section class="noro-panel p-6">
-          <h2 class="mb-1 text-lg font-black text-[var(--noro-text)]">Secrets</h2>
+          <h2 class="mb-1 text-lg font-black text-[var(--noro-text)]">{{ t('admin-settings-secrets-title') }}</h2>
           <p class="mb-4 text-xs text-[var(--noro-muted)]">
-            Read-only by design. A secret in the database is a secret in every
-            dump, backup and replica — these live in the environment only.
+            {{ t('admin-settings-secrets-lead') }}
           </p>
           <ul class="grid gap-2">
             <li
@@ -120,7 +121,7 @@ onMounted(() => load())
             >
               <code>{{ name }}</code>
               <span :class="present ? 'text-[var(--noro-blue)]' : 'text-[var(--noro-muted)]'">
-                {{ present ? 'set in the environment' : 'not set' }}
+                {{ present ? t('admin-settings-secret-set') : t('admin-settings-secret-unset') }}
               </span>
             </li>
           </ul>

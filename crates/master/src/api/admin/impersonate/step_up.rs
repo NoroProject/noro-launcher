@@ -34,7 +34,9 @@ pub async fn confirm_passkey(
     let owner = crate::api::auth::passkeys::verify_login(&state, &req).await?;
     // Ключ обязан быть свой: чужой подтверждает чужую личность.
     if owner != user.user_id {
-        return Err(AppError::Forbidden("это ключ другого аккаунта".into()));
+        return Err(AppError::Forbidden(
+            "this key belongs to another account".into(),
+        ));
     }
     crate::db::open_step_up(&state.db, user.user_id, "passkey").await?;
     Ok(Json(json!({ "ok": true })))
@@ -55,7 +57,7 @@ pub async fn confirm_recovery(
         crate::db::consume_recovery_code(&state.db, &user.profile.username, req.code.trim())
             .await?;
     if owner != Some(user.user_id) {
-        return Err(AppError::Unauthorized("код не подошёл".into()));
+        return Err(AppError::Unauthorized("that code did not match".into()));
     }
     crate::db::open_step_up(&state.db, user.user_id, "recovery_code").await?;
 

@@ -3,19 +3,30 @@ import { SETTING_LABELS, type SettingItem } from '~/types/settings'
 
 const props = defineProps<{ item: SettingItem }>()
 const model = defineModel<string>({ required: true })
+const { t } = useT()
 
 const meta = computed(() => SETTING_LABELS[props.item.key])
+const label = computed(() => {
+  const key = `admin-set-label-${props.item.key}`
+  const val = t(key)
+  return val !== key ? val : (meta.value?.label || props.item.key)
+})
+const hint = computed(() => {
+  const key = `admin-set-hint-${props.item.key}`
+  const val = t(key)
+  return val !== key ? val : meta.value?.hint
+})
 </script>
 
 <template>
   <label class="block">
     <span class="noro-label mb-1.5 flex items-center gap-2">
-      {{ meta?.label || item.key }}
+      {{ label }}
       <span
         v-if="item.from_env"
         class="rounded bg-[color-mix(in_srgb,var(--noro-cream)_16%,transparent)] px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[var(--noro-cream)]"
-        :title="`Set by ${item.env}. The environment wins over the database, so editing here changes nothing until you unset it.`"
-      >from env</span>
+        :title="t('admin-set-from-env-title', { env: item.env })"
+      >{{ t('admin-set-from-env') }}</span>
     </span>
 
     <input
@@ -25,8 +36,8 @@ const meta = computed(() => SETTING_LABELS[props.item.key])
       :placeholder="item.env"
     >
 
-    <span v-if="meta?.hint" class="mt-1 block text-xs text-[var(--noro-muted)]">
-      {{ meta.hint }}
+    <span v-if="hint" class="mt-1 block text-xs text-[var(--noro-muted)]">
+      {{ hint }}
     </span>
   </label>
 </template>

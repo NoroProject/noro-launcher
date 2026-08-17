@@ -21,6 +21,7 @@ export function useAuth() {
     } catch (e) {
       error.value = humanError(e)
       user.value = null
+      api.token.value = null
       return null
     } finally {
       loading.value = false
@@ -33,13 +34,29 @@ export function useAuth() {
     await navigateTo('/login')
   }
 
+  /** Все права: свои и пришедшие от ролей. */
+  const permissions = computed(() => {
+    if (!user.value) return [] as string[]
+    return [...user.value.permissions, ...user.value.roles.flatMap(role => role.permissions)]
+  })
+
   function hasPermission(permission: string) {
-    if (!user.value) return false
-    if (user.value.permissions.includes('*')) return true
-    const direct = user.value.permissions
-    const rolePerms = user.value.roles.flatMap(role => role.permissions)
-    return [...direct, ...rolePerms].some(perm => permissionMatches(perm, permission))
+    return permissions.value.some(perm => permissionMatches(perm, permission))
   }
+
+  /** Хотя бы одно из перечисленных прав: блок панели обычно открывает любое. */
+  function hasAny(...list: string[]) {
+    return list.some(hasPermission)
+  }
+
+  /**
+   * Отдельного права «войти в админку» нет: панель открывает любой узел
+   * `noro.admin.*`. Иначе выдача точечного права оставляла бы человека перед
+   * закрытой дверью, и это выглядело бы как поломка, а не как настройка.
+   */
+  const canAdmin = computed(() =>
+    permissions.value.some(perm => perm === '*' || perm.startsWith('noro.admin.')),
+  )
 
   return {
     ...api,
@@ -49,7 +66,10 @@ export function useAuth() {
     loggedIn,
     loadMe,
     signOut,
-    hasPermission
+    permissions,
+    hasPermission,
+    hasAny,
+    canAdmin
   }
 }
 

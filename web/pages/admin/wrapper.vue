@@ -2,6 +2,7 @@
 import type { AgentFile } from '~/types/agent'
 
 const auth = useAuth()
+const { t } = useT()
 await auth.loadMe()
 
 const host = useRequestURL().host
@@ -14,7 +15,7 @@ const wrapper = computed(() => files.value.find(file => file.platform === 'wrapp
 </script>
 
 <template>
-  <NoroShell title="SERVER WRAPPER" subtitle="Agent installer and supervisor for game servers">
+  <NoroShell :title="t('admin-wrapper-title')" :subtitle="t('admin-wrapper-lead')">
     <div class="grid gap-5 items-start">
       <AdminWrapperSetup :wrapper="wrapper" :host="host" />
       <AdminWrapperOptions />

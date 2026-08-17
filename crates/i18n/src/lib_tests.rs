@@ -43,13 +43,13 @@ fn both_catalogs_define_the_same_keys() {
         .into_iter()
         .filter(|k| !ru.has(k))
         .collect();
-    assert!(missing.is_empty(), "нет в ru.ftl: {missing:?}");
+    assert!(missing.is_empty(), "Missing in ru.ftl: {missing:?}");
 
     let extra: Vec<&str> = keys_of(include_str!("../locales/ru.ftl"))
         .into_iter()
         .filter(|k| !en.has(k))
         .collect();
-    assert!(extra.is_empty(), "нет в en.ftl: {extra:?}");
+    assert!(extra.is_empty(), "Missing in en.ftl: {extra:?}");
 }
 
 #[test]

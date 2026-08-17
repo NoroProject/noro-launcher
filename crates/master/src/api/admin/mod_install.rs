@@ -12,7 +12,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::State;
 use axum::Json;
-use schema::PERM_ADMIN_BUILDS;
+use schema::PERM_MODS_INSTALL;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
@@ -56,9 +57,9 @@ pub async fn install(
     admin: AdminAuth,
     Json(req): Json<InstallReq>,
 ) -> AppResult<Json<Vec<TargetResult>>> {
-    admin.require(PERM_ADMIN_BUILDS)?;
+    admin.require(PERM_MODS_INSTALL)?;
     if req.targets.is_empty() {
-        return Err(AppError::BadRequest("не выбрано ни одной цели".into()));
+        return Err(AppError::BadRequest("no targets selected".into()));
     }
     let resolved = resolve::resolve(&state, &req.source).await?;
 

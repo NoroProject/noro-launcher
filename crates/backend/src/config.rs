@@ -167,7 +167,8 @@ impl LauncherConfig {
         let base = self.master_url.trim_end_matches('/');
         let ws = base
             .replacen("https://", "wss://", 1)
-            .replacen("http://", "ws://", 1);
+            .replacen("http://", "ws://", 1)
+            .replace("localhost", "127.0.0.1");
         format!("{ws}/ws/launcher")
     }
 

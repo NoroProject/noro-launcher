@@ -38,7 +38,7 @@ pub async fn revoke(
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
     if !crate::db::revoke_session(&state.db, id, Some(user.user_id)).await? {
-        return Err(AppError::NotFound("сессия".into()));
+        return Err(AppError::NotFound("session".into()));
     }
     Ok(Json(json!({ "ok": true })))
 }

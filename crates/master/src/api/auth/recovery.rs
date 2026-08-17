@@ -31,7 +31,7 @@ pub async fn login(
         .ok_or_else(|| {
             // Не различаем «нет такого аккаунта» и «код не подошёл»: иначе форма
             // входа становится способом проверять существование аккаунтов.
-            AppError::Unauthorized("Имя или код не подошли".into())
+            AppError::Unauthorized("Wrong username or code".into())
         })?;
 
     let left = crate::db::recovery_codes_left(&state.db, user_id).await?;
@@ -45,7 +45,7 @@ pub async fn login(
             id: user_id,
             username: profile.username.clone(),
         },
-        "auth.recovery_code",
+        crate::audit::actions::AUTH_RECOVERY_CODE,
         crate::audit::target("user", user_id),
         json!({ "codes_left": left }),
     )
@@ -73,7 +73,7 @@ pub async fn reissue(State(state): State<AppState>, user: AuthUser) -> AppResult
             id: user.user_id,
             username: user.profile.username.clone(),
         },
-        "auth.recovery_codes.reissue",
+        crate::audit::actions::AUTH_RECOVERY_REISSUE,
         crate::audit::target("user", user.user_id),
         json!({ "count": codes.len() }),
     )

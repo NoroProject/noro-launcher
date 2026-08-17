@@ -65,7 +65,7 @@ async fn session(socket: WebSocket, state: AppState, game_server_id: Uuid, name:
                 let result = if ok {
                     Ok(data)
                 } else {
-                    Err(error.unwrap_or_else(|| "враппер не объяснил отказ".into()))
+                    Err(error.unwrap_or_else(|| "the wrapper gave no reason".into()))
                 };
                 conn.resolve(id, result);
             }

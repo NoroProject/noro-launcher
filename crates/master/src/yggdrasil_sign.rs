@@ -35,6 +35,13 @@ impl ProfileSigner {
     /// Ротация безопасна: подпись считается на каждый запрос и нигде не хранится.
     /// Потому ключ и не вынесен в переменную окружения — терять его нечем.
     pub fn load_or_create(data_dir: &Path) -> Result<Self> {
+        if let Ok(env_pem) = std::env::var("NORO_YGGDRASIL_RSA_KEY") {
+            if !env_pem.trim().is_empty() {
+                tracing::info!("используется RSA-ключ Yggdrasil из переменной NORO_YGGDRASIL_RSA_KEY");
+                return Self::from_pem(&env_pem);
+            }
+        }
+
         let path = data_dir.join(FILE);
         let key = match std::fs::read_to_string(&path) {
             Ok(pem) => RsaPrivateKey::from_pkcs8_pem(&pem)
@@ -56,6 +63,19 @@ impl ProfileSigner {
             }
         };
 
+        let public_pem = key
+            .to_public_key()
+            .to_public_key_pem(LineEnding::LF)
+            .context("сериализация публичного ключа")?;
+        Ok(Self {
+            signing: SigningKey::<Sha1>::new(key),
+            public_pem,
+        })
+    }
+
+    pub fn from_pem(pem: &str) -> Result<Self> {
+        let key = RsaPrivateKey::from_pkcs8_pem(pem)
+            .context("разбор RSA приватного ключа")?;
         let public_pem = key
             .to_public_key()
             .to_public_key_pem(LineEnding::LF)

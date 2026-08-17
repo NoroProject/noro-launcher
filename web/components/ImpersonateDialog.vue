@@ -3,12 +3,12 @@ const props = defineProps<{ userId: string; username: string }>()
 const open = defineModel<boolean>({ required: true })
 
 const auth = useAuth()
+const { t } = useT()
 const notify = useNotify()
 
 const reason = ref('')
 const code = ref('')
 const busy = ref(false)
-/** `null` — step-up ещё не спрашивали. */
 const needStepUp = ref(false)
 const status = ref<string | null>(null)
 
@@ -41,7 +41,6 @@ async function start() {
       : 'Your launcher is offline — open it and confirm there.'
     poll(res.grant_id)
   } catch (e: any) {
-    // Отдельная ветка: это не отказ, а требование подтвердить личность.
     if (String(e?.data?.error || '').includes('step_up_required')) {
       needStepUp.value = true
     } else {
@@ -67,34 +66,34 @@ function poll(grantId: string) {
 </script>
 
 <template>
-  <NoroModal v-model="open" title="Sign in as this player">
-      <div class="grid gap-4">
-        <UAlert
-          color="warning"
-          variant="subtle"
-          icon="i-lucide-eye-off"
-          description="The player is not notified. Everything you change while signed in as them is recorded in the audit log with your name — that is the only way a dispute can be settled afterwards."
-        />
+  <NoroModal v-model="open" :title="t('admin-users-impersonate-title')">
+    <div class="grid gap-4">
+      <UAlert
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-eye-off"
+        :description="t('admin-users-impersonate-warn')"
+      />
 
-        <template v-if="needStepUp">
-          <label class="block">
-            <span class="noro-label mb-1.5 block">Recovery code</span>
-            <input v-model="code" class="noro-input w-full font-mono" placeholder="XXXX-XXXX-XXXX">
-          </label>
-          <AtomButton icon="i-lucide-shield-check" :loading="busy" @click="stepUp">Confirm identity</AtomButton>
-        </template>
+      <template v-if="needStepUp">
+        <label class="block">
+          <span class="noro-label mb-1.5 block">{{ t('admin-users-impersonate-code') }}</span>
+          <input v-model="code" class="noro-input w-full font-mono" placeholder="XXXX-XXXX-XXXX">
+        </label>
+        <AtomButton icon="i-lucide-shield-check" :loading="busy" @click="stepUp">{{ t('admin-users-impersonate-confirm') }}</AtomButton>
+      </template>
 
-        <template v-else>
-          <label class="block">
-            <span class="noro-label mb-1.5 block">Reason</span>
-            <input v-model="reason" class="noro-input w-full" placeholder="Ticket #123: items disappeared">
-          </label>
-          <AtomButton icon="i-lucide-user-check" :loading="busy" :disabled="reason.trim().length < 3" @click="start">
-            Request access to {{ username }}
-          </AtomButton>
-        </template>
+      <template v-else>
+        <label class="block">
+          <span class="noro-label mb-1.5 block">{{ t('admin-users-reqlogs-why') }}</span>
+          <input v-model="reason" class="noro-input w-full" placeholder="Ticket #123: items disappeared">
+        </label>
+        <AtomButton icon="i-lucide-user-check" :loading="busy" :disabled="reason.trim().length < 3" @click="start">
+          {{ t('admin-users-impersonate-request', { name: username }) }}
+        </AtomButton>
+      </template>
 
-        <p v-if="status" class="text-xs text-[var(--noro-muted)]">{{ status }}</p>
-      </div>
+      <p v-if="status" class="text-xs text-[var(--noro-muted)]">{{ status }}</p>
+    </div>
   </NoroModal>
 </template>

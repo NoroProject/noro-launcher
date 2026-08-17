@@ -38,6 +38,7 @@ pub async fn root(State(state): State<AppState>) -> Json<Value> {
             }
         },
         "skinDomains": skin_domains(&state.config),
+        "signaturePublickey": state.profile_signer.public_key_pem(),
         "signaturePublicKey": state.profile_signer.public_key_pem()
     }))
 }
@@ -83,7 +84,7 @@ pub struct AuthenticateReq {
 /// Заглушка authenticate: возвращает ошибку, т.к. вход только через лаунчер.
 pub async fn authenticate(Json(_req): Json<AuthenticateReq>) -> AppResult<Json<Value>> {
     Err(AppError::Forbidden(
-        "вход только через лаунчер (Discord)".into(),
+        "sign in through the launcher (Discord)".into(),
     ))
 }
 
@@ -100,10 +101,10 @@ pub async fn refresh(
     Json(req): Json<RefreshReq>,
 ) -> AppResult<Json<Value>> {
     let token = parse_uuid_loose(&req.access_token)
-        .ok_or_else(|| AppError::Unauthorized("неверный токен".into()))?;
+        .ok_or_else(|| AppError::Unauthorized("invalid token".into()))?;
     let row = crate::db::user_by_access_token(&state.db, token)
         .await?
-        .ok_or_else(|| AppError::Unauthorized("сессия истекла".into()))?;
+        .ok_or_else(|| AppError::Unauthorized("session expired".into()))?;
     Ok(Json(json!({
         "accessToken": req.access_token,
         "clientToken": req.client_token.unwrap_or_default(),
@@ -149,10 +150,10 @@ pub async fn join(
     Json(req): Json<JoinReq>,
 ) -> AppResult<StatusCode> {
     let token = parse_uuid_loose(&req.access_token)
-        .ok_or_else(|| AppError::Forbidden("неверный токен".into()))?;
+        .ok_or_else(|| AppError::Forbidden("invalid token".into()))?;
     let row = crate::db::user_by_access_token(&state.db, token)
         .await?
-        .ok_or_else(|| AppError::Forbidden("сессия истекла".into()))?;
+        .ok_or_else(|| AppError::Forbidden("session expired".into()))?;
 
     tracing::info!(user = %row.mc_username, server_id = %req.server_id, "yggdrasil join");
 
@@ -160,13 +161,13 @@ pub async fn join(
     // отдельный путь входа, и без этой проверки забаненный игрок с ещё живой
     // сессией спокойно заходил на сервер.
     if row.banned {
-        return Err(AppError::Forbidden("аккаунт заблокирован".into()));
+        return Err(AppError::Forbidden("account is banned".into()));
     }
 
     // selectedProfile должен совпадать с MC UUID пользователя.
     let sel = req.selected_profile.replace('-', "");
     if undash(&row.mc_uuid) != sel {
-        return Err(AppError::Forbidden("профиль не совпадает".into()));
+        return Err(AppError::Forbidden("profile does not match".into()));
     }
 
     let expires = Utc::now() + Duration::minutes(5);

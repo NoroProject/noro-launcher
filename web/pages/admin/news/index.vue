@@ -2,6 +2,8 @@
 import type { NewsRow } from '~/types/api'
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 
 const notify = useNotify()
 await auth.loadMe()
@@ -34,7 +36,7 @@ async function createNews() {
 </script>
 
 <template>
-  <NoroShell title="NEWS" subtitle="Markdown posts for launcher">
+  <NoroShell :title="t('admin-news-title')" :subtitle="t('admin-news-subtitle')">
     <template #actions>
       <AtomButton
         icon="i-lucide-refresh-cw"
@@ -42,9 +44,9 @@ async function createNews() {
         :loading="pending"
         @click="refresh()"
       >
-        Refresh
+        {{ t('cabinet-apps-refresh') }}
       </AtomButton>
-      <AtomButton variant="primary" icon="i-lucide-plus" @click="showCreate = true">New post</AtomButton>
+      <AtomButton v-if="can('noro.admin.news.edit')" variant="primary" icon="i-lucide-plus" @click="showCreate = true">{{ t('admin-news-new-post') }}</AtomButton>
     </template>
 
     <section class="grid gap-3">
@@ -59,21 +61,21 @@ async function createNews() {
             <h2 class="font-bold text-[var(--noro-text)]">{{ item.title }}</h2>
             <p class="mt-1 line-clamp-2 text-sm text-[var(--noro-muted)]">{{ item.body }}</p>
           </div>
-          <UBadge v-if="item.pinned" color="warning" variant="subtle">pinned</UBadge>
+          <UBadge v-if="item.pinned" color="warning" variant="subtle">{{ t('admin-news-pinned') }}</UBadge>
         </div>
       </NuxtLink>
-      <EmptyState v-if="!news?.length" icon="i-lucide-newspaper" title="No news yet" text="Create the first post from the toolbar." />
+      <EmptyState v-if="!news?.length" icon="i-lucide-newspaper" :title="t('admin-news-empty-title')" :text="t('admin-news-empty-text')" />
     </section>
 
-    <AtomModal v-model="showCreate" title="NEW POST" subtitle="Publish launcher news in Markdown" wide>
+    <AtomModal v-model="showCreate" :title="t('admin-news-modal-title')" :subtitle="t('admin-news-modal-subtitle')" wide>
       <form class="grid gap-3" @submit.prevent="createNews">
-        <label><span class="noro-label">Title</span><input v-model="form.title" class="noro-input" required></label>
+        <label><span class="noro-label">{{ t('admin-news-post-title') }}</span><input v-model="form.title" class="noro-input" required></label>
         <AdminImagePicker v-model="form.preview_img_url" label="Preview image" />
-        <div class="grid gap-2"><span class="noro-label">Body</span><AdminMarkdownEditor v-model="form.body" /></div>
-        <UCheckbox v-model="form.pinned" label="Pinned" />
+        <div class="grid gap-2"><span class="noro-label">{{ t('admin-news-post-body') }}</span><AdminMarkdownEditor v-model="form.body" /></div>
+        <UCheckbox v-model="form.pinned" :label="t('admin-news-post-pinned')" />
         <div class="flex justify-end gap-3 pt-2">
-          <AtomButton variant="secondary" @click="showCreate = false">Cancel</AtomButton>
-          <AtomButton variant="primary" icon="i-lucide-plus" :disabled="creating" type="submit">Create</AtomButton>
+          <AtomButton variant="secondary" @click="showCreate = false">{{ t('web-rules-cancel') }}</AtomButton>
+          <AtomButton variant="primary" icon="i-lucide-plus" :disabled="creating" type="submit">{{ t('admin-notes-add') }}</AtomButton>
         </div>
       </form>
     </AtomModal>

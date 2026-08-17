@@ -9,7 +9,8 @@ use crate::state::AppState;
 use crate::wrapper::fs_ops::{self, ServerOutcome};
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use schema::PERM_ADMIN_WRAPPER;
+use schema::PERM_WRAPPER_FILES;
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -30,7 +31,7 @@ pub async fn list(
     Path(id): Path<Uuid>,
     Query(q): Query<PathQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_FILES)?;
     Ok(Json(fs_ops::list(&state, id, &q.path).await?))
 }
 
@@ -40,7 +41,7 @@ pub async fn read(
     Path(id): Path<Uuid>,
     Query(q): Query<PathQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_FILES)?;
     Ok(Json(fs_ops::read(&state, id, &q.path).await?))
 }
 
@@ -56,7 +57,7 @@ pub async fn write(
     Path(id): Path<Uuid>,
     Json(req): Json<WriteReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_FILES)?;
     Ok(Json(
         fs_ops::write(&state, id, &req.path, &req.content).await?,
     ))
@@ -68,7 +69,7 @@ pub async fn delete(
     Path(id): Path<Uuid>,
     Query(q): Query<PathQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_FILES)?;
     fs_ops::delete(&state, id, &q.path).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -84,7 +85,7 @@ pub async fn mkdir(
     Path(id): Path<Uuid>,
     Json(req): Json<MkdirReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_FILES)?;
     fs_ops::mkdir(&state, id, &req.path).await?;
     Ok(Json(json!({ "ok": true })))
 }
@@ -108,7 +109,7 @@ pub async fn apply(
     Path(id): Path<Uuid>,
     Json(req): Json<ApplyReq>,
 ) -> AppResult<Json<Vec<ServerOutcome>>> {
-    admin.require(PERM_ADMIN_WRAPPER)?;
+    admin.require(PERM_WRAPPER_FILES)?;
     let mut servers = vec![id];
     // Исходный сервер мог попасть и в список целей — дважды писать незачем.
     servers.extend(req.targets.into_iter().filter(|t| *t != id));

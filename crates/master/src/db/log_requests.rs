@@ -6,9 +6,9 @@ use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-/// Сколько живёт запрос. Столько же висит модалка у игрока: дольше — и он
-/// отвечает на вопрос, о котором успел забыть.
-pub const REQUEST_TTL_MINS: i64 = 5;
+/// Сколько живёт запрос в очереди. До 24 часов, чтобы при открытии лаунчера
+/// игрок получал отложенные запросы из очереди.
+pub const REQUEST_TTL_MINS: i64 = 1440;
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct LogRequestRow {
@@ -135,4 +135,30 @@ pub async fn expire_log_requests(pool: &PgPool) -> Result<u64> {
     .execute(pool)
     .await?
     .rows_affected())
+}
+
+/// Выборка накопившихся невыполненных запросов для пользователя.
+pub async fn list_pending_for_user(pool: &PgPool, target_id: Uuid) -> Result<Vec<LogRequestRow>> {
+    expire_log_requests(pool).await?;
+    Ok(sqlx::query_as::<_, LogRequestRow>(
+        "SELECT * FROM log_requests
+         WHERE target_id = $1 AND status = 'pending' AND expires_at > NOW()
+         ORDER BY created_at ASC",
+    )
+    .bind(target_id)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Отменить отложенный запрос логов.
+pub async fn cancel_log_request(pool: &PgPool, id: Uuid) -> Result<Option<LogRequestRow>> {
+    Ok(sqlx::query_as::<_, LogRequestRow>(
+        "UPDATE log_requests
+         SET status = 'cancelled', answered_at = NOW()
+         WHERE id = $1 AND status = 'pending'
+         RETURNING *",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?)
 }

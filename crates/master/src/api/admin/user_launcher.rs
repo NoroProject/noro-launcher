@@ -6,7 +6,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
-use schema::PERM_ADMIN_USERS;
+use schema::{PERM_USERS_LAUNCHER, PERM_USERS_SESSIONS_KILL, PERM_USERS_SESSIONS_VIEW};
+
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -16,7 +17,7 @@ pub async fn launcher_status(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_LAUNCHER)?;
 
     let client = crate::db::launcher_client(&state.db, id).await?;
     // Версия сравнивается безотносительно платформы: клиент сообщает её как
@@ -44,7 +45,7 @@ pub async fn sessions(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_SESSIONS_VIEW)?;
     let rows = crate::db::list_sessions(&state.db, id, None).await?;
     Ok(Json(json!(rows)))
 }
@@ -58,13 +59,13 @@ pub async fn revoke_sessions(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_SESSIONS_KILL)?;
     let revoked = crate::db::revoke_all_sessions(&state.db, id, None).await?;
 
     audit::record(
         &state,
         &admin.actor,
-        "user.sessions.revoke",
+        audit::actions::SESSIONS_REVOKE,
         audit::target("user", id),
         json!({ "revoked": revoked }),
     )
@@ -79,14 +80,14 @@ pub async fn revoke_session(
     admin: AdminAuth,
     Path((id, session_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_USERS)?;
+    admin.require(PERM_USERS_SESSIONS_KILL)?;
     if !crate::db::revoke_session(&state.db, session_id, Some(id)).await? {
-        return Err(AppError::NotFound("сессия".into()));
+        return Err(AppError::NotFound("session".into()));
     }
     audit::record(
         &state,
         &admin.actor,
-        "user.session.revoke",
+        audit::actions::SESSION_REVOKE,
         audit::target("user", id),
         json!({ "session_id": session_id }),
     )

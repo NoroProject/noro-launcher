@@ -9,6 +9,7 @@ const props = defineProps<{
 const emit = defineEmits<{ uploaded: [kind: ServerAssetKind, url: string] }>();
 
 const auth = useAuth();
+const { t } = useT();
 const iconInput = ref<HTMLInputElement | null>(null);
 const bgInput = ref<HTMLInputElement | null>(null);
 const loading = reactive({ icon: false, background: false });
@@ -59,8 +60,8 @@ function drop(kind: ServerAssetKind, event: DragEvent) {
         <div class="border-b border-[var(--noro-border)] p-5">
             <div class="flex items-center justify-between gap-4">
                 <div>
-                    <h2 class="text-base font-black text-white">Server assets</h2>
-                    <p class="text-sm text-[var(--noro-muted)]">Icon and banner used by the launcher profile.</p>
+                    <h2 class="text-base font-black text-white">{{ t('admin-media-title') }}</h2>
+                    <p class="text-sm text-[var(--noro-muted)]">{{ t('admin-media-subtitle') }}</p>
                 </div>
                 <UIcon name="i-lucide-images" class="size-5 text-[var(--noro-blue)]" />
             </div>
@@ -96,8 +97,8 @@ function drop(kind: ServerAssetKind, event: DragEvent) {
                         class="size-8"
                         :class="{ 'animate-spin': loading.background }"
                     />
-                    <span class="font-bold text-white">Upload banner</span>
-                    <span class="text-sm text-[var(--noro-muted)]">Drop a wide image or click to browse.</span>
+                    <span class="font-bold text-white">{{ t('admin-media-banner-upload') }}</span>
+                    <span class="text-sm text-[var(--noro-muted)]">{{ t('admin-media-banner-hint') }}</span>
                 </span>
             </button>
             <input ref="bgInput" class="sr-only" type="file" accept="image/*" @change="pick('background', $event)">
@@ -120,14 +121,14 @@ function drop(kind: ServerAssetKind, event: DragEvent) {
                     <UIcon v-else name="i-lucide-image" class="size-7" />
                 </button>
                 <div class="grid content-center gap-2">
-                    <div class="text-sm font-black uppercase text-white">Icon</div>
+                    <div class="text-sm font-black uppercase text-white">{{ t('admin-media-icon') }}</div>
                     <AtomButton
                         :loading="loading.icon"
                         icon="i-lucide-upload"
                         variant="secondary"
                         @click="iconInput?.click()"
                     >
-                        Upload icon
+                        {{ t('admin-media-icon-upload') }}
                     </AtomButton>
                     <input ref="iconInput" class="sr-only" type="file" accept="image/*" @change="pick('icon', $event)">
                 </div>

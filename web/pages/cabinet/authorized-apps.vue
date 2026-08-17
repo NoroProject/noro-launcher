@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const auth = useAuth()
 const notify = useNotify()
+const { t } = useT()
 
 await auth.loadMe()
 
@@ -22,8 +23,6 @@ async function loadApps() {
   try {
     apps.value = await auth.request<AuthorizedApp[]>('/api/me/authorized-apps')
   } catch (e) {
-    // Пустой список выглядел как «доступа ни у кого нет» — ровно то, что игрок
-    // хочет увидеть, и ровно то, чего мы не проверяли.
     apps.value = []
     notify.fail(e, 'Could not load authorized apps')
   } finally {
@@ -32,7 +31,7 @@ async function loadApps() {
 }
 
 async function revokeApp(id: string, name: string) {
-  if (!confirm(`Отозвать доступ для приложения "${name}"?`)) return
+  if (!confirm(`Revoke access for "${name}"?`)) return
   revokingId.value = id
   try {
     await auth.request(`/api/me/authorized-apps/${id}`, { method: 'DELETE' })
@@ -51,19 +50,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <NoroShell title="AUTHORIZED APPS" subtitle="Управление приложениями с доступом к аккаунту">
+  <NoroShell title="AUTHORIZED APPS" :subtitle="t('cabinet-apps-subtitle')">
     <div class="grid gap-4">
       <section class="noro-panel p-6 space-y-4">
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
               <UIcon name="i-lucide-shield-check" class="size-4 text-[var(--noro-blue)]" />
-              Подключённые приложения
+              {{ t('cabinet-apps-title') }}
             </h2>
-            <p class="text-xs text-[var(--noro-muted)]">Сторонние сервисы и лаунчеры, у которых есть доступ к вашему профилю</p>
+            <p class="text-xs text-[var(--noro-muted)]">{{ t('cabinet-apps-lead') }}</p>
           </div>
           <AtomButton variant="secondary" icon="i-lucide-rotate-cw" equal @click="loadApps">
-            Обновить
+            {{ t('cabinet-apps-refresh') }}
           </AtomButton>
         </div>
 
@@ -84,7 +83,7 @@ onMounted(() => {
               </div>
               <div>
                 <div class="font-bold text-[var(--noro-text)] text-sm">{{ app.name }}</div>
-                <div class="text-[11px] text-[var(--noro-muted)]">{{ app.description || 'Доступ к вашему профилю Noro Network' }}</div>
+                <div class="text-[11px] text-[var(--noro-muted)]">{{ app.description || t('cabinet-apps-default-desc') }}</div>
               </div>
             </div>
 
@@ -96,7 +95,7 @@ onMounted(() => {
             >
               <UIcon v-if="revokingId === app.id" name="i-lucide-loader-2" class="size-3.5 animate-spin" />
               <UIcon v-else name="i-lucide-trash-2" class="size-3.5" />
-              <span>Отозвать доступ</span>
+              <span>{{ t('cabinet-apps-revoke') }}</span>
             </button>
           </div>
         </div>
@@ -104,8 +103,8 @@ onMounted(() => {
         <EmptyState
           v-else
           icon="i-lucide-shield-off"
-          title="У вас нет подключённых сторонних приложений"
-          text="Здесь будут отображаться приложения и лаунчеры, которым вы разрешили доступ"
+          :title="t('cabinet-apps-none-title')"
+          :text="t('cabinet-apps-none-text')"
         />
       </section>
     </div>

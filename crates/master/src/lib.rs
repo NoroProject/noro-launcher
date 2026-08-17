@@ -263,12 +263,24 @@ fn router(state: AppState) -> Router {
             get(textures::render_cape_endpoint),
         )
         .route("/api/launcher/locales", get(translations::list))
-        .route("/api/launcher/locales/{locale}", get(translations::get));
+        .route("/api/launcher/locales/{locale}", get(translations::get))
+        // Свод правил открыт всем: на него ссылается каждый бан, и забаненный
+        // должен иметь возможность прочитать, за что именно.
+        // Витрина проекта: список серверов с онлайном, как на любом сайте
+        // модового проекта.
+        .route("/api/servers", get(api::servers::list))
+        .route("/api/rules", get(api::rules::list))
+        .route("/api/rules/scopes", get(api::rules::scopes))
+        .route(
+            "/api/rules/servers/{server_id}",
+            get(api::rules::by_server),
+        );
 
     // Личный кабинет.
     let cabinet_api = Router::new()
         .route("/api/me", get(cabinet::me))
         .route("/api/me/username", put(cabinet::set_username))
+        .route("/api/me/punishments", get(cabinet::punishments))
         .route("/api/me/sessions", get(cabinet_sessions::list))
         .route(
             "/api/me/sessions/others",
@@ -348,6 +360,12 @@ fn router(state: AppState) -> Router {
     // Агенты игровых серверов.
     let agent_api = Router::new()
         .route("/api/agent/players/{mc_uuid}", get(agent::player))
+        .route(
+            "/api/agent/players/{mc_uuid}/punishments",
+            get(agent::list_punishments).post(agent::create_punishment),
+        )
+        .route("/api/agent/rules", get(api::rules::agent_list))
+        .route("/api/agent/rules/{code}", get(api::rules::agent_by_code))
         .route("/api/agent/heartbeat", post(agent::heartbeat))
         .route("/api/agent/artifact", get(agent_artifact::artifact))
         .route("/api/agent/pubkey", get(agent_artifact::pubkey))

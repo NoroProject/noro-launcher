@@ -3,6 +3,8 @@ import type { NewsRow } from '~/types/api'
 
 const route = useRoute()
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 const notify = useNotify()
 await auth.loadMe()
 
@@ -55,34 +57,35 @@ async function removeNews() {
 </script>
 
 <template>
-  <NoroShell :title="item?.title || 'NEWS'" subtitle="Markdown editor">
+  <NoroShell :title="item?.title || t('admin-news-title')" subtitle="Markdown editor">
     <template #actions>
-      <AtomButton variant="ghost" icon="i-lucide-arrow-left" :to="'/admin/news'">Back</AtomButton>
+      <AtomButton variant="ghost" icon="i-lucide-arrow-left" :to="'/admin/news'">{{ t('admin-role-back') }}</AtomButton>
     </template>
 
-    <EmptyState v-if="!item" icon="i-lucide-search-x" title="News item not found" />
+    <EmptyState v-if="!item" icon="i-lucide-search-x" :title="t('admin-news-empty-title')" />
 
     <div v-else class="grid gap-5 xl:grid-cols-[1fr_420px]">
       <form class="noro-panel grid gap-3 p-5" @submit.prevent="save">
-        <label><span class="noro-label">Title</span><input v-model="form.title" class="noro-input" required></label>
+        <label><span class="noro-label">{{ t('admin-news-post-title') }}</span><input v-model="form.title" class="noro-input" required></label>
         <AdminImagePicker v-model="form.preview_img_url" label="Preview image" />
-        <div class="grid gap-2"><span class="noro-label">Body</span><AdminMarkdownEditor v-model="form.body" /></div>
-        <UCheckbox v-model="form.pinned" label="Pinned" />
+        <div class="grid gap-2"><span class="noro-label">{{ t('admin-news-post-body') }}</span><AdminMarkdownEditor v-model="form.body" /></div>
+        <UCheckbox v-model="form.pinned" :label="t('admin-news-post-pinned')" />
         <div class="flex gap-2">
           <AtomButton
+            v-if="can('noro.admin.news.edit')"
             variant="primary"
             icon="i-lucide-save"
             type="submit"
             :loading="busy === 'save'"
           >
-            Save
+            {{ t('cabinet-save') }}
           </AtomButton>
-          <AtomButton variant="danger" :loading="busy === 'delete'" icon="i-lucide-trash-2" @click="removeNews">Delete</AtomButton>
+          <AtomButton v-if="can('noro.admin.news.delete')" variant="danger" :loading="busy === 'delete'" icon="i-lucide-trash-2" @click="removeNews">{{ t('admin-blocklist-act-delete') }}</AtomButton>
         </div>
       </form>
 
       <section class="noro-panel p-5">
-        <h2 class="mb-4 font-bold text-[var(--noro-text)]">Preview</h2>
+        <h2 class="mb-4 font-bold text-[var(--noro-text)]">{{ t('admin-news-preview') }}</h2>
         
         <h3 class="text-xl font-black text-[var(--noro-text)]">{{ form.title }}</h3>
         <pre class="mt-3 whitespace-pre-wrap rounded-lg bg-[var(--noro-input)] p-3 text-sm text-[var(--noro-text)]">{{ form.body }}</pre>

@@ -6,7 +6,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, State};
 use axum::Json;
-use schema::PERM_ADMIN_NEWS;
+use schema::{PERM_NEWS_DELETE, PERM_NEWS_EDIT, PERM_NEWS_VIEW};
+
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -19,7 +20,7 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<Vec<NewsRow>>> {
-    admin.require(PERM_ADMIN_NEWS)?;
+    admin.require(PERM_NEWS_VIEW)?;
     Ok(Json(crate::db::list_news(&state.db, 100).await?))
 }
 
@@ -37,7 +38,7 @@ pub async fn create(
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_NEWS)?;
+    admin.require(PERM_NEWS_EDIT)?;
     let id = crate::db::create_news(
         &state.db,
         &req.title,
@@ -57,7 +58,7 @@ pub async fn update(
     Path(id): Path<Uuid>,
     Json(req): Json<CreateReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_NEWS)?;
+    admin.require(PERM_NEWS_EDIT)?;
     sqlx::query("UPDATE news SET title=$2, body=$3, preview_img_url=$4, pinned=$5 WHERE id=$1")
         .bind(id)
         .bind(&req.title)
@@ -75,7 +76,7 @@ pub async fn delete(
     admin: AdminAuth,
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_NEWS)?;
+    admin.require(PERM_NEWS_DELETE)?;
     crate::db::delete_news(&state.db, id).await?;
     broadcast_news_changed(&state);
     Ok(Json(json!({ "ok": true })))
@@ -90,7 +91,7 @@ pub async fn upload_image(
     admin: AdminAuth,
     mut multipart: Multipart,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_NEWS)?;
+    admin.require(PERM_NEWS_EDIT)?;
     while let Some(field) = multipart
         .next_field()
         .await
@@ -121,7 +122,7 @@ pub async fn upload_image(
         };
         return Ok(Json(json!({ "url": url })));
     }
-    Err(AppError::BadRequest("нет поля image".into()))
+    Err(AppError::BadRequest("missing the image field".into()))
 }
 
 /// Превью показывается карточкой, поэтому 1280px по ширине с запасом хватает.

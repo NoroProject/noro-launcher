@@ -6,7 +6,8 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
-use schema::PERM_ADMIN_SERVERS;
+use schema::PERM_SERVERS_AGENTS;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -31,7 +32,7 @@ pub async fn list(
     admin: AdminAuth,
     Path(server_id): Path<Uuid>,
 ) -> AppResult<Json<Vec<GameServerResp>>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_AGENTS)?;
     let rows = crate::db::list_game_servers(&state.db, server_id).await?;
     Ok(Json(
         rows.into_iter()
@@ -74,9 +75,9 @@ pub async fn create(
     Path(server_id): Path<Uuid>,
     Json(req): Json<SaveReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_AGENTS)?;
     if crate::db::get_server(&state.db, server_id).await?.is_none() {
-        return Err(AppError::NotFound("сборка не найдена".into()));
+        return Err(AppError::NotFound("build not found".into()));
     }
     let secret = generate_agent_secret();
     let row = crate::db::create_game_server(
@@ -99,7 +100,7 @@ pub async fn update(
     Path((_server_id, id)): Path<(Uuid, Uuid)>,
     Json(req): Json<SaveReq>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_AGENTS)?;
     crate::db::update_game_server(
         &state.db,
         id,
@@ -121,7 +122,7 @@ pub async fn rotate_token(
     admin: AdminAuth,
     Path((_server_id, id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_AGENTS)?;
     let secret = generate_agent_secret();
     crate::db::rotate_game_server_token(&state.db, id, &hash_agent_secret(&secret)).await?;
     Ok(Json(json!({ "secret": secret })))
@@ -132,7 +133,7 @@ pub async fn delete(
     admin: AdminAuth,
     Path((_server_id, id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_ADMIN_SERVERS)?;
+    admin.require(PERM_SERVERS_AGENTS)?;
     crate::db::delete_game_server(&state.db, id).await?;
     broadcast(&state);
     Ok(Json(json!({ "ok": true })))

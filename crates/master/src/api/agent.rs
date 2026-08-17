@@ -16,6 +16,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use chrono::{DateTime, Utc};
+
 #[derive(Serialize)]
 pub struct AgentRole {
     pub name: String,
@@ -29,10 +31,22 @@ pub struct AgentRole {
 }
 
 #[derive(Serialize)]
+pub struct AgentPunishmentSummary {
+    pub id: Uuid,
+    pub kind: String,
+    pub reason: String,
+    pub actor_label: String,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize)]
 pub struct AgentPlayer {
     pub uuid: Uuid,
     pub username: String,
     pub banned: bool,
+    pub muted: bool,
+    pub active_mute: Option<AgentPunishmentSummary>,
     /// Игроку разрешён вход на этот сервер. Агент обязан проверить: манифест
     /// сборки — не пропуск, до сервера можно дойти и мимо лаунчера.
     pub allowed: bool,
@@ -57,7 +71,7 @@ pub async fn player(
 ) -> AppResult<Json<AgentPlayer>> {
     let row = crate::db::user_by_mc_uuid(&state.db, mc_uuid)
         .await?
-        .ok_or_else(|| AppError::NotFound("игрок не найден".into()))?;
+        .ok_or_else(|| AppError::NotFound("player not found".into()))?;
     let profile = crate::db::load_profile(&state.db, row.id).await?;
 
     // Доступ считает мастер, а не агент: правила ограниченных серверов уже
@@ -66,6 +80,22 @@ pub async fn player(
     let allowed = match crate::db::get_server(&state.db, server_id).await? {
         Some(server) => !profile.banned && profile.can_join_server(&server_id, server.limited),
         None => false,
+    };
+
+    let mute_row = crate::db::active_mute_for_user(&state.db, row.id, Some(server_id)).await?;
+    let (muted, active_mute) = match mute_row {
+        Some(m) => (
+            true,
+            Some(AgentPunishmentSummary {
+                id: m.id,
+                kind: m.kind,
+                reason: m.reason,
+                actor_label: m.actor_label,
+                created_at: m.created_at,
+                expires_at: m.expires_at,
+            }),
+        ),
+        None => (false, None),
     };
 
     let mut roles: Vec<AgentRole> = profile
@@ -92,6 +122,8 @@ pub async fn player(
         uuid: profile.uuid,
         username: profile.username,
         banned: profile.banned,
+        muted,
+        active_mute,
         allowed,
         roles,
         // Скин есть всегда: у игрока свой либо общий Стив.
@@ -138,4 +170,108 @@ pub async fn heartbeat(
         state.ws.broadcast(&schema::ServerWsMsg::ServersChanged);
     }
     Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+pub struct CreateAgentPunishmentReq {
+    /// `mute` | `warn` | `ban` | `server_ban`
+    pub kind: String,
+    pub reason: String,
+    /// Срок в минутах. None — навсегда.
+    #[serde(default)]
+    pub minutes: Option<i64>,
+    /// Код правила из свода. Плагин присылает его из автодополнения, и по нему
+    /// же мастер проверяет, что срок укладывается в рамки правила.
+    #[serde(default)]
+    pub rule_code: Option<String>,
+}
+
+/// GET /api/agent/players/{mc_uuid}/punishments
+/// Получить список всех действующих и прошедших наказаний игрока.
+pub async fn list_punishments(
+    State(state): State<AppState>,
+    agent: AgentAuth,
+    Path(mc_uuid): Path<Uuid>,
+) -> AppResult<Json<Vec<crate::db::punishments::PunishmentRow>>> {
+    let _ = agent;
+    let row = crate::db::user_by_mc_uuid(&state.db, mc_uuid)
+        .await?
+        .ok_or_else(|| AppError::NotFound("player not found".into()))?;
+    Ok(Json(crate::db::list_punishments(&state.db, row.id).await?))
+}
+
+/// POST /api/agent/players/{mc_uuid}/punishments
+/// Выдать наказание (например, мут или варн) от имени игрового сервера/плагина.
+pub async fn create_punishment(
+    State(state): State<AppState>,
+    agent: AgentAuth,
+    Path(mc_uuid): Path<Uuid>,
+    Json(req): Json<CreateAgentPunishmentReq>,
+) -> AppResult<Json<crate::db::punishments::PunishmentRow>> {
+    if !matches!(req.kind.as_str(), "ban" | "warn" | "server_ban" | "mute") {
+        return Err(AppError::BadRequest("unknown punishment kind".into()));
+    }
+    if req.reason.trim().len() < 3 {
+        return Err(AppError::BadRequest("reason is required".into()));
+    }
+    let row = crate::db::user_by_mc_uuid(&state.db, mc_uuid)
+        .await?
+        .ok_or_else(|| AppError::NotFound("player not found".into()))?;
+
+    let actor_label = format!("Agent: {}", agent.game_server.name);
+    let server_id = if req.kind == "server_ban" || req.kind == "mute" {
+        Some(agent.game_server.server_id)
+    } else {
+        None
+    };
+
+    // Рамки правила действуют и здесь: команда из игры не должна выдавать то,
+    // чего свод не предусматривает. Байпаса у плагина нет — в игре некому
+    // предъявить право, там действует сервер целиком.
+    let rule = match req.rule_code.as_deref() {
+        Some(code) => {
+            crate::db::rule_by_code(&state.db, code, Some(agent.game_server.server_id)).await?
+        }
+        None => None,
+    };
+    if let Some(rule) = &rule {
+        let sanctions = crate::db::sanctions_of_rule(&state.db, rule.id).await?;
+        if !sanctions.is_empty()
+            && !sanctions
+                .iter()
+                .any(|s| s.kind == req.kind && s.allows(req.minutes))
+        {
+            return Err(AppError::Forbidden(format!(
+                "rule {} allows only: {}",
+                rule.code,
+                crate::api::admin::punish_limits::describe(&sanctions)
+            )));
+        }
+    }
+
+    let expires_at = req
+        .minutes
+        .map(|m| chrono::Utc::now() + chrono::Duration::minutes(m.max(1)));
+
+    let punishment = crate::db::create_punishment(
+        &state.db,
+        crate::db::punishments::NewPunishment {
+            user_id: row.id,
+            kind: &req.kind,
+            reason: req.reason.trim(),
+            actor_id: None,
+            actor_label: &actor_label,
+            server_id,
+            expires_at,
+            rule_id: rule.as_ref().map(|r| r.id),
+            rule_code: rule.as_ref().map(|r| r.code.as_str()),
+        },
+    )
+    .await?;
+
+    if req.kind == "ban" {
+        crate::db::refresh_ban_flag(&state.db, row.id).await?;
+    }
+
+    Ok(Json(punishment))
 }

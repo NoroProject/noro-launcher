@@ -2,44 +2,45 @@
 import type { ServerSettingsTab } from "~/types/server-settings";
 
 const model = defineModel<ServerSettingsTab>({ required: true });
+const { t } = useT();
 
-const tabs: Array<{
+const tabs = computed<Array<{
     key: ServerSettingsTab;
     label: string;
     icon: string;
     text: string;
-}> = [
+}>>(() => [
     {
         key: "server",
-        label: "Profile",
+        label: t('admin-tab-profile'),
         icon: "i-lucide-user",
-        text: "Name, order, assets & visibility",
+        text: t('admin-tab-profile-hint'),
     },
     {
         key: "mods",
-        label: "Mods",
+        label: t('admin-tab-mods'),
         icon: "i-lucide-puzzle",
-        text: "Installed mods & Modrinth catalog",
+        text: t('admin-tab-mods-hint'),
     },
     {
         key: "build",
-        label: "Build & Files",
+        label: t('admin-tab-build'),
         icon: "i-lucide-box",
-        text: "Modpack import, files & publish",
+        text: t('admin-tab-build-hint'),
     },
     {
         key: "instances",
-        label: "Game Servers",
+        label: t('admin-tab-instances'),
         icon: "i-lucide-server",
-        text: "Backend servers & wrappers",
+        text: t('admin-tab-instances-hint'),
     },
     {
         key: "client",
-        label: "Client Defaults",
+        label: t('admin-tab-client'),
         icon: "i-lucide-monitor",
-        text: "RAM, JVM flags & optional mods",
+        text: t('admin-tab-client-hint'),
     },
-];
+]);
 </script>
 
 <template>

@@ -46,6 +46,9 @@ pub async fn run(
         RemoteAction::RestartLauncher => Ok(Outcome {
             message: "лаунчер перезапустится".into(),
         }),
+        RemoteAction::KillGame => Ok(Outcome {
+            message: "процесс игры остановлен".into(),
+        }),
     }
 }
 

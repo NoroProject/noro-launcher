@@ -3,7 +3,6 @@ import type { ServerEditForm } from "~/types/server-settings";
 
 defineProps<{
     form: ServerEditForm;
-    /** Только те вкладки, для которых у формы есть заголовок в `copy`. */
     activeTab: "server" | "client";
     minecraft: string[];
     modloaders: string[];
@@ -17,24 +16,21 @@ defineEmits<{
     remove: [];
 }>();
 
-const copy = {
+const { t } = useT();
+
+const copy = computed(() => ({
     server: {
-        title: "Profile",
-        text: "How this pack is named and where it shows up.",
+        title: t("admin-set-profile-title"),
+        text: t("admin-set-profile-text"),
     },
     client: {
-        title: "Client defaults",
-        text: "Version and loader new builds inherit from this pack.",
+        title: t("admin-set-client-title"),
+        text: t("admin-set-client-text"),
     },
-};
+}));
 </script>
 
 <template>
-    <!--
-      Вкладки переключаются через v-show, а не наложением в одной ячейке грида.
-      Наложение делало панель высотой с самую длинную вкладку — на короткой
-      оставалась дыра, — а z-10 у активной перекрывал липкую шапку страницы.
-    -->
     <form
         class="noro-panel grid grid-rows-[auto_1fr_auto] overflow-hidden"
         @submit.prevent="$emit('save')"
@@ -56,32 +52,32 @@ const copy = {
         <div class="p-5">
             <div v-show="activeTab === 'server'" class="grid gap-5 md:grid-cols-2">
                 <label>
-                    <span class="noro-label">Name</span>
+                    <span class="noro-label">{{ t('admin-roles-name') }}</span>
                     <input v-model="form.name" class="noro-input" required>
                 </label>
                 <label>
-                    <span class="noro-label">Launcher order</span>
+                    <span class="noro-label">{{ t('admin-roles-order') }}</span>
                     <input v-model.number="form.sort_order" class="noro-input" type="number">
                 </label>
                 <label class="md:col-span-2">
-                    <span class="noro-label">Description</span>
+                    <span class="noro-label">{{ t('admin-blocklist-reason') }}</span>
                     <input v-model="form.description" class="noro-input">
                 </label>
                 <label class="noro-toggle-row">
                     <UCheckbox v-model="form.active" />
                     <span>
-                        <span class="block font-bold text-white">Active</span>
+                        <span class="block font-bold text-white">{{ t('admin-set-active') }}</span>
                         <span class="text-sm text-[var(--noro-muted)]">
-                            Show this pack in launcher lists.
+                            {{ t('admin-set-active-hint') }}
                         </span>
                     </span>
                 </label>
                 <label class="noro-toggle-row">
                     <UCheckbox v-model="form.limited" />
                     <span>
-                        <span class="block font-bold text-white">Limited access</span>
+                        <span class="block font-bold text-white">{{ t('admin-set-limited') }}</span>
                         <span class="text-sm text-[var(--noro-muted)]">
-                            Require role access before players can join.
+                            {{ t('admin-set-limited-hint') }}
                         </span>
                     </span>
                 </label>
@@ -102,9 +98,7 @@ const copy = {
                 <div class="noro-info md:col-span-2">
                     <UIcon name="i-lucide-package-check" class="size-5" />
                     <span>
-                        Builds inherit these defaults when a new build is
-                        created from this pack. Server addresses live on the game
-                        servers below.
+                        {{ t('admin-set-client-defaults-hint') }}
                     </span>
                 </div>
             </div>
@@ -112,7 +106,7 @@ const copy = {
 
         <div class="flex flex-wrap gap-3 border-t border-[var(--noro-border)] p-5">
             <AtomButton :loading="saving" type="submit" icon="i-lucide-save" variant="primary">
-                Save
+                {{ t('cabinet-save') }}
             </AtomButton>
             <AtomButton
                 :loading="deleting"
@@ -120,7 +114,7 @@ const copy = {
                 variant="danger"
                 @click="$emit('remove')"
             >
-                Delete
+                {{ t('admin-blocklist-act-delete') }}
             </AtomButton>
         </div>
     </form>

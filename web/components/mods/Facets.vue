@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { CatalogCategory, CatalogProviders } from "~/types/catalog";
 
-/** Фильтры каталога. Всё, что сужает выдачу, живёт в одной колонке слева. */
 const props = defineProps<{
     filters: {
         provider: string;
@@ -17,6 +16,7 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ toggleCategory: [name: string]; reset: [] }>();
+const { t } = useT();
 
 const PROJECT_TYPES = ["mod", "modpack", "resourcepack", "shader", "datapack", "plugin"];
 const LOADERS = ["", "fabric", "forge", "neoforge", "quilt"];
@@ -24,7 +24,7 @@ const LOADERS = ["", "fabric", "forge", "neoforge", "quilt"];
 const providerChips = computed(() => [
     { id: "modrinth", label: "Modrinth", on: props.providers.modrinth },
     { id: "curseforge", label: "CurseForge", on: props.providers.curseforge },
-    { id: "all", label: "Both", on: props.providers.curseforge },
+    { id: "all", label: t("admin-facets-both"), on: props.providers.curseforge },
 ]);
 
 const activeCount = computed(
@@ -35,7 +35,7 @@ const activeCount = computed(
 <template>
     <aside class="noro-panel grid content-start gap-5 p-4">
         <section class="grid gap-2">
-            <span class="noro-label noro-label-inline">Source</span>
+            <span class="noro-label noro-label-inline">{{ t('admin-facets-source') }}</span>
             <div class="flex flex-wrap gap-2">
                 <button
                     v-for="chip in providerChips"
@@ -51,7 +51,7 @@ const activeCount = computed(
         </section>
 
         <label class="block">
-            <span class="noro-label">Type</span>
+            <span class="noro-label">{{ t('admin-punish-kind') }}</span>
             <NoroSelect v-model="filters.projectType">
                 <option v-for="type in PROJECT_TYPES" :key="type" :value="type">{{ type }}</option>
             </NoroSelect>
@@ -60,7 +60,7 @@ const activeCount = computed(
         <label class="block">
             <span class="noro-label">Minecraft</span>
             <NoroSelect v-model="filters.mc">
-                <option value="">Any version</option>
+                <option value="">{{ t('admin-facets-any-version') }}</option>
                 <option v-for="v in mcVersions" :key="v" :value="v">{{ v }}</option>
             </NoroSelect>
         </label>
@@ -68,12 +68,12 @@ const activeCount = computed(
         <label class="block">
             <span class="noro-label">Loader</span>
             <NoroSelect v-model="filters.loader">
-                <option v-for="l in LOADERS" :key="l" :value="l">{{ l || "Any loader" }}</option>
+                <option v-for="l in LOADERS" :key="l" :value="l">{{ l || t('admin-facets-any-loader') }}</option>
             </NoroSelect>
         </label>
 
         <section class="grid gap-2">
-            <span class="noro-label noro-label-inline">Runs on</span>
+            <span class="noro-label noro-label-inline">{{ t('admin-facets-runs-on') }}</span>
             <div class="flex gap-2">
                 <button
                     v-for="side in ['', 'client', 'server']"
@@ -82,12 +82,12 @@ const activeCount = computed(
                     class="noro-chip flex-1 px-2 py-2 text-xs font-bold uppercase tracking-wider"
                     :class="filters.side === side ? 'noro-chip-on' : 'text-[var(--noro-muted)]'"
                     @click="filters.side = side as '' | 'client' | 'server'"
-                >{{ side || "any" }}</button>
+                >{{ side || t('admin-facets-any-side') }}</button>
             </div>
         </section>
 
         <section v-if="categories.length" class="grid gap-2">
-            <span class="noro-label noro-label-inline">Categories</span>
+            <span class="noro-label noro-label-inline">{{ t('admin-optmods-category') }}</span>
             <div class="noro-scroll grid max-h-72 gap-1 overflow-y-auto pr-1">
                 <button
                     v-for="cat in categories"
@@ -116,7 +116,7 @@ const activeCount = computed(
             block
             @click="$emit('reset')"
         >
-            Clear {{ activeCount }} filter(s)
+            {{ t('admin-facets-clear', { count: activeCount }) }}
         </AtomButton>
     </aside>
 </template>

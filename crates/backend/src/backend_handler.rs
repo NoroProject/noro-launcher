@@ -942,9 +942,10 @@ impl BackendState {
                 actor_username,
                 reason,
                 forced,
+                server_id,
                 ..
             } => {
-                self.prepare_log_request(request_id, actor_username, reason, forced);
+                self.prepare_log_request(request_id, actor_username, reason, forced, server_id);
             }
             ServerWsMsg::ImpersonateRequest {
                 grant_id,
@@ -989,6 +990,42 @@ impl BackendState {
 
     /// Собственно выполнение — после подтверждения либо сразу, если его не надо.
     pub fn perform_remote_action(&mut self, action: schema::RemoteAction, server_id: Option<Uuid>) {
+        if action == schema::RemoteAction::KillGame {
+            let running: Vec<_> = self.ctx.running.lock().keys().copied().collect();
+            let mut killed = 0;
+            for id in running {
+                if server_id.is_none() || server_id == Some(id) {
+                    if let Some(g) = self.ctx.running.lock().get(&id) {
+                        let _ = g.kill.send(());
+                        killed += 1;
+                    }
+                }
+            }
+            self.ctx.send(MessageToFrontend::AddNotification {
+                key: "notif-remote-action-done".into(),
+                args: [("detail".to_string(), format!("процесс игры остановлен ({killed})"))].into(),
+                level: schema::NotifLevel::Info,
+            });
+            return;
+        }
+
+        if action == schema::RemoteAction::RestartLauncher {
+            let ctx = self.ctx.clone();
+            tokio::spawn(async move {
+                ctx.send(MessageToFrontend::AddNotification {
+                    key: "notif-remote-action-done".into(),
+                    args: [("detail".to_string(), "лаунчер перезапускается...".into())].into(),
+                    level: schema::NotifLevel::Info,
+                });
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                if let Ok(current_exe) = std::env::current_exe() {
+                    let _ = std::process::Command::new(current_exe).spawn();
+                }
+                std::process::exit(0);
+            });
+            return;
+        }
+
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
             match crate::remote_actions::run(&ctx.dirs, action, server_id).await {
@@ -1019,13 +1056,15 @@ impl BackendState {
         actor_username: String,
         reason: String,
         forced: bool,
+        target_server_id: Option<Uuid>,
     ) {
-        let Some(server_id) = self.manifests.keys().copied().next() else {
-            tracing::warn!("запрос логов пришёл, но логов ещё нет");
-            return;
+        let server_id = target_server_id
+            .or_else(|| self.manifests.keys().copied().next());
+        let instance_dir = match server_id {
+            Some(ref id) => self.ctx.dirs.instance(id),
+            None => self.ctx.dirs.root.clone(),
         };
         let ctx = self.ctx.clone();
-        let instance_dir = self.ctx.dirs.instance(&server_id);
         let token = self.access_token.clone();
         let master = self.ctx.config.get().master_url;
 
@@ -1055,7 +1094,7 @@ impl BackendState {
                         &master,
                         &token,
                         &instance_dir,
-                        Some(server_id),
+                        server_id,
                         request_id,
                     )
                     .await;
@@ -1076,11 +1115,12 @@ impl BackendState {
         let Some(token) = self.access_token.clone() else {
             return;
         };
-        let Some(server_id) = self.manifests.keys().copied().next() else {
-            return;
+        let server_id = self.manifests.keys().copied().next();
+        let instance_dir = match server_id {
+            Some(ref id) => self.ctx.dirs.instance(id),
+            None => self.ctx.dirs.root.clone(),
         };
         let ctx = self.ctx.clone();
-        let instance_dir = self.ctx.dirs.instance(&server_id);
         let master = self.ctx.config.get().master_url;
         tokio::spawn(async move {
             match crate::support::send_for_request(
@@ -1088,7 +1128,7 @@ impl BackendState {
                 &master,
                 &token,
                 &instance_dir,
-                Some(server_id),
+                server_id,
                 request_id,
             )
             .await

@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import type { PackImportKind } from "~/types/server-settings";
 
-/**
- * `zip` — архив, внутри которого лежит корень сборки. В отличие от двух других
- * форматов манифеста в нём нет: что положили, то и попадёт в сборку.
- */
+const { t } = useT();
+
 const KINDS: Array<{ value: PackImportKind; label: string; hint: string }> = [
     { value: "mrpack", label: "Modrinth", hint: ".mrpack only" },
     { value: "curseforge", label: "CurseForge", hint: ".zip with manifest.json" },
@@ -69,18 +67,18 @@ const fileSize = computed(() => {
                 <UIcon name="i-lucide-box" class="size-6" />
             </div>
             <div>
-                <h2 class="font-bold text-[var(--noro-text)]">Pack Import</h2>
+                <h2 class="font-bold text-[var(--noro-text)]">{{ t('admin-import-title') }}</h2>
                 <p
                     class="text-[10px] text-[var(--noro-muted)] uppercase tracking-wider"
                 >
-                    Modrinth & CurseForge
+                    {{ t('admin-import-subtitle') }}
                 </p>
             </div>
         </div>
 
         <div class="p-5 grid gap-5">
             <div>
-                <span class="noro-label-xs mb-2 block">Pack Format</span>
+                <span class="noro-label-xs mb-2 block">{{ t('admin-import-format') }}</span>
                 <div
                     class="flex rounded-lg bg-black/20 p-1 border border-[var(--noro-border)]"
                 >
@@ -133,7 +131,7 @@ const fileSize = computed(() => {
                         <p
                             class="font-bold text-[var(--noro-text)] uppercase tracking-wider text-[11px]"
                         >
-                            Click or Drop Pack File
+                            {{ t('admin-import-drop') }}
                         </p>
                         <p class="text-[10px] text-[var(--noro-muted)]">
                             {{ activeKind.hint }}
@@ -172,7 +170,7 @@ const fileSize = computed(() => {
                     block
                     @click="$emit('submitImport')"
                 >
-                    Process Pack
+                    {{ t('admin-import-process') }}
                 </AtomButton>
                 <AtomButton
                     v-if="importFile"

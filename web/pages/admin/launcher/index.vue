@@ -2,6 +2,8 @@
 import type { LauncherVersionRow } from '~/types/api'
 
 const auth = useAuth()
+const { t } = useT()
+const can = (perm: string) => auth.hasPermission(perm)
 
 const notify = useNotify()
 await auth.loadMe()
@@ -43,12 +45,9 @@ async function buildLauncher() {
   }
 }
 
-/** Пять платформ одного вида разом: по одной их не наклацаешь. */
 async function deployAll(ids: string[], kind: string) {
   busy.value = `deploy-${kind}`
   try {
-    // Последовательно: мастер на каждый деплой рассылает лаунчерам обновление,
-    // и параллельный залп сделал бы порядок рассылки случайным.
     for (const id of ids) {
       await auth.request(`/api/admin/launcher/deploy/${id}`, { method: 'POST' })
     }
@@ -76,7 +75,7 @@ async function deploy(versionId: string) {
 </script>
 
 <template>
-  <NoroShell title="LAUNCHER" subtitle="Versions, GitHub tag builds, and deploy">
+  <NoroShell :title="t('admin-launch-title')" :subtitle="t('admin-launch-subtitle')">
     <template #actions>
       <AtomButton
         icon="i-lucide-refresh-cw"
@@ -84,10 +83,10 @@ async function deploy(versionId: string) {
         :loading="pending"
         @click="refresh()"
       >
-        Refresh
+        {{ t('cabinet-apps-refresh') }}
       </AtomButton>
-      <AtomButton variant="primary" icon="i-lucide-hammer" @click="showBuild = true">Build tag</AtomButton>
-      <AtomButton variant="secondary" icon="i-lucide-file-text" @click="showLog = true">Build log</AtomButton>
+      <AtomButton v-if="can('noro.admin.launcher.publish')" variant="primary" icon="i-lucide-hammer" @click="showBuild = true">{{ t('admin-launch-build-tag') }}</AtomButton>
+      <AtomButton variant="secondary" icon="i-lucide-file-text" @click="showLog = true">{{ t('admin-launch-build-log') }}</AtomButton>
     </template>
 
     <UAlert v-if="error" class="mb-5" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="humanError(error)" />
@@ -100,23 +99,23 @@ async function deploy(versionId: string) {
         @deploy="deploy"
         @deploy-many="deployAll"
       />
-      <EmptyState v-else icon="i-lucide-rocket" title="No versions yet" text="Build a launcher tag from the toolbar." />
+      <EmptyState v-else icon="i-lucide-rocket" :title="t('admin-launch-empty-title')" :text="t('admin-launch-empty-text')" />
     </section>
 
-    <AtomModal v-model="showBuild" title="GITHUB BUILD" subtitle="Build a launcher release tag">
+    <AtomModal v-model="showBuild" :title="t('admin-launch-modal-title')" :subtitle="t('admin-launch-modal-subtitle')">
       <div class="grid gap-3">
-        <AtomButton variant="secondary" :loading="busy === 'github'" icon="i-lucide-github" @click="githubLatest">Check latest release</AtomButton>
+        <AtomButton variant="secondary" :loading="busy === 'github'" icon="i-lucide-github" @click="githubLatest">{{ t('admin-launch-check-release') }}</AtomButton>
         <pre v-if="latest" class="rounded-lg bg-[var(--noro-input)] p-3 text-xs text-[var(--noro-text)]">{{ JSON.stringify(latest, null, 2) }}</pre>
         <input v-model="tag" class="noro-input" placeholder="v1.2.3">
         <div class="flex justify-end gap-3 pt-2">
-          <AtomButton variant="secondary" @click="showBuild = false">Cancel</AtomButton>
+          <AtomButton variant="secondary" @click="showBuild = false">{{ t('web-rules-cancel') }}</AtomButton>
           <AtomButton
             variant="primary"
             icon="i-lucide-hammer"
             :disabled="busy === 'build' || !tag"
             @click="buildLauncher"
           >
-            Build tag
+            {{ t('admin-launch-build-tag') }}
           </AtomButton>
         </div>
       </div>

@@ -3,6 +3,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schema::IntegrityReport;
+
 use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;

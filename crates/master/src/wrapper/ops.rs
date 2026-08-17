@@ -14,7 +14,7 @@ use uuid::Uuid;
 pub async fn power(state: &AppState, server: Uuid, action: &str) -> AppResult<()> {
     if !matches!(action, "start" | "stop" | "restart" | "kill") {
         return Err(AppError::BadRequest(format!(
-            "неизвестное действие питания: {action}"
+            "unknown power action: {action}"
         )));
     }
     state
@@ -32,7 +32,7 @@ pub async fn power(state: &AppState, server: Uuid, action: &str) -> AppResult<()
 pub async fn command(state: &AppState, server: Uuid, line: &str) -> AppResult<()> {
     let line = line.trim();
     if line.is_empty() {
-        return Err(AppError::BadRequest("пустая команда".into()));
+        return Err(AppError::BadRequest("empty command".into()));
     }
     state
         .wrappers

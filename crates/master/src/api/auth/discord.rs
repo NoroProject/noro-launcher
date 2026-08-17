@@ -124,7 +124,7 @@ pub async fn launcher_callback(
     let st = consume_state(&state, &q.state).await?;
     let port = st
         .launcher_port
-        .ok_or_else(|| AppError::BadRequest("state без launcher_port".into()))?;
+        .ok_or_else(|| AppError::BadRequest("state has no launcher_port".into()))?;
 
     let (user_id, session) = exchange_and_session(
         &state,
@@ -155,7 +155,7 @@ pub async fn launcher_exchange(
 ) -> AppResult<Json<serde_json::Value>> {
     let (user_id, access_token, refresh_token) = crate::db::take_launcher_code(&state.db, req.code)
         .await?
-        .ok_or_else(|| AppError::BadRequest("код входа недействителен или истёк".into()))?;
+        .ok_or_else(|| AppError::BadRequest("the sign-in code is invalid or expired".into()))?;
     let profile = crate::db::load_profile(&state.db, user_id).await?;
     Ok(Json(serde_json::json!({
         "access_token": access_token,
@@ -200,9 +200,9 @@ async fn exchange_and_session(
         .await
         .map_err(|e| AppError::Other(e.into()))?;
 
-    let access = token_resp["access_token"]
-        .as_str()
-        .ok_or_else(|| AppError::Unauthorized(format!("Discord отверг код: {token_resp}")))?;
+    let access = token_resp["access_token"].as_str().ok_or_else(|| {
+        AppError::Unauthorized(format!("Discord rejected the code: {token_resp}"))
+    })?;
 
     let me: Value = state
         .http()
@@ -217,12 +217,12 @@ async fn exchange_and_session(
 
     let discord_id = me["id"]
         .as_str()
-        .ok_or_else(|| AppError::Unauthorized("нет Discord id".into()))?;
+        .ok_or_else(|| AppError::Unauthorized("missing Discord id".into()))?;
     // Ник не подставляем: аккаунт создаётся один раз, и «player» остался бы с
     // игроком навсегда — вместе с чужими такими же «player».
     let username = me["username"]
         .as_str()
-        .ok_or_else(|| AppError::Unauthorized("Discord не вернул имя пользователя".into()))?;
+        .ok_or_else(|| AppError::Unauthorized("Discord returned no username".into()))?;
     let avatar = me["avatar"]
         .as_str()
         .map(|hash| format!("https://cdn.discordapp.com/avatars/{discord_id}/{hash}.png"));
@@ -233,7 +233,7 @@ async fn exchange_and_session(
     crate::audit::record_by_user(
         state,
         user_id,
-        "auth.login",
+        crate::audit::actions::AUTH_LOGIN,
         serde_json::json!({ "method": "discord", "scope": scope }),
     )
     .await;
@@ -251,10 +251,10 @@ pub async fn refresh(
     Json(req): Json<RefreshReq>,
 ) -> AppResult<Json<Value>> {
     let rt = uuid::Uuid::parse_str(&req.refresh_token)
-        .map_err(|_| AppError::Unauthorized("неверный refresh-токен".into()))?;
+        .map_err(|_| AppError::Unauthorized("invalid refresh token".into()))?;
     let session = crate::db::refresh_session(&state.db, rt, Duration::days(30))
         .await?
-        .ok_or_else(|| AppError::Unauthorized("refresh-токен не найден".into()))?;
+        .ok_or_else(|| AppError::Unauthorized("refresh token not found".into()))?;
     Ok(Json(serde_json::json!({
         "access_token": session.access_token,
         "refresh_token": session.refresh_token,

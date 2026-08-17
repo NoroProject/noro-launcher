@@ -1,37 +1,48 @@
 /**
  * Единая обратная связь для действий админки.
- *
- * До этого обработчики писались как `try { ... } finally { busy = null }` — без
- * `catch`. Успех выглядел ровно как отказ: форма уже показывает то, что ввели,
- * и после нажатия на экране не менялось ничего. Упавший запрос при этом уходил
- * в unhandled rejection и не доходил до пользователя вообще.
  */
 export function useNotify() {
   const toast = useToast()
+  const { t } = useT()
 
   return {
-    ok(title = 'Saved', description?: string) {
-      toast.add({ title, description, icon: 'i-lucide-check', color: 'success' })
+    ok(title?: string, description?: string) {
+      toast.add({
+        title: title || t('toast-success'),
+        description,
+        icon: 'i-lucide-check',
+        color: 'success'
+      })
     },
 
     /** Нейтральное уведомление о начатом действии: скачивание, копирование. */
     info(title: string, description?: string) {
-      toast.add({ title, description, icon: 'i-lucide-info', color: 'info' })
+      toast.add({
+        title,
+        description,
+        icon: 'i-lucide-info',
+        color: 'info'
+      })
     },
 
-    fail(err: unknown, title = 'Failed') {
+    fail(err: unknown, title?: string) {
       console.error(err)
-      toast.add({ title, description: describe(err), icon: 'i-lucide-triangle-alert', color: 'error' })
+      toast.add({
+        title: title || t('toast-error'),
+        description: describe(err, t),
+        icon: 'i-lucide-triangle-alert',
+        color: 'error'
+      })
     },
   }
 }
 
 /** Достаёт текст ошибки мастера; `$fetch` прячет тело ответа в `data`. */
-function describe(err: unknown): string {
+function describe(err: unknown, t: (key: string, args?: Record<string, string | number>) => string): string {
   const e = err as { data?: { error?: string, message?: string }, statusCode?: number, message?: string }
   const fromBody = e?.data?.error || e?.data?.message
   if (fromBody) return fromBody
-  if (e?.statusCode === 401 || e?.statusCode === 403) return 'Not enough permissions, or the session expired.'
-  if (e?.statusCode) return `Master returned ${e.statusCode}.`
-  return e?.message || 'Unknown error.'
+  if (e?.statusCode === 401 || e?.statusCode === 403) return t('auth-session-expired')
+  if (e?.statusCode) return t('notif-server-error', { reason: String(e.statusCode) })
+  return e?.message || t('toast-error')
 }

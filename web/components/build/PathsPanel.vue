@@ -1,8 +1,8 @@
 <script setup lang="ts">
-
 const pathsForm = defineModel<{ unmanaged: string; userManaged: string }>("pathsForm", { required: true });
 defineEmits<{ browse: [] }>();
 
+const { t } = useT();
 const ignoredCount = computed(() => pathsForm.value.unmanaged.split("\n").filter(l => l.trim()).length);
 const userCount = computed(() => pathsForm.value.userManaged.split("\n").filter(l => l.trim()).length);
 </script>
@@ -14,11 +14,11 @@ const userCount = computed(() => pathsForm.value.userManaged.split("\n").filter(
         <UIcon name="i-lucide-route" class="size-5" />
       </div>
       <div class="flex-1">
-        <div class="font-bold text-[var(--noro-text)]">Path Rules</div>
-        <div class="text-[10px] uppercase tracking-wider text-[var(--noro-muted)]">Sync exclusions &amp; overrides</div>
+        <div class="font-bold text-[var(--noro-text)]">{{ t('admin-paths-title') }}</div>
+        <div class="text-[10px] uppercase tracking-wider text-[var(--noro-muted)]">{{ t('admin-paths-subtitle') }}</div>
       </div>
       <div class="text-right text-[10px] font-mono text-[var(--noro-muted)]">
-        {{ ignoredCount + userCount }} rules
+        {{ t('admin-paths-rules-count', { count: ignoredCount + userCount }) }}
       </div>
     </div>
 
@@ -27,30 +27,28 @@ const userCount = computed(() => pathsForm.value.userManaged.split("\n").filter(
         <div class="rounded-lg border border-[var(--noro-border)] bg-black/20 p-3">
           <div class="flex items-center gap-2 text-[var(--noro-blue)]">
             <UIcon name="i-lucide-eye-off" class="size-4" />
-            <span class="text-xs font-bold uppercase tracking-widest">Ignored</span>
+            <span class="text-xs font-bold uppercase tracking-widest">{{ t('admin-paths-ignored') }}</span>
           </div>
           <div class="mt-1 text-2xl font-black text-[var(--noro-text)]">{{ ignoredCount }}</div>
-          <div class="text-[10px] text-[var(--noro-muted)]">Never touched by sync</div>
+          <div class="text-[10px] text-[var(--noro-muted)]">{{ t('admin-paths-ignored-hint') }}</div>
         </div>
         <div class="rounded-lg border border-[var(--noro-border)] bg-black/20 p-3">
           <div class="flex items-center gap-2 text-[var(--noro-magenta)]">
             <UIcon name="i-lucide-user" class="size-4" />
-            <span class="text-xs font-bold uppercase tracking-widest">User Overrides</span>
+            <span class="text-xs font-bold uppercase tracking-widest">{{ t('admin-paths-user-overrides') }}</span>
           </div>
           <div class="mt-1 text-2xl font-black text-[var(--noro-text)]">{{ userCount }}</div>
-          <div class="text-[10px] text-[var(--noro-muted)]">Seeded once, player edits kept</div>
+          <div class="text-[10px] text-[var(--noro-muted)]">{{ t('admin-paths-user-overrides-hint') }}</div>
         </div>
       </div>
 
-      <!-- Редактор переехал в файловый менеджер: правила ставятся на дереве,
-           где видно, что во что вложено, и наследуются вниз по папкам. -->
       <AtomButton
         icon="i-lucide-folder-open"
         variant="primary"
         block
         @click="$emit('browse')"
       >
-        Edit in file manager
+        {{ t('admin-paths-edit-fm') }}
       </AtomButton>
     </div>
   </section>

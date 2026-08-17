@@ -5,6 +5,7 @@ use super::maven::maven_to_path;
 use super::BootstrapCtx;
 use anyhow::{anyhow, Result};
 use schema::{ArtifactKind, Modloader};
+
 use serde_json::Value;
 
 pub async fn bootstrap_fabric(ctx: &mut BootstrapCtx<'_>, loader: Modloader) -> Result<()> {

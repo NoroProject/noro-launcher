@@ -45,7 +45,7 @@ pub struct LoginVerifyReq {
 pub async fn verify(state: &AppState, req: &LoginVerifyReq) -> AppResult<Uuid> {
     let (_, raw_state) = crate::db::take_webauthn_state(&state.db, req.state_id, "login")
         .await?
-        .ok_or_else(|| AppError::BadRequest("Срок действия испытания истёк".into()))?;
+        .ok_or_else(|| AppError::BadRequest("The challenge has expired".into()))?;
     let auth_state: DiscoverableAuthentication = serde_json::from_value(raw_state)?;
 
     let (user_id, _) = state
@@ -64,7 +64,7 @@ pub async fn verify(state: &AppState, req: &LoginVerifyReq) -> AppResult<Uuid> {
         }
     }
     if keys.is_empty() {
-        return Err(AppError::Unauthorized("Ключ не подошёл".into()));
+        return Err(AppError::Unauthorized("That key did not match".into()));
     }
 
     let discoverable: Vec<DiscoverableKey> = keys.iter().map(|(_, pk)| pk.into()).collect();
@@ -101,7 +101,7 @@ pub async fn login_verify(
     crate::audit::record_by_user(
         &state,
         user_id,
-        "auth.login",
+        crate::audit::actions::AUTH_LOGIN,
         serde_json::json!({ "method": "passkey" }),
     )
     .await;

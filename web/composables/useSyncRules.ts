@@ -22,14 +22,16 @@ export const MODE_LABEL: Record<SyncMode, string> = {
   user: 'U',
 }
 
-export const MODE_HINT: Record<SyncMode, string> = {
-  sync: 'Synced — server version always wins',
-  ignored: 'Ignored — never downloaded or removed',
-  user: 'User — installed once, then left alone',
-}
-
 export function useSyncRules(buildId: string) {
   const auth = useAuth()
+  const { t } = useT()
+
+  const MODE_HINT = computed<Record<SyncMode, string>>(() => ({
+    sync: t('admin-fm-sync-synced'),
+    ignored: t('admin-fm-sync-ignored'),
+    user: t('admin-fm-sync-user'),
+  }))
+
   const ignored = ref<string[]>([])
   const user = ref<string[]>([])
   const saving = ref(false)
@@ -77,7 +79,6 @@ export function useSyncRules(buildId: string) {
   /** Клик перебирает режимы по кругу — как chmod по-быстрому. */
   function cycle(path: string) {
     const current = ruleFor(path)
-    // У унаследованного своего правила нет: первый клик задаёт его явно.
     const next = current.from
       ? current.mode
       : MODE_ORDER[(MODE_ORDER.indexOf(current.mode) + 1) % MODE_ORDER.length]
@@ -85,8 +86,6 @@ export function useSyncRules(buildId: string) {
   }
 
   async function save() {
-    // Ручка перезаписывает оба списка целиком, поэтому сохранять до успешной
-    // загрузки нельзя: пустые списки затрут все прежние правила молча.
     if (!loaded.value) {
       throw new Error('Sync rules are not loaded yet — refusing to overwrite them')
     }
@@ -103,5 +102,5 @@ export function useSyncRules(buildId: string) {
 
   const count = computed(() => ignored.value.length + user.value.length)
 
-  return { ignored, user, saving, loaded, count, load, ruleFor, setMode, cycle, save }
+  return { ignored, user, saving, loaded, count, MODE_HINT, load, ruleFor, setMode, cycle, save }
 }

@@ -60,7 +60,12 @@ pub fn target(kind: &'static str, id: impl ToString) -> Option<Target> {
 ///
 /// Отдельный хелпер, потому что «кто» тут известен по id, а имя приходится
 /// доставать — и забыть его значит получить в журнале строку без автора.
-pub async fn record_by_user(state: &AppState, user_id: Uuid, action: &str, details: Value) {
+pub async fn record_by_user(
+    state: &AppState,
+    user_id: Uuid,
+    action: &'static actions::Action,
+    details: Value,
+) {
     let username = crate::db::get_user(&state.db, user_id)
         .await
         .ok()
@@ -88,7 +93,7 @@ pub async fn record_by_user(state: &AppState, user_id: Uuid, action: &str, detai
 pub async fn record(
     state: &AppState,
     actor: &Actor,
-    action: &str,
+    action: &'static actions::Action,
     target: Option<Target>,
     details: Value,
 ) {
@@ -100,7 +105,7 @@ pub async fn record(
         &state.db,
         actor.id(),
         &actor.label(),
-        action,
+        action.name,
         kind,
         id,
         &details,
@@ -108,6 +113,6 @@ pub async fn record(
     )
     .await
     {
-        tracing::error!(error = %e, action, "не удалось записать событие в аудит");
+        tracing::error!(error = %e, action = action.name, "не удалось записать событие в аудит");
     }
 }
