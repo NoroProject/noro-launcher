@@ -4,13 +4,22 @@ use super::*;
 fn wildcard_matching() {
     assert!(permission_matches("*", "anything.here"));
     assert!(permission_matches("noro.server.*", "noro.server.hitech"));
-    assert!(permission_matches("noro.server.*", "noro.server.hitech.join"));
+    assert!(permission_matches(
+        "noro.server.*",
+        "noro.server.hitech.join"
+    ));
     assert!(permission_matches(
         "noro.server.hitech.join",
         "noro.server.hitech.join"
     ));
-    assert!(!permission_matches("noro.server.*", "noro.admin.users.view"));
-    assert!(!permission_matches("noro.server.hitech", "noro.server.hitech2"));
+    assert!(!permission_matches(
+        "noro.server.*",
+        "noro.admin.users.view"
+    ));
+    assert!(!permission_matches(
+        "noro.server.hitech",
+        "noro.server.hitech2"
+    ));
 }
 
 /// Право на один сервер не должно открывать соседний: именно это отделяет

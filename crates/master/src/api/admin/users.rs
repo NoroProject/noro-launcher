@@ -6,7 +6,10 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
-use schema::{UserProfile, PERM_PUNISH_BAN, PERM_USERS_CAPES, PERM_USERS_PERMISSIONS, PERM_USERS_ROLES, PERM_USERS_SKIN, PERM_USERS_VIEW};
+use schema::{
+    UserProfile, PERM_PUNISH_BAN, PERM_USERS_CAPES, PERM_USERS_PERMISSIONS, PERM_USERS_ROLES,
+    PERM_USERS_SKIN, PERM_USERS_VIEW,
+};
 
 use serde::Deserialize;
 use uuid::Uuid;

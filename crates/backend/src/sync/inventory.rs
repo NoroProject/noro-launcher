@@ -59,7 +59,7 @@ impl Inventory {
 ///
 /// Возвращает находки — новые и изменённые файлы, которых нет в манифесте.
 pub async fn scan(instance_dir: &Path, known: &[String]) -> (Vec<IntegrityFinding>, Inventory) {
-    let mut inventory = Inventory::load(instance_dir).await;
+    let inventory = Inventory::load(instance_dir).await;
     let mut fresh = Inventory {
         files: BTreeMap::new(),
         initial_done: true,

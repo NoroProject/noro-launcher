@@ -65,7 +65,10 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                         div()
                             .text_size(px(12.))
                             .text_color(rgb(TEXT_PRIMARY))
-                            .child(format!("Запрос от администратора: {}", prompt.actor_username)),
+                            .child(format!(
+                                "Запрос от администратора: {}",
+                                prompt.actor_username
+                            )),
                     )
                     .child(
                         div()

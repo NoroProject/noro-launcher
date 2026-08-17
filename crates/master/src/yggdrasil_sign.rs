@@ -37,7 +37,9 @@ impl ProfileSigner {
     pub fn load_or_create(data_dir: &Path) -> Result<Self> {
         if let Ok(env_pem) = std::env::var("NORO_YGGDRASIL_RSA_KEY") {
             if !env_pem.trim().is_empty() {
-                tracing::info!("используется RSA-ключ Yggdrasil из переменной NORO_YGGDRASIL_RSA_KEY");
+                tracing::info!(
+                    "используется RSA-ключ Yggdrasil из переменной NORO_YGGDRASIL_RSA_KEY"
+                );
                 return Self::from_pem(&env_pem);
             }
         }
@@ -74,8 +76,7 @@ impl ProfileSigner {
     }
 
     pub fn from_pem(pem: &str) -> Result<Self> {
-        let key = RsaPrivateKey::from_pkcs8_pem(pem)
-            .context("разбор RSA приватного ключа")?;
+        let key = RsaPrivateKey::from_pkcs8_pem(pem).context("разбор RSA приватного ключа")?;
         let public_pem = key
             .to_public_key()
             .to_public_key_pem(LineEnding::LF)

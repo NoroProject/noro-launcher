@@ -1003,7 +1003,11 @@ impl BackendState {
             }
             self.ctx.send(MessageToFrontend::AddNotification {
                 key: "notif-remote-action-done".into(),
-                args: [("detail".to_string(), format!("процесс игры остановлен ({killed})"))].into(),
+                args: [(
+                    "detail".to_string(),
+                    format!("процесс игры остановлен ({killed})"),
+                )]
+                .into(),
                 level: schema::NotifLevel::Info,
             });
             return;
@@ -1058,8 +1062,7 @@ impl BackendState {
         forced: bool,
         target_server_id: Option<Uuid>,
     ) {
-        let server_id = target_server_id
-            .or_else(|| self.manifests.keys().copied().next());
+        let server_id = target_server_id.or_else(|| self.manifests.keys().copied().next());
         let instance_dir = match server_id {
             Some(ref id) => self.ctx.dirs.instance(id),
             None => self.ctx.dirs.root.clone(),

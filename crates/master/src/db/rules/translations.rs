@@ -79,10 +79,7 @@ pub async fn sanction_translations(
 }
 
 /// Все переводы одного правила — редактору, чтобы показать языки вкладками.
-pub async fn translations_of_rule(
-    pool: &PgPool,
-    rule_id: Uuid,
-) -> Result<Vec<RuleTranslationRow>> {
+pub async fn translations_of_rule(pool: &PgPool, rule_id: Uuid) -> Result<Vec<RuleTranslationRow>> {
     Ok(sqlx::query_as::<_, RuleTranslationRow>(
         "SELECT * FROM rule_translations WHERE rule_id = $1 ORDER BY locale",
     )

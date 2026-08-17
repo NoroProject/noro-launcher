@@ -95,7 +95,8 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                                     .hover(|s| s.text_color(rgb(TEXT_PRIMARY)))
                                     .child(toggle_label)
                                     .on_click(cx.listener(|this, _e, _w, cx| {
-                                        this.log_request_preview_open = !this.log_request_preview_open;
+                                        this.log_request_preview_open =
+                                            !this.log_request_preview_open;
                                         cx.notify();
                                     })),
                             )
@@ -128,10 +129,7 @@ fn preview(text: &str, files_summary: &str) -> AnyElement {
         text.chars().take(3000).collect::<String>()
     };
 
-    div()
-        .size_full()
-        .child(content)
-        .into_any_element()
+    div().size_full().child(content).into_any_element()
 }
 
 fn buttons(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
@@ -141,41 +139,35 @@ fn buttons(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .flex()
         .gap(px(8.))
         .when(!forced, |d| {
-            d.child(
-                div().flex_1().child(btn(
-                    "logreq-send",
-                    t("logreq-send"),
-                    true,
-                    cx.listener(|this, _e, _w, cx| {
-                        this.answer_log_request(true);
-                        cx.notify();
-                    }),
-                )),
-            )
-            .child(
-                div().flex_1().child(btn(
-                    "logreq-decline",
-                    t("logreq-decline"),
-                    false,
-                    cx.listener(|this, _e, _w, cx| {
-                        this.answer_log_request(false);
-                        cx.notify();
-                    }),
-                )),
-            )
+            d.child(div().flex_1().child(btn(
+                "logreq-send",
+                t("logreq-send"),
+                true,
+                cx.listener(|this, _e, _w, cx| {
+                    this.answer_log_request(true);
+                    cx.notify();
+                }),
+            )))
+            .child(div().flex_1().child(btn(
+                "logreq-decline",
+                t("logreq-decline"),
+                false,
+                cx.listener(|this, _e, _w, cx| {
+                    this.answer_log_request(false);
+                    cx.notify();
+                }),
+            )))
         })
         .when(forced, |d| {
-            d.child(
-                div().flex_1().child(btn(
-                    "logreq-close",
-                    t("logreq-close"),
-                    false,
-                    cx.listener(|this, _e, _w, cx| {
-                        this.dismiss_log_request();
-                        cx.notify();
-                    }),
-                )),
-            )
+            d.child(div().flex_1().child(btn(
+                "logreq-close",
+                t("logreq-close"),
+                false,
+                cx.listener(|this, _e, _w, cx| {
+                    this.dismiss_log_request();
+                    cx.notify();
+                }),
+            )))
         })
         .into_any_element()
 }

@@ -269,13 +269,13 @@ fn router(state: AppState) -> Router {
         // Витрина проекта: список серверов с онлайном, как на любом сайте
         // модового проекта.
         .route("/api/servers", get(api::servers::list))
-        .route("/api/public/settings", get(api::public_settings::get_public_settings))
+        .route(
+            "/api/public/settings",
+            get(api::public_settings::get_public_settings),
+        )
         .route("/api/rules", get(api::rules::list))
         .route("/api/rules/scopes", get(api::rules::scopes))
-        .route(
-            "/api/rules/servers/{server_id}",
-            get(api::rules::by_server),
-        );
+        .route("/api/rules/servers/{server_id}", get(api::rules::by_server));
 
     // Личный кабинет.
     let cabinet_api = Router::new()

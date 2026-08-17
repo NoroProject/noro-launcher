@@ -130,7 +130,7 @@ async fn newest(root: &Path, subdir: &str, suffix: &str, limit: usize) -> Vec<St
         }
         found.push((meta.modified().unwrap_or(std::time::UNIX_EPOCH), e.path()));
     }
-    found.sort_by(|a, b| b.0.cmp(&a.0));
+    found.sort_by_key(|(modified, _)| std::cmp::Reverse(*modified));
 
     found
         .into_iter()

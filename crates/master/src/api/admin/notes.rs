@@ -6,7 +6,9 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
-use schema::{PERM_USERS_JOURNAL, PERM_USERS_NOTES_DELETE, PERM_USERS_NOTES_VIEW, PERM_USERS_NOTES_WRITE};
+use schema::{
+    PERM_USERS_JOURNAL, PERM_USERS_NOTES_DELETE, PERM_USERS_NOTES_VIEW, PERM_USERS_NOTES_WRITE,
+};
 
 use serde::Deserialize;
 use serde_json::{json, Value};

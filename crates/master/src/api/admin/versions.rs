@@ -6,9 +6,9 @@ use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
 
+use schema::PERM_LAUNCHER_PUBLISH;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use schema::PERM_LAUNCHER_PUBLISH;
 
 /// Версии Minecraft (release/snapshot) из манифеста Mojang.
 pub async fn minecraft(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Value>> {

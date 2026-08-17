@@ -5,8 +5,8 @@ use axum::Router;
 use super::{
     agents, audit, backup, blocklist, build_routes, capes, catalog, cores, game_servers,
     impersonate, integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions,
-    news, notes, permission_nodes, punishments, remote, roles, rules, servers, settings, stats, storage,
-    tokens, user_launcher, users, versions, wrapper, wrapper_backups, wrapper_fs,
+    news, notes, permission_nodes, punishments, remote, roles, rules, servers, settings, stats,
+    storage, tokens, user_launcher, users, versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -53,7 +53,10 @@ pub fn router() -> Router<AppState> {
             get(settings::list).put(settings::save),
         )
         .route("/api/admin/settings/env", get(settings::export_env))
-        .route("/api/admin/settings/hero-image", post(settings::upload_hero_image))
+        .route(
+            "/api/admin/settings/hero-image",
+            post(settings::upload_hero_image),
+        )
         .route("/api/admin/diagnostics", get(settings::diagnostics))
         .route(
             "/api/admin/users/{id}/impersonate",
@@ -75,7 +78,10 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/integrity", get(integrity::list))
         .route("/api/admin/support/bundles", get(crate::api::support::list))
         .route("/api/admin/support/requests", get(log_requests::list))
-        .route("/api/admin/support/requests/{id}", delete(log_requests::cancel))
+        .route(
+            "/api/admin/support/requests/{id}",
+            delete(log_requests::cancel),
+        )
         .route(
             "/api/admin/users/{id}/request-logs",
             post(log_requests::request),

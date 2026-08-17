@@ -1,6 +1,6 @@
 use super::*;
-use uuid::Uuid;
 use schema::{PERM_PUNISH_BYPASS, PERM_PUNISH_PERMANENT};
+use uuid::Uuid;
 
 fn sanction(kind: &str, min: Option<i64>, max: Option<i64>) -> RuleSanctionRow {
     RuleSanctionRow {

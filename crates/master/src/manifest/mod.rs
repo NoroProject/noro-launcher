@@ -14,7 +14,10 @@ use anyhow::{Context, Result};
 use kinds::side_from_str;
 pub use kinds::{kind_from_str, kind_to_str};
 pub use publish::{ensure_signed, manifest_summary};
-use schema::{ArtifactKind, BuildManifest, FileEntry, Modloader, OptionalMod, RecommendedClientSettings, UserProfile};
+use schema::{
+    ArtifactKind, BuildManifest, FileEntry, Modloader, OptionalMod, RecommendedClientSettings,
+    UserProfile,
+};
 
 use std::collections::BTreeMap;
 use std::str::FromStr;

@@ -306,5 +306,7 @@ pub async fn punishments(
     user: AuthUser,
 ) -> AppResult<Json<Vec<crate::db::punishments::PunishmentRow>>> {
     crate::db::expire_punishments(&state.db).await?;
-    Ok(Json(crate::db::list_punishments(&state.db, user.user_id).await?))
+    Ok(Json(
+        crate::db::list_punishments(&state.db, user.user_id).await?,
+    ))
 }

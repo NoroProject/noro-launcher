@@ -8,7 +8,10 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
-use schema::{OptionalMod, PERM_BUILDS_DELETE, PERM_BUILDS_EDIT, PERM_BUILDS_IMPORT, PERM_BUILDS_PUBLISH, PERM_BUILDS_VIEW};
+use schema::{
+    OptionalMod, PERM_BUILDS_DELETE, PERM_BUILDS_EDIT, PERM_BUILDS_IMPORT, PERM_BUILDS_PUBLISH,
+    PERM_BUILDS_VIEW,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};

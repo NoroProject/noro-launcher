@@ -28,15 +28,16 @@ pub fn build_picker(ui: &LauncherUI, server: &ServerEntry, cx: &mut Cx) -> Optio
         .copied()
         .flatten()
         .or(server.current_build_id);
-    let current = server.available_builds.iter().find(|b| Some(b.id) == active);
+    let current = server
+        .available_builds
+        .iter()
+        .find(|b| Some(b.id) == active);
 
     Some(
         div()
             .relative()
             .child(trigger(server.id, current, ui.build_picker_open, cx))
-            .when(ui.build_picker_open, |d| {
-                d.child(menu(server, active, cx))
-            })
+            .when(ui.build_picker_open, |d| d.child(menu(server, active, cx)))
             .into_any_element(),
     )
 }
@@ -44,7 +45,9 @@ pub fn build_picker(ui: &LauncherUI, server: &ServerEntry, cx: &mut Cx) -> Optio
 /// Кнопка с текущей версией. Список раскрывается вверх: панель и так стоит у
 /// нижнего края окна.
 fn trigger(server_id: Uuid, current: Option<&BuildOption>, open: bool, cx: &mut Cx) -> AnyElement {
-    let label = current.map(|b| b.version.clone()).unwrap_or_else(|| "—".into());
+    let label = current
+        .map(|b| b.version.clone())
+        .unwrap_or_else(|| "—".into());
     let preview = current.is_some_and(|b| !b.published);
 
     div()
@@ -76,7 +79,11 @@ fn trigger(server_id: Uuid, current: Option<&BuildOption>, open: bool, cx: &mut 
                 .text_color(rgb(if preview { ACCENT } else { TEXT_PRIMARY }))
                 .child(label),
         )
-        .child(ic(if open { "chevron-up" } else { "chevron-down" }, 12., TEXT_MUTED))
+        .child(ic(
+            if open { "chevron-up" } else { "chevron-down" },
+            12.,
+            TEXT_MUTED,
+        ))
         .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
             let _ = server_id;
             this.build_picker_open = !this.build_picker_open;

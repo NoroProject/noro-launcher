@@ -53,7 +53,14 @@ fn a_missing_translation_falls_back_to_the_original() {
 #[test]
 fn an_empty_description_does_not_erase_the_original() {
     let mut rules = [rule("Гриферство", "Ломать чужое нельзя")];
-    apply_locale(&mut [], &mut rules, &mut [], &[], &[translation("Griefing", "")], &[]);
+    apply_locale(
+        &mut [],
+        &mut rules,
+        &mut [],
+        &[],
+        &[translation("Griefing", "")],
+        &[],
+    );
     assert_eq!(rules[0].title, "Griefing");
     assert_eq!(rules[0].description, "Ломать чужое нельзя");
 }

@@ -201,7 +201,8 @@ async fn authenticate(
             let _ = tx.send(ServerWsMsg::AuthOk { user: profile });
 
             // Отправляем накопившиеся запросы логов из очереди при входе
-            if let Ok(pending_requests) = crate::db::list_pending_for_user(&state.db, user_id).await {
+            if let Ok(pending_requests) = crate::db::list_pending_for_user(&state.db, user_id).await
+            {
                 for req in pending_requests {
                     let _ = tx.send(ServerWsMsg::LogRequest {
                         request_id: req.id,

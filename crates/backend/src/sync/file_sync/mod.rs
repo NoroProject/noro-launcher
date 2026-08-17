@@ -4,8 +4,8 @@
 use super::downloader::{download_all, DownloadTask};
 use anyhow::{bail, Result};
 use bridge::SyncStage;
-use schema::{ArtifactKind, BuildManifest, FileEntry, UserProfile};
-use std::path::{Path, PathBuf};
+use schema::{BuildManifest, FileEntry, UserProfile};
+use std::path::Path;
 use std::sync::Arc;
 
 /// Колбэк прогресса: (стадия, готово, всего, текущий файл).
@@ -55,7 +55,7 @@ pub async fn sync_server(
 
     // База хешей: то, что мы установили в прошлый раз. Без неё режим `merged`
     // не отличает правки игрока от обновления сервера.
-    let mut base = super::merge::BaseHashes::load(instance_dir).await;
+    let base = super::merge::BaseHashes::load(instance_dir).await;
     let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
 
     // 3. Проверка файлов — что нужно скачать.

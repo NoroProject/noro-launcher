@@ -68,7 +68,7 @@ pub(super) async fn collect(
                 // Берём серверную, но сначала откладываем версию игрока.
                 schema::ConflictPolicy::TakeTheirs => {
                     if let Err(e) =
-                        crate::sync::merge::backup_conflict(instance_dir, &f.path, &stamp).await
+                        crate::sync::merge::backup_conflict(instance_dir, &f.path, stamp).await
                     {
                         tracing::warn!(path = %f.path, error = %e, "не отложить версию игрока");
                     }

@@ -49,10 +49,7 @@ impl RuleSanctionRow {
 
 /// Санкции нескольких правил разом: страница правил рисует их все, и запрос на
 /// каждое правило превращал бы открытие свода в сотню обращений к базе.
-pub async fn list_rule_sanctions(
-    pool: &PgPool,
-    rule_ids: &[Uuid],
-) -> Result<Vec<RuleSanctionRow>> {
+pub async fn list_rule_sanctions(pool: &PgPool, rule_ids: &[Uuid]) -> Result<Vec<RuleSanctionRow>> {
     let rows = sqlx::query_as::<_, RuleSanctionRow>(
         "SELECT * FROM rule_sanctions WHERE rule_id = ANY($1) ORDER BY sort_order, kind",
     )
