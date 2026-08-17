@@ -30,10 +30,27 @@ public final class MessageRender {
                 .replace("{duration}", DurationArg.format(punishment.minutesLeft()))
                 .replace("{expires}", punishment.permanent() ? "never" : EXPIRES.format(punishment.expiresAt()))
                 .replace("{actor}", punishment.actorLabel() == null ? "console" : punishment.actorLabel())
-                .replace("{rule}", punishment.ruleCode() == null ? "—" : punishment.ruleCode())
+                .replace("{rule}", formatRule(punishment.ruleCode()))
                 .replace("{id}", shortId(punishment))
                 .replace("{kind}", verb(punishment.kind()));
         return PrefixFormat.legacy(out);
+    }
+
+    private static String formatRule(String ruleCode) {
+        if (ruleCode == null || ruleCode.isBlank() || "—".equals(ruleCode)) {
+            return "—";
+        }
+        String raw = ruleCode.trim();
+        String clean = raw.replace("@", "").trim();
+        String url;
+        if (clean.startsWith("http://") || clean.startsWith("https://")) {
+            url = clean;
+        } else if (clean.startsWith("rule-")) {
+            url = "https://noro.dalynkaa.dev/rules#" + clean;
+        } else {
+            url = "https://noro.dalynkaa.dev/rules#rule-" + clean;
+        }
+        return "[" + raw + "](" + url + ")";
     }
 
     /**

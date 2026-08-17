@@ -92,10 +92,6 @@ final class ModBridge implements GameBridge {
      * одинаковый на всём диапазоне версий.
      */
     private static Component text(String message) {
-        //#if MC>=11900
-        return Component.literal(message);
-        //#else
-        //$$ return new net.minecraft.network.chat.TextComponent(message);
-        //#endif
+        return ModText.parse(message);
     }
 }

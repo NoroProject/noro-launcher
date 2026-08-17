@@ -60,11 +60,7 @@ final class ModJoin {
             AgentRuntime.LOG.info("Denied {}: {}", name, decision.message());
             // Единственный разрыв API на всём диапазоне 1.18.2 → 26.x:
             // Component.literal появился в 1.19, до него был TextComponent.
-            //#if MC>=11900
-            player.connection.disconnect(Component.literal(decision.message()));
-            //#else
-            //$$ player.connection.disconnect(new net.minecraft.network.chat.TextComponent(decision.message()));
-            //#endif
+            player.connection.disconnect(ModText.parse(decision.message()));
             return;
         }
         // Пустой профиль отсеивает сам кэш: мастер мог не ответить.
