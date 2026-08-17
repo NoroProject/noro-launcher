@@ -7,25 +7,14 @@ const { t } = useT()
 const notify = useNotify()
 
 const reason = ref('')
-const code = ref('')
 const busy = ref(false)
 const needStepUp = ref(false)
 const status = ref<string | null>(null)
 
-async function stepUp() {
-  busy.value = true
-  try {
-    await auth.request('/api/admin/step-up/recovery', {
-      method: 'POST',
-      body: { code: code.value.trim() },
-    })
-    needStepUp.value = false
-    notify.ok('Confirmed for the next 15 minutes')
-  } catch (e) {
-    notify.fail(e)
-  } finally {
-    busy.value = false
-  }
+/** Подтвердились — окно открыто, повторяем запрос сами, чтобы не жать дважды. */
+async function confirmed() {
+  needStepUp.value = false
+  await start()
 }
 
 async function start() {
@@ -75,13 +64,7 @@ function poll(grantId: string) {
         :description="t('admin-users-impersonate-warn')"
       />
 
-      <template v-if="needStepUp">
-        <label class="block">
-          <span class="noro-label mb-1.5 block">{{ t('admin-users-impersonate-code') }}</span>
-          <input v-model="code" class="noro-input w-full font-mono" placeholder="XXXX-XXXX-XXXX">
-        </label>
-        <AtomButton icon="i-lucide-shield-check" :loading="busy" @click="stepUp">{{ t('admin-users-impersonate-confirm') }}</AtomButton>
-      </template>
+      <StepUpGate v-if="needStepUp" @confirmed="confirmed" />
 
       <template v-else>
         <label class="block">

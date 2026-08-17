@@ -129,23 +129,26 @@ onMounted(() => load())
 
 <template>
   <section class="noro-panel space-y-4 p-5">
-    <div class="flex items-center justify-between">
-      <div>
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
         <h3 class="text-lg font-bold text-[var(--noro-text)]">{{ t('admin-support-panel-title') }}</h3>
         <p class="text-xs text-[var(--noro-muted)]">{{ t('admin-support-panel-subtitle') }}</p>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <AtomButton v-if="can('noro.admin.support.request')" variant="dark" icon="i-lucide-file-text" size="sm" @click="emit('requestLogs')">
-          {{ t('admin-users-req-logs') }}
-        </AtomButton>
-        <AtomButton v-if="can('noro.admin.users.launcher')" variant="dark" icon="i-lucide-x-circle" size="sm" :disabled="actionBusy" @click="runAction('kill_game')">
-          {{ t('admin-support-close-game') }}
-        </AtomButton>
-        <AtomButton v-if="can('noro.admin.users.launcher')" variant="dark" icon="i-lucide-rotate-ccw" size="sm" :disabled="actionBusy" @click="runAction('restart_launcher')">
-          {{ t('admin-support-restart-launcher') }}
-        </AtomButton>
-        <AtomButton variant="dark" icon="i-lucide-refresh-cw" :loading="pending" class="!min-h-8 !px-2" @click="load" />
-      </div>
+      <AtomButton variant="dark" size="sm" icon="i-lucide-refresh-cw" :loading="pending" class="shrink-0" @click="load" />
+    </div>
+
+    <!-- Действия отдельным рядом: рядом с заголовком они в узкой колонке
+         вставали лесенкой разной ширины и наезжали на подзаголовок. -->
+    <div class="flex flex-wrap gap-2">
+      <AtomButton v-if="can('noro.admin.support.request')" variant="dark" icon="i-lucide-file-text" size="sm" class="min-w-40 flex-1" @click="emit('requestLogs')">
+        {{ t('admin-users-req-logs') }}
+      </AtomButton>
+      <AtomButton v-if="can('noro.admin.users.launcher')" variant="dark" icon="i-lucide-x-circle" size="sm" class="min-w-40 flex-1" :disabled="actionBusy" @click="runAction('kill_game')">
+        {{ t('admin-support-close-game') }}
+      </AtomButton>
+      <AtomButton v-if="can('noro.admin.users.launcher')" variant="dark" icon="i-lucide-rotate-ccw" size="sm" class="min-w-40 flex-1" :disabled="actionBusy" @click="runAction('restart_launcher')">
+        {{ t('admin-support-restart-launcher') }}
+      </AtomButton>
     </div>
 
     <!-- Delivered Support Bundles (ZIP archives) -->
