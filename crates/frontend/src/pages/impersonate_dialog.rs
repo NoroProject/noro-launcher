@@ -96,36 +96,5 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     )
 }
 
-/// Баннер «вы в чужом аккаунте». Постоянный: забыть об этом нельзя.
-pub fn banner(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
-    let name = ui.impersonating_as.as_ref()?;
-
-    Some(
-        div()
-            .w_full()
-            .px(px(16.))
-            .py(px(8.))
-            .bg(rgb(ACCENT))
-            .flex()
-            .items_center()
-            .gap(px(12.))
-            .child(
-                div()
-                    .flex_1()
-                    .text_size(px(12.))
-                    .font_weight(FontWeight::BOLD)
-                    .text_color(rgb(TEXT_PRIMARY))
-                    .child(format!("{} {}", t("impersonate-banner"), name)),
-            )
-            .child(btn(
-                "impersonate-exit",
-                t("impersonate-exit"),
-                false,
-                cx.listener(|this, _e, _w, cx| {
-                    this.exit_impersonation();
-                    cx.notify();
-                }),
-            ))
-            .into_any_element(),
-    )
-}
+// Отметка «вы в чужом аккаунте» — в рамке окна: она относится к окну целиком,
+// а не к странице. См. `components::window_chrome`.

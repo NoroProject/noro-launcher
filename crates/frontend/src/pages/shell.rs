@@ -15,8 +15,7 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
     for (id, url) in to_load {
         ui.ensure_icon_loaded(id, url, cx);
     }
-    // Баннер над всем: забыть, что ты в чужом аккаунте, нельзя.
-    let banner = impersonate_dialog::banner(ui, cx);
+    // Отметка о чужом аккаунте живёт в рамке окна — см. `window_chrome`.
     let dialog = impersonate_dialog::dialog(ui, cx);
     let log_dialog = log_request_dialog::dialog(ui, cx);
     let remote_dialog = remote_action_dialog::dialog(ui, cx);
@@ -26,7 +25,6 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
         .flex()
         .flex_col()
         .bg(rgb(BG_WINDOW))
-        .children(banner)
         .child(
             div()
                 .flex_1()

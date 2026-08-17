@@ -41,7 +41,11 @@ pub async fn list(
 
     while let Ok(Some(entry)) = entries.next_entry().await {
         let name = entry.file_name().to_string_lossy().to_string();
-        if !name.ends_with(".jar") {
+        // Файлы с точки — не агенты. macOS кладёт рядом AppleDouble `._имя.jar`
+        // при распаковке архива, собранного её же tar, и такой файл проходил
+        // проверку расширения: в админке появлялись платформы `._fabric`,
+        // `._paper` и прочие, а мусор ещё и уезжал в общий стор.
+        if !name.ends_with(".jar") || name.starts_with('.') {
             continue;
         }
         // Кладём в общий стор: дальше ссылка ведёт на /files/{sha1}, который уже

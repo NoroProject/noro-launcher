@@ -4,10 +4,10 @@ use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{
-    div, prelude::*, px, rgb, rgba, AnyElement, Context, MouseButton, MouseDownEvent, Pixels,
-    Point, Size, WindowControlArea,
+    div, prelude::*, px, rgb, rgba, AnyElement, Context, FontWeight, MouseButton, MouseDownEvent,
+    Pixels, Point, Size, WindowControlArea,
 };
-use i18n::Locale;
+use i18n::{t, Locale};
 
 /// Верхняя панель окна. `compact` — тонкий вариант для основного интерфейса.
 pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> AnyElement {
@@ -33,6 +33,7 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
                 window.start_window_move();
             }
         })
+        .children(impersonate_pill(ui, cx))
         // Windows двигает окно сам, по ответу на WM_NCHITTEST, — там
         // `start_window_move()` не делает ничего, и шапка не таскалась вовсе.
         // Метку вешаем на пустую часть: накрыть ею всю панель нельзя, система
@@ -48,6 +49,62 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
         .child(control("win-min", "minus", false))
         .child(control("win-close", "x", true))
         .into_any_element()
+}
+
+/// Отметка «вы в чужом аккаунте» прямо в рамке окна.
+///
+/// Раньше это была полоса во всю ширину под рамкой. Она забирала у контента
+/// полсотни пикселей на каждом экране и по весу читалась как часть интерфейса
+/// лаунчера, хотя относится к окну целиком. Здесь она столь же постоянна, но
+/// стоит там же, где остальные свойства окна, и не двигает содержимое.
+fn impersonate_pill(ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> Option<AnyElement> {
+    let name = ui.impersonating_as.clone()?;
+
+    Some(
+        div()
+            .h(px(24.))
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .pl(px(8.))
+            .pr(px(4.))
+            .rounded(px(R_SM))
+            .bg(rgb(ACCENT))
+            .child(ic("eye-off", 12., ON_CTA))
+            .child(
+                div()
+                    .text_size(px(12.))
+                    .font_weight(FontWeight::BOLD)
+                    .text_color(rgb(ON_CTA))
+                    .child(format!("{} {name}", t("impersonate-banner"))),
+            )
+            .child(
+                div()
+                    .id("impersonate-exit")
+                    .h(px(20.))
+                    .px(px(8.))
+                    .flex()
+                    .items_center()
+                    .gap(px(4.))
+                    .rounded(px(R_SM))
+                    .cursor_pointer()
+                    .bg(rgba((ON_CTA << 8) | 0x22))
+                    .hover(|s| s.bg(rgba((ON_CTA << 8) | 0x44)))
+                    .child(ic("log-out", 10., ON_CTA))
+                    .child(
+                        div()
+                            .text_size(px(11.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(rgb(ON_CTA))
+                            .child(t("impersonate-exit")),
+                    )
+                    .on_click(cx.listener(|this, _e, _w, cx| {
+                        this.exit_impersonation();
+                        cx.notify();
+                    })),
+            )
+            .into_any_element(),
+    )
 }
 
 /// Ширина системной зоны ресайза по краям окна.
