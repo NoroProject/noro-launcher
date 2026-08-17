@@ -1,6 +1,7 @@
 //! noro-master — мастер-сервер: авторизация, Yggdrasil, раздача файлов,
 //! WebSocket с лаунчерами, админ-API, bootstrap артефактов.
 
+pub mod agent_link;
 pub mod api;
 pub mod audit;
 pub mod build_importer;
@@ -75,6 +76,7 @@ pub async fn run() -> Result<()> {
         import_jobs: Arc::new(dashmap::DashMap::new()),
         catalog: catalog::HttpCache::default(),
         wrappers: wrapper::WrapperHub::default(),
+        agents: agent_link::AgentHub::default(),
         // Без публичных адресов домен для passkey не вывести. Это не повод не
         // подняться: инстанс как раз и поднимается, чтобы их задать.
         webauthn: build_webauthn(&config),
@@ -362,8 +364,21 @@ fn router(state: AppState) -> Router {
     let agent_api = Router::new()
         .route("/api/agent/players/{mc_uuid}", get(agent::player))
         .route(
+            "/api/agent/players/by-name/{username}",
+            get(agent::player_by_name),
+        )
+        .route(
             "/api/agent/players/{mc_uuid}/punishments",
             get(agent::list_punishments).post(agent::create_punishment),
+        )
+        .route(
+            "/api/agent/punishments/{id}/revoke",
+            post(agent::revoke_punishment),
+        )
+        .route("/api/agent/punishments/{id}/ack", post(agent::acknowledge))
+        .route(
+            "/api/agent/messages",
+            get(api::moderation_messages::agent_messages),
         )
         .route("/api/agent/rules", get(api::rules::agent_list))
         .route("/api/agent/rules/{code}", get(api::rules::agent_by_code))
@@ -373,7 +388,11 @@ fn router(state: AppState) -> Router {
         .route("/api/agent/nodes", post(agent_nodes::report))
         // Канал управления враппером. Живёт рядом с остальным агентским API:
         // авторизация та же — секрет игрового сервера.
-        .route("/api/agent/ws", get(wrapper::session::ws_handler));
+        .route("/api/agent/ws", get(wrapper::session::ws_handler))
+        // Канал наказаний до агента внутри игры. Отдельный от враппера: тот
+        // управляет процессом снаружи и есть не везде, а бан обязан долетать
+        // до игрока в тот же момент, а не к его следующему входу.
+        .route("/api/agent/link", get(agent_link::session::ws_handler));
 
     let admin_api = api::admin::router().route(
         "/api/admin/locales/{locale}",

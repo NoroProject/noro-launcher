@@ -15,6 +15,7 @@ pub mod launcher_clients;
 pub mod log_requests;
 pub mod mod_install;
 pub mod mod_suggestions;
+pub mod moderation_messages;
 pub mod news;
 pub mod notes;
 pub mod permission_nodes;

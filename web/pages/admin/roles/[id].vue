@@ -34,6 +34,8 @@ const form = reactive({
   sort_order: 0,
   lp_group: '',
   icon: '',
+  prefix: '',
+  suffix: '',
   parent_id: ''
 })
 const busy = ref<string | null>(null)
@@ -47,6 +49,8 @@ watchEffect(() => {
     sort_order: role.value.sort_order || 0,
     lp_group: role.value.lp_group || '',
     icon: role.value.icon || '',
+    prefix: role.value.prefix || '',
+    suffix: role.value.suffix || '',
     parent_id: role.value.parent_id || ''
   })
 })
@@ -102,6 +106,20 @@ async function removePermission(entries: PermissionEntry[]) {
           <input v-model="form.icon" class="noro-input" maxlength="8" placeholder="★">
           <span class="mt-2 block text-xs text-[var(--noro-muted)]">
             {{ t('admin-role-icon-hint') }}
+          </span>
+        </label>
+        <label>
+          <span class="noro-label">{{ t('admin-role-prefix-label') }}</span>
+          <input v-model="form.prefix" class="noro-input font-mono" maxlength="64" placeholder="&8[&cADMIN&8] ">
+          <span class="mt-2 block text-xs text-[var(--noro-muted)]">
+            {{ t('admin-role-prefix-hint') }}
+          </span>
+        </label>
+        <label>
+          <span class="noro-label">{{ t('admin-role-suffix-label') }}</span>
+          <input v-model="form.suffix" class="noro-input font-mono" maxlength="64" placeholder=" &7★">
+          <span class="mt-2 block text-xs text-[var(--noro-muted)]">
+            {{ t('admin-role-suffix-hint') }}
           </span>
         </label>
         <label>

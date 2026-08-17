@@ -23,6 +23,8 @@ pub struct AppState {
     pub catalog: HttpCache,
     /// Подключённые ServerWrapper'ы игровых серверов.
     pub wrappers: crate::wrapper::WrapperHub,
+    /// Агенты внутри игры — им уходят наказания.
+    pub agents: crate::agent_link::AgentHub,
     /// Проверка passkey. Собирается один раз при старте. `None` — публичные
     /// адреса ещё не заданы: домен, к которому браузер привяжет ключ, вывести
     /// не из чего, и обещать игроку passkey нельзя.

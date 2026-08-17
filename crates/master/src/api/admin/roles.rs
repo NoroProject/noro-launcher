@@ -67,6 +67,13 @@ pub struct UpdateReq {
     /// Иконка роли: имя из набора либо юникод-символ.
     #[serde(default)]
     pub icon: Option<String>,
+    /// Что стоит перед ником в игре, с цветами через `&`. Иконка — не префикс:
+    /// она остаётся одним глифом для таба и сайта.
+    #[serde(default)]
+    pub prefix: Option<String>,
+    /// Что стоит после ника. Тот же формат.
+    #[serde(default)]
+    pub suffix: Option<String>,
     /// Роль-родитель, чьи права действуют и здесь. `None` — наследования нет.
     #[serde(default)]
     pub parent_id: Option<Uuid>,
@@ -85,13 +92,17 @@ pub async fn update(
     crate::db::update_role(
         &state.db,
         id,
-        &req.display_name,
-        req.color.as_deref(),
-        req.is_default,
-        req.sort_order,
-        req.lp_group.as_deref(),
-        req.icon.as_deref(),
-        req.parent_id,
+        crate::db::RoleFields {
+            display_name: &req.display_name,
+            color: req.color.as_deref(),
+            is_default: req.is_default,
+            sort_order: req.sort_order,
+            lp_group: req.lp_group.as_deref(),
+            icon: req.icon.as_deref(),
+            prefix: req.prefix.as_deref(),
+            suffix: req.suffix.as_deref(),
+            parent_id: req.parent_id,
+        },
     )
     .await?;
     audit::record(
@@ -118,6 +129,8 @@ pub async fn update(
             sort_order: req.sort_order,
             lp_group: req.lp_group,
             icon: req.icon,
+            prefix: req.prefix,
+            suffix: req.suffix,
             permission_grants: vec![],
             parent_id: req.parent_id,
             inherited_permissions: vec![],

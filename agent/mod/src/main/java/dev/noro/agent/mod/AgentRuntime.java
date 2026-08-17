@@ -1,9 +1,10 @@
 package dev.noro.agent.mod;
 
-import dev.noro.agent.core.AccessGate;
+import com.mojang.brigadier.CommandDispatcher;
 import dev.noro.agent.core.AgentConfig;
 import dev.noro.agent.core.HeartbeatTask;
 import dev.noro.agent.core.MasterClient;
+import dev.noro.agent.core.MasterHttp;
 import dev.noro.agent.core.LuckPermsSupport;
 import dev.noro.agent.core.NoroAgentApi;
 import dev.noro.agent.core.ProfileCache;
@@ -11,7 +12,7 @@ import dev.noro.agent.core.RoleApplier;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import net.minecraft.network.chat.Component;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import org.slf4j.Logger;
@@ -30,10 +31,13 @@ public final class AgentRuntime {
     public static final Logger LOG = LoggerFactory.getLogger("noro-agent");
 
     private AgentConfig config;
+    private MasterHttp http;
     private MasterClient client;
     private RoleApplier roleSync;
     private HeartbeatTask heartbeat;
     private ModPermissions permissions;
+    private ModModeration moderation;
+    private ModJoin join;
 
     /** Общий с {@link NoroAgentApi}: чужие моды читают профиль оттуда же. */
     private final ProfileCache profiles = NoroAgentApi.cache();
@@ -54,8 +58,11 @@ public final class AgentRuntime {
             return false;
         }
         LOG.info("Starting against {}", config);
-        client = new MasterClient(config);
+        http = new MasterHttp(config);
+        client = new MasterClient(http);
         permissions = new ModPermissions(client, config);
+        moderation = new ModModeration(http, client, LOG);
+        join = new ModJoin(config, client, profiles, moderation);
         return true;
     }
 
@@ -77,6 +84,22 @@ public final class AgentRuntime {
         // Каталог узлов уходит мимо главного потока: старт сервера не должен
         // ждать сеть ради подсказки в админке.
         CompletableFuture.runAsync(permissions::report);
+
+        // Модерация оживает только вместе с сервером: раньше кикать и писать в
+        // чат было бы некому.
+        moderation.start(server);
+    }
+
+    /** Дерево команд собирается на каждом лоадере своим событием. */
+    public void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
+        moderation.registerCommands(dispatcher);
+    }
+
+    /**
+     * Сказал ли замученный то, чего ему нельзя. Отказ игроку показан внутри.
+     */
+    public boolean silenced(ServerPlayer player) {
+        return moderation != null && moderation.silenced(player);
     }
 
     /**
@@ -95,11 +118,15 @@ public final class AgentRuntime {
     public void onPlayerLeave(UUID uuid) {
         permissions.forget(uuid);
         profiles.forget(uuid);
+        moderation.forget(uuid);
     }
 
     public void onServerStopping() {
         if (heartbeat != null) {
             heartbeat.close();
+        }
+        if (moderation != null) {
+            moderation.close();
         }
     }
 
@@ -107,44 +134,6 @@ public final class AgentRuntime {
         if (server == null) {
             return;
         }
-        UUID uuid = player.getUUID();
-        // getScoreboardName(), а не getGameProfile().getName(): GameProfile стал
-        // record в 1.21.9, и геттер там теперь name(). Имя нужно только для лога,
-        // а этот метод одинаков на всём диапазоне.
-        String name = player.getScoreboardName();
-
-        // На Forge и NeoForge мастера уже спросили на логине — второй раз за тем
-        // же ответом не ходим. На Fabric такой фазы нет, и решение снимается тут.
-        AccessGate.Decision negotiated = permissions.takeDecision(uuid);
-        if (negotiated != null) {
-            apply(player, name, uuid, negotiated);
-            return;
-        }
-        // Запрос к мастеру уводим с главного потока, решение возвращаем на него:
-        // MinecraftServer сам является Executor'ом.
-        CompletableFuture.supplyAsync(() -> AccessGate.check(client, config, uuid, LOG))
-                .thenAcceptAsync(decision -> apply(player, name, uuid, decision), server);
-    }
-
-    private void apply(ServerPlayer player, String name, UUID uuid, AccessGate.Decision decision) {
-        if (!decision.allowed()) {
-            // Отказ приходит уже после входа в мир: пред-логин хука без микширования
-            // на этих платформах нет. В прокси-топологии проверку надо ставить на
-            // прокси, чтобы игрок вообще не доходил до бэкенда.
-            LOG.info("Denied {}: {}", name, decision.message());
-            // Единственный разрыв API на всём диапазоне 1.18.2 → 26.x:
-            // Component.literal появился в 1.19, до него был TextComponent.
-            //#if MC>=11900
-            player.connection.disconnect(Component.literal(decision.message()));
-            //#else
-            //$$ player.connection.disconnect(new net.minecraft.network.chat.TextComponent(decision.message()));
-            //#endif
-            return;
-        }
-        // Пустой профиль отсеивает сам кэш: мастер мог не ответить.
-        profiles.remember(uuid, decision.profile());
-        if (roleSync != null && decision.profile() != null) {
-            roleSync.apply(uuid, decision.profile());
-        }
+        join.accept(server, player, permissions.takeDecision(player.getUUID()), roleSync);
     }
 }

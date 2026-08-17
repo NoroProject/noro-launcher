@@ -31,6 +31,7 @@ const adminNavGroups = computed(() => [
         items: [
             { label: t("nav-admin-news"), to: "/admin/news", icon: "i-lucide-newspaper", perms: ["noro.admin.news.view"] },
             { label: t("nav-admin-rules"), to: "/admin/rules", icon: "i-lucide-book-open", perms: ["noro.admin.rules.view"] },
+            { label: t("nav-admin-moderation"), to: "/admin/moderation", icon: "i-lucide-message-square-warning", perms: ["noro.admin.settings.view"] },
             { label: t("nav-admin-translations"), to: "/admin/translations", icon: "i-lucide-languages", perms: ["noro.admin.translations.view"] },
             { label: t("nav-admin-wrapper"), to: "/admin/wrapper", icon: "i-lucide-package", perms: ["noro.admin.wrapper.view"] },
         ],

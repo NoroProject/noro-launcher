@@ -3,9 +3,64 @@ version: '${version}'
 main: dev.noro.agent.paper.NoroAgentPlugin
 api-version: '${apiVersion}'
 authors: [noro]
-description: Projects master roles, access and online count onto this server.
+description: Projects master roles, access, punishments and online count onto this server.
 # Мягкие зависимости: доступ и heartbeat работают и без них. Без LuckPerms
 # отключается раскладка ролей по группам, без PlaceholderAPI — `%noro_…%`.
 # Обе должны стартовать раньше агента: LuckPerms — чтобы нашёлся его API,
 # PlaceholderAPI — чтобы было где зарегистрировать расширение.
 softdepend: [LuckPerms, PlaceholderAPI]
+
+# Наказания хранит мастер, поэтому команды агента заменяют ванильные /ban и
+# /pardon: иначе на сервере оказалось бы два независимых списка забаненных.
+commands:
+  ban:
+    description: Ban a player from the whole network.
+    usage: /ban <player> [30m|7d|perm] [@rule] <reason>
+  serverban:
+    description: Ban a player from this server only.
+    usage: /serverban <player> [30m|7d|perm] [@rule] <reason>
+  mute:
+    description: Take away chat from a player on this server.
+    usage: /mute <player> [30m|7d|perm] [@rule] <reason>
+  warn:
+    description: Warn a player. Shown to them at once, or on their next login.
+    usage: /warn <player> [@rule] <reason>
+  unban:
+    description: Lift every active ban of a player.
+    usage: /unban <player>
+  unmute:
+    description: Lift every active mute of a player.
+    usage: /unmute <player>
+  history:
+    description: Show the punishments of a player.
+    usage: /history <player>
+
+# Узлы объявлены здесь по одной причине: Bukkit раскрывает шаблон
+# `noro.mod.*` только по тем правам, которые кто-то зарегистрировал. Без этого
+# списка модератор с широким правом с мастера остался бы без наших команд.
+# default: false — выдаёт их только мастер.
+permissions:
+  noro.mod.punish.view:
+    description: See punishments of a player.
+    default: false
+  noro.mod.punish.warn:
+    description: Issue warnings.
+    default: false
+  noro.mod.punish.mute:
+    description: Issue mutes.
+    default: false
+  noro.mod.punish.ban:
+    description: Issue network bans.
+    default: false
+  noro.mod.punish.server_ban:
+    description: Ban from this server.
+    default: false
+  noro.mod.punish.revoke:
+    description: Lift a punishment.
+    default: false
+  noro.mod.punish.permanent:
+    description: Punish forever.
+    default: false
+  noro.mod.punish.bypass:
+    description: Ignore the limits set by the rule.
+    default: false

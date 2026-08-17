@@ -34,6 +34,18 @@ pub async fn all_settings(pool: &PgPool) -> Result<BTreeMap<String, Value>> {
     Ok(rows.into_iter().collect())
 }
 
+/// Одна настройка по ключу. Для тех значений, что читают на ходу, а не при
+/// старте: шаблоны сообщений правят из админки, и перечитывать ради них всю
+/// таблицу незачем.
+pub async fn get_setting(pool: &PgPool, key: &str) -> Result<Option<Value>> {
+    Ok(
+        sqlx::query_scalar::<_, Value>("SELECT value FROM instance_settings WHERE key = $1")
+            .bind(key)
+            .fetch_optional(pool)
+            .await?,
+    )
+}
+
 pub async fn set_setting(pool: &PgPool, key: &str, value: &Value, by: Option<Uuid>) -> Result<()> {
     sqlx::query(
         "INSERT INTO instance_settings (key, value, updated_by)

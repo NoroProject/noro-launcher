@@ -583,6 +583,10 @@ admin-roles-order = Порядок сортировки
 admin-roles-is-default = Роль по умолчанию
 admin-role-back = Назад
 admin-role-icon-hint = Один символ рядом с именем. Отображается в кабинете, лаунчере и игровом чате.
+admin-role-prefix-label = Префикс в игре
+admin-role-prefix-hint = Стоит перед ником в чате и табе: `&8[&cADMIN&8] `. Цвета через &. Пусто — вместо него берётся иконка.
+admin-role-suffix-label = Суффикс в игре
+admin-role-suffix-hint = Стоит после ника. Формат тот же, что у префикса.
 admin-role-inherits-label = Наследует от
 admin-role-inherits-none = Ничего — только собственные права
 admin-role-inherits-hint = Все права родительской роли автоматически действуют и здесь вверх по цепочке.
@@ -674,6 +678,7 @@ nav-admin-integrity = Целостность
 nav-admin-blocklist = Чёрный список
 nav-admin-news = Новости
 nav-admin-rules = Правила
+nav-admin-moderation = Тексты наказаний
 nav-admin-translations = Переводы
 nav-admin-wrapper = Обёртка
 nav-admin-launcher = Лаунчер
@@ -1143,3 +1148,36 @@ admin-agent-versions-count = { $count } версий
 
 
 
+
+## Тексты наказаний
+admin-moderation-title = Тексты наказаний
+admin-moderation-subtitle = Что видит игрок при бане, муте и предупреждении
+admin-moderation-reset = Вернуть встроенный
+admin-moderation-vars-title = Подстановки
+admin-moderation-vars-lead = Всё остальное остаётся в тексте как есть. Цвета пишутся через &, например &c.
+admin-moderation-var-player = Наказанный игрок
+admin-moderation-var-reason = Причина, которую указал модератор
+admin-moderation-var-duration = Сколько осталось, например 6d 23h
+admin-moderation-var-expires = Дата окончания, UTC
+admin-moderation-var-actor = Кто выдал
+admin-moderation-var-rule = Код правила либо прочерк
+admin-moderation-var-id = Номер дела, первые восемь знаков
+admin-moderation-var-kind = banned, muted или warned
+admin-moderation-ban-perm = Бан сети, навсегда
+admin-moderation-ban-perm-hint = Экран отключения. Это весь разговор с игроком — напишите, куда подавать апелляцию.
+admin-moderation-ban-temp = Бан сети, со сроком
+admin-moderation-ban-temp-hint = Тот же экран, но игрок должен ещё узнать, когда бан кончится.
+admin-moderation-sban-perm = Бан сервера, навсегда
+admin-moderation-sban-perm-hint = Показывается, когда закрыт только этот сервер.
+admin-moderation-sban-temp = Бан сервера, со сроком
+admin-moderation-sban-temp-hint = На остальных серверах сети игрок продолжает играть.
+admin-moderation-mute-perm = Мут, навсегда
+admin-moderation-mute-perm-hint = Ответ на каждое сообщение, которое пытается написать замученный.
+admin-moderation-mute-temp = Мут, со сроком
+admin-moderation-mute-temp-hint = То же, но с остатком срока. Молчание в ответ читается как поломка сервера.
+admin-moderation-warn = Предупреждение
+admin-moderation-warn-hint = Показывается сразу, если игрок в сети, иначе — при следующем входе.
+admin-moderation-broadcast = Объявление
+admin-moderation-broadcast-hint = Видят все на сервере. Пусто — наказывать молча.
+admin-moderation-receipt = Подтверждение модератору
+admin-moderation-receipt-hint = Что видит в ответ тот, кто выдал наказание.

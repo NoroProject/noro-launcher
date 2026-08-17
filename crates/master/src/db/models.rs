@@ -34,6 +34,8 @@ pub struct RoleRow {
     pub sort_order: i32,
     pub lp_group: Option<String>,
     pub icon: Option<String>,
+    pub prefix: Option<String>,
+    pub suffix: Option<String>,
     pub parent_id: Option<Uuid>,
 }
 

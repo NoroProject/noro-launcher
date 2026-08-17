@@ -1,0 +1,88 @@
+package dev.noro.agent.mod;
+
+import com.mojang.brigadier.CommandDispatcher;
+import dev.noro.agent.core.AgentLink;
+import dev.noro.agent.core.MasterClient;
+import dev.noro.agent.core.MasterHttp;
+import dev.noro.agent.core.Moderation;
+import dev.noro.agent.core.ModerationClient;
+import dev.noro.agent.core.ModerationCommands;
+import dev.noro.agent.core.PlayerProfile;
+import dev.noro.agent.core.RuleCatalog;
+import java.util.UUID;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+import org.slf4j.Logger;
+
+/**
+ * Модерация на стороне мода: команды, мут и живой канал с мастером.
+ *
+ * <p>Отдельно от {@link AgentRuntime}, потому что подключается к другим
+ * событиям и живёт своим циклом: канал открывается со стартом сервера и
+ * закрывается с его остановкой, а не вместе с инициализацией мода.
+ */
+final class ModModeration implements AutoCloseable {
+
+    private final MasterHttp http;
+    private final MasterClient client;
+    private final Moderation moderation;
+    private final RuleCatalog rules;
+    private final Logger log;
+
+    private ModBridge bridge;
+    private AgentLink link;
+
+    ModModeration(MasterHttp http, MasterClient client, Logger log) {
+        this.http = http;
+        this.client = client;
+        this.log = log;
+        this.moderation = new Moderation(new ModerationClient(http), log);
+        this.rules = new RuleCatalog(http);
+    }
+
+    /** Сервер запустился: с этого момента есть кого кикать и кому писать. */
+    void start(MinecraftServer server) {
+        bridge = new ModBridge(server);
+        moderation.attach(bridge);
+        rules.refresh();
+        link = new AgentLink(http, moderation, log);
+        link.start();
+    }
+
+    /** Дерево команд собирается на каждом лоадере своим событием. */
+    void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
+        new ModCommands(new ModerationCommands(client, moderation, log), bridge, rules).register(dispatcher);
+    }
+
+    /** Вход игрока: мут в силе, непрочитанные предупреждения показаны. */
+    void greet(UUID uuid, PlayerProfile profile) {
+        moderation.applier().greet(uuid, profile);
+    }
+
+    void forget(UUID uuid) {
+        moderation.mutes().forget(uuid);
+    }
+
+    /**
+     * Сказал ли замученный то, чего ему нельзя.
+     *
+     * @return {@code true}, если сообщение надо отменить — отказ игроку уже
+     *     показан
+     */
+    boolean silenced(ServerPlayer player) {
+        String notice = moderation.muteNotice(player.getUUID(), player.getScoreboardName());
+        if (notice == null) {
+            return false;
+        }
+        bridge.tell(player.getUUID(), notice);
+        return true;
+    }
+
+    @Override
+    public void close() {
+        if (link != null) {
+            link.close();
+        }
+    }
+}

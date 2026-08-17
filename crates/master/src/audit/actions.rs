@@ -49,6 +49,7 @@ actions! {
     PUNISHMENT_BAN        = "punishment.ban",              "Users", "Punishment: ban";
     PUNISHMENT_WARN       = "punishment.warn",             "Users", "Punishment: warning";
     PUNISHMENT_SERVER_BAN = "punishment.server_ban",       "Users", "Punishment: server access";
+    PUNISHMENT_MUTE       = "punishment.mute",             "Users", "Punishment: mute";
     PUNISHMENT_REVOKE     = "punishment.revoke",           "Users", "Punishment lifted";
 
     // Роли
@@ -102,6 +103,7 @@ pub fn punishment(kind: &str) -> &'static Action {
     match kind {
         "ban" => PUNISHMENT_BAN,
         "server_ban" => PUNISHMENT_SERVER_BAN,
+        "mute" => PUNISHMENT_MUTE,
         _ => PUNISHMENT_WARN,
     }
 }

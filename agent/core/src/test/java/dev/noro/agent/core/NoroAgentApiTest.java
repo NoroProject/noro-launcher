@@ -13,9 +13,9 @@ class NoroAgentApiTest {
     private static final UUID PLAYER = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     /** Старшая роль без иконки: префикс должен взяться у следующей. */
-    private static final RoleInfo OWNER = new RoleInfo("owner", "Owner", "owner", "#ff0000", null, 100);
+    private static final RoleInfo OWNER = new RoleInfo("owner", "Owner", "owner", "#ff0000", null, null, null, 100);
 
-    private static final RoleInfo ADMIN = new RoleInfo("admin", "Админ", "admin", "#ff8c82", "★", 50);
+    private static final RoleInfo ADMIN = new RoleInfo("admin", "Админ", "admin", "#ff8c82", "★", null, null, 50);
 
     @AfterEach
     void clear() {
@@ -26,7 +26,8 @@ class NoroAgentApiTest {
     private static void online() {
         NoroAgentApi.cache()
                 .remember(PLAYER, new PlayerProfile(
-                        PLAYER, "Steve", false, true, List.of(OWNER, ADMIN), null, null, List.of(), List.of()));
+                        PLAYER, "Steve", false, true, false, null, List.of(), List.of(OWNER, ADMIN), null, null,
+                        List.of(), List.of()));
     }
 
     @Test

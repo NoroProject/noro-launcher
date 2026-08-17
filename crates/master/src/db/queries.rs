@@ -264,6 +264,8 @@ pub async fn role_with_perms(pool: &PgPool, r: RoleRow) -> Result<Role> {
         sort_order: r.sort_order,
         lp_group: r.lp_group,
         icon: r.icon,
+        prefix: r.prefix,
+        suffix: r.suffix,
         permission_grants,
         parent_id: r.parent_id,
         inherited_permissions,
@@ -569,33 +571,45 @@ pub async fn create_role(
     .await?)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn update_role(
-    pool: &PgPool,
-    id: Uuid,
-    display_name: &str,
-    color: Option<&str>,
-    is_default: bool,
-    sort_order: i32,
-    lp_group: Option<&str>,
-    icon: Option<&str>,
-    parent_id: Option<Uuid>,
-) -> Result<()> {
+/// Правимые поля роли. Структурой, а не девятью аргументами: три соседних
+/// `Option<&str>` подряд слишком легко переставить местами в вызове.
+#[derive(Debug, Clone)]
+pub struct RoleFields<'a> {
+    pub display_name: &'a str,
+    pub color: Option<&'a str>,
+    pub is_default: bool,
+    pub sort_order: i32,
+    pub lp_group: Option<&'a str>,
+    pub icon: Option<&'a str>,
+    pub prefix: Option<&'a str>,
+    pub suffix: Option<&'a str>,
+    pub parent_id: Option<Uuid>,
+}
+
+pub async fn update_role(pool: &PgPool, id: Uuid, fields: RoleFields<'_>) -> Result<()> {
     sqlx::query(
         "UPDATE roles SET display_name=$2, color=$3, is_default=$4, sort_order=$5,
-         lp_group=$6, icon=$7, parent_id=$8 WHERE id=$1",
+         lp_group=$6, icon=$7, prefix=$8, suffix=$9, parent_id=$10 WHERE id=$1",
     )
     .bind(id)
-    .bind(display_name)
-    .bind(color)
-    .bind(is_default)
-    .bind(sort_order)
-    .bind(lp_group.filter(|s| !s.trim().is_empty()))
-    .bind(icon.filter(|s| !s.trim().is_empty()))
-    .bind(parent_id)
+    .bind(fields.display_name)
+    .bind(fields.color)
+    .bind(fields.is_default)
+    .bind(fields.sort_order)
+    // Пустая строка из формы — это «не задано», а не значение: иначе роль
+    // получила бы префикс из нуля символов и пустую группу LuckPerms.
+    .bind(blank_to_none(fields.lp_group))
+    .bind(blank_to_none(fields.icon))
+    .bind(blank_to_none(fields.prefix))
+    .bind(blank_to_none(fields.suffix))
+    .bind(fields.parent_id)
     .execute(pool)
     .await?;
     Ok(())
+}
+
+fn blank_to_none(value: Option<&str>) -> Option<&str> {
+    value.filter(|s| !s.trim().is_empty())
 }
 
 pub async fn delete_role(pool: &PgPool, id: Uuid) -> Result<()> {
@@ -1477,6 +1491,17 @@ pub async fn user_by_mc_uuid(pool: &PgPool, mc_uuid: Uuid) -> Result<Option<User
         .bind(mc_uuid)
         .fetch_optional(pool)
         .await?;
+    Ok(row)
+}
+
+/// Пользователь по нику. Регистронезависимо: в игре ник набирают руками, и
+/// команда модерации не должна разваливаться из-за заглавной буквы.
+pub async fn user_by_mc_username(pool: &PgPool, username: &str) -> Result<Option<UserRow>> {
+    let row =
+        sqlx::query_as::<_, UserRow>("SELECT * FROM users WHERE LOWER(mc_username) = LOWER($1)")
+            .bind(username)
+            .fetch_optional(pool)
+            .await?;
     Ok(row)
 }
 

@@ -15,6 +15,12 @@ public record PlayerProfile(
         String username,
         boolean banned,
         boolean allowed,
+        /** Замучен ли на этом сервере — считает мастер, с учётом срока. */
+        boolean muted,
+        /** Действующий мут либо {@code null}. Из него берётся текст отказа в чате. */
+        PunishmentInfo activeMute,
+        /** Предупреждения, которых игрок ещё не видел. */
+        List<PunishmentInfo> pendingWarns,
         List<RoleInfo> roles,
         /** Есть всегда: свой скин игрока либо общий Стив. */
         String skinUrl,
@@ -32,5 +38,6 @@ public record PlayerProfile(
         roles = roles == null ? List.of() : List.copyOf(roles);
         lpGroups = lpGroups == null ? List.of() : List.copyOf(lpGroups);
         permissions = permissions == null ? List.of() : List.copyOf(permissions);
+        pendingWarns = pendingWarns == null ? List.of() : List.copyOf(pendingWarns);
     }
 }

@@ -3,14 +3,17 @@ package dev.noro.agent.paper;
 import dev.noro.agent.core.AccessGate;
 import dev.noro.agent.core.AgentConfig;
 import dev.noro.agent.core.MasterClient;
+import dev.noro.agent.core.Moderation;
 import dev.noro.agent.core.PermissionSet;
 import dev.noro.agent.core.ProfileCache;
 import dev.noro.agent.core.RoleApplier;
+import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.slf4j.Logger;
 
@@ -30,6 +33,7 @@ final class LoginListener implements Listener {
     private final RoleApplier roleSync;
     private final PaperPermissions permissions;
     private final ProfileCache profiles;
+    private final Moderation moderation;
     private final Logger log;
 
     LoginListener(
@@ -38,12 +42,14 @@ final class LoginListener implements Listener {
             RoleApplier roleSync,
             PaperPermissions permissions,
             ProfileCache profiles,
+            Moderation moderation,
             Logger log) {
         this.config = config;
         this.client = client;
         this.roleSync = roleSync;
         this.permissions = permissions;
         this.profiles = profiles;
+        this.moderation = moderation;
         this.log = log;
     }
 
@@ -72,11 +78,23 @@ final class LoginListener implements Listener {
     }
 
     /**
+     * Мут и непрочитанные предупреждения — уже после входа в мир: писать
+     * игроку, который ещё на экране загрузки, некуда.
+     */
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        moderation.applier().greet(uuid, profiles.get(uuid));
+    }
+
+    /**
      * Профиль живёт ровно столько, сколько игрок на сервере: за него отвечает
      * тот же слушатель, который его и завёл.
      */
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        profiles.forget(event.getPlayer().getUniqueId());
+        UUID uuid = event.getPlayer().getUniqueId();
+        profiles.forget(uuid);
+        moderation.mutes().forget(uuid);
     }
 }

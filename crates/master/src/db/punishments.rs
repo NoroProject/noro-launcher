@@ -82,6 +82,29 @@ pub async fn list_punishments(pool: &PgPool, user_id: Uuid) -> Result<Vec<Punish
     .await?)
 }
 
+pub async fn punishment_by_id(pool: &PgPool, id: Uuid) -> Result<Option<PunishmentRow>> {
+    Ok(
+        sqlx::query_as::<_, PunishmentRow>("SELECT * FROM punishments WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?,
+    )
+}
+
+/// Предупреждения, которых игрок ещё не видел. Агент показывает их при входе:
+/// варн, о котором наказанный не узнал, не значит ничего.
+pub async fn pending_warns(pool: &PgPool, user_id: Uuid) -> Result<Vec<PunishmentRow>> {
+    Ok(sqlx::query_as::<_, PunishmentRow>(
+        "SELECT * FROM punishments
+         WHERE user_id = $1 AND kind = 'warn' AND revoked_at IS NULL
+           AND acknowledged_at IS NULL
+         ORDER BY created_at",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 /// Действующие наказания.
 pub async fn active_punishments(pool: &PgPool, user_id: Uuid) -> Result<Vec<PunishmentRow>> {
     Ok(sqlx::query_as::<_, PunishmentRow>(

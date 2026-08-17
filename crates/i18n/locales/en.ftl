@@ -578,6 +578,10 @@ admin-roles-order = Order
 admin-roles-is-default = Default role
 admin-role-back = Back
 admin-role-icon-hint = A single character shown next to the name. Unicode works everywhere — in the cabinet, in the launcher and in game chat.
+admin-role-prefix-label = Prefix in game
+admin-role-prefix-hint = Stands before the name in chat and tab: `&8[&cADMIN&8] `. Colours with &. Leave empty and the icon is used instead.
+admin-role-suffix-label = Suffix in game
+admin-role-suffix-hint = Stands after the name. Same format as the prefix.
 admin-role-inherits-label = Inherits from
 admin-role-inherits-none = Nothing — own permissions only
 admin-role-inherits-hint = Everything the parent grants applies here too, all the way up the chain.
@@ -669,6 +673,7 @@ nav-admin-integrity = Integrity
 nav-admin-blocklist = Blocklist
 nav-admin-news = News
 nav-admin-rules = Rules
+nav-admin-moderation = Punishment texts
 nav-admin-translations = Translations
 nav-admin-wrapper = Wrapper
 nav-admin-launcher = Launcher
@@ -1138,3 +1143,36 @@ admin-agent-versions-count = { $count } versions
 
 
 
+
+## Punishment texts
+admin-moderation-title = Punishment texts
+admin-moderation-subtitle = What a player sees when banned, muted or warned
+admin-moderation-reset = Reset to default
+admin-moderation-vars-title = Placeholders
+admin-moderation-vars-lead = Anything else stays in the text as typed. Colours are written with &, like &c.
+admin-moderation-var-player = Punished player
+admin-moderation-var-reason = Reason given by the moderator
+admin-moderation-var-duration = Time left, like 6d 23h
+admin-moderation-var-expires = Date it runs out, UTC
+admin-moderation-var-actor = Who issued it
+admin-moderation-var-rule = Rule code, or a dash
+admin-moderation-var-id = Case number, first eight characters
+admin-moderation-var-kind = banned, muted or warned
+admin-moderation-ban-perm = Network ban, forever
+admin-moderation-ban-perm-hint = Disconnect screen. This is the whole conversation with the player — say where to appeal.
+admin-moderation-ban-temp = Network ban, with a term
+admin-moderation-ban-temp-hint = Same screen, but the player also needs to know when it runs out.
+admin-moderation-sban-perm = Server ban, forever
+admin-moderation-sban-perm-hint = Shown when the player is barred from this server only.
+admin-moderation-sban-temp = Server ban, with a term
+admin-moderation-sban-temp-hint = The player can still play elsewhere on the network.
+admin-moderation-mute-perm = Mute, forever
+admin-moderation-mute-perm-hint = The answer to every message the muted player tries to send.
+admin-moderation-mute-temp = Mute, with a term
+admin-moderation-mute-temp-hint = Same, with the time left. Silence reads as a broken server.
+admin-moderation-warn = Warning
+admin-moderation-warn-hint = Shown at once if the player is online, otherwise on their next login.
+admin-moderation-broadcast = Announcement
+admin-moderation-broadcast-hint = Shown to everyone on the server. Leave empty to punish quietly.
+admin-moderation-receipt = Confirmation to the moderator
+admin-moderation-receipt-hint = What the person who issued the punishment sees in reply.

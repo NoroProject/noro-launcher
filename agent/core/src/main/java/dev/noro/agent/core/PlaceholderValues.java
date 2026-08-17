@@ -19,8 +19,9 @@ public final class PlaceholderValues {
     /** Ключи без хвоста: платформы регистрируют их поимённо. */
     public static final List<String> KEYS = List.of(
             "username", "uuid", "banned", "allowed",
-            "prefix", "prefix_plain",
+            "prefix", "prefix_plain", "suffix", "suffix_plain",
             "role", "role_name", "role_color", "role_color_legacy", "role_icon", "role_sort",
+            "role_prefix", "role_suffix",
             "roles", "roles_icons", "role_count",
             "group", "groups", "group_count",
             "skin_url", "cape_url", "permission_count");
@@ -57,9 +58,9 @@ public final class PlaceholderValues {
     }
 
     private static String fixed(PlayerProfile profile, String name) {
-        // Роль для показа и роль для префикса — разные: старшая роль может быть
-        // без иконки, и тогда в игре видна иконка следующей за ней. Здесь то же
-        // правило, что у LuckPerms с весами префиксов.
+        // Роль для показа и роль для префикса — разные: у старшей роли может не
+        // быть оформления, и тогда в игре виден префикс следующей за ней. То же
+        // правило, по которому LuckPerms выбирает префикс по весам.
         RoleInfo top = top(profile, false);
         RoleInfo shown = top(profile, true);
         return switch (name) {
@@ -69,8 +70,14 @@ public final class PlaceholderValues {
             case "allowed" -> String.valueOf(profile.allowed());
             case "skin_url" -> text(profile.skinUrl());
             case "cape_url" -> text(profile.capeUrl());
-            case "prefix" -> shown == null ? "" : PrefixFormat.of(shown.color(), shown.icon());
-            case "prefix_plain" -> shown == null ? "" : text(shown.icon());
+            case "prefix" -> shown == null ? "" : shown.prefixText();
+            // Без цветовых кодов: нужно там, где строку кладут в поле, которое
+            // само не умеет legacy, — заголовок скорборда, лог, веб-виджет.
+            case "prefix_plain" -> shown == null ? "" : PrefixFormat.plain(shown.prefixText());
+            case "suffix" -> shown == null ? "" : shown.suffixText();
+            case "suffix_plain" -> shown == null ? "" : PrefixFormat.plain(shown.suffixText());
+            case "role_prefix" -> top == null ? "" : top.prefixText();
+            case "role_suffix" -> top == null ? "" : top.suffixText();
             case "role" -> top == null ? "" : text(top.displayName());
             case "role_name" -> top == null ? "" : text(top.name());
             case "role_color" -> top == null ? "" : text(top.color());
@@ -124,12 +131,12 @@ public final class PlaceholderValues {
      * Package-private: наружу флаг не выставляем — там на два случая есть два
      * имени, {@code NoroAgentApi.prefixRole} и {@code topRole}.
      */
-    static RoleInfo top(PlayerProfile profile, boolean withIconOnly) {
+    static RoleInfo top(PlayerProfile profile, boolean decoratedOnly) {
         if (profile == null) {
             return null;
         }
         return profile.roles().stream()
-                .filter(role -> !withIconOnly || role.hasPrefix())
+                .filter(role -> !decoratedOnly || role.hasDecoration())
                 .max(Comparator.comparingInt(RoleInfo::sortOrder))
                 .orElse(null);
     }

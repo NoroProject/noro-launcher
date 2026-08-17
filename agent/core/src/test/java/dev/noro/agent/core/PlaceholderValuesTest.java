@@ -12,11 +12,11 @@ class PlaceholderValuesTest {
     private static final UUID UUID_ONE = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     /** Старшая роль без иконки: в игре видна иконка следующей за ней. */
-    private static final RoleInfo OWNER = new RoleInfo("owner", "Owner", "owner", "#ff0000", null, 100);
+    private static final RoleInfo OWNER = new RoleInfo("owner", "Owner", "owner", "#ff0000", null, null, null, 100);
 
-    private static final RoleInfo ADMIN = new RoleInfo("admin", "Админ", "admin", "#ff8c82", "★", 50);
+    private static final RoleInfo ADMIN = new RoleInfo("admin", "Админ", "admin", "#ff8c82", "★", null, null, 50);
 
-    private static final RoleInfo VIP = new RoleInfo("vip", "VIP", "vip", "#00ff00", "✦", 10);
+    private static final RoleInfo VIP = new RoleInfo("vip", "VIP", "vip", "#00ff00", "✦", null, null, 10);
 
     private static PlayerProfile profile() {
         return new PlayerProfile(
@@ -24,6 +24,9 @@ class PlaceholderValuesTest {
                 "Steve",
                 false,
                 true,
+                false,
+                null,
+                List.of(),
                 List.of(VIP, OWNER, ADMIN),
                 "https://cdn/skin.png",
                 null,
@@ -40,10 +43,35 @@ class PlaceholderValuesTest {
     }
 
     @Test
-    void prefixSkipsRolesWithoutIcon() {
-        // owner старше, но иконки у него нет — префикс даёт admin.
+    void prefixSkipsRolesWithoutDecoration() {
+        // owner старше, но показывать ему нечего — префикс даёт admin.
         assertEquals("§x§f§f§8§c§8§2★§r", PlaceholderValues.resolve(profile(), "prefix"));
         assertEquals("★", PlaceholderValues.resolve(profile(), "prefix_plain"));
+    }
+
+    /**
+     * Заданный префикс вытесняет иконку: иконка — глиф для таба, а префикс —
+     * то, что владелец сервера написал сам.
+     */
+    @Test
+    void ownPrefixWinsOverIcon() {
+        RoleInfo staff = new RoleInfo("staff", "Staff", null, "#ff8c82", "★", "&8[&cSTAFF&8] ", " &7#1", 100);
+        PlayerProfile profile = new PlayerProfile(
+                UUID_ONE, "Steve", false, true, false, null, List.of(), List.of(staff), null, null,
+                List.of(), List.of());
+
+        assertEquals("§8[§cSTAFF§8] ", PlaceholderValues.resolve(profile, "prefix"));
+        assertEquals("[STAFF] ", PlaceholderValues.resolve(profile, "prefix_plain"));
+        assertEquals(" §7#1", PlaceholderValues.resolve(profile, "suffix"));
+        assertEquals(" #1", PlaceholderValues.resolve(profile, "suffix_plain"));
+        // Иконка при этом остаётся сама собой и доступна отдельным ключом.
+        assertEquals("★", PlaceholderValues.resolve(profile, "role_icon"));
+    }
+
+    /** Суффикса нет — ключ отдаёт пустую строку, а не «null» посреди ника. */
+    @Test
+    void missingSuffixIsEmpty() {
+        assertEquals("", PlaceholderValues.resolve(profile(), "suffix"));
     }
 
     @Test
@@ -85,9 +113,10 @@ class PlaceholderValuesTest {
      */
     @Test
     void prefixDoesNotNeedALuckPermsGroup() {
-        RoleInfo groupless = new RoleInfo("admin", "Админ", null, "#5865f2", "★", 100);
+        RoleInfo groupless = new RoleInfo("admin", "Админ", null, "#5865f2", "★", null, null, 100);
         PlayerProfile profile = new PlayerProfile(
-                UUID_ONE, "Steve", false, true, List.of(groupless), null, null, List.of(), List.of());
+                UUID_ONE, "Steve", false, true, false, null, List.of(), List.of(groupless), null, null,
+                List.of(), List.of());
 
         assertEquals("§x§5§8§6§5§f§2★§r", PlaceholderValues.resolve(profile, "prefix"));
         assertEquals("★", PlaceholderValues.resolve(profile, "prefix_plain"));
@@ -98,7 +127,8 @@ class PlaceholderValuesTest {
     @Test
     void missingDataBecomesEmptyString() {
         PlayerProfile bare = new PlayerProfile(
-                UUID_ONE, "Steve", false, true, List.of(), null, null, List.of(), List.of());
+                UUID_ONE, "Steve", false, true, false, null, List.of(), List.of(), null, null,
+                List.of(), List.of());
         assertEquals("", PlaceholderValues.resolve(bare, "prefix"));
         assertEquals("", PlaceholderValues.resolve(bare, "role"));
         assertEquals("", PlaceholderValues.resolve(bare, "cape_url"));

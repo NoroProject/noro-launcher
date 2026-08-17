@@ -111,6 +111,9 @@ pub async fn create(
     if banned {
         notify_profile(&state, id).await;
     }
+    // Игрок может сидеть в игре прямо сейчас: бан обязан выкинуть его сразу,
+    // а мут — заткнуть до того, как он допишет строку.
+    crate::agent_link::notify::punished(&state, &row).await;
 
     audit::record(
         &state,
@@ -135,6 +138,9 @@ pub async fn revoke(
     Path((id, punishment_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_PUNISH_REVOKE)?;
+    // Читаем до снятия: агенту нужно знать, что именно отпустить, а после
+    // `revoke_punishment` строка уже помечена снятой.
+    let punishment = crate::db::punishment_by_id(&state.db, punishment_id).await?;
     if !crate::db::revoke_punishment(&state.db, punishment_id, admin.user_id()).await? {
         return Err(AppError::NotFound(
             "punishment not found or already lifted".into(),
@@ -142,6 +148,9 @@ pub async fn revoke(
     }
     crate::db::refresh_ban_flag(&state.db, id).await?;
     notify_profile(&state, id).await;
+    if let Some(punishment) = &punishment {
+        crate::agent_link::notify::revoked(&state, punishment, &admin.actor.label()).await;
+    }
 
     audit::record(
         &state,

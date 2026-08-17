@@ -5,8 +5,9 @@ use axum::Router;
 use super::{
     agents, audit, backup, blocklist, build_routes, capes, catalog, cores, game_servers,
     impersonate, integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions,
-    news, notes, permission_nodes, punishments, remote, roles, rules, servers, settings, stats,
-    storage, tokens, user_launcher, users, versions, wrapper, wrapper_backups, wrapper_fs,
+    moderation_messages, news, notes, permission_nodes, punishments, remote, roles, rules, servers,
+    settings, stats, storage, tokens, user_launcher, users, versions, wrapper, wrapper_backups,
+    wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
@@ -58,6 +59,10 @@ pub fn router() -> Router<AppState> {
             post(settings::upload_hero_image),
         )
         .route("/api/admin/diagnostics", get(settings::diagnostics))
+        .route(
+            "/api/admin/moderation/messages",
+            get(moderation_messages::get).put(moderation_messages::put),
+        )
         .route(
             "/api/admin/users/{id}/impersonate",
             post(impersonate::start),
