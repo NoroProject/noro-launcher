@@ -15,7 +15,7 @@ const links = computed(() => [
 <template>
   <footer class="mt-16 border-t border-[var(--noro-border)] bg-[var(--noro-bg-deep)]">
     <div class="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-10 md:flex-row md:items-center md:justify-between">
-      <div class="flex items-center gap-3">
+      <NuxtLink to="/" class="flex items-center gap-3 transition hover:opacity-80">
         <img src="/icon.png" class="size-10" alt="">
         <div>
           <div class="noro-pixel text-base uppercase text-[var(--noro-cream)]">Noro</div>
@@ -23,7 +23,7 @@ const links = computed(() => [
             {{ t('web-footer-tagline') }}
           </div>
         </div>
-      </div>
+      </NuxtLink>
 
       <nav class="flex flex-wrap items-center gap-4">
         <NuxtLink

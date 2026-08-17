@@ -93,7 +93,7 @@ function linkClass(path: string) {
 <template>
     <aside class="flex flex-col bg-[var(--noro-sidebar)] lg:sticky lg:top-0 lg:h-screen lg:w-72">
         <div class="flex h-20 shrink-0 items-center justify-between gap-2 border-b border-[var(--noro-border)] bg-[var(--noro-bg-deep)] px-4">
-            <div class="flex items-center gap-2.5 min-w-0">
+            <NuxtLink to="/" class="flex items-center gap-2.5 min-w-0 transition hover:opacity-80">
                 <div class="grid size-9 shrink-0 place-items-center rounded-lg">
                     <img src="/icon.png" alt="Noro" />
                 </div>
@@ -101,7 +101,7 @@ function linkClass(path: string) {
                     <div class="noro-pixel text-base uppercase text-[var(--noro-cream)]">NORO</div>
                     <div class="truncate text-[10px] font-bold uppercase leading-tight tracking-wider text-[var(--noro-muted)]">{{ inAdminArea ? t("nav-admin-control") : t("nav-player-cabinet") }}</div>
                 </div>
-            </div>
+            </NuxtLink>
             <LocaleSwitch class="shrink-0" />
         </div>
 
