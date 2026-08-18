@@ -19,7 +19,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "admin_cli"
-version = "1.7.3"
+version = "1.7.4"
 dependencies = [
  "anyhow",
  "chrono",
@@ -677,7 +677,7 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "1.7.3"
+version = "1.7.4"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -895,7 +895,7 @@ dependencies = [
 
 [[package]]
 name = "bridge"
-version = "1.7.3"
+version = "1.7.4"
 dependencies = [
  "parking_lot",
  "schema",
@@ -2399,7 +2399,7 @@ dependencies = [
 
 [[package]]
 name = "frontend"
-version = "1.7.3"
+version = "1.7.4"
 dependencies = [
  "base64 0.22.1",
  "bridge",
@@ -4087,7 +4087,7 @@ dependencies = [
 
 [[package]]
 name = "master"
-version = "1.7.3"
+version = "1.7.4"
 dependencies = [
  "anyhow",
  "argon2",
@@ -4405,7 +4405,7 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
 name = "noro_core"
-version = "1.7.3"
+version = "1.7.4"
 dependencies = [
  "anyhow",
  "backend",
@@ -4423,7 +4423,7 @@ dependencies = [
 
 [[package]]
 name = "noro_launcher"
-version = "1.7.3"
+version = "1.7.4"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6082,7 +6082,7 @@ dependencies = [
 
 [[package]]
 name = "schema"
-version = "1.7.3"
+version = "1.7.4"
 dependencies = [
  "chrono",
  "once_cell",

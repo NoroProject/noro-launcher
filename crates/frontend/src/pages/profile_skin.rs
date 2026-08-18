@@ -26,6 +26,7 @@ pub fn skin_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .gap(px(10.))
         .child(preview_box(ui, cx))
         .when(is_grabbable(ui), |d| d.child(drag_hint()))
+        .children(super::profile_skin_model::model_row(ui, cx))
         .into_any_element()
 }
 

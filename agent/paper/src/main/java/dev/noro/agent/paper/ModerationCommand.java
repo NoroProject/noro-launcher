@@ -1,7 +1,11 @@
 package dev.noro.agent.paper;
 
+import dev.noro.agent.core.FreezeCommand;
 import dev.noro.agent.core.GameBridge;
+import dev.noro.agent.core.MasterClient;
+import dev.noro.agent.core.Moderation;
 import dev.noro.agent.core.ModerationCommands;
+import dev.noro.agent.core.ReportCommand;
 import dev.noro.agent.core.RuleCatalog;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,26 +25,48 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
     private static final List<String> TERMS = List.of("30m", "1h", "6h", "1d", "7d", "30d", "perm");
 
     private final ModerationCommands commands;
+    private final FreezeCommand freezeCmd;
+    private final ReportCommand reportCmd;
     private final GameBridge bridge;
     private final RuleCatalog rules;
 
-    ModerationCommand(ModerationCommands commands, GameBridge bridge, RuleCatalog rules) {
-        this.commands = commands;
+    private final VanishManager vanishManager;
+
+    ModerationCommand(MasterClient master, Moderation moderation, RuleCatalog rules, GameBridge bridge, VanishManager vanishManager, org.slf4j.Logger log) {
+        this.commands = new ModerationCommands(master, moderation, log);
+        this.freezeCmd = new FreezeCommand(master, moderation, log);
+        this.reportCmd = new ReportCommand(master, log);
         this.bridge = bridge;
         this.rules = rules;
+        this.vanishManager = vanishManager;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         PaperSender actor = new PaperSender(sender);
+        String lang = actor.console() ? "en" : null;
         switch (command.getName().toLowerCase(Locale.ROOT)) {
-            case "ban" -> commands.punish(actor, "ban", args);
-            case "serverban" -> commands.punish(actor, "server_ban", args);
-            case "mute" -> commands.punish(actor, "mute", args);
-            case "warn" -> commands.punish(actor, "warn", args);
-            case "unban" -> commands.revoke(actor, "ban", args);
-            case "unmute" -> commands.revoke(actor, "mute", args);
-            case "history" -> commands.history(actor, args);
+            case "ban" -> commands.punish(actor, "ban", args, lang);
+            case "serverban" -> commands.punish(actor, "server_ban", args, lang);
+            case "mute" -> commands.punish(actor, "mute", args, lang);
+            case "warn" -> commands.punish(actor, "warn", args, lang);
+            case "unban" -> commands.revoke(actor, "ban", args, lang);
+            case "unmute" -> commands.revoke(actor, "mute", args, lang);
+            case "history" -> commands.history(actor, args, lang);
+            case "freeze" -> freezeCmd.freeze(actor, args, lang);
+            case "unfreeze" -> freezeCmd.unfreeze(actor, args, lang);
+            case "report" -> reportCmd.execute(actor, args, lang);
+            case "vanish", "v" -> {
+                if (sender instanceof org.bukkit.entity.Player p) {
+                    if (args.length > 0 && args[0].equalsIgnoreCase("list")) {
+                        vanishManager.sendVanishList(p);
+                    } else if (p.hasPermission("noro.mod.vanish.use")) {
+                        vanishManager.toggleVanish(p, lang);
+                    } else {
+                        p.sendMessage(dev.noro.agent.core.AgentStrings.get(lang, "no_perm_view"));
+                    }
+                }
+            }
             default -> {
                 return false;
             }
@@ -54,7 +80,7 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
             return prefixed(bridge.onlineNames(), args[0]);
         }
         String name = command.getName().toLowerCase(Locale.ROOT);
-        if (name.equals("unban") || name.equals("unmute") || name.equals("history")) {
+        if (name.equals("unban") || name.equals("unmute") || name.equals("history") || name.equals("freeze") || name.equals("unfreeze") || name.equals("report") || name.equals("vanish") || name.equals("v")) {
             return List.of();
         }
         // Второй аргумент — срок, если он у команды есть и ещё не назван.
@@ -82,6 +108,6 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
 
     /** Имена, которые надо объявить в {@code plugin.yml}. */
     static List<String> names() {
-        return List.of("ban", "serverban", "mute", "warn", "unban", "unmute", "history");
+        return List.of("ban", "serverban", "mute", "warn", "unban", "unmute", "history", "freeze", "unfreeze", "report", "vanish", "v");
     }
 }

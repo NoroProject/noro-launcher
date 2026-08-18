@@ -34,12 +34,37 @@ commands:
   history:
     description: Show the punishments of a player.
     usage: /history <player>
+  freeze:
+    description: Freeze a player movement and commands.
+    usage: /freeze <player> [reason]
+  unfreeze:
+    description: Unfreeze a player.
+    usage: /unfreeze <player>
+  report:
+    description: Report a player for a violation.
+    usage: /report <player> <reason>
+  vanish:
+    description: Toggle vanish mode.
+    usage: /vanish
+    aliases: [v]
+  v:
+    description: Toggle vanish mode.
+    usage: /v
 
 # Узлы объявлены здесь по одной причине: Bukkit раскрывает шаблон
 # `noro.mod.*` только по тем правам, которые кто-то зарегистрировал. Без этого
 # списка модератор с широким правом с мастера остался бы без наших команд.
 # default: false — выдаёт их только мастер.
 permissions:
+  noro.mod.vanish.use:
+    description: Toggle vanish mode.
+    default: false
+  noro.mod.vanish.see:
+    description: See vanished players.
+    default: false
+  noro.mod.freeze:
+    description: Freeze and unfreeze players.
+    default: false
   noro.mod.punish.view:
     description: See punishments of a player.
     default: false

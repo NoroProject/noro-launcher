@@ -42,6 +42,16 @@
 //$$         NoroPermissionHandler.warnIfInactive(AgentRuntime.LOG);
 //$$     }
 //$$
+//$$     /** Счётчик тиков: на Forge событие одно, фазу приносит поле. */
+//$$     @SubscribeEvent
+//$$     public void onTick(net.minecraftforge.event.TickEvent.ServerTickEvent event) {
+//$$         if (event.phase == net.minecraftforge.event.TickEvent.Phase.START) {
+//$$             runtime.meter().onTickStart();
+//$$         } else {
+//$$             runtime.meter().onTickEnd();
+//$$         }
+//$$     }
+//$$
 //$$     @SubscribeEvent
 //$$     public void onServerStopping(ServerStoppingEvent event) {
 //$$         runtime.onServerStopping();

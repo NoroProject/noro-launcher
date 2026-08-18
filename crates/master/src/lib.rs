@@ -77,6 +77,7 @@ pub async fn run() -> Result<()> {
         catalog: catalog::HttpCache::default(),
         wrappers: wrapper::WrapperHub::default(),
         agents: agent_link::AgentHub::default(),
+        roster: agent_link::Roster::default(),
         // Без публичных адресов домен для passkey не вывести. Это не повод не
         // подняться: инстанс как раз и поднимается, чтобы их задать.
         webauthn: build_webauthn(&config),
@@ -85,6 +86,7 @@ pub async fn run() -> Result<()> {
     // Фоновый опрос GitHub (если настроен).
     launcher_builder::github_watcher::spawn(state.clone());
     db::cleanup::spawn(state.db.clone());
+    db::restart_schedules::spawn_restart_scheduler(state.clone());
 
     let app = router(state);
 
@@ -137,8 +139,9 @@ async fn announce(config: &Config, db: &sqlx::PgPool) -> Result<()> {
 
 fn router(state: AppState) -> Router {
     use api::{
-        agent, agent_artifact, agent_nodes, auth, cabinet, cabinet_sessions, file_serve, launcher,
-        support, textures, translations,
+        agent, agent_artifact, agent_nodes, auth, cabinet, cabinet_locale, cabinet_online,
+        cabinet_sessions, cabinet_skin_model, file_serve, launcher, server_online, support,
+        textures, translations,
     };
 
     // Yggdrasil (authlib-injector) — без авторизации.
@@ -277,12 +280,17 @@ fn router(state: AppState) -> Router {
         )
         .route("/api/rules", get(api::rules::list))
         .route("/api/rules/scopes", get(api::rules::scopes))
-        .route("/api/rules/servers/{server_id}", get(api::rules::by_server));
+        .route("/api/rules/servers/{server_id}", get(api::rules::by_server))
+        .route("/api/servers/{server_id}/online", get(server_online::get_online));
 
     // Личный кабинет.
     let cabinet_api = Router::new()
         .route("/api/me", get(cabinet::me))
         .route("/api/me/username", put(cabinet::set_username))
+        .route("/api/me/locale", put(cabinet_locale::set_locale))
+        .route("/api/me/skin/model", put(cabinet_skin_model::set_model))
+        .route("/api/me/hide-from-online", put(cabinet_online::set_hide_from_online))
+        .route("/api/me/silent-join", put(cabinet_online::set_silent_join))
         .route("/api/me/punishments", get(cabinet::punishments))
         .route("/api/me/sessions", get(cabinet_sessions::list))
         .route(
@@ -363,6 +371,7 @@ fn router(state: AppState) -> Router {
     // Агенты игровых серверов.
     let agent_api = Router::new()
         .route("/api/agent/players/{mc_uuid}", get(agent::player))
+        .route("/api/agent/players/batch", post(agent::players_batch))
         .route(
             "/api/agent/players/by-name/{username}",
             get(agent::player_by_name),
@@ -383,6 +392,9 @@ fn router(state: AppState) -> Router {
         .route("/api/agent/rules", get(api::rules::agent_list))
         .route("/api/agent/rules/{code}", get(api::rules::agent_by_code))
         .route("/api/agent/heartbeat", post(agent::heartbeat))
+        .route("/api/agent/chat-filters", get(agent::list_chat_filters))
+        .route("/api/agent/automod-triggers", post(agent::record_automod_trigger))
+        .route("/api/agent/reports", post(agent::agent_create_report))
         .route("/api/agent/artifact", get(agent_artifact::artifact))
         .route("/api/agent/pubkey", get(agent_artifact::pubkey))
         .route("/api/agent/nodes", post(agent_nodes::report))

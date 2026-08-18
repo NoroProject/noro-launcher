@@ -5,7 +5,10 @@ const canCommand = computed(() => auth.hasPermission('noro.admin.wrapper.command
 const props = defineProps<{ gameServerId: string; enabled: boolean }>();
 const emit = defineEmits<{ command: [line: string] }>();
 
-const console = useServerConsole(props.gameServerId);
+// Не `console`: Vue держит это имя в списке разрешённых глобалей, и в шаблоне
+// оно резолвится в глобальный объект, а не в setup-биндинг. Отсюда и падало
+// `term.lines.value` — у глобального `console` нет `lines`.
+const term = useServerConsole(props.gameServerId);
 const input = ref("");
 const view = ref<HTMLElement | null>(null);
 /** Прилипание к низу: если админ отмотал вверх, дёргать его обратно нельзя. */
@@ -18,7 +21,7 @@ function onScroll() {
 }
 
 watch(
-    () => console.lines.value.length,
+    () => term.lines.value.length,
     async () => {
         if (!follow.value) return;
         await nextTick();
@@ -38,11 +41,11 @@ watch(
     () => props.enabled,
     async (on) => {
         if (!on) {
-            console.stop();
+            term.stop();
             return;
         }
-        await console.loadBacklog();
-        await console.start();
+        await term.loadBacklog();
+        await term.start();
     },
     { immediate: true },
 );
@@ -55,12 +58,12 @@ watch(
                 <span class="noro-label noro-label-inline">Console</span>
                 <span
                     class="size-2 rounded-full"
-                    :style="{ background: console.live.value ? 'var(--noro-green)' : 'var(--noro-muted)' }"
-                    :title="console.live.value ? 'streaming' : 'not streaming'"
+                    :style="{ background: term.live.value ? 'var(--noro-green)' : 'var(--noro-muted)' }"
+                    :title="term.live.value ? 'streaming' : 'not streaming'"
                 />
             </div>
             <div class="flex gap-2">
-                <AtomButton variant="ghost" size="sm" icon="i-lucide-eraser" @click="console.clear()">
+                <AtomButton variant="ghost" size="sm" icon="i-lucide-eraser" @click="term.clear()">
                     Clear
                 </AtomButton>
                 <AtomButton
@@ -79,7 +82,7 @@ watch(
             @scroll="onScroll"
         >
             <p
-                v-for="(line, i) in console.lines.value"
+                v-for="(line, i) in term.lines.value"
                 :key="i"
                 class="whitespace-pre-wrap break-words"
                 :class="{
@@ -88,7 +91,7 @@ watch(
                     'text-[var(--noro-muted)]': !line.includes('ERROR') && !line.includes('WARN') && !line.includes('FATAL'),
                 }"
             >{{ line }}</p>
-            <p v-if="!console.lines.value.length" class="text-[var(--noro-muted)]">
+            <p v-if="!term.lines.value.length" class="text-[var(--noro-muted)]">
                 Nothing yet.
             </p>
         </div>

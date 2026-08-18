@@ -117,6 +117,7 @@ pub async fn update(
         }),
     )
     .await;
+    everyone_rereads(&state);
     let roles = crate::db::list_roles(&state.db).await?;
     Ok(Json(roles.into_iter().find(|r| r.id == id).unwrap_or_else(
         || Role {
@@ -182,6 +183,7 @@ pub async fn delete(
         serde_json::json!({}),
     )
     .await;
+    everyone_rereads(&state);
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
@@ -216,6 +218,7 @@ pub async fn add_permission(
         serde_json::json!({ "permission": req.permission, "server_id": req.server_id }),
     )
     .await;
+    everyone_rereads(&state);
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
@@ -235,5 +238,15 @@ pub async fn remove_permission(
         serde_json::json!({ "permission": perm, "server_id": scope.server_id }),
     )
     .await;
+    everyone_rereads(&state);
     Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// Правка роли задевает каждого её носителя, а кто в игре — знает агент.
+///
+/// Перечислять носителей здесь значило бы повторить выборку, которую агент всё
+/// равно сделает по своему списку онлайна, — и сделать её по всей базе вместо
+/// десятка человек на сервере.
+fn everyone_rereads(state: &AppState) {
+    crate::agent_link::notify::profile_changed(state, None);
 }

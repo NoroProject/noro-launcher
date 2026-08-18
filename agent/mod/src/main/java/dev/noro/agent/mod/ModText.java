@@ -8,14 +8,10 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Разметка шаблонов мастера → ванильный {@code Component}.
- *
- * <p>Сам разбор живёт в core ({@link TextMarkup}), здесь только сборка
- * компонентов: цвета, стили и кликабельные ссылки. Так Paper и моды показывают
- * один шаблон одинаково — раньше разбор был только здесь, и на Paper те же
- * тексты уезжали в чат вместе с «#f87171».
  */
 final class ModText {
 
@@ -55,10 +51,6 @@ final class ModText {
         return span.linked() ? withLink(style, span.url()) : style;
     }
 
-    /**
-     * Кликабельная ссылка. Единственный разрыв API на диапазоне: в 1.21.5
-     * события стали sealed-типами вместо пары «действие + строка».
-     */
     private static Style withLink(Style base, String url) {
         //#if MC>=12105
         //$$ return base.withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
@@ -70,6 +62,26 @@ final class ModText {
         //$$ return base.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url))
         //$$         .withHoverEvent(new HoverEvent(
         //$$                 HoverEvent.Action.SHOW_TEXT, new net.minecraft.network.chat.TextComponent(url)));
+        //#endif
+    }
+
+    static void send(ServerPlayer player, Component component) {
+        //#if MC>=11900
+        player.sendSystemMessage(component);
+        //#else
+        //$$ player.sendMessage(component, net.minecraft.Util.NIL_UUID);
+        //#endif
+    }
+
+    static void send(ServerPlayer player, String message) {
+        send(player, parse(message));
+    }
+
+    static Component translatable(String key, Object... args) {
+        //#if MC>=11900
+        return Component.translatable(key, args);
+        //#else
+        //$$ return new net.minecraft.network.chat.TranslatableComponent(key, args);
         //#endif
     }
 }

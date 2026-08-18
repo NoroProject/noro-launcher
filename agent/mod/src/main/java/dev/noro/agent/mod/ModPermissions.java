@@ -51,6 +51,15 @@ final class ModPermissions {
         negotiated.put(uuid, decision);
     }
 
+    /**
+     * Разложить уже прочитанный профиль. Отдельно от {@link #load}: там мы сами
+     * идём к мастеру, а сюда профиль приносят — по кадру об изменении ролей.
+     */
+    void remember(UUID uuid, dev.noro.agent.core.PlayerProfile profile) {
+        byPlayer.put(uuid, PermissionSet.of(profile.permissions()));
+        NoroAgentApi.cache().remember(uuid, profile);
+    }
+
     /** @return {@code null}, если логин прошёл мимо {@link #load} — тогда решение спрашивают заново */
     AccessGate.Decision takeDecision(UUID uuid) {
         return negotiated.remove(uuid);

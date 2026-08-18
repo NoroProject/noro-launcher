@@ -98,13 +98,21 @@ pub async fn scopes(State(state): State<AppState>) -> AppResult<Json<Vec<RuleSco
     ))
 }
 
+#[derive(Deserialize)]
+pub struct AgentRulesQuery {
+    pub lang: Option<String>,
+    pub locale: Option<String>,
+}
+
 /// GET /api/agent/rules — свод своего сервера: плагину он нужен для
 /// автодополнения кодов в командах модерации.
 pub async fn agent_list(
     State(state): State<AppState>,
     agent: AgentAuth,
+    Query(query): Query<AgentRulesQuery>,
 ) -> AppResult<Json<RulesResponse>> {
-    load(&state, Some(agent.game_server.server_id), None).await
+    let lang = query.lang.or(query.locale);
+    load(&state, Some(agent.game_server.server_id), lang.as_deref()).await
 }
 
 #[derive(Serialize)]
@@ -120,11 +128,31 @@ pub async fn agent_by_code(
     State(state): State<AppState>,
     agent: AgentAuth,
     Path(code): Path<String>,
+    Query(query): Query<AgentRulesQuery>,
 ) -> AppResult<Json<RuleWithSanctions>> {
     let server_id = agent.game_server.server_id;
-    let rule = crate::db::rule_by_code(&state.db, &code, Some(server_id))
+    let mut rule = crate::db::rule_by_code(&state.db, &code, Some(server_id))
         .await?
         .ok_or_else(|| crate::error::AppError::NotFound(format!("rule {code} not found")))?;
-    let sanctions = crate::db::sanctions_of_rule(&state.db, rule.id).await?;
+    let mut sanctions = crate::db::sanctions_of_rule(&state.db, rule.id).await?;
+
+    let lang = query.lang.or(query.locale);
+    if let Some(locale) = lang.filter(|l| !l.is_empty()) {
+        let rule_tr = crate::db::rule_translations(&state.db, &locale).await?;
+        let sanction_tr = crate::db::sanction_translations(&state.db, &locale).await?;
+        let mut dummy_cats = vec![];
+        let mut dummy_rules = vec![rule.clone()];
+        crate::db::apply_locale(
+            &mut dummy_cats,
+            &mut dummy_rules,
+            &mut sanctions,
+            &[],
+            &rule_tr,
+            &sanction_tr,
+        );
+        rule = dummy_rules.remove(0);
+    }
+
     Ok(Json(RuleWithSanctions { rule, sanctions }))
 }
+

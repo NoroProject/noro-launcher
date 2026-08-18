@@ -1,18 +1,12 @@
 package dev.noro.agent.core;
 
+import dev.noro.agent.core.automod.ChatFilters;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.slf4j.Logger;
 
 /**
- * Модерация на этом сервере: муты, шаблоны и применение наказаний.
- *
- * <p>Собирает вместе то, что иначе пришлось бы протаскивать по отдельности в
- * каждую команду и в каждый слушатель. Платформа подключает сюда свой
- * {@link GameBridge} и получает готовое поведение.
- *
- * <p>Она же — приёмник живого канала: кадр с мастера превращается в кик или
- * снятый мут ровно теми же вызовами, что и ответ на команду.
+ * Модерация на этом сервере: муты, шаблоны, фильтры чата и применение наказаний.
  */
 public final class Moderation implements AgentLink.Listener, AutoCloseable {
 
@@ -21,6 +15,8 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
     private final RuleCatalog rules;
     private final MuteRegistry mutes = new MuteRegistry();
     private final MuteSync sync;
+    private final MaintenanceCountdown maintenanceCountdown;
+    private final ChatFilters chatFilters;
     private final Logger log;
 
     /** Читают из игрового потока на каждый отказ, пишут при обновлении с мастера. */
@@ -28,22 +24,34 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
 
     private volatile PunishmentApplier applier;
 
+    /** Кто перечитывает профили. Ставит платформа: применение — её дело. */
+    private volatile ProfileRefresher refresher;
+
     public Moderation(ModerationClient client, MasterClient master, RuleCatalog rules, Logger log) {
         this.client = client;
         this.master = master;
         this.rules = rules;
         this.log = log;
         this.sync = new MuteSync(master, mutes, log);
+        this.maintenanceCountdown = new MaintenanceCountdown(log);
+        this.chatFilters = new ChatFilters(master.http(), log);
     }
 
-    /**
-     * Подключить игру. До этого момента наказания применять некуда — сервер
-     * ещё не запущен, и все входящие кадры уходят в лог.
-     */
     public void attach(GameBridge bridge) {
         this.applier = new PunishmentApplier(bridge, mutes, this, log);
         refreshTemplates();
         sync.start();
+        chatFilters.refresh();
+        NoroAgentApi.attachMutes((uuid, actionbar) -> muteNotice(uuid, nameOf(uuid), actionbar));
+    }
+
+    private static String nameOf(UUID uuid) {
+        PlayerProfile profile = NoroAgentApi.profile(uuid);
+        return profile == null ? "" : profile.username();
+    }
+
+    public void attachRefresher(ProfileRefresher refresher) {
+        this.refresher = refresher;
     }
 
     public ModerationClient client() {
@@ -70,15 +78,44 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
         return applier;
     }
 
-    /**
-     * Текст отказа замученному — то, что он видит вместо своего сообщения.
-     *
-     * <p>Заодно повод сверить мут с мастером: игрок пишет в чат именно тогда,
-     * когда считает себя размученным, и если кадр о снятии не дошёл, это
-     * единственный момент, когда мы можем это заметить.
-     *
-     * @param actionbar короткая версия — над хотбаром одна строка без переносов
-     */
+    public MaintenanceCountdown maintenanceCountdown() {
+        return maintenanceCountdown;
+    }
+
+    public ChatFilters chatFilters() {
+        return chatFilters;
+    }
+
+    public ChatFilters.Result checkChatMessage(UUID uuid, String text) {
+        ChatFilters.Result res = chatFilters.check(uuid, text);
+        if (res.action() == ChatFilters.Action.ALLOW) {
+            return res;
+        }
+
+        // Сохраняем доказательство срабатывания в automod_triggers на мастере
+        chatFilters.recordTrigger(uuid, res.filterType(), res.action().name().toLowerCase(), res.triggerMessage());
+
+        String playerName = nameOf(uuid);
+
+        if (res.action() == ChatFilters.Action.PUNISH) {
+            chatFilters.issueAutoPunishment(uuid, res.filterType(), rules);
+        } else if (res.action() == ChatFilters.Action.ESCALATE) {
+            if (applier != null) {
+                applier.bridge().announceToPermission("noro.mod.staff.notify", "#f87171[AutoMod ESCALATE: " + res.filterType() + "] " + playerName + ": " + res.triggerMessage());
+            }
+            chatFilters.issueAutoPunishment(uuid, res.filterType(), rules);
+        } else if (res.action() == ChatFilters.Action.SHADOW) {
+            if (applier != null) {
+                applier.bridge().announceToPermission("noro.mod.staff.notify", "#fbbf24[AutoMod SHADOW: " + res.filterType() + "] " + playerName + ": " + res.triggerMessage());
+            }
+        } else if (res.action() == ChatFilters.Action.DENY && "escalate".equalsIgnoreCase(res.mode())) {
+            if (applier != null) {
+                applier.bridge().announceToPermission("noro.mod.staff.notify", "#f87171[AutoMod WARN: " + res.filterType() + "] " + playerName + ": " + res.triggerMessage());
+            }
+        }
+        return res;
+    }
+
     public String muteNotice(UUID uuid, String playerName, boolean actionbar) {
         if (mutes.stale(uuid, MuteSync.FRESH)) {
             sync.refresh(uuid);
@@ -91,25 +128,16 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
         return render(template, mute, playerName);
     }
 
-    /** Подстановка с тем, что знает только агент: названием пункта свода. */
     public String render(String template, PunishmentInfo punishment, String playerName) {
         String title = rules == null ? null : rules.titleFor(punishment.ruleCode());
         return MessageRender.render(template, punishment, playerName, title, templates.rulesUrl());
     }
 
-    /**
-     * Причина по правилу, когда модератор её не написал.
-     *
-     * <p>Текст берётся из шаблона мастера, а не собирается здесь: формулировка —
-     * дело того, кто правит тексты, и на разных серверах она разная.
-     */
     public String reasonForRule(String ruleCode) {
         if (ruleCode == null || ruleCode.isBlank()) {
             return "";
         }
         String code = ruleCode.startsWith("@") ? ruleCode.substring(1) : ruleCode;
-        // Своя формулировка пункта важнее общего шаблона: её писали именно для
-        // этого нарушения и перевели вместе со сводом.
         String own = rules == null ? null : rules.punishReasonFor(code);
         if (own != null && !own.isBlank()) {
             return own;
@@ -120,7 +148,6 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
                 .replace("{rule_title}", title == null || title.isBlank() ? code : title);
     }
 
-    /** Перечитать шаблоны с мастера. Фоном: старт сервера не ждёт сеть. */
     public void refreshTemplates() {
         CompletableFuture.runAsync(() -> templates = client.messages());
     }
@@ -149,7 +176,68 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
     }
 
     @Override
+    public void onFiltersChanged() {
+        chatFilters.refresh();
+    }
+
+    @Override
+    public void onProfileChanged(UUID uuid) {
+        ProfileRefresher current = refresher;
+        if (current == null) {
+            return;
+        }
+        if (uuid == null) {
+            current.refreshAll();
+        } else {
+            current.refresh(uuid);
+        }
+    }
+
+    @Override
+    public void onKick(UUID target, String message) {
+        PunishmentApplier current = applier;
+        if (current != null && target != null) {
+            current.bridge().kick(target, message);
+        }
+    }
+
+    @Override
+    public void onTell(UUID target, String message) {
+        PunishmentApplier current = applier;
+        if (current != null && target != null) {
+            current.bridge().tell(target, message);
+        }
+    }
+
+    @Override
+    public void onAnnounce(String message) {
+        PunishmentApplier current = applier;
+        if (current != null && message != null) {
+            current.bridge().announce(message);
+        }
+    }
+
+    @Override
+    public void onMaintenanceStart(int countdownSeconds, String reason) {
+        GameBridge bridge = applier == null ? null : applier.bridge();
+        maintenanceCountdown.start(countdownSeconds, reason, bridge, templates);
+    }
+
+    @Override
+    public void onMaintenanceCancel() {
+        GameBridge bridge = applier == null ? null : applier.bridge();
+        maintenanceCountdown.cancel(bridge);
+    }
+
+    @Override
+    public void onRestartNotice(int seconds, String reason) {
+        GameBridge bridge = applier == null ? null : applier.bridge();
+        maintenanceCountdown.start(seconds, "[RESTART] " + (reason == null ? "Planned restart" : reason), bridge, templates);
+    }
+
+    @Override
     public void close() {
         sync.close();
+        maintenanceCountdown.close();
     }
 }

@@ -3,15 +3,25 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, audit, backup, blocklist, build_routes, capes, catalog, cores, game_servers,
-    impersonate, integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions,
-    moderation_messages, news, notes, permission_nodes, punishments, remote, roles, rules, servers,
-    settings, stats, storage, tokens, user_launcher, users, versions, wrapper, wrapper_backups,
-    wrapper_fs,
+    agents, audit, backup, blocklist, build_routes, capes, catalog, chat_filters, cores, freezes_and_reports, game_actions,
+    game_servers, impersonate, integrity, launcher, launcher_clients, log_requests, mod_install,
+    mod_suggestions, moderation_messages, news, notes, optional_upload, permission_nodes, punishments,
+    remote, restarts, roles, rules, servers, settings, stats, storage, tokens, user_launcher, users,
+    versions, wrapper, wrapper_backups, wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/api/admin/freezes", post(freezes_and_reports::freeze))
+        .route("/api/admin/freezes/{user_id}", delete(freezes_and_reports::unfreeze))
+        .route("/api/admin/reports", get(freezes_and_reports::list_reports))
+        .route("/api/admin/reports/{id}/claim", post(freezes_and_reports::claim_report))
+        .route("/api/admin/reports/{id}/resolve", put(freezes_and_reports::resolve_report))
+        .route("/api/admin/restarts", get(restarts::list).post(restarts::create))
+        .route("/api/admin/restarts/{id}", delete(restarts::delete))
+        .route("/api/admin/game/kick", post(game_actions::kick))
+        .route("/api/admin/game/tell", post(game_actions::tell))
+        .route("/api/admin/game/announce", post(game_actions::announce))
         .route("/api/admin/agents", get(agents::list))
         .route("/api/admin/audit", get(audit::list))
         .route("/api/admin/audit/actions", get(audit::actions))
@@ -59,6 +69,10 @@ pub fn router() -> Router<AppState> {
             post(settings::upload_hero_image),
         )
         .route("/api/admin/diagnostics", get(settings::diagnostics))
+        .route(
+            "/api/admin/builds/{id}/optional-mods",
+            post(optional_upload::upload),
+        )
         .route(
             "/api/admin/moderation/messages",
             get(moderation_messages::get).put(moderation_messages::put),
@@ -270,6 +284,10 @@ fn servers_router() -> Router<AppState> {
             put(servers::upload_background),
         )
         .route(
+            "/api/admin/servers/{id}/game-servers/maintenance",
+            put(game_servers::bulk_maintenance),
+        )
+        .route(
             "/api/admin/servers/{id}/game-servers",
             get(game_servers::list).post(game_servers::create),
         )
@@ -324,6 +342,10 @@ fn wrapper_router() -> Router<AppState> {
         .route(
             "/api/admin/game-servers/{id}/backups",
             get(wrapper_backups::list).post(wrapper_backups::create),
+        )
+        .route(
+            "/api/admin/chat-filters",
+            get(chat_filters::list).put(chat_filters::save),
         )
         .route(
             "/api/admin/game-servers/{id}/backups/{name}",

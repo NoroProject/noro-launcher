@@ -14,6 +14,9 @@ pub struct UserRow {
     pub mc_uuid: Uuid,
     pub mc_username: String,
     pub skin_url: Option<String>,
+    /// Тонкая модель (Алекс). `false` — классическая (Стив): именно её клиент
+    /// подразумевает, когда метаданных у текстуры нет.
+    pub skin_slim: bool,
     pub cape_url: Option<String>,
     pub banned: bool,
     pub ban_reason: Option<String>,
@@ -22,6 +25,14 @@ pub struct UserRow {
     pub is_local_account: bool,
     pub can_play: bool,
     pub is_root: bool,
+    /// Выбранный язык. `None` — не выбирал: тогда работает язык по умолчанию.
+    /// Нужен там, где языка клиента ещё нет, — прежде всего на экране отказа
+    /// при входе в игру.
+    pub locale: Option<String>,
+    #[sqlx(default)]
+    pub hide_from_online: bool,
+    #[sqlx(default)]
+    pub silent_join: bool,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]

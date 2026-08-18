@@ -25,7 +25,7 @@ pub fn manifest_summary(m: &BuildManifest) -> String {
 /// Здесь `viewer` = `None`: подписывается полный набор, потому что это
 /// метаданные сборки, а не то, что уедет игроку.
 pub async fn ensure_signed(state: &AppState, build: &BuildRow) -> Result<BuildManifest> {
-    let manifest = build_manifest(state, build, None).await?;
+    let manifest = build_manifest(state, build, None, "").await?;
     crate::db::update_build_manifest_meta(
         &state.db,
         build.id,

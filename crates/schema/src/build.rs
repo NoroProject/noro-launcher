@@ -100,10 +100,31 @@ pub struct OptionalMod {
     pub conflicts: Vec<String>,
     #[serde(default)]
     pub triggers: Vec<ModTrigger>,
+    /// Системы, где мод имеет смысл: `windows`, `macos`, `linux`. Пусто — все.
+    ///
+    /// Нужно модам с нативными библиотеками: на чужой системе такой мод не
+    /// просто бесполезен, он роняет запуск, а игрок видит только «игра
+    /// закрылась» и чинить это ему нечем.
+    #[serde(default)]
+    pub os: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
+}
+
+impl OptionalMod {
+    /// Годится ли мод для этой системы. Пустой список — годится везде.
+    ///
+    /// Сравнение по `std::env::consts::OS`: `windows`, `macos`, `linux` — та же
+    /// нотация, что и в платформах лаунчера, только без архитектуры.
+    pub fn runs_on(&self, os: &str) -> bool {
+        self.os.is_empty()
+            || self
+                .os
+                .iter()
+                .any(|allowed| allowed.eq_ignore_ascii_case(os))
+    }
 }
 
 /// Рекомендованные клиентские настройки для конкретной сборки.
@@ -228,5 +249,49 @@ mod serde_bytes_vec {
 
     pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
         Vec::deserialize(d)
+    }
+}
+
+#[cfg(test)]
+mod optional_mod_tests {
+    use super::*;
+
+    fn mod_for(os: &[&str]) -> OptionalMod {
+        OptionalMod {
+            name: "sodium".into(),
+            description: String::new(),
+            category: String::new(),
+            files: vec![],
+            enabled_by_default: false,
+            visible: true,
+            limited: false,
+            dependencies: vec![],
+            conflicts: vec![],
+            triggers: vec![],
+            os: os.iter().map(|s| s.to_string()).collect(),
+            icon_url: None,
+            author: None,
+        }
+    }
+
+    /// Без списка систем мод годится везде: так лежат все сборки, сделанные до
+    /// появления поля, и молча спрятать их от игроков нельзя.
+    #[test]
+    fn empty_list_means_every_system() {
+        assert!(mod_for(&[]).runs_on("windows"));
+        assert!(mod_for(&[]).runs_on("linux"));
+    }
+
+    #[test]
+    fn keeps_only_listed_systems() {
+        let windows_only = mod_for(&["windows"]);
+        assert!(windows_only.runs_on("windows"));
+        assert!(!windows_only.runs_on("macos"));
+    }
+
+    /// Регистр приходит из админки, где его набирают руками.
+    #[test]
+    fn ignores_letter_case() {
+        assert!(mod_for(&["Windows"]).runs_on("windows"));
     }
 }

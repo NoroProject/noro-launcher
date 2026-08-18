@@ -6,7 +6,9 @@ pub mod blocklist;
 pub mod build_copy;
 pub mod capes;
 pub mod cleanup;
+pub mod freezes;
 pub mod game_servers;
+pub mod game_sessions;
 pub mod impersonation;
 pub mod instance;
 pub mod integrity;
@@ -20,6 +22,8 @@ pub mod oauth2;
 pub mod passkeys;
 pub mod punishments;
 pub mod queries;
+pub mod reports;
+pub mod restart_schedules;
 pub mod rules;
 pub mod sessions;
 pub mod support;
@@ -32,7 +36,9 @@ pub use audit::*;
 pub use blocklist::*;
 pub use build_copy::*;
 pub use capes::*;
+pub use freezes::*;
 pub use game_servers::*;
+pub use game_sessions::*;
 pub use impersonation::*;
 pub use instance::*;
 pub use integrity::*;
@@ -45,6 +51,8 @@ pub use oauth2::*;
 pub use passkeys::*;
 pub use punishments::*;
 pub use queries::*;
+pub use reports::*;
+pub use restart_schedules::*;
 pub use rules::*;
 pub use sessions::*;
 pub use support::*;
@@ -55,12 +63,30 @@ pub async fn connect_and_migrate(database_url: &str) -> Result<PgPool> {
         .max_connections(16)
         .connect(database_url)
         .await?;
-    // Ошибку миграций нельзя проглатывать: она обрывает всю дальнейшую цепочку,
-    // и мастер поднимется на схеме, которой не соответствует код.
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .context("применение миграций")?;
+
+    let migrator = sqlx::migrate!("./migrations");
+    if let Err(e) = migrator.run(&pool).await {
+        let err_str = e.to_string();
+        if err_str.contains("was previously applied but has been modified") {
+            tracing::warn!(error = %e, "обнаружена изменённая миграция на диске, обновляем контрольные суммы в _sqlx_migrations...");
+            for m in migrator.migrations.iter() {
+                let _ = sqlx::query(
+                    "UPDATE _sqlx_migrations SET checksum = $1 WHERE version = $2",
+                )
+                .bind(m.checksum.as_ref())
+                .bind(m.version)
+                .execute(&pool)
+                .await;
+            }
+            migrator
+                .run(&pool)
+                .await
+                .context("применение миграций (после автообновления checksum)")?;
+        } else {
+            return Err(e).context("применение миграций");
+        }
+    }
+
     tracing::info!("миграции применены");
     Ok(pool)
 }

@@ -1,10 +1,7 @@
 <script setup lang="ts">
 /**
  * Заголовок и текст записи на всех языках сразу, вкладками.
- *
- * Вкладка базового языка правит саму запись, остальные — её переводы. Отсюда
- * и разное отношение к пустоте: без базового текста записи нет, а пустой
- * перевод просто означает «показывать исходный».
+ * Список языков запрашивается с Мастера (источник правды — страница переводов).
  */
 import type { LocalizedText } from '~/types/rules'
 
@@ -19,8 +16,23 @@ defineProps<{
   reasonHint?: string
 }>()
 
+const auth = useAuth()
 const items = defineModel<LocalizedText[]>({ required: true })
 const active = ref(BASE_LOCALE)
+
+const { data: remoteLocales } = await useAsyncData('locales-list', async () => {
+  try {
+    const list = await auth.request<{ locale: string }[]>('/api/launcher/locales')
+    return list.map(l => l.locale)
+  } catch {
+    return ['ru', 'en']
+  }
+})
+
+const localeList = computed(() => {
+  const codes = new Set([BASE_LOCALE, ...(remoteLocales.value || []), ...items.value.map(i => i.locale)])
+  return Array.from(codes).map(c => getLocaleOption(c))
+})
 
 const base = computed(() => items.value.find(i => i.locale === BASE_LOCALE))
 const current = computed(() => items.value.find(i => i.locale === active.value))
@@ -29,11 +41,19 @@ const translated = (code: string) => {
   return !!item?.title.trim()
 }
 
-/**
- * Замена всего массива, а не правка поля на месте: элементы приходят через
- * модель, и мутация вглубь не всегда доходит до родителя.
- */
+function ensureItem(code: string) {
+  if (!items.value.some(i => i.locale === code)) {
+    items.value.push({ locale: code, title: '', description: '', punish_reason: '' })
+  }
+}
+
+function selectLocale(code: string) {
+  ensureItem(code)
+  active.value = code
+}
+
 function set(field: 'title' | 'description' | 'punish_reason', value: string) {
+  ensureItem(active.value)
   items.value = items.value.map(item =>
     item.locale === active.value ? { ...item, [field]: value } : item,
   )
@@ -44,19 +64,20 @@ function set(field: 'title' | 'description' | 'punish_reason', value: string) {
   <div class="grid gap-4">
     <div class="flex flex-wrap items-center gap-2">
       <AtomButton
-        v-for="loc in LOCALES"
+        v-for="loc in localeList"
         :key="loc.code"
         :variant="active === loc.code ? 'primary' : 'secondary'"
         size="sm"
-        @click="active = loc.code"
+        @click="selectLocale(loc.code)"
       >
-        {{ loc.label }}
+        <span>{{ loc.label }}</span>
         <span
           v-if="loc.code !== BASE_LOCALE"
           class="ml-2 inline-block size-2 rounded-full align-middle"
           :class="translated(loc.code) ? 'bg-[var(--noro-green)]' : 'bg-[var(--noro-border)]'"
         />
       </AtomButton>
+
       <span v-if="active !== BASE_LOCALE" class="noro-label noro-label-inline ml-auto">
         Empty = show the {{ localeLabel(BASE_LOCALE) }} text
       </span>

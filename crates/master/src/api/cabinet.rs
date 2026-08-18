@@ -54,39 +54,63 @@ pub async fn upload_skin(
     user: AuthUser,
     mut multipart: Multipart,
 ) -> AppResult<Json<UserProfile>> {
+    // Оба поля собираем до записи. Раньше запись шла прямо в ветке файла, и
+    // модель терялась, если клиент клал её в форму после картинки — а именно
+    // так делает `FormData.append` в привычном порядке «сначала файл».
+    let mut chosen: Option<bool> = None;
+    let mut skin: Option<Vec<u8>> = None;
     while let Some(field) = multipart
         .next_field()
         .await
         .map_err(|e| AppError::BadRequest(e.to_string()))?
     {
-        if field.name() == Some("skin") {
-            let data = field
-                .bytes()
-                .await
-                .map_err(|e| AppError::BadRequest(e.to_string()))?;
-            // Простая проверка PNG-сигнатуры.
-            if data.len() < 8 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
-                return Err(AppError::BadRequest("PNG expected".into()));
+        match field.name() {
+            Some("model") | Some("slim") => {
+                if let Ok(txt) = field.text().await {
+                    chosen = super::skin_model::parse_choice(&txt);
+                }
             }
-            if data.len() > 256 * 1024 {
-                return Err(AppError::BadRequest("skin is too large".into()));
+            Some("skin") => {
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| AppError::BadRequest(e.to_string()))?;
+                // Простая проверка PNG-сигнатуры.
+                if data.len() < 8 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
+                    return Err(AppError::BadRequest("PNG expected".into()));
+                }
+                if data.len() > 256 * 1024 {
+                    return Err(AppError::BadRequest("skin is too large".into()));
+                }
+                skin = Some(data.to_vec());
             }
-            let stored = state
-                .files
-                .put_bytes(&data)
-                .await
-                .map_err(AppError::Other)?;
-            let url = state.config.file_url(&stored.sha1);
-            crate::db::set_skin(&state.db, user.user_id, Some(&url)).await?;
-            let profile = crate::db::load_profile(&state.db, user.user_id).await?;
-            state.ws.send_to_user(
-                user.user_id,
-                &schema::ServerWsMsg::PermissionsUpdated {
-                    user: profile.clone(),
-                },
-            );
-            return Ok(Json(profile));
+            _ => {}
         }
+    }
+
+    if let Some(data) = skin {
+        // Игрок не выбрал — угадываем по картинке. Большинство и не знает, что
+        // такое «slim», а нарисованный под Алекс скин с толстыми руками виден
+        // сразу и выглядит как поломка сервера, а не как выбор по умолчанию.
+        let slim = match chosen {
+            Some(value) => value,
+            None => super::skin_model::detect_slim(&data),
+        };
+        let stored = state
+            .files
+            .put_bytes(&data)
+            .await
+            .map_err(AppError::Other)?;
+        let url = state.config.file_url(&stored.sha1);
+        crate::db::set_skin(&state.db, user.user_id, Some(&url), slim).await?;
+        let profile = crate::db::load_profile(&state.db, user.user_id).await?;
+        state.ws.send_to_user(
+            user.user_id,
+            &schema::ServerWsMsg::PermissionsUpdated {
+                user: profile.clone(),
+            },
+        );
+        return Ok(Json(profile));
     }
     Err(AppError::BadRequest("missing skin field".into()))
 }
@@ -95,7 +119,7 @@ pub async fn delete_skin(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<UserProfile>> {
-    crate::db::set_skin(&state.db, user.user_id, None).await?;
+    crate::db::set_skin(&state.db, user.user_id, None, false).await?;
     let profile = crate::db::load_profile(&state.db, user.user_id).await?;
     state.ws.send_to_user(
         user.user_id,
@@ -149,14 +173,21 @@ pub async fn upload_skin_from_username(
         .await
         .map_err(AppError::Other)?;
     let skin_url = state.config.file_url(&stored.sha1);
-    crate::db::set_skin(&state.db, user.user_id, Some(&skin_url)).await?;
-    let _ =
-        sqlx::query("INSERT INTO user_skin_presets (user_id, name, skin_url) VALUES ($1, $2, $3)")
-            .bind(user.user_id)
-            .bind(username)
-            .bind(&skin_url)
-            .execute(&state.db)
-            .await;
+    // Модель берём у самой картинки, а не у того, что стояло раньше: скин
+    // чужой, и нарисован он под свою геометрию. Оставить прежнюю значит выдать
+    // тонкий скин с толстыми руками — это видно сразу и читается как поломка.
+    let slim = super::skin_model::detect_slim(&data);
+    crate::db::set_skin(&state.db, user.user_id, Some(&skin_url), slim).await?;
+    let _ = sqlx::query(
+        "INSERT INTO user_skin_presets (user_id, name, skin_url, skin_slim)
+         VALUES ($1, $2, $3, $4)",
+    )
+    .bind(user.user_id)
+    .bind(username)
+    .bind(&skin_url)
+    .bind(slim)
+    .execute(&state.db)
+    .await;
 
     let profile = crate::db::load_profile(&state.db, user.user_id).await?;
     state.ws.send_to_user(
@@ -223,12 +254,18 @@ pub struct SkinPresetItem {
     pub id: uuid::Uuid,
     pub name: String,
     pub skin_url: String,
+    /// Модель, с которой пресет сохраняли. Без неё переключение между
+    /// сохранёнными скинами ломало бы вид: картинка та, руки другие.
+    pub skin_slim: bool,
 }
 
 #[derive(serde::Deserialize)]
 pub struct CreateSkinPresetReq {
     pub name: String,
     pub skin_url: String,
+    /// Не прислали — берём ту, что стоит у игрока сейчас.
+    #[serde(default)]
+    pub skin_slim: Option<bool>,
 }
 
 #[derive(serde::Deserialize)]
@@ -241,7 +278,7 @@ pub async fn list_skin_presets(
     user: AuthUser,
 ) -> AppResult<Json<Vec<SkinPresetItem>>> {
     let rows = sqlx::query_as::<_, SkinPresetItem>(
-        "SELECT id, name, skin_url FROM user_skin_presets WHERE user_id = $1 ORDER BY created_at DESC",
+        "SELECT id, name, skin_url, skin_slim FROM user_skin_presets WHERE user_id = $1 ORDER BY created_at DESC",
     )
     .bind(user.user_id)
     .fetch_all(&state.db)
@@ -256,12 +293,20 @@ pub async fn create_skin_preset(
     user: AuthUser,
     Json(req): Json<CreateSkinPresetReq>,
 ) -> AppResult<Json<SkinPresetItem>> {
+    let preset_slim = match req.skin_slim {
+        Some(value) => value,
+        None => crate::db::get_user(&state.db, user.user_id)
+            .await?
+            .is_some_and(|u| u.skin_slim),
+    };
     let row = sqlx::query_as::<_, SkinPresetItem>(
-        "INSERT INTO user_skin_presets (user_id, name, skin_url) VALUES ($1, $2, $3) RETURNING id, name, skin_url",
+        "INSERT INTO user_skin_presets (user_id, name, skin_url, skin_slim)
+         VALUES ($1, $2, $3, $4) RETURNING id, name, skin_url, skin_slim",
     )
     .bind(user.user_id)
     .bind(&req.name)
     .bind(&req.skin_url)
+    .bind(preset_slim)
     .fetch_one(&state.db)
     .await
     .map_err(|e| AppError::Other(e.into()))?;

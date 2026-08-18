@@ -20,6 +20,7 @@ mod news_detail;
 mod profile;
 mod profile_cape;
 mod profile_skin;
+mod profile_skin_model;
 mod profile_skin_pick;
 mod profile_user;
 mod remote_action_dialog;

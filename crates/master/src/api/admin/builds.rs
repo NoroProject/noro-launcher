@@ -727,6 +727,7 @@ pub(super) fn optional_from_draft(
         dependencies: Vec::new(),
         conflicts: Vec::new(),
         triggers: Vec::new(),
+        os: Vec::new(),
         icon_url,
         author,
     }

@@ -13,6 +13,7 @@ interface SavedSkin {
   id: string
   name: string
   skin_url: string
+  skin_slim: boolean
 }
 
 const file = ref<File | null>(null)
@@ -47,6 +48,28 @@ const { data: capes } = await useAsyncData('user-capes-list', () =>
 )
 
 const currentSkinUrl = computed(() => auth.user.value?.skin_url)
+const currentSlim = computed(() => auth.user.value?.skin_slim === true)
+const modelSaving = ref(false)
+
+/**
+ * Смена модели без перезаливки файла: картинка та же, меняется только ширина
+ * рук. Требовать исходник ради галочки нельзя — скин мог приехать по нику.
+ */
+async function setModel(slim: boolean) {
+  if (modelSaving.value || currentSlim.value === slim) return
+  modelSaving.value = true
+  error.value = null
+  try {
+    auth.user.value = await auth.request<UserProfile>('/api/me/skin/model', {
+      method: 'PUT',
+      body: { model: slim ? 'slim' : 'classic' },
+    })
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    modelSaving.value = false
+  }
+}
 const currentCapeUrl = computed(() => auth.user.value?.cape_url)
 
 const { data: serverPresets, refresh: refreshPresets } = await useAsyncData('user-skin-presets', () =>
@@ -164,7 +187,11 @@ async function applySavedSkin(skin: SavedSkin) {
     const res = await fetch(skin.skin_url)
     const blob = await res.blob()
     const skinFile = new File([blob], `${skin.name}.png`, { type: 'image/png' })
-    const updated = await auth.upload<UserProfile>('/api/me/skin', 'skin', skinFile)
+    // Модель едет вместе с пресетом: без неё сохранённый тонкий скин вернулся
+    // бы с толстыми руками, и переключение между пресетами ломало бы вид.
+    const updated = await auth.upload<UserProfile>('/api/me/skin', 'skin', skinFile, {
+      model: skin.skin_slim ? 'slim' : 'classic',
+    })
     auth.user.value = updated
     message.value = `Equipped skin: ${skin.name}`
   } catch (err) {
@@ -250,6 +277,23 @@ async function selectCape(capeId: string | null) {
         </div>
 
         <SkinPreview3D :skin-url="currentSkinUrl" :cape-url="currentCapeUrl" />
+
+        <div v-if="currentSkinUrl" class="space-y-2 pt-4 border-t border-[var(--noro-border)]">
+          <p class="noro-label">{{ t('skin-model') }}</p>
+          <div class="grid grid-cols-2 gap-2">
+            <AtomButton
+              v-for="option in [{ slim: false, label: t('skin-model-classic') }, { slim: true, label: t('skin-model-slim') }]"
+              :key="String(option.slim)"
+              :variant="currentSlim === option.slim ? 'secondary' : 'ghost'"
+              :disabled="modelSaving"
+              class="justify-center text-xs"
+              @click="setModel(option.slim)"
+            >
+              {{ option.label }}
+            </AtomButton>
+          </div>
+          <p class="text-[10px] leading-4 text-[var(--noro-muted)]">{{ t('skin-model-hint') }}</p>
+        </div>
 
         <div v-if="currentSkinUrl" class="pt-2 border-t border-[var(--noro-border)]">
           <AtomButton

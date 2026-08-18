@@ -52,9 +52,104 @@ pub fn messages_changed(state: &AppState) {
     state.agents.broadcast(&ToAgent::MessagesChanged);
 }
 
+pub fn filters_changed(state: &AppState) {
+    state.agents.broadcast(&ToAgent::FiltersChanged);
+}
+
+pub fn restart_notice(
+    state: &AppState,
+    server_id: Option<uuid::Uuid>,
+    game_server_id: Option<uuid::Uuid>,
+    seconds: u32,
+    reason: Option<String>,
+) {
+    let msg = ToAgent::RestartNotice { seconds, reason };
+    if let Some(gs_id) = game_server_id {
+        state.agents.send_to_game_server(&msg, gs_id);
+    } else if let Some(sid) = server_id {
+        state.agents.send(&msg, Some(sid));
+    } else {
+        state.agents.broadcast(&msg);
+    }
+}
+
+/// Профиль игрока изменился: роли, права, префикс.
+///
+/// Без этого выданная на сайте роль не значила в игре ничего до перезахода:
+/// `ProfileCache` наполняется на логине и обновляет только муты.
+///
+/// `None` — перечитать всех. Так уходит правка самой роли: носителей у неё
+/// сколько угодно, и перечислять их здесь значит повторить выборку, которую
+/// агент всё равно сделает по своему списку онлайна.
+pub fn profile_changed(state: &AppState, mc_uuid: Option<uuid::Uuid>) {
+    state
+        .agents
+        .broadcast(&ToAgent::ProfileChanged { uuid: mc_uuid });
+}
+
+pub fn kick(state: &AppState, server_id: Option<uuid::Uuid>, target: uuid::Uuid, message: String) {
+    let msg = ToAgent::Kick { target, message };
+    if let Some(sid) = server_id {
+        state.agents.send(&msg, Some(sid));
+    } else {
+        state.agents.broadcast(&msg);
+    }
+}
+
+pub fn tell(state: &AppState, server_id: Option<uuid::Uuid>, target: uuid::Uuid, message: String) {
+    let msg = ToAgent::Tell { target, message };
+    if let Some(sid) = server_id {
+        state.agents.send(&msg, Some(sid));
+    } else {
+        state.agents.broadcast(&msg);
+    }
+}
+
+pub fn announce(state: &AppState, server_id: Option<uuid::Uuid>, message: String) {
+    let msg = ToAgent::Announce { message };
+    if let Some(sid) = server_id {
+        state.agents.send(&msg, Some(sid));
+    } else {
+        state.agents.broadcast(&msg);
+    }
+}
+
+pub fn maintenance_start(
+    state: &AppState,
+    server_id: Option<uuid::Uuid>,
+    game_server_id: Option<uuid::Uuid>,
+    countdown_seconds: u32,
+    reason: Option<String>,
+) {
+    let msg = ToAgent::MaintenanceStart {
+        countdown_seconds,
+        reason,
+    };
+    if let Some(gs_id) = game_server_id {
+        state.agents.send_to_game_server(&msg, gs_id);
+    } else if let Some(sid) = server_id {
+        state.agents.send(&msg, Some(sid));
+    } else {
+        state.agents.broadcast(&msg);
+    }
+}
+
+pub fn maintenance_cancel(
+    state: &AppState,
+    server_id: Option<uuid::Uuid>,
+    game_server_id: Option<uuid::Uuid>,
+) {
+    let msg = ToAgent::MaintenanceCancel;
+    if let Some(gs_id) = game_server_id {
+        state.agents.send_to_game_server(&msg, gs_id);
+    } else if let Some(sid) = server_id {
+        state.agents.send(&msg, Some(sid));
+    } else {
+        state.agents.broadcast(&msg);
+    }
+}
+
 async fn load_user(state: &AppState, row: &PunishmentRow) -> Option<UserRow> {
-    // Пустой хаб — обычное дело: серверы могут быть выключены. Тогда и в базу
-    // ходить незачем.
     if state.agents.connected_count() == 0 {
         return None;
     }

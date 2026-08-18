@@ -4,21 +4,20 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Кадр живого канала. Плоская модель под все три вида: у Gson нет разбора по
- * полю-тегу, а заводить ради трёх кадров иерархию с адаптером — больше кода,
- * чем самого протокола.
- *
- * <p>Поля должны совпадать с {@code ToAgent} в
- * {@code crates/master/src/agent_link/proto.rs}.
+ * Кадр живого канала.
  */
 record LinkFrame(
         String type,
         LivePunishment punishment,
         UUID id,
+        UUID uuid,
         UUID target,
         String targetName,
         String kind,
-        String actorLabel) {
+        String actorLabel,
+        String message,
+        Integer countdownSeconds,
+        String reason) {
 
     void deliver(AgentLink.Listener listener) {
         switch (type == null ? "" : type) {
@@ -33,12 +32,36 @@ record LinkFrame(
             case "messages_changed":
                 listener.onMessagesChanged();
                 return;
+            case "filters_changed":
+                listener.onFiltersChanged();
+                return;
+            case "restart_notice":
+                int sec = countdownSeconds != null ? countdownSeconds : 60;
+                listener.onRestartNotice(sec, reason == null ? "Planned restart" : reason);
+                return;
+            case "profile_changed":
+                listener.onProfileChanged(uuid);
+                return;
+            case "kick":
+                listener.onKick(target, message);
+                return;
+            case "tell":
+                listener.onTell(target, message);
+                return;
+            case "announce":
+                listener.onAnnounce(message);
+                return;
+            case "maintenance_start":
+                listener.onMaintenanceStart(countdownSeconds != null ? countdownSeconds : 60, reason);
+                return;
+            case "maintenance_cancel":
+                listener.onMaintenanceCancel();
+                return;
             default:
                 throw new IllegalArgumentException("unknown frame type " + type);
         }
     }
 
-    /** Наказание с адресатом: в канале игрок назван, в самом наказании — нет. */
     record LivePunishment(
             UUID id,
             UUID target,

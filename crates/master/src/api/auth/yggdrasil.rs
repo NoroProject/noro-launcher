@@ -302,7 +302,15 @@ fn profile_json(state: &AppState, u: &crate::db::models::UserRow, signed: bool) 
         .skin_url
         .clone()
         .unwrap_or_else(|| state.config.default_skin_url());
-    textures.insert("SKIN".into(), json!({ "url": skin }));
+    // `model: slim` — единственное, чем в Yggdrasil описывается модель Алекс.
+    // Для классической метаданных не шлём: их отсутствие клиент и понимает как
+    // Стива, а пустой объект некоторые сборки читают как ошибку.
+    let skin_texture = if u.skin_slim {
+        json!({ "url": skin, "metadata": { "model": "slim" } })
+    } else {
+        json!({ "url": skin })
+    };
+    textures.insert("SKIN".into(), skin_texture);
     if let Some(cape) = &u.cape_url {
         textures.insert("CAPE".into(), json!({ "url": cape }));
     }

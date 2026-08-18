@@ -28,9 +28,16 @@ public final class RuleCatalog {
 
     /** Обновить фоном: старт сервера не должен ждать сеть ради подсказки. */
     public void refresh() {
+        refresh(null);
+    }
+
+    public void refresh(String lang) {
         CompletableFuture.runAsync(() -> {
             try {
-                RulesData data = http.get("/api/agent/rules", RulesData.class).orElse(null);
+                String path = lang == null || lang.isBlank()
+                        ? "/api/agent/rules"
+                        : "/api/agent/rules?lang=" + Uris.segment(lang);
+                RuleCatalogDto.RulesData data = http.get(path, RuleCatalogDto.RulesData.class).orElse(null);
                 if (data == null || data.rules == null) {
                     return;
                 }
@@ -38,7 +45,7 @@ public final class RuleCatalog {
                 Map<String, String> codeToTitle = new HashMap<>();
                 Map<String, String> codeToReason = new HashMap<>();
                 List<String> loadedCodes = new ArrayList<>();
-                for (Rule rule : data.rules) {
+                for (RuleCatalogDto.Rule rule : data.rules) {
                     if (rule.id != null && rule.code != null) {
                         idToCode.put(rule.id, rule.code);
                         loadedCodes.add(rule.code);
@@ -53,7 +60,7 @@ public final class RuleCatalog {
 
                 Map<String, List<String>> durationsMap = new HashMap<>();
                 if (data.sanctions != null) {
-                    for (Sanction sanction : data.sanctions) {
+                    for (RuleCatalogDto.Sanction sanction : data.sanctions) {
                         String code = idToCode.get(sanction.ruleId);
                         if (code == null) {
                             continue;
@@ -110,12 +117,6 @@ public final class RuleCatalog {
 
     /**
      * Формулировка наказания, заданная у пункта свода и переведённая мастером.
-     *
-     * <p>Именно её видит игрок в бане. Заголовок правила для этого не годится:
-     * «Уважение к другим игрокам» в качестве причины читается как похвала.
-     *
-     * @return {@code null}, если у пункта её не задали — тогда причину соберёт
-     *     шаблон {@code reason_by_rule}
      */
     public String punishReasonFor(String ruleCode) {
         if (ruleCode == null) {
@@ -132,25 +133,5 @@ public final class RuleCatalog {
         }
         String clean = ruleCode.startsWith("@") ? ruleCode.substring(1) : ruleCode;
         return ruleDurations.getOrDefault(clean, List.of());
-    }
-
-    /** Часть ответа {@code GET /api/agent/rules}, которая нужна агенту. */
-    private static final class RulesData {
-        List<Rule> rules;
-        List<Sanction> sanctions;
-    }
-
-    private static final class Rule {
-        String id;
-        String code;
-        String title;
-        String punishReason;
-    }
-
-    private static final class Sanction {
-        String ruleId;
-        String kind;
-        Long minMinutes;
-        Long maxMinutes;
     }
 }

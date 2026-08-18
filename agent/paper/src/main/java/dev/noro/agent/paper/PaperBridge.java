@@ -54,6 +54,18 @@ final class PaperBridge implements GameBridge {
         server.getScheduler().runTask(plugin, () -> server.broadcast(text(message)));
     }
 
+    @Override
+    public void announceToPermission(String permission, String message) {
+        server.getScheduler().runTask(plugin, () -> {
+            Component msg = text(message);
+            for (Player p : server.getOnlinePlayers()) {
+                if (p.hasPermission(permission)) {
+                    p.sendMessage(msg);
+                }
+            }
+        });
+    }
+
     private void onMain(UUID uuid, java.util.function.Consumer<Player> action) {
         server.getScheduler().runTask(plugin, () -> {
             Player player = server.getPlayer(uuid);

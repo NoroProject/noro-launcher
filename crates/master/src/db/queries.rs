@@ -123,6 +123,9 @@ pub async fn profile_from_row(pool: &PgPool, u: UserRow) -> Result<UserProfile> 
             server_id,
         })
         .collect();
+    let freeze_info = crate::db::freezes::active_freeze_for_user(pool, u.id).await?;
+    let frozen = freeze_info.is_some();
+
     Ok(UserProfile {
         id: u.id,
         uuid: u.mc_uuid,
@@ -131,6 +134,7 @@ pub async fn profile_from_row(pool: &PgPool, u: UserRow) -> Result<UserProfile> 
         discord_username: u.discord_username,
         discord_avatar: u.discord_avatar,
         skin_url: u.skin_url,
+        skin_slim: u.skin_slim,
         cape_url: u.cape_url,
         roles,
         permissions,
@@ -139,6 +143,10 @@ pub async fn profile_from_row(pool: &PgPool, u: UserRow) -> Result<UserProfile> 
         is_local_account: u.is_local_account,
         can_play: u.can_play,
         is_root: u.is_root,
+        hide_from_online: u.hide_from_online,
+        frozen,
+        freeze_info,
+        silent_join: u.silent_join,
     })
 }
 
@@ -361,10 +369,13 @@ pub async fn set_username(pool: &PgPool, id: Uuid, username: &str) -> Result<()>
     Ok(())
 }
 
-pub async fn set_skin(pool: &PgPool, id: Uuid, skin_url: Option<&str>) -> Result<()> {
-    sqlx::query("UPDATE users SET skin_url = $2 WHERE id = $1")
+/// Модель задаётся вместе со скином: файл и его геометрия — одно решение
+/// игрока, и разъехаться они не должны.
+pub async fn set_skin(pool: &PgPool, id: Uuid, skin_url: Option<&str>, slim: bool) -> Result<()> {
+    sqlx::query("UPDATE users SET skin_url = $2, skin_slim = $3 WHERE id = $1")
         .bind(id)
         .bind(skin_url)
+        .bind(slim)
         .execute(pool)
         .await?;
     Ok(())
@@ -1492,6 +1503,13 @@ pub async fn user_by_mc_uuid(pool: &PgPool, mc_uuid: Uuid) -> Result<Option<User
         .fetch_optional(pool)
         .await?;
     Ok(row)
+}
+
+pub async fn users_by_mc_uuids(pool: &PgPool, uuids: &[Uuid]) -> Result<Vec<UserRow>> {
+    Ok(sqlx::query_as::<_, UserRow>("SELECT * FROM users WHERE mc_uuid = ANY($1)")
+        .bind(uuids)
+        .fetch_all(pool)
+        .await?)
 }
 
 /// Пользователь по нику. Регистронезависимо: в игре ник набирают руками, и

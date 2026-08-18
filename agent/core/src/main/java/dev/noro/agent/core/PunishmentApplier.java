@@ -42,6 +42,10 @@ public final class PunishmentApplier {
         this.log = log;
     }
 
+    public GameBridge bridge() {
+        return bridge;
+    }
+
     /** Наказание выдано: показать и применить. */
     public void apply(UUID target, String targetName, PunishmentInfo punishment) {
         if (punishment == null || punishment.id() == null || !seen.add(punishment.id())) {

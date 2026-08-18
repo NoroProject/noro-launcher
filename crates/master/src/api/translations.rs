@@ -19,12 +19,28 @@ pub struct LocaleInfo {
 
 /// Какие языки есть на мастере и каковы их хеши.
 pub async fn list(State(state): State<AppState>) -> AppResult<Json<Vec<LocaleInfo>>> {
+    let mut map = std::collections::HashMap::new();
+    map.insert("en".to_string(), hex::encode(Sha1::digest(i18n::Locale::En.builtin_ftl().as_bytes())));
+    map.insert("ru".to_string(), hex::encode(Sha1::digest(i18n::Locale::Ru.builtin_ftl().as_bytes())));
+
     let rows = crate::db::list_translations(&state.db).await?;
-    Ok(Json(
-        rows.into_iter()
-            .map(|(locale, sha1)| LocaleInfo { locale, sha1 })
-            .collect(),
-    ))
+    for (locale, sha1) in rows {
+        map.insert(locale, sha1);
+    }
+
+    let mod_map = crate::api::moderation_messages::load_map(&state.db).await;
+    for locale in mod_map.keys() {
+        if !map.contains_key(locale) {
+            map.insert(locale.clone(), "".to_string());
+        }
+    }
+
+    let mut result: Vec<_> = map
+        .into_iter()
+        .map(|(locale, sha1)| LocaleInfo { locale, sha1 })
+        .collect();
+    result.sort_by(|a, b| a.locale.cmp(&b.locale));
+    Ok(Json(result))
 }
 
 #[derive(Serialize)]
@@ -42,17 +58,17 @@ pub async fn get(
     State(state): State<AppState>,
     Path(locale): Path<String>,
 ) -> AppResult<Json<Catalog>> {
-    let known = i18n::Locale::from_code(&locale)
-        .ok_or_else(|| AppError::NotFound(format!("locale {locale}")))?;
-    // Переопределения может не быть — это нормальное состояние, а не 404:
-    // редактору всё равно нужен список ключей из встроенного каталога.
     let stored = crate::db::get_translation(&state.db, &locale).await?;
     let (ftl, sha1) = stored.unwrap_or_default();
+    let known_builtin = i18n::Locale::from_code(&locale)
+        .map(|k| k.builtin_ftl().to_string())
+        .unwrap_or_else(|| i18n::Locale::En.builtin_ftl().to_string());
+
     Ok(Json(Catalog {
         locale,
         sha1,
         ftl,
-        builtin: known.builtin_ftl().to_string(),
+        builtin: known_builtin,
     }))
 }
 

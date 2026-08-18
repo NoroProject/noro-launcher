@@ -8,10 +8,13 @@ use uuid::Uuid;
 
 pub type Tx = mpsc::UnboundedSender<ServerWsMsg>;
 
+/// `session_platform` живёт вместе с сессией: платформа приходит один раз, во
+/// входе, а нужна каждому манифесту.
 pub async fn handle(
     state: &AppState,
     conn_id: crate::ws::ConnId,
     authed_user: &mut Option<Uuid>,
+    session_platform: &mut String,
     msg: ClientWsMsg,
     tx: &Tx,
 ) -> anyhow::Result<()> {
@@ -21,6 +24,8 @@ pub async fn handle(
             launcher_version,
             platform,
         } => {
+            session_platform.clear();
+            session_platform.push_str(&platform);
             authenticate(
                 state,
                 conn_id,
@@ -54,7 +59,15 @@ pub async fn handle(
                 });
                 return Ok(());
             };
-            super::servers::send_manifest(state, user_id, server_id, build_id, tx).await?;
+            super::servers::send_manifest(
+                state,
+                user_id,
+                server_id,
+                build_id,
+                session_platform,
+                tx,
+            )
+            .await?;
         }
 
         ClientWsMsg::SetOptionalMods { server_id, enabled } => {

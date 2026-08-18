@@ -1,6 +1,4 @@
-//! Что агент видит в профиле игрока. Формы ответов вынесены из обработчиков:
-//! на них смотрят с трёх сторон — мастер, три реализации агента и тесты
-//! подписи, — и искать их среди запросов к базе неудобно.
+//! Что агент видит в профиле игрока.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -10,18 +8,11 @@ use uuid::Uuid;
 pub struct AgentRole {
     pub name: String,
     pub display_name: String,
-    /// Группа LuckPerms. `None` — роль в игру не проецируется.
     pub lp_group: Option<String>,
     pub color: Option<String>,
-    /// Один глиф рядом с ником — не префикс. Префикс живёт отдельно, потому
-    /// что это произвольная строка, а иконка обязана влезать в таб.
     pub icon: Option<String>,
-    /// Что ставится перед ником в игре, с цветами через `&`. Пусто — агент
-    /// подставит иконку в цвете роли, как было до появления этого поля.
     pub prefix: Option<String>,
-    /// Что ставится после ника.
     pub suffix: Option<String>,
-    /// Больше — важнее. Совпадает с весом группы в LuckPerms.
     pub sort_order: i32,
 }
 
@@ -57,21 +48,21 @@ pub struct AgentPlayer {
     pub banned: bool,
     pub muted: bool,
     pub active_mute: Option<AgentPunishmentSummary>,
-    /// Предупреждения, которые игрок ещё не видел. Агент показывает их при
-    /// входе и подтверждает через `/punishments/{id}/ack` — иначе варн
-    /// оставался бы записью в базе, о которой наказанный не знает.
+    pub active_ban: Option<AgentPunishmentSummary>,
     pub pending_warns: Vec<AgentPunishmentSummary>,
-    /// Игроку разрешён вход на этот сервер. Агент обязан проверить: манифест
-    /// сборки — не пропуск, до сервера можно дойти и мимо лаунчера.
     pub allowed: bool,
+    #[serde(default)]
+    pub denial_reason: Option<String>,
+    #[serde(default)]
+    pub maintenance_bypass: bool,
     pub roles: Vec<AgentRole>,
     pub skin_url: String,
     pub cape_url: Option<String>,
-    /// Группы LuckPerms в порядке важности — готовый результат для агента,
-    /// чтобы он не повторял у себя логику отбора.
+    pub locale: Option<String>,
     pub lp_groups: Vec<String>,
-    /// Права, действующие на этом сервере: свои и от ролей, глобальные и
-    /// привязанные к сборке. Плюс узлы `prefix.<вес>.<значение>` — LuckPerms
-    /// хранит префикс так же, и моды, читающие права напрямую, ищут именно там.
     pub permissions: Vec<String>,
+    #[serde(default)]
+    pub frozen: Option<schema::FreezeInfo>,
+    #[serde(default)]
+    pub vanish_on_join: bool,
 }

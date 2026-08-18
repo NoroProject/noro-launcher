@@ -460,6 +460,7 @@ function onSkinFilePicked(e: Event) {
 
       <div v-if="activeTab === 'moderation'" class="space-y-5">
         <PunishmentsPanel v-if="can('noro.mod.punish.view')" :user-id="id" />
+        <AdminFreezeUserBlock v-if="can('noro.mod.freeze')" :user-id="id" :frozen="user?.frozen" @updated="refreshUser" />
         <UserNotesPanel v-if="can('noro.admin.users.notes.view')" :user-id="id" />
       </div>
     </div>

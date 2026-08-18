@@ -30,4 +30,9 @@ public interface GameBridge {
 
     /** Сообщение всем на сервере. */
     void announce(String message);
+
+    /** Сообщение только игрокам с указанным правом (пермишеном). */
+    default void announceToPermission(String permission, String message) {
+        announce(message);
+    }
 }

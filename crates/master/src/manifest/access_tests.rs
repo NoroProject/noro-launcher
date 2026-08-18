@@ -25,6 +25,7 @@ fn opt_mod(name: &str, limited: bool, files: &[&str]) -> OptionalMod {
         dependencies: Vec::new(),
         conflicts: Vec::new(),
         triggers: Vec::new(),
+        os: Vec::new(),
         icon_url: None,
         author: None,
     }
@@ -51,6 +52,7 @@ fn viewer(permissions: &[&str]) -> UserProfile {
         discord_username: Some("player".into()),
         discord_avatar: None,
         skin_url: None,
+        skin_slim: false,
         cape_url: None,
         roles: Vec::new(),
         permissions: permissions.iter().map(|p| p.to_string()).collect(),
@@ -59,6 +61,10 @@ fn viewer(permissions: &[&str]) -> UserProfile {
         is_local_account: false,
         can_play: true,
         is_root: false,
+        hide_from_online: false,
+        frozen: false,
+        freeze_info: None,
+        silent_join: false,
     }
 }
 
@@ -110,7 +116,7 @@ fn limited_mod_without_permission_loses_files() {
         &["mods/staff.jar", "mods/optifine.jar", "mods/core.jar"],
     );
 
-    filter_for_viewer(&mut m, &viewer(&[]));
+    filter_for_viewer(&mut m, &viewer(&[]), "");
 
     assert_eq!(paths(&m), vec!["mods/optifine.jar", "mods/core.jar"]);
     assert_eq!(m.optional_mods.len(), 1);
@@ -126,7 +132,7 @@ fn granted_permission_keeps_everything() {
         &["mods/staff.jar", "mods/core.jar"],
     );
 
-    filter_for_viewer(&mut m, &viewer(&[&perm]));
+    filter_for_viewer(&mut m, &viewer(&[&perm]), "");
 
     assert_eq!(paths(&m), vec!["mods/staff.jar", "mods/core.jar"]);
     assert_eq!(m.optional_mods.len(), 1);
@@ -143,7 +149,55 @@ fn file_shared_with_allowed_mod_survives() {
         &["mods/shared.jar", "mods/denied.jar"],
     );
 
-    filter_for_viewer(&mut m, &viewer(&[&perm]));
+    filter_for_viewer(&mut m, &viewer(&[&perm]), "");
 
     assert_eq!(paths(&m), vec!["mods/shared.jar"]);
+}
+
+/// Мод для чужой системы уезжать не должен: его файлы попали бы в
+/// `verified_files`, лаунчер скачал бы их, а сверка удаляла бы как лишние.
+#[test]
+fn mod_for_another_system_loses_files() {
+    let mut windows_only = opt_mod("shaders", false, &["mods/shaders.jar"]);
+    windows_only.os = vec!["windows".into()];
+    let mut m = manifest(vec![windows_only], &["mods/shaders.jar", "mods/core.jar"]);
+
+    filter_for_viewer(&mut m, &viewer(&[]), "macos");
+
+    assert!(m.optional_mods.is_empty());
+    assert_eq!(paths(&m), vec!["mods/core.jar"]);
+}
+
+/// На своей системе тот же мод остаётся целиком.
+#[test]
+fn mod_for_this_system_stays() {
+    let mut windows_only = opt_mod("shaders", false, &["mods/shaders.jar"]);
+    windows_only.os = vec!["windows".into()];
+    let mut m = manifest(vec![windows_only], &["mods/shaders.jar"]);
+
+    filter_for_viewer(&mut m, &viewer(&[]), "windows");
+
+    assert_eq!(m.optional_mods.len(), 1);
+    assert_eq!(paths(&m), vec!["mods/shaders.jar"]);
+}
+
+/// Лаунчеры, выпущенные до передачи платформы, шлют пустую строку. Спрятать от
+/// них моды значило бы сломать работающие сборки.
+#[test]
+fn unknown_system_keeps_everything() {
+    let mut windows_only = opt_mod("shaders", false, &["mods/shaders.jar"]);
+    windows_only.os = vec!["windows".into()];
+    let mut m = manifest(vec![windows_only], &["mods/shaders.jar"]);
+
+    filter_for_viewer(&mut m, &viewer(&[]), "");
+
+    assert_eq!(m.optional_mods.len(), 1);
+}
+
+/// Платформа приходит с архитектурой, а моды различаются только системой.
+#[test]
+fn platform_narrows_down_to_the_system() {
+    assert_eq!(super::os_of("macos-aarch64"), "macos");
+    assert_eq!(super::os_of("windows-x86_64"), "windows");
+    assert_eq!(super::os_of(""), "");
 }

@@ -10,9 +10,12 @@ import dev.noro.agent.core.Moderation;
 import dev.noro.agent.core.ModerationClient;
 import dev.noro.agent.core.ModerationCommands;
 import dev.noro.agent.core.NoroAgentApi;
+import dev.noro.agent.core.PermissionSet;
 import dev.noro.agent.core.ProfileCache;
+import dev.noro.agent.core.ProfileRefresher;
 import dev.noro.agent.core.RoleApplier;
 import dev.noro.agent.core.RuleCatalog;
+import dev.noro.agent.core.TickMeter;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -50,23 +53,55 @@ public final class NoroAgentPlugin extends JavaPlugin {
         moderation = new Moderation(new ModerationClient(http), client, rules, getSLF4JLogger());
         moderation.attach(bridge);
 
+        // Канал поднимаем раньше слушателей: вход и выход игрока уходят наверх
+        // через него, а первый игрок может зайти в ту же секунду.
+        link = new AgentLink(http, moderation, getSLF4JLogger());
+        link.start();
+
+        VanishManager vanishManager = new VanishManager(this);
+
         getServer()
                 .getPluginManager()
                 .registerEvents(
                         new LoginListener(
-                                config, client, roleSync, permissions, profiles, moderation, getSLF4JLogger()),
+                                config,
+                                client,
+                                roleSync,
+                                permissions,
+                                profiles,
+                                moderation,
+                                vanishManager,
+                                link.events(),
+                                getSLF4JLogger()),
                         this);
         getServer().getPluginManager().registerEvents(permissions, this);
         getServer().getPluginManager().registerEvents(new ChatGuard(moderation), this);
+        getServer().getPluginManager().registerEvents(new FreezeListener(profiles), this);
+        getServer().getPluginManager().registerEvents(new VanishListener(vanishManager), this);
         PlaceholderSupport.register(this, profiles, getSLF4JLogger());
-        registerCommands(client, moderation, rules, bridge);
+        registerCommands(client, moderation, rules, bridge, vanishManager);
 
-        heartbeat = new HeartbeatTask(client, new PaperServerStatus(getServer()), config, getSLF4JLogger());
+        // Счётчик тиков: задача с периодом в один тик — единственная точка на
+        // Paper, которая наступает ровно раз за тик на всех версиях.
+        // Роль, выданную на сайте, игрок получает сейчас, а не после
+        // перезахода: кадр profile_changed приводит нас сюда.
+        PaperServerStatus status = new PaperServerStatus(getServer(), new TickMeter(), vanishManager);
+        moderation.attachRefresher(new ProfileRefresher(
+                client,
+                status::players,
+                (uuid, profile) -> {
+                    profiles.remember(uuid, profile);
+                    permissions.remember(uuid, PermissionSet.of(profile.permissions()));
+                    if (roleSync != null) {
+                        roleSync.apply(uuid, profile);
+                    }
+                },
+                getSLF4JLogger()));
+
+        getServer().getScheduler().runTaskTimer(this, status.meter()::onTickEnd, 1L, 1L);
+        heartbeat = new HeartbeatTask(client, status, config, getSLF4JLogger());
+        heartbeat.reportStallsTo(link.events());
         heartbeat.start();
-        // Живой канал: бан из панели должен выкинуть игрока сейчас, а не к его
-        // следующему входу.
-        link = new AgentLink(http, moderation, getSLF4JLogger());
-        link.start();
 
         // Права плагины регистрируют в своих onEnable, а первый тик наступает уже
         // после всех — только там каталог полон. Собираем его в главном потоке,
@@ -83,9 +118,8 @@ public final class NoroAgentPlugin extends JavaPlugin {
     }
 
     private void registerCommands(
-            MasterClient client, Moderation moderation, RuleCatalog rules, PaperBridge bridge) {
-        ModerationCommand handler = new ModerationCommand(
-                new ModerationCommands(client, moderation, getSLF4JLogger()), bridge, rules);
+            MasterClient client, Moderation moderation, RuleCatalog rules, PaperBridge bridge, VanishManager vanishManager) {
+        ModerationCommand handler = new ModerationCommand(client, moderation, rules, bridge, vanishManager, getSLF4JLogger());
         for (String name : ModerationCommand.names()) {
             PluginCommand command = getCommand(name);
             // Команда могла быть занята другим плагином — тогда её просто нет

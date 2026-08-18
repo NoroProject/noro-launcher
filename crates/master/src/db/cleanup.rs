@@ -1,7 +1,4 @@
-//! Фоновая уборка протухших строк авторизации.
-//!
-//! Ни одна из этих таблиц раньше не чистилась: одноразовые коды и сессии
-//! копились с первого дня и никогда не удалялись.
+//! Фоновая уборка протухших строк авторизации и логов.
 
 use sqlx::PgPool;
 use std::time::Duration;
@@ -10,11 +7,6 @@ use std::time::Duration;
 const INTERVAL: Duration = Duration::from_secs(60 * 60);
 
 /// Сколько сессия живёт после истечения access-токена.
-///
-/// Удалять строку сразу по `expires_at` нельзя: `refresh_session` обновляет
-/// сессию, не глядя на срок, — то есть refresh-токен работает и после того, как
-/// access протух. Снести такую строку значит разлогинить игрока, который просто
-/// не заходил неделю. Отсечка нужна большая, она только ограничивает рост.
 const SESSION_GRACE: &str = "90 days";
 
 /// Запустить уборку в фоне.
@@ -40,19 +32,63 @@ async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
     )
     .await?;
 
-    // Истёкшие баны. Без этого временный бан истекает в таблице наказаний, но
-    // игрок остаётся заблокированным до следующей правки его карточки.
+    // Истёкшие баны.
     let unbanned = crate::db::expire_punishments(pool).await?;
     if unbanned > 0 {
         tracing::info!(count = unbanned, "сняты истёкшие баны");
     }
 
-    // Бандлы логов старше 30 дней. Сам архив останется осиротевшим blob'ом и
-    // уйдёт при следующей сборке мусора хранилища.
+    // Бандлы логов старше 30 дней.
     let bundles = delete(pool, "DELETE FROM support_bundles WHERE expires_at < NOW()").await?;
 
-    // Начатые и брошенные диалоги passkey: их никто уже не заберёт.
+    // Срабатывания автомодерации старше 30 дней.
+    let triggers = delete(pool, "DELETE FROM automod_triggers WHERE created_at < NOW() - INTERVAL '30 days'").await?;
+
+    // Начатые и брошенные диалоги passkey.
     let webauthn = delete(pool, "DELETE FROM webauthn_states WHERE expires_at < NOW()").await?;
+
+    // Закрытие потерянных игровых сессий (сервер упал, агент перезапущен)
+    let lost_sessions = sqlx::query(
+        "UPDATE player_sessions ps
+         SET ended_at = COALESCE(gs.last_seen_at, NOW()), end_reason = 'lost'
+         FROM game_servers gs
+         WHERE ps.game_server_id = gs.id
+           AND ps.ended_at IS NULL
+           AND (gs.last_seen_at IS NULL OR gs.last_seen_at < NOW() - INTERVAL '90 seconds')",
+    )
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if lost_sessions > 0 {
+        tracing::info!(count = lost_sessions, "закрыты потерянные игровые сессии (lost)");
+    }
+
+    // Агрегирование сырой телеметрии старше 7 дней в часовые бакеты перед её удалением
+    let _ = sqlx::query(
+        "INSERT INTO server_telemetry_hourly
+            (game_server_id, bucket_hour, tps_min, tps_max, tps_avg, mspt_avg, online_max)
+         SELECT
+            game_server_id,
+            date_trunc('hour', created_at) AS bucket_hour,
+            MIN(tps) AS tps_min,
+            MAX(tps) AS tps_max,
+            AVG(tps) AS tps_avg,
+            AVG(mspt) AS mspt_avg,
+            MAX(online_players) AS online_max
+         FROM server_telemetry
+         WHERE created_at < NOW() - INTERVAL '7 days'
+         GROUP BY game_server_id, date_trunc('hour', created_at)
+         ON CONFLICT (game_server_id, bucket_hour) DO NOTHING",
+    )
+    .execute(pool)
+    .await;
+
+    // Сырая телеметрия старше 7 дней
+    let telemetry = delete(
+        pool,
+        "DELETE FROM server_telemetry WHERE created_at < NOW() - INTERVAL '7 days'",
+    )
+    .await?;
 
     let sessions = delete(
         pool,
@@ -62,14 +98,16 @@ async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
     )
     .await?;
 
-    if codes + launcher_codes + webauthn + bundles + sessions > 0 {
+    if codes + launcher_codes + webauthn + bundles + sessions + telemetry + triggers > 0 {
         tracing::info!(
             oauth_codes = codes,
             launcher_auth_codes = launcher_codes,
             webauthn_states = webauthn,
             support_bundles = bundles,
             oauth_sessions = sessions,
-            "убраны протухшие строки авторизации"
+            server_telemetry = telemetry,
+            automod_triggers = triggers,
+            "убраны протухшие строки авторизации, телеметрии и логов"
         );
     }
     Ok(())

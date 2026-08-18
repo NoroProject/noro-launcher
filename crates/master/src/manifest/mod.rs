@@ -31,6 +31,7 @@ pub async fn build_manifest(
     state: &AppState,
     build: &BuildRow,
     viewer: Option<&UserProfile>,
+    platform: &str,
 ) -> Result<BuildManifest> {
     let base_build = crate::db::get_base_build(
         &state.db,
@@ -142,7 +143,7 @@ pub async fn build_manifest(
 
     // До подписи: подпись должна покрывать ровно тот набор, который уедет.
     if let Some(v) = viewer {
-        access::filter_for_viewer(&mut manifest, v);
+        access::filter_for_viewer(&mut manifest, v, access::os_of(platform));
     }
     state.signer.sign_manifest(&mut manifest);
     Ok(manifest)

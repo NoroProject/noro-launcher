@@ -108,6 +108,7 @@ pub async fn approve_suggestion(
                     dependencies: vec![],
                     conflicts: vec![],
                     triggers: vec![],
+                    os: Vec::new(),
                     icon_url: suggestion.icon_url.clone(),
                     author: None,
                 });
@@ -200,6 +201,7 @@ pub async fn accept_suggestion(
             dependencies: vec![],
             conflicts: vec![],
             triggers: vec![],
+            os: Vec::new(),
             icon_url: resolved.icon_url.clone().or(suggestion.icon_url.clone()),
             author: resolved.author.clone(),
         };

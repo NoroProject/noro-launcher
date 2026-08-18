@@ -1,10 +1,25 @@
-/** Языки сайта. Тот же список, что у лаунчера: каталог один на оба. */
+/** Каталог языков и утилиты форматирования. */
 
 export interface LocaleOption {
   code: string
   label: string
-  /** Короткая подпись для переключателя в шапке. */
   short: string
+}
+
+export const KNOWN_LOCALES: Record<string, { label: string, short: string }> = {
+  ru: { label: 'Русский', short: 'RU' },
+  en: { label: 'English', short: 'ENG' },
+  es: { label: 'Español', short: 'ESP' },
+  de: { label: 'Deutsch', short: 'GER' },
+  fr: { label: 'Français', short: 'FRA' },
+  zh: { label: '中文', short: 'ZH' },
+  ja: { label: '日本語', short: 'JA' },
+  uk: { label: 'Українська', short: 'UKR' },
+  'pt-br': { label: 'Português (Brasil)', short: 'BR' },
+  pt: { label: 'Português', short: 'PT' },
+  it: { label: 'Italiano', short: 'ITA' },
+  pl: { label: 'Polski', short: 'POL' },
+  tr: { label: 'Türkçe', short: 'TUR' },
 }
 
 export const LOCALES: LocaleOption[] = [
@@ -12,15 +27,20 @@ export const LOCALES: LocaleOption[] = [
   { code: 'en', label: 'English', short: 'ENG' },
 ]
 
-/**
- * Язык, на котором написан исходный текст.
- *
- * Для содержимого свода это не «ещё один перевод», а сама запись: её текст
- * лежит в `rules.title`, и с него читают все языки, на которые правило не
- * перевели.
- */
 export const BASE_LOCALE = 'ru'
 
+export function getLocaleOption(code: string): LocaleOption {
+  const known = KNOWN_LOCALES[code.toLowerCase()]
+  if (known) {
+    return { code, ...known }
+  }
+  return {
+    code,
+    label: code.toUpperCase(),
+    short: code.substring(0, 3).toUpperCase(),
+  }
+}
+
 export function localeLabel(code: string) {
-  return LOCALES.find(l => l.code === code)?.label || code
+  return getLocaleOption(code).label
 }

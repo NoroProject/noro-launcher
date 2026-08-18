@@ -263,7 +263,7 @@ pub async fn upload_skin_for_user(
                 .await
                 .map_err(AppError::Other)?;
             let url = state.config.file_url(&stored.sha1);
-            crate::db::set_skin(&state.db, id, Some(&url)).await?;
+            crate::db::set_skin(&state.db, id, Some(&url), false).await?;
             return notify_user(&state, id).await;
         }
     }
@@ -276,7 +276,7 @@ pub async fn delete_skin_for_user(
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_USERS_SKIN)?;
-    crate::db::set_skin(&state.db, id, None).await?;
+    crate::db::set_skin(&state.db, id, None, false).await?;
     notify_user(&state, id).await
 }
 
@@ -307,6 +307,9 @@ pub async fn list_skin_presets_for_user(
 #[derive(Deserialize)]
 pub struct SelectSkinPresetReq {
     pub skin_url: String,
+    /// Тонкая модель (Алекс). По умолчанию классическая.
+    #[serde(default)]
+    pub slim: bool,
 }
 
 pub async fn select_skin_preset_for_user(
@@ -316,7 +319,7 @@ pub async fn select_skin_preset_for_user(
     Json(req): Json<SelectSkinPresetReq>,
 ) -> AppResult<Json<UserProfile>> {
     admin.require(PERM_USERS_SKIN)?;
-    crate::db::set_skin(&state.db, id, Some(&req.skin_url)).await?;
+    crate::db::set_skin(&state.db, id, Some(&req.skin_url), req.slim).await?;
     notify_user(&state, id).await
 }
 
@@ -344,5 +347,8 @@ async fn notify_user(state: &AppState, id: Uuid) -> AppResult<Json<UserProfile>>
             user: profile.clone(),
         },
     );
+    // И в игру. Иначе выданная здесь роль не значила бы там ничего до тех пор,
+    // пока игрок не перезайдёт, — а он не знает, что должен.
+    crate::agent_link::notify::profile_changed(state, Some(profile.uuid));
     Ok(Json(profile))
 }

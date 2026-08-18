@@ -28,7 +28,8 @@ public final class ModMessageEvents {
                     new Class<?>[] { listenerClass },
                     (p, method, args) -> {
                         if (args != null && args.length >= 2 && args[1] instanceof ServerPlayer sender) {
-                            return !runtime.silenced(sender);
+                            String text = args.length > 2 && args[2] != null ? args[2].toString() : "";
+                            return !runtime.checkChatMessage(sender, text);
                         }
                         return true;
                     });

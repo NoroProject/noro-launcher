@@ -104,15 +104,13 @@ public final class TextMarkup {
     /**
      * `#rrggbb`, необязательно с амперсандом впереди.
      *
-     * <p>Цвет — ровно шесть знаков, и седьмой hex-цифрой быть не должен. Иначе
-     * номер дела в шаблоне («Дело: #{id}» → `#1a2b3c4d`) съедался бы как цвет, и
-     * игрок видел бы в бане обрубок вместо номера, по которому подаёт апелляцию.
+     * <p>Ровно шесть знаков и ничего больше. Проверять седьмой символ нельзя:
+     * за цветом обычно сразу идёт текст, и «#f8fafcdalynkaa» — это цвет плюс
+     * ник, а не восьмизначный код. Номер дела разводится не здесь, а в шаблоне:
+     * решётку перед `{id}` там не ставят.
      */
     private static int webColor(String text, int at, MarkupCursor cursor, int extra) {
         if (at + 7 > text.length()) {
-            return 0;
-        }
-        if (at + 7 < text.length() && hexDigit(text.charAt(at + 7))) {
             return 0;
         }
         int rgb = rgb(text.substring(at + 1, at + 7));
@@ -121,10 +119,6 @@ public final class TextMarkup {
         }
         cursor.color(rgb);
         return 7 + extra;
-    }
-
-    private static boolean hexDigit(char ch) {
-        return Character.digit(ch, 16) >= 0;
     }
 
     /** `[текст](ссылка)` — так в шаблон кладут ссылку на свод правил. */

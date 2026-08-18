@@ -10,6 +10,9 @@
   "entrypoints": {
     "server": ["dev.noro.agent.mod.FabricEntry"]
   },
+  "mixins": [
+    "noro-agent.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.15.0",
     "fabric-api": "*",

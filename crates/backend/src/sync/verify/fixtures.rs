@@ -77,6 +77,7 @@ pub fn optional(name: &str, limited: bool, files: &[&str]) -> OptionalMod {
         dependencies: Vec::new(),
         conflicts: Vec::new(),
         triggers: Vec::new(),
+        os: Vec::new(),
         icon_url: None,
         author: None,
     }

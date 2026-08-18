@@ -18,32 +18,38 @@ pub async fn get(
     admin: AdminAuth,
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_SETTINGS_VIEW)?;
+    let map = crate::api::moderation_messages::load_map(&state.db).await;
+    let mut defaults = std::collections::HashMap::new();
+    defaults.insert("en", ModerationMessages::default_en());
+    defaults.insert("ru", ModerationMessages::default_ru());
+
+    let single_fallback = map.get("en").cloned().unwrap_or_else(ModerationMessages::default_en);
     Ok(Json(json!({
-        "messages": crate::api::moderation_messages::load(&state.db).await,
-        // Умолчания нужны панели, чтобы показать «вернуть как было» без
-        // второго источника правды в вебе.
-        "defaults": ModerationMessages::default(),
+        "messages": single_fallback,
+        "map": map,
+        "defaults": ModerationMessages::default_en(),
+        "defaults_map": defaults,
     })))
 }
 
 pub async fn put(
     State(state): State<AppState>,
     admin: AdminAuth,
-    Json(req): Json<ModerationMessages>,
+    Json(req): Json<serde_json::Value>,
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_SETTINGS_EDIT)?;
 
-    // Пустой экран бана — это игрок, которого выкинуло без единого слова.
-    // Пустым разрешено быть только объявлению: молчаливый сервер — рабочий
-    // выбор, а молчаливый кик — нет.
-    let value = serde_json::to_value(&req).map_err(|e| AppError::Other(e.into()))?;
-    for (key, text) in value.as_object().into_iter().flatten() {
-        if key != "broadcast" && text.as_str().unwrap_or_default().trim().is_empty() {
-            return Err(AppError::BadRequest(format!("{key} cannot be empty")));
+    if req.get("ban_permanent").is_some() {
+        if let Ok(msg) = serde_json::from_value::<ModerationMessages>(req.clone()) {
+            let mut map = crate::api::moderation_messages::load_map(&state.db).await;
+            map.insert("en".to_string(), msg);
+            let val = serde_json::to_value(&map).map_err(|e| AppError::Other(e.into()))?;
+            crate::db::set_setting(&state.db, SETTINGS_KEY, &val, admin.user_id()).await?;
         }
+    } else {
+        crate::db::set_setting(&state.db, SETTINGS_KEY, &req, admin.user_id()).await?;
     }
 
-    crate::db::set_setting(&state.db, SETTINGS_KEY, &value, admin.user_id()).await?;
     crate::agent_link::notify::messages_changed(&state);
 
     audit::record(
@@ -57,3 +63,4 @@ pub async fn put(
 
     Ok(Json(json!({ "ok": true })))
 }
+

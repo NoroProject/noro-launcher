@@ -64,16 +64,23 @@ class TextMarkupTest {
         assertEquals("https://noro.example/support", raw.get(raw.size() - 1).url());
     }
 
-    /** Одинокий амперсанд и решётка остаются собой, а не съедаются разбором. */
+    /** Одинокий амперсанд остаётся собой, а не съедается разбором. */
     @Test
     void keepsPlainTextIntact() {
         assertEquals("Tom & Jerry", TextMarkup.parse("Tom & Jerry").get(0).text());
-        // Номер дела длиннее цвета: восемь hex-знаков цветом не считаются.
-        assertEquals("дело #1a2b3c4d", TextMarkup.parse("дело #1a2b3c4d").get(0).text());
-        // А настоящий цвет перед решёткой номера разбирается как цвет.
-        List<TextSpan> mixed = TextMarkup.parse("#64748bДело: #1a2b3c4d");
-        assertEquals(0x64748b, mixed.get(0).color());
-        assertEquals("Дело: #1a2b3c4d", mixed.get(0).text());
+    }
+
+    /**
+     * За цветом сразу идёт текст, и он может начинаться с a–f: «#f8fafcdalynkaa»
+     * — это цвет и ник. Ровно на этом ник слипался с кодом цвета в чате.
+     */
+    @Test
+    void colorEndsAfterSixDigits() {
+        List<TextSpan> spans = TextMarkup.parse("#f8fafcdalynkaa");
+
+        assertEquals(1, spans.size());
+        assertEquals(0xf8fafc, spans.get(0).color());
+        assertEquals("dalynkaa", spans.get(0).text());
     }
 
     @Test

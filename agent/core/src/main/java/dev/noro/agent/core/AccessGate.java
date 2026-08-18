@@ -6,28 +6,37 @@ import org.slf4j.Logger;
 
 /**
  * Решение о входе игрока — один раз для всех трёх платформ.
- *
- * <p>Само право считает мастер и отдаёт готовым флагом {@code allowed}; здесь
- * остаётся то, о чём мастер не знает: что делать при 404 и при обрыве связи.
- * Эти два случая и надо было свести в одно место, иначе Paper, NeoForge и
- * Fabric разъедутся в поведении на ровном месте.
  */
 public final class AccessGate {
 
     private AccessGate() {}
 
-    /**
-     * @param profile профиль, если мастер ответил — чтобы не ходить за ролями
-     *                вторым запросом
-     */
-    public record Decision(boolean allowed, String message, PlayerProfile profile) {
+    /** Почему не пустили. */
+    public enum Reason {
+        /** Бан сети: не пускает никуда. */
+        NETWORK_BAN,
+        /** Бан этой сборки: на остальных серверах доступ есть. */
+        SERVER_BAN,
+        /** Мастер такого игрока не знает — настоящая граница доступа. */
+        NO_ACCOUNT,
+        /** Аккаунт есть, доступа к этой сборке нет. */
+        NO_ACCESS,
+        /** Мастер недоступен, а сервер настроен никого не пускать вслепую. */
+        MASTER_DOWN,
+        /** Сервер на техническом обслуживании. */
+        MAINTENANCE
+    }
+
+    public record Denial(Reason reason, PunishmentInfo punishment, String playerName) {}
+
+    public record Decision(boolean allowed, Denial denial, PlayerProfile profile) {
 
         static Decision allow(PlayerProfile profile) {
             return new Decision(true, null, profile);
         }
 
-        static Decision deny(String message) {
-            return new Decision(false, message, null);
+        static Decision deny(Reason reason, PunishmentInfo punishment, String playerName) {
+            return new Decision(false, new Denial(reason, punishment, playerName), null);
         }
     }
 
@@ -35,17 +44,13 @@ public final class AccessGate {
         try {
             Optional<PlayerProfile> found = client.player(mcUuid);
             if (found.isEmpty()) {
-                // Настоящая граница доступа — «есть аккаунт на мастере».
-                // Ключи и лаунчер её не задают, а вот это — задаёт.
-                return Decision.deny("No account on this network. Sign in through the launcher first.");
+                return Decision.deny(Reason.NO_ACCOUNT, null, null);
             }
             PlayerProfile profile = found.get();
             if (profile.allowed()) {
                 return Decision.allow(profile);
             }
-            return Decision.deny(profile.banned()
-                    ? "You are banned on this network."
-                    : "You do not have access to this server.");
+            return refuse(profile);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return failure(config, log, "interrupted");
@@ -54,13 +59,25 @@ public final class AccessGate {
         }
     }
 
+    private static Decision refuse(PlayerProfile profile) {
+        if ("maintenance".equals(profile.denialReason())) {
+            return Decision.deny(Reason.MAINTENANCE, null, profile.username());
+        }
+        PunishmentInfo ban = profile.activeBan();
+        if (ban != null) {
+            Reason reason =
+                    "server_ban".equals(ban.kind()) ? Reason.SERVER_BAN : Reason.NETWORK_BAN;
+            return Decision.deny(reason, ban, profile.username());
+        }
+        Reason reason = profile.banned() ? Reason.NETWORK_BAN : Reason.NO_ACCESS;
+        return Decision.deny(reason, null, profile.username());
+    }
+
     private static Decision failure(AgentConfig config, Logger log, String reason) {
         if (config.denyOnMasterError()) {
             log.warn("Master unreachable, denying login: {}", reason);
-            return Decision.deny("Authentication service is unavailable. Try again in a minute.");
+            return Decision.deny(Reason.MASTER_DOWN, null, null);
         }
-        // Открытый режим включают осознанно: сервер переживает падение мастера,
-        // но на это время пускает и тех, кого мастер бы не пустил.
         log.warn("Master unreachable, allowing login (deny-on-master-error=false): {}", reason);
         return Decision.allow(null);
     }

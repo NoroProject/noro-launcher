@@ -24,7 +24,44 @@ public final class NoroAgentApi {
     private static final ProfileCache CACHE = new ProfileCache();
     private static final PermissionNodeCatalog NODES = new PermissionNodeCatalog();
 
+    /**
+     * Кто отвечает на вопрос «замучен ли игрок». Ставит агент при старте.
+     *
+     * <p>Отдельной точкой, а не плейсхолдером: чат-моды перехватывают сообщение
+     * сами (на NeoForge иначе и нельзя — StyledChat уводит чат из ванильного
+     * пути), и им нужен готовый текст отказа, а не поле профиля.
+     */
+    private static volatile Mutes mutes;
+
     private NoroAgentApi() {}
+
+    /** Источник текста отказа при муте. Реализует агент. */
+    public interface Mutes {
+        /**
+         * @param actionbar нужен короткий текст для строки над хотбаром
+         * @return текст отказа либо {@code null}, если игрок не замучен
+         */
+        String notice(UUID uuid, boolean actionbar);
+    }
+
+    /** Агент подключает свой источник мутов. Не для чужого кода. */
+    public static void attachMutes(Mutes source) {
+        mutes = source;
+    }
+
+    /**
+     * Замучен ли игрок и что ему показать.
+     *
+     * <p>Чат-мод спрашивает это перед отправкой сообщения: {@code null} —
+     * говорить можно. Текст уже собран по шаблону мастера, с цветами и
+     * подстановками; разбирать его чат-моду не нужно, только показать.
+     *
+     * @param actionbar {@code true} — короткая версия для строки над хотбаром
+     */
+    public static String muteNotice(UUID uuid, boolean actionbar) {
+        Mutes source = mutes;
+        return source == null ? null : source.notice(uuid, actionbar);
+    }
 
     /** Хранилище, которое агент наполняет на входе игрока. Не для чужого кода. */
     public static ProfileCache cache() {

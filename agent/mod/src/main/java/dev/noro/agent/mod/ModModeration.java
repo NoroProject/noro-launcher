@@ -1,6 +1,7 @@
 package dev.noro.agent.mod;
 
 import com.mojang.brigadier.CommandDispatcher;
+import dev.noro.agent.core.AgentEvents;
 import dev.noro.agent.core.AgentLink;
 import dev.noro.agent.core.MasterClient;
 import dev.noro.agent.core.MasterHttp;
@@ -43,6 +44,7 @@ final class ModModeration implements AutoCloseable {
 
     /** Сервер запустился: с этого момента есть кого кикать и кому писать. */
     void start(MinecraftServer server) {
+        ModVanishManager.getInstance().setServer(server);
         bridge = new ModBridge(server);
         moderation.attach(bridge);
         rules.refresh();
@@ -50,9 +52,29 @@ final class ModModeration implements AutoCloseable {
         link.start();
     }
 
+    /**
+     * Как сообщить мастеру о случившемся в игре.
+     *
+     * <p>{@code null} до старта сервера: канала ещё нет, а событий — тем более.
+     */
+    AgentEvents events() {
+        AgentLink current = link;
+        return current == null ? null : current.events();
+    }
+
     /** Дерево команд собирается на каждом лоадере своим событием. */
     void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
         new ModCommands(new ModerationCommands(client, moderation, log), rules).register(dispatcher);
+    }
+
+    /** Подключить перечитывание профилей: применяет их платформа. */
+    void attachRefresher(dev.noro.agent.core.ProfileRefresher refresher) {
+        moderation.attachRefresher(refresher);
+    }
+
+    /** Экран непущенному игроку — по шаблонам админки, а не литералом. */
+    String denialText(dev.noro.agent.core.AccessGate.Denial denial) {
+        return dev.noro.agent.core.DenialScreen.text(denial, moderation.templates(), rules);
     }
 
     /** Вход игрока: мут в силе, непрочитанные предупреждения показаны. */
@@ -77,6 +99,10 @@ final class ModModeration implements AutoCloseable {
         }
         bridge.actionbar(player.getUUID(), notice);
         return true;
+    }
+
+    dev.noro.agent.core.automod.ChatFilters.Result checkChatMessage(UUID uuid, String text) {
+        return moderation.checkChatMessage(uuid, text);
     }
 
     @Override

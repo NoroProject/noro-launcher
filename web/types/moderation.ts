@@ -16,6 +16,9 @@ export interface ModerationMessages {
   broadcast: string
   actor_receipt: string
   reason_by_rule: string
+  no_account: string
+  no_access: string
+  maintenance: string
 }
 
 interface MessageField {

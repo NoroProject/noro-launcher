@@ -3,6 +3,7 @@ package dev.noro.agent.mod;
 
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -23,6 +24,10 @@ public final class FabricEntry implements DedicatedServerModInitializer {
             return;
         }
         ServerLifecycleEvents.SERVER_STARTED.register(runtime::onServerStarted);
+        // Счётчик тиков. Оба события есть с 1.16 и не менялись — на всём нашем
+        // диапазоне это одна и та же пара вызовов.
+        ServerTickEvents.START_SERVER_TICK.register(server -> runtime.meter().onTickStart());
+        ServerTickEvents.END_SERVER_TICK.register(server -> runtime.meter().onTickEnd());
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> runtime.onServerStopping());
         ServerPlayConnectionEvents.JOIN.register(
                 (handler, sender, server) -> runtime.onPlayerJoin(handler.player));

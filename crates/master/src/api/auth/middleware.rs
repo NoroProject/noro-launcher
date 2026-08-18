@@ -49,6 +49,29 @@ impl FromRequestParts<AppState> for AuthUser {
     }
 }
 
+/// Необязательный пользователь (если токен передан и валиден — AuthUser, иначе None).
+pub struct OptionalAuthUser(pub Option<AuthUser>);
+
+impl std::ops::Deref for OptionalAuthUser {
+    type Target = Option<AuthUser>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl FromRequestParts<AppState> for OptionalAuthUser {
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        Ok(OptionalAuthUser(
+            AuthUser::from_request_parts(parts, state).await.ok(),
+        ))
+    }
+}
+
 /// Доступ к админ-API. Любое из:
 ///  - пользователь с правом, покрывающим запрошенное (например `noro.admin.users`);
 ///  - admin-токен с таким правом.

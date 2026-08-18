@@ -7,8 +7,11 @@ import dev.noro.agent.core.MasterClient;
 import dev.noro.agent.core.MasterHttp;
 import dev.noro.agent.core.LuckPermsSupport;
 import dev.noro.agent.core.NoroAgentApi;
+import dev.noro.agent.core.PlayerProfile;
 import dev.noro.agent.core.ProfileCache;
+import dev.noro.agent.core.ProfileRefresher;
 import dev.noro.agent.core.RoleApplier;
+import dev.noro.agent.core.TickMeter;
 import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -38,9 +41,16 @@ public final class AgentRuntime {
     private ModPermissions permissions;
     private ModModeration moderation;
     private ModJoin join;
+    private ModPresence presence;
 
     /** Общий с {@link NoroAgentApi}: чужие моды читают профиль оттуда же. */
     private final ProfileCache profiles = NoroAgentApi.cache();
+
+    /**
+     * Счётчик тиков. Заполняет его точка входа своего лоадера — хук конца тика
+     * у Fabric и NeoForge называется по-разному, а всё остальное одинаково.
+     */
+    private final TickMeter meter = new TickMeter();
 
     /**
      * Сервер запоминаем со старта, а не спрашиваем у игрока: {@code ServerPlayer.getServer()}
@@ -63,7 +73,13 @@ public final class AgentRuntime {
         permissions = new ModPermissions(client, config);
         moderation = new ModModeration(http, client, LOG);
         join = new ModJoin(config, client, profiles, moderation);
+        presence = new ModPresence(moderation);
         return true;
+    }
+
+    /** Счётчик тиков: точка входа подключает к нему хук своего лоадера. */
+    public TickMeter meter() {
+        return meter;
     }
 
     /** Общее хранилище прав: точка входа отдаёт его обработчику своего лоадера. */
@@ -76,8 +92,12 @@ public final class AgentRuntime {
         // LuckPerms грузится тоже модом, поэтому спрашиваем его после старта
         // сервера, а не в инициализации — там порядок не гарантирован.
         roleSync = LuckPermsSupport.tryCreate(LOG);
-        heartbeat = new HeartbeatTask(client, new ModServerStatus(server), config, LOG);
-        heartbeat.start();
+        ModServerStatus status = new ModServerStatus(server, meter);
+        heartbeat = new HeartbeatTask(client, status, config, LOG);
+        // Роль, выданную на сайте, игрок получает сейчас, а не после
+        // перезахода: кадр profile_changed приводит нас сюда.
+        moderation.attachRefresher(new ProfileRefresher(
+                client, status::players, this::reapply, LOG));
         // Тоже после старта и по той же причине: Text Placeholder API — мод,
         // и до этого момента его может не быть в пути классов.
         ModPlaceholders.register(profiles);
@@ -86,8 +106,11 @@ public final class AgentRuntime {
         CompletableFuture.runAsync(permissions::report);
 
         // Модерация оживает только вместе с сервером: раньше кикать и писать в
-        // чат было бы некому.
+        // чат было бы некому. Канал поднимается там же — и только после этого
+        // сигналу жизни есть куда сообщить о зависании.
         moderation.start(server);
+        heartbeat.reportStallsTo(moderation.events());
+        heartbeat.start();
     }
 
     /** Дерево команд собирается на каждом лоадере своим событием. */
@@ -102,6 +125,22 @@ public final class AgentRuntime {
         return moderation != null && moderation.silenced(player);
     }
 
+    public boolean checkChatMessage(ServerPlayer player, String rawText) {
+        if (silenced(player)) {
+            return true;
+        }
+        if (moderation != null) {
+            dev.noro.agent.core.automod.ChatFilters.Result res = moderation.checkChatMessage(player.getUUID(), rawText);
+            if (res.action() == dev.noro.agent.core.automod.ChatFilters.Action.DENY
+                    || res.action() == dev.noro.agent.core.automod.ChatFilters.Action.PUNISH
+                    || res.action() == dev.noro.agent.core.automod.ChatFilters.Action.ESCALATE) {
+                ModText.send(player, ModText.parse("#f87171Message blocked by AutoMod [" + res.filterType() + "]"));
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Права снимаются на фазе логина, до входа в мир.
      *
@@ -114,11 +153,26 @@ public final class AgentRuntime {
         permissions.load(uuid);
     }
 
+    /**
+     * Обновлённый профиль: права в свою карту, группы — в LuckPerms.
+     *
+     * <p>Дерево команд игроку не пересылаем: Brigadier пересчитывает
+     * {@code requires()} на своём такте, а внеплановая рассылка на сотню
+     * игроков разом — заметный пакет каждому из них.
+     */
+    private void reapply(UUID uuid, PlayerProfile profile) {
+        permissions.remember(uuid, profile);
+        if (roleSync != null) {
+            roleSync.apply(uuid, profile);
+        }
+    }
+
     /** Права и профиль живут ровно столько, сколько игрок на сервере. */
     public void onPlayerLeave(UUID uuid) {
         permissions.forget(uuid);
         profiles.forget(uuid);
         moderation.forget(uuid);
+        presence.left(uuid);
     }
 
     public void onServerStopping() {
@@ -135,5 +189,6 @@ public final class AgentRuntime {
             return;
         }
         join.accept(server, player, permissions.takeDecision(player.getUUID()), roleSync);
+        presence.joined(player);
     }
 }

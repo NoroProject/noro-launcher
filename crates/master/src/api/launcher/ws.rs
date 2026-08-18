@@ -38,6 +38,8 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
     });
 
     let mut authed_user: Option<Uuid> = None;
+    // Платформа приходит во входе и нужна манифесту: держим её рядом с сессией.
+    let mut platform = String::new();
 
     while let Some(Ok(msg)) = stream.next().await {
         let text = match msg {
@@ -50,8 +52,15 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
             continue;
         };
 
-        if let Err(e) =
-            super::messages::handle(&state, conn_id, &mut authed_user, client_msg, &tx).await
+        if let Err(e) = super::messages::handle(
+            &state,
+            conn_id,
+            &mut authed_user,
+            &mut platform,
+            client_msg,
+            &tx,
+        )
+        .await
         {
             tracing::warn!(error = %e, "WS message handling failed");
             let _ = tx.send(ServerWsMsg::Notification {

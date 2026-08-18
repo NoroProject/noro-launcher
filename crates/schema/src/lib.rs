@@ -9,6 +9,7 @@ pub mod integrity;
 pub mod launcher;
 pub mod manifest_args;
 pub mod news;
+pub mod optional;
 pub mod path_rules;
 pub mod permissions;
 pub mod redact;

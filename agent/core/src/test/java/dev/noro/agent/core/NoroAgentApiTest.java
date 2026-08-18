@@ -12,29 +12,25 @@ class NoroAgentApiTest {
 
     private static final UUID PLAYER = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-    /** Старшая роль без иконки: префикс должен взяться у следующей. */
     private static final RoleInfo OWNER = new RoleInfo("owner", "Owner", "owner", "#ff0000", null, null, null, 100);
-
     private static final RoleInfo ADMIN = new RoleInfo("admin", "Админ", "admin", "#ff8c82", "★", null, null, 50);
 
     @AfterEach
     void clear() {
-        // Кэш здесь статический, и тесты не должны видеть чужие профили.
         NoroAgentApi.cache().forget(PLAYER);
     }
 
     private static void online() {
         NoroAgentApi.cache()
                 .remember(PLAYER, new PlayerProfile(
-                        PLAYER, "Steve", false, true, false, null, List.of(), List.of(OWNER, ADMIN), null, null,
-                        List.of(), List.of()));
+                        PLAYER, "Steve", false, true, null, false, false, null, null, List.of(), List.of(OWNER, ADMIN),
+                        null, null, List.of(), List.of(), null, null, false));
     }
 
     @Test
     void givesHexColorAndIconSeparately() {
         online();
         RoleInfo role = NoroAgentApi.prefixRole(PLAYER);
-        // Ровно то, что нужно моду с поддержкой hex: цвет и иконка не слиты.
         assertEquals("#ff8c82", role.color());
         assertEquals("★", role.icon());
         assertEquals("Админ", role.displayName());

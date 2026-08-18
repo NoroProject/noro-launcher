@@ -57,8 +57,15 @@ public final class ModerationClient {
      * агент возьмёт встроенные и продолжит работать.
      */
     public MessageTemplates messages() {
+        return messages(null);
+    }
+
+    public MessageTemplates messages(String lang) {
         try {
-            return http.get("/api/agent/messages", MessageTemplates.class)
+            String path = lang == null || lang.isBlank()
+                    ? "/api/agent/messages"
+                    : "/api/agent/messages?lang=" + Uris.segment(lang);
+            return http.get(path, MessageTemplates.class)
                     .map(MessageTemplates::complete)
                     .orElseGet(MessageTemplates::defaults);
         } catch (InterruptedException e) {

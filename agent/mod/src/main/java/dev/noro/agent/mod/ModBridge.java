@@ -73,6 +73,19 @@ final class ModBridge implements GameBridge {
         });
     }
 
+    @Override
+    public void announceToPermission(String permission, String message) {
+        server.execute(() -> {
+            Component component = text(message);
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                dev.noro.agent.core.PlayerProfile profile = dev.noro.agent.core.NoroAgentApi.profile(player.getUUID());
+                if (profile != null && profile.permissions() != null && profile.permissions().contains(permission)) {
+                    send(player, component);
+                }
+            }
+        });
+    }
+
     private void onMain(UUID uuid, java.util.function.Consumer<ServerPlayer> action) {
         server.execute(() -> {
             ServerPlayer player = server.getPlayerList().getPlayer(uuid);

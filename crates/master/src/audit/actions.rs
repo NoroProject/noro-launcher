@@ -36,6 +36,9 @@ actions! {
     // Игра
     GAME_START            = "game.start",                  "Game",  "Build launched";
     GAME_STOP             = "game.stop",                   "Game",  "Game closed";
+    GAME_KICK             = "game.kick",                   "Game",  "Player kicked from game";
+    GAME_TELL             = "game.tell",                   "Game",  "Private message sent";
+    GAME_ANNOUNCE         = "game.announce",               "Game",  "Announcement broadcast";
     INTEGRITY_FINDINGS    = "integrity.findings",          "Game",  "Integrity mismatch";
     INTEGRITY_REVIEW      = "integrity.review",            "Game",  "Flag reviewed";
 
@@ -51,6 +54,10 @@ actions! {
     PUNISHMENT_SERVER_BAN = "punishment.server_ban",       "Users", "Punishment: server access";
     PUNISHMENT_MUTE       = "punishment.mute",             "Users", "Punishment: mute";
     PUNISHMENT_REVOKE     = "punishment.revoke",           "Users", "Punishment lifted";
+    USER_FREEZE           = "user.freeze",                 "Users", "Player frozen";
+    USER_UNFREEZE         = "user.unfreeze",               "Users", "Player unfrozen";
+    REPORT_CREATE         = "report.create",               "Users", "Report filed";
+    REPORT_RESOLVE        = "report.resolve",              "Users", "Report resolved";
 
     // Роли
     ROLE_CREATE           = "role.create",                 "Roles", "Role created";

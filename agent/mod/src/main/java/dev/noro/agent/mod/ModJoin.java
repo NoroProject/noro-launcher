@@ -57,14 +57,17 @@ final class ModJoin {
             // Отказ приходит уже после входа в мир: пред-логин хука без микширования
             // на этих платформах нет. В прокси-топологии проверку надо ставить на
             // прокси, чтобы игрок вообще не доходил до бэкенда.
-            AgentRuntime.LOG.info("Denied {}: {}", name, decision.message());
+            AgentRuntime.LOG.info("Denied {}: {}", name, decision.denial().reason());
             // Единственный разрыв API на всём диапазоне 1.18.2 → 26.x:
             // Component.literal появился в 1.19, до него был TextComponent.
-            player.connection.disconnect(ModText.parse(decision.message()));
+            player.connection.disconnect(ModText.parse(moderation.denialText(decision.denial())));
             return;
         }
         // Пустой профиль отсеивает сам кэш: мастер мог не ответить.
         profiles.remember(uuid, decision.profile());
+        if (decision.profile() != null && decision.profile().vanishOnJoin()) {
+            ModVanishManager.getInstance().setVanish(player, true, decision.profile().locale());
+        }
         moderation.greet(uuid, decision.profile());
         if (roleSync != null && decision.profile() != null) {
             roleSync.apply(uuid, decision.profile());

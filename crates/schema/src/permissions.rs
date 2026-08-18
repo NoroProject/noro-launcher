@@ -86,6 +86,9 @@ nodes! {
     // выдаёт ровно то, что записано в своде.
     PERM_PUNISH_BYPASS        = "noro.mod.punish.bypass",        "Moderation", "Ignore the limits set by the rule";
     PERM_PUNISH_PERMANENT     = "noro.mod.punish.permanent",     "Moderation", "Punish forever";
+    PERM_FREEZE               = "noro.mod.freeze",               "Moderation", "Freeze/unfreeze a player";
+    PERM_REPORTS_VIEW         = "noro.mod.reports.view",         "Moderation", "See player reports";
+    PERM_REPORTS_RESOLVE      = "noro.mod.reports.resolve",      "Moderation", "Resolve player reports";
 
     // --- Свод правил ----------------------------------------------------------
     PERM_RULES_VIEW           = "noro.admin.rules.view",         "Rules", "Open the rulebook editor";
@@ -118,6 +121,11 @@ nodes! {
     PERM_WRAPPER_FILES        = "noro.admin.wrapper.files",      "Machine", "Read and write server files";
     PERM_WRAPPER_POWER        = "noro.admin.wrapper.power",      "Machine", "Start, stop and restart";
     PERM_WRAPPER_BACKUPS      = "noro.admin.wrapper.backups",    "Machine", "Create and restore backups";
+
+    // --- Действия в игре ------------------------------------------------------
+    PERM_GAME_KICK            = "noro.admin.game.kick",          "Game", "Kick player from game";
+    PERM_GAME_TELL            = "noro.admin.game.tell",          "Game", "Send private message in game";
+    PERM_GAME_ANNOUNCE        = "noro.admin.game.announce",      "Game", "Broadcast announcement in game";
 
     // --- Контент --------------------------------------------------------------
     PERM_NEWS_VIEW            = "noro.admin.news.view",          "Content", "See news posts";

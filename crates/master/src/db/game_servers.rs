@@ -28,6 +28,16 @@ pub struct GameServerRow {
     pub created_at: DateTime<Utc>,
     /// `proxy` — точка входа, `server` — бэкенд с агентом.
     pub kind: String,
+    #[serde(default)]
+    pub maintenance: bool,
+    pub maintenance_reason: Option<String>,
+}
+
+pub async fn get_game_server(pool: &PgPool, id: Uuid) -> Result<Option<GameServerRow>> {
+    Ok(sqlx::query_as::<_, GameServerRow>("SELECT * FROM game_servers WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?)
 }
 
 impl GameServerRow {
@@ -109,9 +119,12 @@ pub async fn update_game_server(
     mc_port: i32,
     sort_order: i32,
     kind: &str,
+    maintenance: bool,
+    maintenance_reason: Option<&str>,
 ) -> Result<()> {
     sqlx::query(
-        "UPDATE game_servers SET name=$2, mc_host=$3, mc_port=$4, sort_order=$5, kind=$6
+        "UPDATE game_servers
+         SET name=$2, mc_host=$3, mc_port=$4, sort_order=$5, kind=$6, maintenance=$7, maintenance_reason=$8
          WHERE id=$1",
     )
     .bind(id)
@@ -120,9 +133,28 @@ pub async fn update_game_server(
     .bind(mc_port)
     .bind(sort_order)
     .bind(kind)
+    .bind(maintenance)
+    .bind(maintenance_reason)
     .execute(pool)
     .await?;
     Ok(())
+}
+
+pub async fn set_build_game_servers_maintenance(
+    pool: &PgPool,
+    server_id: Uuid,
+    maintenance: bool,
+    maintenance_reason: Option<&str>,
+) -> Result<u64> {
+    let res = sqlx::query(
+        "UPDATE game_servers SET maintenance = $2, maintenance_reason = $3 WHERE server_id = $1",
+    )
+    .bind(server_id)
+    .bind(maintenance)
+    .bind(maintenance_reason)
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected())
 }
 
 pub async fn rotate_game_server_token(pool: &PgPool, id: Uuid, token_hash: &str) -> Result<()> {

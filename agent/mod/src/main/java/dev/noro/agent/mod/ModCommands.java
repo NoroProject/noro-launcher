@@ -44,6 +44,31 @@ final class ModCommands {
                 commands.revoke(new ModSender(source), "mute", new String[] {name})));
         dispatcher.register(target("history", "noro.mod.punish.view", (source, name) ->
                 commands.history(new ModSender(source), new String[] {name})));
+        dispatcher.register(vanishCommand("vanish"));
+        dispatcher.register(vanishCommand("v"));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> vanishCommand(String name) {
+        return Commands.literal(name)
+                .executes(context -> {
+                    CommandSourceStack source = context.getSource();
+                    if (source.getEntity() instanceof net.minecraft.server.level.ServerPlayer player) {
+                        ModSender sender = new ModSender(source);
+                        if (sender.has(ModVanishManager.PERM_USE)) {
+                            ModVanishManager.getInstance().toggleVanish(player, null);
+                        } else {
+                            ModText.send(player, dev.noro.agent.core.AgentStrings.get(null, "no_perm_view"));
+                        }
+                    }
+                    return 1;
+                })
+                .then(Commands.literal("list")
+                        .executes(context -> {
+                            if (context.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer player) {
+                                ModVanishManager.getInstance().sendVanishList(player);
+                            }
+                            return 1;
+                        }));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> punish(String name, String kind) {

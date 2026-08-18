@@ -74,6 +74,10 @@ pub struct UserProfile {
     pub discord_username: Option<String>,
     pub discord_avatar: Option<String>,
     pub skin_url: Option<String>,
+    /// Тонкая модель (Алекс). `false` — классическая (Стив): именно её клиент
+    /// подразумевает, когда метаданных у текстуры нет, поэтому она и умолчание.
+    #[serde(default)]
+    pub skin_slim: bool,
     pub cape_url: Option<String>,
     pub roles: Vec<Role>,
     /// Прямые права поверх ролей.
@@ -94,6 +98,21 @@ pub struct UserProfile {
     /// Единственный аккаунт, который нельзя забанить и удалить.
     #[serde(default)]
     pub is_root: bool,
+    #[serde(default)]
+    pub hide_from_online: bool,
+    #[serde(default)]
+    pub frozen: bool,
+    #[serde(default)]
+    pub freeze_info: Option<FreezeInfo>,
+    #[serde(default)]
+    pub silent_join: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FreezeInfo {
+    pub reason: String,
+    pub frozen_by: String,
+    pub frozen_at: DateTime<Utc>,
 }
 
 fn yes() -> bool {

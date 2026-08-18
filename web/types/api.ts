@@ -32,12 +32,16 @@ export interface UserProfile {
   discord_username: string;
   discord_avatar?: string | null;
   skin_url?: string | null;
+  /** Тонкая модель (Алекс). `false` — классическая (Стив). */
+  skin_slim?: boolean;
   cape_url?: string | null;
   roles: Role[];
   permissions: string[];
   /** Прямые права с контекстом сборки. */
   permission_grants?: PermissionEntry[];
   banned?: boolean;
+  frozen?: boolean;
+  hide_from_online?: boolean;
 }
 
 export interface UserRow {
@@ -48,8 +52,11 @@ export interface UserRow {
   mc_uuid: string;
   mc_username: string;
   skin_url?: string | null;
+  skin_slim?: boolean;
   cape_url?: string | null;
   banned: boolean;
+  frozen?: boolean;
+  hide_from_online?: boolean;
   ban_reason?: string | null;
   created_at: string;
   last_login_at?: string | null;

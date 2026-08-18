@@ -53,10 +53,14 @@ pub struct SaveReq {
     pub mc_port: i32,
     #[serde(default)]
     pub sort_order: i32,
-    /// `proxy` — точка входа, `server` — бэкенд. Всё, что не `proxy`,
-    /// считается бэкендом: неизвестный тип не должен выключать подсчёт онлайна.
     #[serde(default)]
     pub kind: Option<String>,
+    #[serde(default)]
+    pub maintenance: bool,
+    #[serde(default)]
+    pub maintenance_reason: Option<String>,
+    #[serde(default)]
+    pub countdown_seconds: Option<u32>,
 }
 
 impl SaveReq {
@@ -68,7 +72,6 @@ impl SaveReq {
     }
 }
 
-/// Создать сервер. Секрет возвращается ОДИН раз: в базе только его хеш.
 pub async fn create(
     State(state): State<AppState>,
     admin: AdminAuth,
@@ -97,7 +100,7 @@ pub async fn create(
 pub async fn update(
     State(state): State<AppState>,
     admin: AdminAuth,
-    Path((_server_id, id)): Path<(Uuid, Uuid)>,
+    Path((server_id, id)): Path<(Uuid, Uuid)>,
     Json(req): Json<SaveReq>,
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_SERVERS_AGENTS)?;
@@ -109,14 +112,63 @@ pub async fn update(
         req.mc_port,
         req.sort_order,
         req.kind(),
+        req.maintenance,
+        req.maintenance_reason.as_deref(),
     )
     .await?;
+    if req.maintenance {
+        crate::agent_link::notify::maintenance_start(
+            &state,
+            Some(server_id),
+            Some(id),
+            req.countdown_seconds.unwrap_or(60),
+            req.maintenance_reason.clone(),
+        );
+    } else {
+        crate::agent_link::notify::maintenance_cancel(&state, Some(server_id), Some(id));
+    }
     broadcast(&state);
     Ok(Json(json!({ "ok": true })))
 }
 
-/// Перевыпустить секрет: старый перестаёт работать сразу. Нужно и при утечке,
-/// и когда секрет просто потеряли — показать прежний мастер уже не может.
+#[derive(Deserialize)]
+pub struct BulkMaintenanceReq {
+    pub maintenance: bool,
+    pub maintenance_reason: Option<String>,
+    #[serde(default)]
+    pub countdown_seconds: Option<u32>,
+}
+
+/// PUT /api/admin/servers/{id}/game-servers/maintenance — включение/выключение техработ сразу для всех серверов сборки
+pub async fn bulk_maintenance(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(server_id): Path<Uuid>,
+    Json(req): Json<BulkMaintenanceReq>,
+) -> AppResult<Json<Value>> {
+    admin.require(PERM_SERVERS_AGENTS)?;
+    let count = crate::db::set_build_game_servers_maintenance(
+        &state.db,
+        server_id,
+        req.maintenance,
+        req.maintenance_reason.as_deref(),
+    )
+    .await?;
+    if req.maintenance {
+        crate::agent_link::notify::maintenance_start(
+            &state,
+            Some(server_id),
+            None,
+            req.countdown_seconds.unwrap_or(60),
+            req.maintenance_reason.clone(),
+        );
+    } else {
+        crate::agent_link::notify::maintenance_cancel(&state, Some(server_id), None);
+    }
+    broadcast(&state);
+    Ok(Json(json!({ "ok": true, "updated_servers": count })))
+}
+
 pub async fn rotate_token(
     State(state): State<AppState>,
     admin: AdminAuth,

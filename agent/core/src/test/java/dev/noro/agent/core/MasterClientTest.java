@@ -106,12 +106,51 @@ class MasterClientTest {
     @Test
     void heartbeatSendsSnakeCaseBody() throws Exception {
         try (StubMaster master = StubMaster.start(200, "{\"ok\":true}")) {
-            new MasterClient(master.config()).heartbeat(12, 60, "Paper 1.21.1");
+            new MasterClient(master.config()).heartbeat(status(PLAYER));
 
             assertEquals("/api/agent/heartbeat", master.lastPath);
             assertTrue(master.lastBody.contains("\"max_players\":60"), master.lastBody);
             assertTrue(master.lastBody.contains("\"online\":12"), master.lastBody);
             assertTrue(master.lastBody.contains("\"version\":\"Paper 1.21.1\""), master.lastBody);
         }
+    }
+
+    /**
+     * Состав едет в каждом heartbeat — по нему мастер сверяет онлайн. Проверяем
+     * именно это: без списка в теле потерянный кадр выхода оставил бы игрока
+     * онлайн навсегда.
+     */
+    @Test
+    void heartbeatCarriesTheRoster() throws Exception {
+        try (StubMaster master = StubMaster.start(200, "{\"ok\":true}")) {
+            new MasterClient(master.config()).heartbeat(status(PLAYER));
+
+            assertTrue(master.lastBody.contains("\"players\":[\"" + PLAYER + "\"]"), master.lastBody);
+            assertTrue(master.lastBody.contains("\"vanished\":[]"), master.lastBody);
+        }
+    }
+
+    private static ServerStatus status(UUID... online) {
+        return new ServerStatus() {
+            @Override
+            public int online() {
+                return 12;
+            }
+
+            @Override
+            public int maxPlayers() {
+                return 60;
+            }
+
+            @Override
+            public String version() {
+                return "Paper 1.21.1";
+            }
+
+            @Override
+            public java.util.Collection<UUID> players() {
+                return List.of(online);
+            }
+        };
     }
 }

@@ -52,11 +52,14 @@ pub async fn visible_servers(
 }
 
 /// Собрать и отправить персональный манифест сборки.
+/// `platform` — из `Authenticate`: по ней отсеиваются моды для чужой системы.
+/// Пусто — клиент её не прислал, и отсеивать нечего.
 pub async fn send_manifest(
     state: &AppState,
     user_id: Uuid,
     server_id: Uuid,
     build_id: Option<Uuid>,
+    platform: &str,
     tx: &Tx,
 ) -> anyhow::Result<()> {
     let profile = crate::db::load_profile(&state.db, user_id).await?;
@@ -94,7 +97,8 @@ pub async fn send_manifest(
 
     match chosen {
         Some(build) => {
-            let manifest = crate::manifest::build_manifest(state, &build, Some(&profile)).await?;
+            let manifest =
+                crate::manifest::build_manifest(state, &build, Some(&profile), platform).await?;
             let _ = tx.send(ServerWsMsg::BuildManifest { manifest });
         }
         None => {

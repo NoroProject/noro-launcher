@@ -9,17 +9,14 @@ const { t } = useT()
 const can = (perm: string) => auth.hasPermission(perm)
 await auth.loadMe()
 
-const LOCALES = [
-  { code: 'en', label: 'English' },
-  { code: 'ru', label: 'Русский' }
-]
-
 const active = ref('ru')
 const busy = ref(false)
 const message = ref<string | null>(null)
 const error = ref<string | null>(null)
 const search = ref('')
 const onlyChanged = ref(false)
+const showAddModal = ref(false)
+const newLangCode = ref('')
 
 /** Ключ → встроенный текст. Это эталон: он задаёт, что вообще переводится. */
 const builtin = ref(new Map<string, string>())
@@ -32,6 +29,13 @@ const { data: known, refresh } = await useAsyncData(
   () => auth.request<LocaleInfo[]>('/api/launcher/locales'),
   { default: () => [] as LocaleInfo[] }
 )
+
+const availableLocales = computed(() => {
+  const codes = new Set((known.value || []).map(l => l.locale))
+  codes.add('ru')
+  codes.add('en')
+  return Array.from(codes).map(code => getLocaleOption(code))
+})
 
 const rows = computed(() => {
   const needle = search.value.trim().toLowerCase()
@@ -109,6 +113,14 @@ async function resetAll() {
   }
 }
 
+async function addLanguage() {
+  const code = newLangCode.value.trim().toLowerCase().replace('_', '-')
+  if (!code) return
+  showAddModal.value = false
+  newLangCode.value = ''
+  await load(code)
+}
+
 await load(active.value)
 </script>
 
@@ -118,15 +130,25 @@ await load(active.value)
       <section class="noro-panel p-6">
         <div class="flex flex-wrap items-center gap-2">
           <AtomButton
-            v-for="loc in LOCALES"
+            v-for="loc in availableLocales"
             :key="loc.code"
             :variant="active === loc.code ? 'primary' : 'secondary'"
             size="sm"
-            equal
             @click="load(loc.code)"
           >
-            {{ loc.label }}
+            <span>{{ loc.label }}</span>
           </AtomButton>
+
+          <AtomButton
+            v-if="can('noro.admin.translations.edit')"
+            variant="ghost"
+            size="sm"
+            icon="i-lucide-plus"
+            @click="showAddModal = true"
+          >
+            Добавить язык
+          </AtomButton>
+
           <span class="noro-label ml-auto">
             {{ t('admin-i18n-changed-count', { count: changedCount, total: builtin.size }) }}
           </span>
@@ -217,5 +239,27 @@ await load(active.value)
       <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
       <UAlert v-else-if="message" color="success" variant="subtle" icon="i-lucide-check" :description="message" />
     </div>
+
+    <!-- Модалка добавления языка -->
+    <UModal v-model:open="showAddModal" title="Добавить перевод на новый язык">
+      <template #body>
+        <div class="space-y-4 p-4">
+          <p class="text-xs text-[var(--noro-muted)]">
+            Введите ISO код языка (например, <code class="text-[var(--noro-cream)]">es</code>, <code class="text-[var(--noro-cream)]">de</code>, <code class="text-[var(--noro-cream)]">fr</code>, <code class="text-[var(--noro-cream)]">uk</code>, <code class="text-[var(--noro-cream)]">zh</code>):
+          </p>
+          <input
+            v-model="newLangCode"
+            type="text"
+            class="noro-input w-full text-sm"
+            placeholder="es, de, fr, uk, zh..."
+            @keyup.enter="addLanguage"
+          >
+          <div class="flex justify-end gap-2 pt-2">
+            <AtomButton variant="ghost" @click="showAddModal = false">Отмена</AtomButton>
+            <AtomButton variant="primary" :disabled="!newLangCode.trim()" @click="addLanguage">Добавить</AtomButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </NoroShell>
 </template>

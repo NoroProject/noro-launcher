@@ -9,4 +9,4 @@ pub mod webauthn;
 pub mod yggdrasil;
 
 pub use agent_auth::{generate_agent_secret, hash_agent_secret, AgentAuth};
-pub use middleware::{AdminAuth, AuthUser};
+pub use middleware::{AdminAuth, AuthUser, OptionalAuthUser};

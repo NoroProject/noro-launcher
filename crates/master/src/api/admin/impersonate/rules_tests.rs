@@ -13,6 +13,7 @@ fn user(id: u128, perms: &[&str]) -> UserProfile {
         discord_username: None,
         discord_avatar: None,
         skin_url: None,
+        skin_slim: false,
         cape_url: None,
         roles: Vec::new(),
         permissions: perms.iter().map(|p| p.to_string()).collect(),
@@ -21,6 +22,10 @@ fn user(id: u128, perms: &[&str]) -> UserProfile {
         is_local_account: false,
         can_play: true,
         is_root: false,
+        hide_from_online: false,
+        frozen: false,
+        freeze_info: None,
+        silent_join: false,
     }
 }
 

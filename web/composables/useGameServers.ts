@@ -2,10 +2,6 @@ import type { GameServer, GameServerForm } from "~/types/game-server";
 
 /**
  * Игровые сервера сборки: список, регистрация, секреты.
- *
- * Секрет мастер отдаёт один раз при выдаче — в базе только хеш. Поэтому
- * `secret` держится здесь, а не в строке списка: показать его повторно
- * неоткуда, остаётся только перевыпустить.
  */
 export function useGameServers(serverId: string) {
   const notify = useNotify();
@@ -16,7 +12,6 @@ export function useGameServers(serverId: string) {
   const pending = ref(false);
   const error = ref<string | null>(null);
   const busyId = ref<string | null>(null);
-  /** Секрет, выданный только что: показывается один раз. */
   const secret = ref<{ name: string; value: string } | null>(null);
 
   async function load() {
@@ -46,11 +41,27 @@ export function useGameServers(serverId: string) {
     try {
       await api.request(`${base}/${id}`, { method: "PUT", body: form });
       await load();
-      notify.ok()
+      notify.ok();
     } catch (e) {
-      notify.fail(e)
+      notify.fail(e);
     } finally {
       busyId.value = null;
+    }
+  }
+
+  async function setBulkMaintenance(maintenance: boolean, maintenance_reason?: string, countdown_seconds?: number) {
+    pending.value = true;
+    try {
+      await api.request(`${base}/maintenance`, {
+        method: "PUT",
+        body: { maintenance, maintenance_reason: maintenance_reason || null, countdown_seconds: countdown_seconds ?? 60 },
+      });
+      await load();
+      notify.ok();
+    } catch (e) {
+      notify.fail(e);
+    } finally {
+      pending.value = false;
     }
   }
 
@@ -61,9 +72,9 @@ export function useGameServers(serverId: string) {
         method: "POST",
       });
       secret.value = { name: item.name, value: res.secret };
-      notify.ok()
+      notify.ok();
     } catch (e) {
-      notify.fail(e)
+      notify.fail(e);
     } finally {
       busyId.value = null;
     }
@@ -74,13 +85,13 @@ export function useGameServers(serverId: string) {
     try {
       await api.request(`${base}/${id}`, { method: "DELETE" });
       await load();
-      notify.ok('Deleted')
+      notify.ok('Deleted');
     } catch (e) {
-      notify.fail(e)
+      notify.fail(e);
     } finally {
       busyId.value = null;
     }
   }
 
-  return { items, pending, error, busyId, secret, load, create, update, rotate, remove };
+  return { items, pending, error, busyId, secret, load, create, update, rotate, remove, setBulkMaintenance };
 }

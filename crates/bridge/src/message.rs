@@ -200,6 +200,13 @@ pub enum MessageToBackend {
         bytes: Vec<u8>,
     },
 
+    /// Сменить модель уже загруженного скина: тонкая (Алекс) или классическая
+    /// (Стив). Отдельно от загрузки — картинка при этом не меняется, а
+    /// требовать от игрока исходник ради ширины рук не за что.
+    SetSkinModel {
+        slim: bool,
+    },
+
     RequestCapesList,
     RequestSkinPresetsList,
     SelectCape {
@@ -295,6 +302,10 @@ pub struct OptionalModInfo {
     pub allowed: bool,
     /// Включён ли сейчас.
     pub enabled: bool,
+    /// Моды, с которыми этот несовместим: включить оба нельзя.
+    pub conflicts: Vec<String>,
+    /// Моды, без которых этот не имеет смысла.
+    pub dependencies: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

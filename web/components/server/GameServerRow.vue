@@ -16,6 +16,9 @@ const draft = reactive<GameServerForm>({
     mc_port: props.item.mc_port,
     sort_order: props.item.sort_order,
     kind: props.item.kind,
+    maintenance: props.item.maintenance,
+    maintenance_reason: props.item.maintenance_reason || "",
+    countdown_seconds: 60,
 });
 
 const isProxy = computed(() => props.item.kind === "proxy");
@@ -61,10 +64,15 @@ function save() {
                     <div class="flex items-center gap-2">
                         <span class="truncate text-sm font-bold text-white">{{ item.name }}</span>
                         <UBadge v-if="isProxy" color="info" variant="subtle" size="sm">{{ t('admin-gs-proxy') }}</UBadge>
+                        <UBadge v-if="item.maintenance" color="warning" variant="subtle" size="sm" class="flex items-center gap-1">
+                            <UIcon name="i-lucide-wrench" class="size-3" />
+                            {{ t('admin-gs-maintenance') }}
+                        </UBadge>
                     </div>
                     <div class="truncate text-xs text-[var(--noro-muted)]">
                         {{ item.mc_host || t('admin-gs-no-address') }}:{{ item.mc_port }}
                         <span v-if="item.version"> &middot; {{ item.version }}</span>
+                        <span v-if="item.maintenance && item.maintenance_reason" class="text-amber-400"> &middot; {{ item.maintenance_reason }}</span>
                     </div>
                 </div>
             </div>
@@ -102,16 +110,37 @@ function save() {
             </div>
         </div>
 
-        <form v-else class="grid gap-3 md:grid-cols-[1fr_1fr_110px_130px_auto_auto]" @submit.prevent="save">
-            <input v-model="draft.name" class="noro-input" :placeholder="t('admin-roles-name')">
-            <input v-model="draft.mc_host" class="noro-input" :placeholder="t('admin-gs-host')">
-            <input v-model.number="draft.mc_port" type="number" class="noro-input">
-            <NoroSelect v-model="draft.kind">
-                <option value="server">{{ t('admin-gs-backend') }}</option>
-                <option value="proxy">{{ t('admin-gs-proxy') }}</option>
-            </NoroSelect>
-            <AtomButton type="submit" icon="i-lucide-check" variant="primary">{{ t('web-rules-save') }}</AtomButton>
-            <AtomButton icon="i-lucide-x" variant="ghost" @click="editing = false" />
+        <form v-else class="grid gap-3 p-2" @submit.prevent="save">
+            <div class="grid gap-3 md:grid-cols-[1fr_1fr_110px_130px_auto_auto]">
+                <input v-model="draft.name" class="noro-input" :placeholder="t('admin-roles-name')">
+                <input v-model="draft.mc_host" class="noro-input" :placeholder="t('admin-gs-host')">
+                <input v-model.number="draft.mc_port" type="number" class="noro-input">
+                <NoroSelect v-model="draft.kind">
+                    <option value="server">{{ t('admin-gs-backend') }}</option>
+                    <option value="proxy">{{ t('admin-gs-proxy') }}</option>
+                </NoroSelect>
+                <AtomButton type="submit" icon="i-lucide-check" variant="primary">{{ t('web-rules-save') }}</AtomButton>
+                <AtomButton icon="i-lucide-x" variant="ghost" @click="editing = false" />
+            </div>
+            <div class="flex flex-wrap items-center gap-4 border-t border-white/10 pt-3">
+                <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-amber-400">
+                    <input v-model="draft.maintenance" type="checkbox" class="accent-amber-500">
+                    <UIcon name="i-lucide-wrench" class="size-4" />
+                    <span>{{ t('admin-gs-maintenance') }}</span>
+                </label>
+                <input
+                    v-if="draft.maintenance"
+                    v-model="draft.maintenance_reason"
+                    class="noro-input flex-1 min-w-[200px]"
+                    :placeholder="t('admin-gs-maintenance-reason')"
+                >
+                <NoroSelect v-if="draft.maintenance" v-model.number="draft.countdown_seconds" class="w-[180px]" :title="t('admin-gs-maintenance-countdown')">
+                    <option :value="0">{{ t('admin-gs-maintenance-countdown-imm') }}</option>
+                    <option :value="30">{{ t('admin-gs-maintenance-countdown-30s') }}</option>
+                    <option :value="60">{{ t('admin-gs-maintenance-countdown-60s') }}</option>
+                    <option :value="300">{{ t('admin-gs-maintenance-countdown-300s') }}</option>
+                </NoroSelect>
+            </div>
         </form>
     </div>
 </template>

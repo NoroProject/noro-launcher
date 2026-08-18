@@ -45,6 +45,30 @@
 //$$         runtime.onServerStopping();
 //$$     }
 //$$
+//$$     // Счётчик тиков. Событие разделили на Pre и Post в 1.20.6; до того это
+//$$     // было одно событие с полем phase, и разница между версиями здесь ровно
+//$$     // в этом.
+        //#if MC>=12006
+//$$     @SubscribeEvent
+//$$     public void onTickPre(net.neoforged.neoforge.event.tick.ServerTickEvent.Pre event) {
+//$$         runtime.meter().onTickStart();
+//$$     }
+//$$
+//$$     @SubscribeEvent
+//$$     public void onTickPost(net.neoforged.neoforge.event.tick.ServerTickEvent.Post event) {
+//$$         runtime.meter().onTickEnd();
+//$$     }
+        //#else
+//$$     @SubscribeEvent
+//$$     public void onTick(net.neoforged.neoforge.event.TickEvent.ServerTickEvent event) {
+//$$         if (event.phase == net.neoforged.neoforge.event.TickEvent.Phase.START) {
+//$$             runtime.meter().onTickStart();
+//$$         } else {
+//$$             runtime.meter().onTickEnd();
+//$$         }
+//$$     }
+        //#endif
+//$$
 //$$     /** Оба Gather-события приходят на старте сервера, до входа первого игрока. */
 //$$     @SubscribeEvent
 //$$     public void onGatherHandler(PermissionGatherEvent.Handler event) {

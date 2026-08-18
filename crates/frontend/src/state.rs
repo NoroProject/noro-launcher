@@ -1072,6 +1072,15 @@ impl LauncherUI {
         self.backend.send(MessageToBackend::UploadSkin { bytes });
     }
 
+    /// Сменить модель скина. Картинка остаётся, меняется ширина рук; профиль
+    /// приедет обратно тем же путём, что и после загрузки.
+    pub fn set_skin_model(&mut self, slim: bool, _cx: &mut Context<Self>) {
+        if self.skin_uploading || self.user.as_ref().is_none_or(|u| u.skin_slim == slim) {
+            return;
+        }
+        self.backend.send(MessageToBackend::SetSkinModel { slim });
+    }
+
     pub fn open_news(&mut self, id: Uuid, cx: &mut Context<Self>) {
         self.page = Page::NewsDetail(id);
         self.load_news_image(id, cx);
@@ -1130,8 +1139,23 @@ impl LauncherUI {
             .send(MessageToBackend::KillGame { server_id: id });
     }
 
+    /// Включить или выключить опциональный мод.
+    ///
+    /// Включение проверяется правилами сборки: несовместимый мод и мод без
+    /// своей зависимости не включаются, а игрок получает причину. Молча гасить
+    /// соседа нельзя — выбор между двумя несовместимыми модами его, а не наш.
     pub fn toggle_optional(&mut self, server_id: Uuid, name: &str) {
         if let Some(mods) = self.optional_mods.get_mut(&server_id) {
+            let turning_on = mods
+                .iter()
+                .find(|m| m.name == name)
+                .is_some_and(|m| !m.enabled);
+            if turning_on {
+                if let Some(issue) = Self::blocking_issue(mods, name) {
+                    self.toast = Some(issue);
+                    return;
+                }
+            }
             if let Some(m) = mods.iter_mut().find(|m| m.name == name) {
                 if !m.allowed {
                     return;
@@ -1145,6 +1169,55 @@ impl LauncherUI {
                 .collect();
             self.backend
                 .send(MessageToBackend::SetOptionalMods { server_id, enabled });
+        }
+    }
+
+    /// Что мешает включить мод. `None` — включать можно.
+    ///
+    /// Правила общие с мастером (`schema::optional`): разъедься они, лаунчер
+    /// разрешал бы то, что мастер отвергает.
+    fn blocking_issue(mods: &[OptionalModInfo], name: &str) -> Option<Toast> {
+        let known: Vec<schema::build::OptionalMod> = mods.iter().map(Self::as_rule).collect();
+        let enabled: Vec<String> = mods
+            .iter()
+            .filter(|m| m.enabled)
+            .map(|m| m.name.clone())
+            .collect();
+        let issue = schema::optional::can_enable(&known, &enabled, name).err()?;
+        let mut args = i18n::FluentArgs::new();
+        let key = match &issue {
+            schema::optional::SelectionIssue::Conflict { with, .. } => {
+                args.set("mod", with.clone());
+                "optional-conflicts-with"
+            }
+            schema::optional::SelectionIssue::MissingDependency { needs, .. } => {
+                args.set("mod", needs.clone());
+                "optional-needs-first"
+            }
+        };
+        Some(Toast {
+            text: i18n::t_args(key, &args),
+            level: NotifLevel::Warning,
+        })
+    }
+
+    /// Из того, что знает интерфейс, — в правило сборки. Интерфейсу хватает
+    /// имени и связей: остальные поля правила на решение не влияют.
+    fn as_rule(m: &OptionalModInfo) -> schema::build::OptionalMod {
+        schema::build::OptionalMod {
+            name: m.name.clone(),
+            description: String::new(),
+            category: String::new(),
+            files: Vec::new(),
+            enabled_by_default: false,
+            visible: true,
+            limited: m.limited,
+            dependencies: m.dependencies.clone(),
+            conflicts: m.conflicts.clone(),
+            triggers: Vec::new(),
+            os: Vec::new(),
+            icon_url: None,
+            author: None,
         }
     }
 

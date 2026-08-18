@@ -5,7 +5,6 @@ import java.net.http.HttpClient;
 import java.net.http.WebSocket;
 import java.time.Duration;
 import java.util.UUID;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -14,14 +13,17 @@ import org.slf4j.Logger;
 /**
  * Живой канал с мастером: {@code GET /api/agent/link}.
  *
- * <p>Без него бан из панели догонял бы игрока только к следующему входу — то
- * есть уже после того, как тот дописал в чат. Соединение всегда открывает
- * агент: до игровой машины снаружи дороги может и не быть.
+ * <p>Вниз идут наказания — без канала бан из панели догонял бы игрока только к
+ * следующему входу, то есть уже после того, как тот дописал в чат. Вверх идут
+ * события игры, которых мастеру иначе не увидеть: вход, выход, зависание.
+ * Соединение всегда открывает агент: до игровой машины снаружи дороги может и
+ * не быть.
  *
  * <p>Канал не обязателен для работы сервера. Оборвался — наказания всё равно
  * применятся: на входе их приносит профиль, а команда получает ответ по HTTP.
- * Поэтому здесь только переподключение с ростом паузы и ни одной попытки
- * что-то остановить.
+ * И наоборот: ни одно решение агента не ждёт ответа мастера отсюда. Поэтому
+ * здесь только переподключение с ростом паузы и ни одной попытки что-то
+ * остановить.
  */
 public final class AgentLink implements AutoCloseable {
 
@@ -34,6 +36,23 @@ public final class AgentLink implements AutoCloseable {
         void onRevoked(UUID target, String targetName, String kind, String actorLabel);
 
         void onMessagesChanged();
+
+        default void onFiltersChanged() {}
+
+        default void onRestartNotice(int seconds, String reason) {}
+
+        /** Роли или права изменились. {@code null} — перечитать всех. */
+        void onProfileChanged(UUID uuid);
+
+        default void onKick(UUID target, String message) {}
+
+        default void onTell(UUID target, String message) {}
+
+        default void onAnnounce(String message) {}
+
+        default void onMaintenanceStart(int countdownSeconds, String reason) {}
+
+        default void onMaintenanceCancel() {}
     }
 
     private final AgentConfig config;
@@ -49,6 +68,9 @@ public final class AgentLink implements AutoCloseable {
         return thread;
     });
 
+    private final LinkOutbox outbox;
+    private final AgentEvents events;
+
     private volatile WebSocket socket;
     private volatile boolean closed;
     private volatile int backoffSeconds = 2;
@@ -58,9 +80,17 @@ public final class AgentLink implements AutoCloseable {
         this.http = http;
         this.listener = listener;
         this.log = log;
+        this.outbox = new LinkOutbox(() -> socket, log);
+        this.events = new AgentEvents(outbox, http.gson());
+    }
+
+    /** Как сообщить мастеру о случившемся в игре. */
+    public AgentEvents events() {
+        return events;
     }
 
     public void start() {
+        outbox.start();
         connect();
     }
 
@@ -71,7 +101,7 @@ public final class AgentLink implements AutoCloseable {
         URI uri = URI.create(config.masterUrl().replaceFirst("^http", "ws") + "/api/agent/link");
         client.newWebSocketBuilder()
                 .header("Authorization", "Bearer " + config.secret())
-                .buildAsync(uri, new Frames())
+                .buildAsync(uri, new LinkReader(http.gson(), listener, this::scheduleReconnect, log))
                 .whenComplete((ws, error) -> {
                     if (error != null) {
                         scheduleReconnect(error.getMessage());
@@ -87,6 +117,9 @@ public final class AgentLink implements AutoCloseable {
         if (closed) {
             return;
         }
+        // Мёртвый сокет держать нельзя: очередь исходящих отдаёт в него кадры и
+        // теряла бы их молча, считая связь живой.
+        socket = null;
         int delay = backoffSeconds;
         backoffSeconds = Math.min(backoffSeconds * 2, MAX_BACKOFF_SECONDS);
         log.warn("Live link is down ({}), retrying in {}s", reason, delay);
@@ -96,50 +129,11 @@ public final class AgentLink implements AutoCloseable {
     @Override
     public void close() {
         closed = true;
+        outbox.close();
         timer.shutdownNow();
         WebSocket current = socket;
         if (current != null) {
             current.abort();
-        }
-    }
-
-    /** Разбор кадров. Текст может прийти по частям — WebSocket этого не скрывает. */
-    private final class Frames implements WebSocket.Listener {
-
-        private final StringBuilder buffer = new StringBuilder();
-
-        @Override
-        public CompletionStage<?> onText(WebSocket ws, CharSequence data, boolean last) {
-            buffer.append(data);
-            if (last) {
-                String frame = buffer.toString();
-                buffer.setLength(0);
-                dispatch(frame);
-            }
-            ws.request(1);
-            return null;
-        }
-
-        @Override
-        public CompletionStage<?> onClose(WebSocket ws, int status, String reason) {
-            scheduleReconnect("closed: " + reason);
-            return null;
-        }
-
-        @Override
-        public void onError(WebSocket ws, Throwable error) {
-            scheduleReconnect(error.getMessage());
-        }
-
-        private void dispatch(String frame) {
-            try {
-                LinkFrame parsed = http.gson().fromJson(frame, LinkFrame.class);
-                parsed.deliver(listener);
-            } catch (RuntimeException e) {
-                // Непонятный кадр — не повод рвать канал: мастер мог уехать
-                // вперёд по версии, а остальные кадры мы понимаем.
-                log.warn("Skipping a frame from master: {}", e.getMessage());
-            }
         }
     }
 }

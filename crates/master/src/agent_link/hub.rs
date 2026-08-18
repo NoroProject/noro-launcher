@@ -22,6 +22,9 @@ struct Conn {
     /// Сборка, к которой относится игровой сервер: мут и бан на сборке идут
     /// только её серверам.
     server_id: Uuid,
+    /// Сам игровой сервер: по нему адресуются кадры «этому серверу» и по нему
+    /// же ведётся состав онлайна.
+    game_server_id: Uuid,
     tx: UnboundedSender<String>,
 }
 
@@ -32,14 +35,46 @@ pub struct AgentHub {
 }
 
 impl AgentHub {
-    pub fn register(&self, server_id: Uuid, tx: UnboundedSender<String>) -> ConnId {
+    pub fn register(
+        &self,
+        server_id: Uuid,
+        game_server_id: Uuid,
+        tx: UnboundedSender<String>,
+    ) -> ConnId {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        self.conns.insert(id, Conn { server_id, tx });
+        self.conns.insert(
+            id,
+            Conn {
+                server_id,
+                game_server_id,
+                tx,
+            },
+        );
         id
     }
 
     pub fn unregister(&self, id: ConnId) {
         self.conns.remove(&id);
+    }
+
+    /// Остался ли ещё хоть один живой агент этого игрового сервера. Спрашивают
+    /// при обрыве: чистить состав онлайна можно только когда ушёл последний.
+    pub fn has_game_server(&self, game_server_id: Uuid) -> bool {
+        self.conns
+            .iter()
+            .any(|conn| conn.game_server_id == game_server_id)
+    }
+
+    /// Кадр одному игровому серверу — тому, где сидит адресат.
+    pub fn send_to_game_server(&self, msg: &ToAgent, game_server_id: Uuid) {
+        let Some(frame) = encode(msg) else {
+            return;
+        };
+        for conn in self.conns.iter() {
+            if conn.game_server_id == game_server_id {
+                let _ = conn.tx.send(frame.clone());
+            }
+        }
     }
 
     pub fn connected_count(&self) -> usize {
@@ -53,19 +88,25 @@ impl AgentHub {
 
     /// Разослать агентам одной сборки. `None` — всем.
     pub fn send(&self, msg: &ToAgent, server_id: Option<Uuid>) {
-        let frame = match serde_json::to_string(msg) {
-            Ok(frame) => frame,
-            // Кадр собирается из наших же типов: сюда можно попасть только
-            // ошибкой в коде, и глотать её молча нельзя.
-            Err(e) => {
-                tracing::error!(error = %e, "не удалось собрать кадр для агента");
-                return;
-            }
+        let Some(frame) = encode(msg) else {
+            return;
         };
         for conn in self.conns.iter() {
             if server_id.is_none_or(|id| conn.server_id == id) {
                 let _ = conn.tx.send(frame.clone());
             }
+        }
+    }
+}
+
+fn encode(msg: &ToAgent) -> Option<String> {
+    match serde_json::to_string(msg) {
+        Ok(frame) => Some(frame),
+        // Кадр собирается из наших же типов: сюда можно попасть только ошибкой
+        // в коде, и глотать её молча нельзя.
+        Err(e) => {
+            tracing::error!(error = %e, "не удалось собрать кадр для агента");
+            None
         }
     }
 }

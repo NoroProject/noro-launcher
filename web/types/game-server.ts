@@ -12,10 +12,10 @@ export interface GameServer {
   icon_url?: string | null;
   last_seen_at: string | null;
   created_at: string;
-  /** Агент выходил на связь недавно. */
   live: boolean;
-  /** `proxy` — точка входа, `server` — бэкенд с агентом. */
   kind: GameServerKind;
+  maintenance: boolean;
+  maintenance_reason: string | null;
 }
 
 export type GameServerKind = "proxy" | "server";
@@ -26,4 +26,11 @@ export interface GameServerForm {
   mc_port: number;
   sort_order: number;
   kind: GameServerKind;
+  maintenance?: boolean;
+  maintenance_reason?: string;
+  /**
+   * Обязательное: поле привязано к `v-model.number`, а тот не принимает
+   * `undefined`. Значение по умолчанию задаёт форма, а не тип.
+   */
+  countdown_seconds: number;
 }

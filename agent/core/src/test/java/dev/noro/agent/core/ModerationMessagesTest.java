@@ -71,7 +71,8 @@ class ModerationMessagesTest {
     @Test
     void completesMissingTemplatesWithBuiltIn() {
         MessageTemplates partial = new MessageTemplates(
-                null, "", null, null, null, null, null, null, null, null, "", null, null, null);
+                null, "", null, null, null, null, null, null, null, null, "", null, null, null, null, null,
+                null);
         MessageTemplates complete = partial.complete();
 
         assertEquals(MessageTemplates.defaults().banPermanent(), complete.banPermanent());

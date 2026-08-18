@@ -75,6 +75,11 @@ public final class MasterHttp {
         post(path, body, null);
     }
 
+    public void delete(String path) throws IOException, InterruptedException {
+        HttpResponse<String> response = send(authorized(path).DELETE().build());
+        requireOk(response);
+    }
+
     private HttpResponse<String> send(HttpRequest request) throws IOException, InterruptedException {
         return http.send(request, HttpResponse.BodyHandlers.ofString());
     }

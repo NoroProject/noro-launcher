@@ -566,6 +566,30 @@ impl BackendState {
                 });
             }
 
+            MessageToBackend::SetSkinModel { slim } => {
+                if let Some(token) = &self.access_token {
+                    let master = self.ctx.config.get().master_url.clone();
+                    let http = self.ctx.http.clone();
+                    let t = token.clone();
+                    let internal = self.ctx.internal.clone();
+                    let ctx2 = self.ctx.clone();
+                    tokio::spawn(async move {
+                        match set_skin_model_on_master(&http, &master, &t, slim).await {
+                            Ok(profile) => {
+                                let _ =
+                                    internal.send(InternalEvent::ProfileUpdated { user: profile });
+                            }
+                            Err(e) => {
+                                ctx2.send(MessageToFrontend::AddNotification {
+                                    key: "notif-skin-model-failed".into(),
+                                    args: [("reason".to_string(), e.to_string())].into(),
+                                    level: schema::NotifLevel::Error,
+                                });
+                            }
+                        }
+                    });
+                }
+            }
             MessageToBackend::UploadSkin { bytes } => {
                 if let Some(token) = &self.access_token {
                     let master = self.ctx.config.get().master_url.clone();
@@ -804,6 +828,8 @@ impl BackendState {
                     limited: m.limited,
                     allowed,
                     enabled: is_enabled && allowed,
+                    conflicts: m.conflicts.clone(),
+                    dependencies: m.dependencies.clone(),
                 }
             })
             .collect();
@@ -1258,6 +1284,31 @@ impl BackendState {
 
 /// Multipart upload of skin bytes to master using the launcher access token (Bearer).
 /// Returns the fresh UserProfile from /api/me/skin (same as cabinet).
+/// Смена модели скина. Ответ тот же, что у загрузки: обновлённый профиль.
+async fn set_skin_model_on_master(
+    http: &reqwest::Client,
+    master: &str,
+    token: &str,
+    slim: bool,
+) -> Result<schema::UserProfile, String> {
+    let url = format!("{}/api/me/skin/model", master.trim_end_matches('/'));
+    let res = http
+        .put(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({ "model": if slim { "slim" } else { "classic" } }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        let status = res.status();
+        let txt = res.text().await.unwrap_or_default();
+        return Err(format!("HTTP {} {}", status, txt));
+    }
+    res.json::<schema::UserProfile>()
+        .await
+        .map_err(|e| e.to_string())
+}
+
 async fn upload_skin_to_master(
     http: &reqwest::Client,
     master: &str,
