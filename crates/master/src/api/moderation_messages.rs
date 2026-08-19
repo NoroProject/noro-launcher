@@ -90,7 +90,8 @@ pub async fn load_map(pool: &sqlx::PgPool) -> HashMap<String, ModerationMessages
     // англоязычному игроку, а русскому — нетронутые умолчания.
     if stored.get("ban_permanent").is_some() {
         map.insert("ru".to_string(), merge("ru", stored));
-    } else if let Ok(parsed) = serde_json::from_value::<HashMap<String, serde_json::Value>>(stored) {
+    } else if let Ok(parsed) = serde_json::from_value::<HashMap<String, serde_json::Value>>(stored)
+    {
         for (lang, value) in parsed {
             let merged = merge(&lang, value);
             map.insert(lang, merged);
@@ -141,4 +142,3 @@ pub async fn agent_messages(
         rules_url: format!("{}/rules", state.config.web_url.trim_end_matches('/')),
     })
 }
-

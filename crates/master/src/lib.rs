@@ -281,7 +281,10 @@ fn router(state: AppState) -> Router {
         .route("/api/rules", get(api::rules::list))
         .route("/api/rules/scopes", get(api::rules::scopes))
         .route("/api/rules/servers/{server_id}", get(api::rules::by_server))
-        .route("/api/servers/{server_id}/online", get(server_online::get_online));
+        .route(
+            "/api/servers/{server_id}/online",
+            get(server_online::get_online),
+        );
 
     // Личный кабинет.
     let cabinet_api = Router::new()
@@ -289,10 +292,16 @@ fn router(state: AppState) -> Router {
         .route("/api/me/username", put(cabinet::set_username))
         .route("/api/me/locale", put(cabinet_locale::set_locale))
         .route("/api/me/skin/model", put(cabinet_skin_model::set_model))
-        .route("/api/me/hide-from-online", put(cabinet_online::set_hide_from_online))
+        .route(
+            "/api/me/hide-from-online",
+            put(cabinet_online::set_hide_from_online),
+        )
         .route("/api/me/silent-join", put(cabinet_online::set_silent_join))
         .route("/api/me/punishments", get(cabinet::punishments))
-        .route("/api/me/activity-heatmap", get(cabinet_sessions::activity_heatmap))
+        .route(
+            "/api/me/activity-heatmap",
+            get(cabinet_sessions::activity_heatmap),
+        )
         .route("/api/me/sessions", get(cabinet_sessions::list))
         .route(
             "/api/me/sessions/others",
@@ -394,7 +403,10 @@ fn router(state: AppState) -> Router {
         .route("/api/agent/rules/{code}", get(api::rules::agent_by_code))
         .route("/api/agent/heartbeat", post(agent::heartbeat))
         .route("/api/agent/chat-filters", get(agent::list_chat_filters))
-        .route("/api/agent/automod-triggers", post(agent::record_automod_trigger))
+        .route(
+            "/api/agent/automod-triggers",
+            post(agent::record_automod_trigger),
+        )
         .route("/api/agent/reports", post(agent::agent_create_report))
         .route("/api/agent/artifact", get(agent_artifact::artifact))
         .route("/api/agent/pubkey", get(agent_artifact::pubkey))

@@ -29,7 +29,9 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
             vanished,
         } => {
             state.roster.join(server.id, uuid, vanished);
-            if let Err(e) = crate::db::game_sessions::start_session(&state.db, uuid, server.id).await {
+            if let Err(e) =
+                crate::db::game_sessions::start_session(&state.db, uuid, server.id).await
+            {
                 tracing::warn!(server = %server.name, player = %uuid, error = %e, "не удалось открыть сессию игрока");
             }
             tracing::debug!(
@@ -48,7 +50,8 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
                 server.id,
                 reason.as_deref().unwrap_or("leave"),
             )
-            .await {
+            .await
+            {
                 tracing::warn!(server = %server.name, player = %uuid, error = %e, "не удалось закрыть сессию игрока");
             }
             tracing::debug!(
@@ -69,7 +72,8 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
                 "игровой поток не двигался — перезапускаем зависший сервер через wrapper"
             );
             if stalled_secs >= 60 {
-                if let Err(e) = crate::wrapper::ops::power(state, server.server_id, "restart").await {
+                if let Err(e) = crate::wrapper::ops::power(state, server.server_id, "restart").await
+                {
                     tracing::error!(server = %server.name, error = %e, "не удалось перезапустить зависший сервер");
                 }
             }

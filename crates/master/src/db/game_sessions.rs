@@ -14,11 +14,10 @@ pub struct ActivityDayRow {
 
 /// Открыть сессию при входе игрока на сервер.
 pub async fn start_session(pool: &PgPool, mc_uuid: Uuid, game_server_id: Uuid) -> Result<()> {
-    let user_id: Option<Uuid> =
-        sqlx::query_scalar("SELECT id FROM users WHERE mc_uuid = $1")
-            .bind(mc_uuid)
-            .fetch_optional(pool)
-            .await?;
+    let user_id: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE mc_uuid = $1")
+        .bind(mc_uuid)
+        .fetch_optional(pool)
+        .await?;
     if let Some(user_id) = user_id {
         // Закрываем висячие предыдущие сессии на этом же сервере
         sqlx::query(
@@ -43,12 +42,16 @@ pub async fn start_session(pool: &PgPool, mc_uuid: Uuid, game_server_id: Uuid) -
 }
 
 /// Закрыть сессию при выходе игрока.
-pub async fn end_session(pool: &PgPool, mc_uuid: Uuid, game_server_id: Uuid, reason: &str) -> Result<()> {
-    let user_id: Option<Uuid> =
-        sqlx::query_scalar("SELECT id FROM users WHERE mc_uuid = $1")
-            .bind(mc_uuid)
-            .fetch_optional(pool)
-            .await?;
+pub async fn end_session(
+    pool: &PgPool,
+    mc_uuid: Uuid,
+    game_server_id: Uuid,
+    reason: &str,
+) -> Result<()> {
+    let user_id: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE mc_uuid = $1")
+        .bind(mc_uuid)
+        .fetch_optional(pool)
+        .await?;
     if let Some(user_id) = user_id {
         let rows = sqlx::query(
             "UPDATE player_sessions

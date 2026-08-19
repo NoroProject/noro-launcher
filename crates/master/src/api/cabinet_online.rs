@@ -5,8 +5,8 @@ use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::State;
 use axum::Json;
-use serde::Deserialize;
 use schema::UserProfile;
+use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct HideFromOnlineReq {
@@ -24,7 +24,9 @@ pub async fn set_hide_from_online(
         .bind(user.user_id)
         .execute(&state.db)
         .await?;
-    Ok(Json(crate::db::load_profile(&state.db, user.user_id).await?))
+    Ok(Json(
+        crate::db::load_profile(&state.db, user.user_id).await?,
+    ))
 }
 
 #[derive(Deserialize)]
@@ -39,13 +41,19 @@ pub async fn set_silent_join(
     Json(req): Json<SilentJoinReq>,
 ) -> AppResult<Json<UserProfile>> {
     let profile = crate::db::load_profile(&state.db, user.user_id).await?;
-    if !profile.has_permission("noro.mod.vanish.silent_join") && !profile.has_permission("noro.mod.vanish.use") {
-        return Err(crate::error::AppError::Forbidden("no permission for silent join".into()));
+    if !profile.has_permission("noro.mod.vanish.silent_join")
+        && !profile.has_permission("noro.mod.vanish.use")
+    {
+        return Err(crate::error::AppError::Forbidden(
+            "no permission for silent join".into(),
+        ));
     }
     sqlx::query("UPDATE users SET silent_join = $1 WHERE id = $2")
         .bind(req.silent)
         .bind(user.user_id)
         .execute(&state.db)
         .await?;
-    Ok(Json(crate::db::load_profile(&state.db, user.user_id).await?))
+    Ok(Json(
+        crate::db::load_profile(&state.db, user.user_id).await?,
+    ))
 }

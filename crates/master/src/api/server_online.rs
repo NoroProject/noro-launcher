@@ -41,7 +41,10 @@ pub async fn get_online(
 
     let is_staff = user
         .as_ref()
-        .map(|u| u.profile.has_permission("noro.mod.punish.view") || u.profile.has_permission("noro.admin.users.view"))
+        .map(|u| {
+            u.profile.has_permission("noro.mod.punish.view")
+                || u.profile.has_permission("noro.admin.users.view")
+        })
         .unwrap_or(false);
 
     let rows: Vec<(Uuid, String, Option<String>, bool)> = sqlx::query_as(

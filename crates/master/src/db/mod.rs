@@ -65,27 +65,24 @@ pub async fn connect_and_migrate(database_url: &str) -> Result<PgPool> {
         .await?;
 
     let migrator = sqlx::migrate!("./migrations");
-    if let Err(e) = migrator.run(&pool).await {
-        let err_str = e.to_string();
-        if err_str.contains("was previously applied but has been modified") {
-            tracing::warn!(error = %e, "обнаружена изменённая миграция на диске, обновляем контрольные суммы в _sqlx_migrations...");
-            for m in migrator.migrations.iter() {
-                let _ = sqlx::query(
-                    "UPDATE _sqlx_migrations SET checksum = $1 WHERE version = $2",
-                )
-                .bind(m.checksum.as_ref())
-                .bind(m.version)
-                .execute(&pool)
-                .await;
-            }
-            migrator
-                .run(&pool)
-                .await
-                .context("применение миграций (после автообновления checksum)")?;
-        } else {
-            return Err(e).context("применение миграций");
-        }
-    }
+    // Расхождение контрольной суммы — отказ, а не повод её переписать.
+    //
+    // Раньше здесь стояло автообновление `_sqlx_migrations.checksum` под то,
+    // что лежит на диске. Оно снимало симптом и оставляло болезнь: правку уже
+    // применённой миграции sqlx второй раз не выполняет, поэтому база начинала
+    // расходиться с файлами, продолжая рапортовать «применено».
+    //
+    // Так и вышло с волной 3: `0050` поправили после применения, суммы молча
+    // переписались, а `player_reports` не появилась ни на одной базе — админка
+    // падала на «relation does not exist», и чинить пришлось отдельной
+    // миграцией. Молчаливая расходимость дороже несостоявшегося старта: второе
+    // видно сразу, первое — через неделю и не там, где сломали.
+    migrator.run(&pool).await.context(
+        "применение миграций. Если ругается на изменённую миграцию — файл \
+         правили после того, как он уже применился. Возвращайте его как было и \
+         заводите новую миграцию: sqlx не выполняет применённые повторно, и \
+         правка всё равно не доедет до базы",
+    )?;
 
     tracing::info!("миграции применены");
     Ok(pool)

@@ -13,10 +13,12 @@ pub async fn freeze_player(
     actor_id: Option<Uuid>,
     reason: &str,
 ) -> Result<()> {
-    sqlx::query("UPDATE player_freezes SET released_at = NOW() WHERE user_id = $1 AND released_at IS NULL")
-        .bind(user_id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE player_freezes SET released_at = NOW() WHERE user_id = $1 AND released_at IS NULL",
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await?;
 
     sqlx::query("INSERT INTO player_freezes (user_id, actor_id, reason) VALUES ($1, $2, $3)")
         .bind(user_id)
@@ -30,10 +32,12 @@ pub async fn freeze_player(
 
 /// Разморозить игрока.
 pub async fn unfreeze_player(pool: &PgPool, user_id: Uuid) -> Result<bool> {
-    let res = sqlx::query("UPDATE player_freezes SET released_at = NOW() WHERE user_id = $1 AND released_at IS NULL")
-        .bind(user_id)
-        .execute(pool)
-        .await?;
+    let res = sqlx::query(
+        "UPDATE player_freezes SET released_at = NOW() WHERE user_id = $1 AND released_at IS NULL",
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await?;
     Ok(res.rows_affected() > 0)
 }
 

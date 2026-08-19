@@ -57,7 +57,11 @@ fn choice(
     div()
         .flex_1()
         .child(btn(
-            if slim { "skin-model-slim" } else { "skin-model-classic" },
+            if slim {
+                "skin-model-slim"
+            } else {
+                "skin-model-classic"
+            },
             t(label_key),
             active,
             cx.listener(move |this, _, _, cx| {

@@ -32,7 +32,9 @@ pub async fn list(
     Query(q): Query<ListRestartsQuery>,
 ) -> AppResult<Json<Vec<crate::db::restart_schedules::RestartScheduleRow>>> {
     admin.require("noro.admin.servers.edit")?;
-    Ok(Json(crate::db::restart_schedules::list_restart_schedules(&state.db, q.game_server_id).await?))
+    Ok(Json(
+        crate::db::restart_schedules::list_restart_schedules(&state.db, q.game_server_id).await?,
+    ))
 }
 
 /// POST /api/admin/restarts
@@ -43,7 +45,9 @@ pub async fn create(
 ) -> AppResult<Json<crate::db::restart_schedules::RestartScheduleRow>> {
     admin.require("noro.admin.servers.edit")?;
     if req.cron_expr.is_none() && req.at_times.is_none() && req.interval_minutes.is_none() {
-        return Err(AppError::BadRequest("must specify cron_expr, at_times or interval_minutes".into()));
+        return Err(AppError::BadRequest(
+            "must specify cron_expr, at_times or interval_minutes".into(),
+        ));
     }
     let row = crate::db::restart_schedules::create_restart_schedule(
         &state.db,

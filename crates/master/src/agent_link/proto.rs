@@ -33,7 +33,9 @@ pub struct LivePunishment {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ToAgent {
     /// Наказание выдано или продлено — применить немедленно.
-    Punished { punishment: LivePunishment },
+    Punished {
+        punishment: LivePunishment,
+    },
     /// Наказание снято. `kind` нужен, чтобы агент понял, что именно отпустить:
     /// снятый мут возвращает чат, снятый бан не делает ничего с онлайном.
     Revoked {
@@ -55,13 +57,23 @@ pub enum ToAgent {
     /// `None` — «перечитать всех»: так уходят правки самой роли, которые
     /// касаются каждого её носителя. Агент берёт таких батчем, иначе на сервере
     /// с сотней игроков это была бы сотня запросов подряд.
-    ProfileChanged { uuid: Option<Uuid> },
+    ProfileChanged {
+        uuid: Option<Uuid>,
+    },
     /// Кикнуть игрока с сервера с указанным текстом.
-    Kick { target: Uuid, message: String },
+    Kick {
+        target: Uuid,
+        message: String,
+    },
     /// Написать личное сообщение игроку.
-    Tell { target: Uuid, message: String },
+    Tell {
+        target: Uuid,
+        message: String,
+    },
     /// Объявление на весь сервер.
-    Announce { message: String },
+    Announce {
+        message: String,
+    },
     /// Начались техработы: предупредить и через `countdown_seconds` кикнуть всех (кроме имеющих право bypass).
     MaintenanceStart {
         countdown_seconds: u32,

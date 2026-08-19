@@ -42,7 +42,11 @@ async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
     let bundles = delete(pool, "DELETE FROM support_bundles WHERE expires_at < NOW()").await?;
 
     // Срабатывания автомодерации старше 30 дней.
-    let triggers = delete(pool, "DELETE FROM automod_triggers WHERE created_at < NOW() - INTERVAL '30 days'").await?;
+    let triggers = delete(
+        pool,
+        "DELETE FROM automod_triggers WHERE created_at < NOW() - INTERVAL '30 days'",
+    )
+    .await?;
 
     // Начатые и брошенные диалоги passkey.
     let webauthn = delete(pool, "DELETE FROM webauthn_states WHERE expires_at < NOW()").await?;
@@ -60,7 +64,10 @@ async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
     .await?
     .rows_affected();
     if lost_sessions > 0 {
-        tracing::info!(count = lost_sessions, "закрыты потерянные игровые сессии (lost)");
+        tracing::info!(
+            count = lost_sessions,
+            "закрыты потерянные игровые сессии (lost)"
+        );
     }
 
     // Агрегирование сырой телеметрии старше 7 дней в часовые бакеты перед её удалением

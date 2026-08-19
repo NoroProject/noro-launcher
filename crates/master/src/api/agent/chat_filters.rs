@@ -74,7 +74,7 @@ pub async fn record_trigger(
 
     sqlx::query(
         "INSERT INTO automod_triggers (user_id, game_server_id, filter_type, mode, trigger_text)
-         VALUES ($1, $2, $3, $4, $5)"
+         VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(user_id)
     .bind(agent.game_server.server_id)

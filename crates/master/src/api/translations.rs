@@ -20,8 +20,14 @@ pub struct LocaleInfo {
 /// Какие языки есть на мастере и каковы их хеши.
 pub async fn list(State(state): State<AppState>) -> AppResult<Json<Vec<LocaleInfo>>> {
     let mut map = std::collections::HashMap::new();
-    map.insert("en".to_string(), hex::encode(Sha1::digest(i18n::Locale::En.builtin_ftl().as_bytes())));
-    map.insert("ru".to_string(), hex::encode(Sha1::digest(i18n::Locale::Ru.builtin_ftl().as_bytes())));
+    map.insert(
+        "en".to_string(),
+        hex::encode(Sha1::digest(i18n::Locale::En.builtin_ftl().as_bytes())),
+    );
+    map.insert(
+        "ru".to_string(),
+        hex::encode(Sha1::digest(i18n::Locale::Ru.builtin_ftl().as_bytes())),
+    );
 
     let rows = crate::db::list_translations(&state.db).await?;
     for (locale, sha1) in rows {

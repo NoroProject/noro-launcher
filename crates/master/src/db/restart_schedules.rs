@@ -23,7 +23,10 @@ pub struct RestartScheduleRow {
     pub created_at: DateTime<Utc>,
 }
 
-pub async fn list_restart_schedules(pool: &PgPool, game_server_id: Uuid) -> Result<Vec<RestartScheduleRow>> {
+pub async fn list_restart_schedules(
+    pool: &PgPool,
+    game_server_id: Uuid,
+) -> Result<Vec<RestartScheduleRow>> {
     Ok(sqlx::query_as::<_, RestartScheduleRow>(
         "SELECT id, game_server_id, cron_expr, at_times, interval_minutes, notice_minutes, online_policy, max_defer_minutes, active, last_run_at, next_run_at, created_at FROM restart_schedules WHERE game_server_id = $1 ORDER BY created_at DESC",
     )
@@ -44,7 +47,9 @@ pub async fn create_restart_schedule(
 ) -> Result<RestartScheduleRow> {
     let now = Utc::now();
     let next_run = compute_next_run(cron_expr, at_times.as_deref(), interval_minutes, now)
-        .ok_or_else(|| anyhow::anyhow!("cannot compute next run from provided schedule parameters"))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!("cannot compute next run from provided schedule parameters")
+        })?;
 
     Ok(sqlx::query_as::<_, RestartScheduleRow>(
         "INSERT INTO restart_schedules
@@ -106,7 +111,12 @@ fn parse_at_times(times: &[String], now: DateTime<Utc>) -> Option<DateTime<Utc>>
     for t_str in times {
         if let Ok(t) = NaiveTime::parse_from_str(t_str.trim(), "%H:%M") {
             if t > current_time {
-                if let Some(dt) = now.date_naive().and_time(t).and_local_timezone(Utc).single() {
+                if let Some(dt) = now
+                    .date_naive()
+                    .and_time(t)
+                    .and_local_timezone(Utc)
+                    .single()
+                {
                     candidates.push(dt);
                 }
             } else if let Some(tomorrow) = now.date_naive().succ_opt() {
@@ -130,7 +140,12 @@ fn parse_cron(cron_expr: &str, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
         let hour: u32 = candidate.format("%H").to_string().parse().unwrap_or(0);
         let dom: u32 = candidate.format("%d").to_string().parse().unwrap_or(0);
         let month: u32 = candidate.format("%m").to_string().parse().unwrap_or(0);
-        let dow: u32 = candidate.format("%u").to_string().parse::<u32>().unwrap_or(0) % 7;
+        let dow: u32 = candidate
+            .format("%u")
+            .to_string()
+            .parse::<u32>()
+            .unwrap_or(0)
+            % 7;
 
         if field_matches(parts[0], min)
             && field_matches(parts[1], hour)
@@ -217,7 +232,12 @@ async fn check_and_trigger_restarts(state: &crate::state::AppState) -> Result<()
         }
 
         // Высчитываем следующий запуск
-        let next_run = compute_next_run(s.cron_expr.as_deref(), s.at_times.as_deref(), s.interval_minutes, now);
+        let next_run = compute_next_run(
+            s.cron_expr.as_deref(),
+            s.at_times.as_deref(),
+            s.interval_minutes,
+            now,
+        );
         sqlx::query(
             "UPDATE restart_schedules SET last_run_at = $1, next_run_at = $2 WHERE id = $3",
         )

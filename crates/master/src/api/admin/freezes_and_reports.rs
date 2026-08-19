@@ -6,10 +6,10 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
+use schema::{PERM_FREEZE, PERM_REPORTS_RESOLVE, PERM_REPORTS_VIEW};
 use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
-use schema::{PERM_FREEZE, PERM_REPORTS_RESOLVE, PERM_REPORTS_VIEW};
 
 #[derive(Deserialize)]
 pub struct FreezeReq {
@@ -98,7 +98,9 @@ pub async fn list_reports(
     Query(query): Query<ReportsQuery>,
 ) -> AppResult<Json<Vec<crate::db::reports::ReportRow>>> {
     admin.require(PERM_REPORTS_VIEW)?;
-    Ok(Json(crate::db::list_reports(&state.db, query.open_only).await?))
+    Ok(Json(
+        crate::db::list_reports(&state.db, query.open_only).await?,
+    ))
 }
 
 /// POST /api/admin/reports/{id}/claim
@@ -108,7 +110,10 @@ pub async fn claim_report(
     Path(id): Path<Uuid>,
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_REPORTS_VIEW)?;
-    let actor_id = admin.actor.id().ok_or_else(|| AppError::Unauthorized("actor required".into()))?;
+    let actor_id = admin
+        .actor
+        .id()
+        .ok_or_else(|| AppError::Unauthorized("actor required".into()))?;
     let ok = crate::db::claim_report(&state.db, id, actor_id).await?;
     Ok(Json(json!({ "ok": ok })))
 }
@@ -122,7 +127,14 @@ pub async fn resolve_report(
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_REPORTS_RESOLVE)?;
     let resolver_id = admin.actor.id().unwrap_or(id);
-    let ok = crate::db::resolve_report(&state.db, id, resolver_id, &req.resolution, req.punishment_id).await?;
+    let ok = crate::db::resolve_report(
+        &state.db,
+        id,
+        resolver_id,
+        &req.resolution,
+        req.punishment_id,
+    )
+    .await?;
     if ok {
         audit::record(
             &state,

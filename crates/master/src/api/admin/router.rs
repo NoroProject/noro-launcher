@@ -3,21 +3,34 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, audit, backup, blocklist, build_routes, capes, catalog, chat_filters, cores, freezes_and_reports, game_actions,
-    game_servers, impersonate, integrity, launcher, launcher_clients, log_requests, mod_install,
-    mod_suggestions, moderation_messages, news, notes, optional_upload, permission_nodes, punishments,
-    remote, restarts, roles, rules, servers, settings, stats, storage, tokens, user_launcher, users,
-    versions, wrapper, wrapper_backups, wrapper_fs,
+    agents, audit, backup, blocklist, build_routes, capes, catalog, chat_filters, cores,
+    freezes_and_reports, game_actions, game_servers, impersonate, integrity, launcher,
+    launcher_clients, log_requests, mod_install, mod_suggestions, moderation_messages, news, notes,
+    optional_upload, permission_nodes, punishments, remote, restarts, roles, rules, servers,
+    settings, stats, storage, tokens, user_launcher, users, versions, wrapper, wrapper_backups,
+    wrapper_fs,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/freezes", post(freezes_and_reports::freeze))
-        .route("/api/admin/freezes/{user_id}", delete(freezes_and_reports::unfreeze))
+        .route(
+            "/api/admin/freezes/{user_id}",
+            delete(freezes_and_reports::unfreeze),
+        )
         .route("/api/admin/reports", get(freezes_and_reports::list_reports))
-        .route("/api/admin/reports/{id}/claim", post(freezes_and_reports::claim_report))
-        .route("/api/admin/reports/{id}/resolve", put(freezes_and_reports::resolve_report))
-        .route("/api/admin/restarts", get(restarts::list).post(restarts::create))
+        .route(
+            "/api/admin/reports/{id}/claim",
+            post(freezes_and_reports::claim_report),
+        )
+        .route(
+            "/api/admin/reports/{id}/resolve",
+            put(freezes_and_reports::resolve_report),
+        )
+        .route(
+            "/api/admin/restarts",
+            get(restarts::list).post(restarts::create),
+        )
         .route("/api/admin/restarts/{id}", delete(restarts::delete))
         .route("/api/admin/game/kick", post(game_actions::kick))
         .route("/api/admin/game/tell", post(game_actions::tell))

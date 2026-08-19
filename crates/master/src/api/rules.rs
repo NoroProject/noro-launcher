@@ -155,4 +155,3 @@ pub async fn agent_by_code(
 
     Ok(Json(RuleWithSanctions { rule, sanctions }))
 }
-

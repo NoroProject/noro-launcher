@@ -1,7 +1,6 @@
 //! Профиль игрока для агента: роли, доступ, наказания и текстуры одним
 //! запросом — чтобы не держать игрока в лимбе на входе.
 
-use std::collections::HashSet;
 use super::types::{AgentPlayer, AgentPunishmentSummary, AgentRole};
 use crate::api::auth::AgentAuth;
 use crate::db::models::UserRow;
@@ -9,6 +8,7 @@ use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::Json;
+use std::collections::HashSet;
 use uuid::Uuid;
 
 /// `GET /api/agent/players/{mc_uuid}`
@@ -20,7 +20,9 @@ pub async fn player(
     let row = crate::db::user_by_mc_uuid(&state.db, mc_uuid)
         .await?
         .ok_or_else(|| AppError::NotFound("player not found".into()))?;
-    Ok(Json(build(&state, row, &agent.game_server, HashSet::new()).await?))
+    Ok(Json(
+        build(&state, row, &agent.game_server, HashSet::new()).await?,
+    ))
 }
 
 /// `GET /api/agent/players/by-name/{username}`
@@ -32,7 +34,9 @@ pub async fn player_by_name(
     let row = crate::db::user_by_mc_username(&state.db, &username)
         .await?
         .ok_or_else(|| AppError::NotFound(format!("no player named {username}")))?;
-    Ok(Json(build(&state, row, &agent.game_server, HashSet::new()).await?))
+    Ok(Json(
+        build(&state, row, &agent.game_server, HashSet::new()).await?,
+    ))
 }
 
 const MAX_BATCH: usize = 500;
@@ -80,13 +84,15 @@ async fn build(
     let server_id = game_server.server_id;
     let profile = crate::db::load_profile(&state.db, row.id).await?;
 
-    let active_mute = crate::db::punishments::active_mute_for_user(&state.db, row.id, Some(server_id))
-        .await?
-        .map(AgentPunishmentSummary::from);
+    let active_mute =
+        crate::db::punishments::active_mute_for_user(&state.db, row.id, Some(server_id))
+            .await?
+            .map(AgentPunishmentSummary::from);
 
-    let active_ban = crate::db::punishments::active_ban_for_user(&state.db, row.id, Some(server_id))
-        .await?
-        .map(AgentPunishmentSummary::from);
+    let active_ban =
+        crate::db::punishments::active_ban_for_user(&state.db, row.id, Some(server_id))
+            .await?
+            .map(AgentPunishmentSummary::from);
 
     let pending_warns = crate::db::punishments::pending_warns(&state.db, row.id)
         .await?

@@ -34,10 +34,12 @@ pub struct GameServerRow {
 }
 
 pub async fn get_game_server(pool: &PgPool, id: Uuid) -> Result<Option<GameServerRow>> {
-    Ok(sqlx::query_as::<_, GameServerRow>("SELECT * FROM game_servers WHERE id = $1")
-        .bind(id)
-        .fetch_optional(pool)
-        .await?)
+    Ok(
+        sqlx::query_as::<_, GameServerRow>("SELECT * FROM game_servers WHERE id = $1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?,
+    )
 }
 
 impl GameServerRow {

@@ -23,7 +23,10 @@ pub async fn get(
     defaults.insert("en", ModerationMessages::default_en());
     defaults.insert("ru", ModerationMessages::default_ru());
 
-    let single_fallback = map.get("en").cloned().unwrap_or_else(ModerationMessages::default_en);
+    let single_fallback = map
+        .get("en")
+        .cloned()
+        .unwrap_or_else(ModerationMessages::default_en);
     Ok(Json(json!({
         "messages": single_fallback,
         "map": map,
@@ -63,4 +66,3 @@ pub async fn put(
 
     Ok(Json(json!({ "ok": true })))
 }
-

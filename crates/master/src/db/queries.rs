@@ -1506,10 +1506,12 @@ pub async fn user_by_mc_uuid(pool: &PgPool, mc_uuid: Uuid) -> Result<Option<User
 }
 
 pub async fn users_by_mc_uuids(pool: &PgPool, uuids: &[Uuid]) -> Result<Vec<UserRow>> {
-    Ok(sqlx::query_as::<_, UserRow>("SELECT * FROM users WHERE mc_uuid = ANY($1)")
-        .bind(uuids)
-        .fetch_all(pool)
-        .await?)
+    Ok(
+        sqlx::query_as::<_, UserRow>("SELECT * FROM users WHERE mc_uuid = ANY($1)")
+            .bind(uuids)
+            .fetch_all(pool)
+            .await?,
+    )
 }
 
 /// Пользователь по нику. Регистронезависимо: в игре ник набирают руками, и

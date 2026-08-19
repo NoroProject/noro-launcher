@@ -122,7 +122,10 @@ struct FeedbackRow {
     resolution: String,
 }
 
-pub async fn pop_pending_report_feedbacks(pool: &PgPool, user_id: Uuid) -> Result<Vec<ReportFeedback>> {
+pub async fn pop_pending_report_feedbacks(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<ReportFeedback>> {
     let rows = sqlx::query_as::<_, FeedbackRow>(
         "DELETE FROM pending_report_feedbacks WHERE user_id = $1
          RETURNING target_username, resolution",
