@@ -24,12 +24,13 @@ const siblings = computed(
 );
 
 const wrapper = useWrapper(gameServerId.value);
-const tab = ref<"console" | "files" | "mods" | "backups">("console");
+const tab = ref<"console" | "files" | "mods" | "backups" | "restarts">("console");
 const TABS = [
     { id: "console", label: "Console", icon: "i-lucide-terminal" },
     { id: "files", label: "Files", icon: "i-lucide-folder-tree" },
     { id: "mods", label: "Mods", icon: "i-lucide-package" },
     { id: "backups", label: "Backups", icon: "i-lucide-archive" },
+    { id: "restarts", label: "Restarts", icon: "i-lucide-timer-reset" },
 ] as const;
 </script>
 
@@ -93,6 +94,13 @@ const TABS = [
                     v-else-if="tab === 'backups'"
                     :game-server-id="gameServerId"
                     :enabled="wrapper.connected.value"
+                    class="h-full flex flex-col min-h-0"
+                />
+                <!-- Расписания живут на мастере, поэтому враппер здесь не нужен:
+                     завести их можно и на выключенном сервере. -->
+                <GameserverRestarts
+                    v-else-if="tab === 'restarts'"
+                    :game-server-id="gameServerId"
                     class="h-full flex flex-col min-h-0"
                 />
             </div>
