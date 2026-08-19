@@ -2,6 +2,12 @@
 const props = defineProps<{
     skinUrl?: string | null;
     capeUrl?: string | null;
+    /**
+     * Тонкая модель. Не `auto-detect`: угадывание смотрит на прозрачность
+     * столбца руки и спорит с выбором игрока — тот переключает модель ровно
+     * тогда, когда картинка угадывается неправильно.
+     */
+    slim?: boolean;
 }>();
 
 /** Тот же Стив, которого мастер отдаёт игре, — чтобы вьюер не пустовал. */
@@ -23,7 +29,9 @@ function resize() {
 async function loadTextures() {
     if (!viewer) return;
     try {
-        await viewer.loadSkin(props.skinUrl || defaultSkinUrl, { model: "auto-detect" });
+        await viewer.loadSkin(props.skinUrl || defaultSkinUrl, {
+            model: props.slim ? "slim" : "default",
+        });
         if (props.capeUrl) {
             await viewer.loadCape(props.capeUrl, { backEquipment: "cape" });
         } else {
@@ -55,7 +63,7 @@ onMounted(async () => {
     isReady.value = true;
 });
 
-watch(() => [props.skinUrl, props.capeUrl], () => void loadTextures());
+watch(() => [props.skinUrl, props.capeUrl, props.slim], () => void loadTextures());
 
 onBeforeUnmount(() => {
     observer?.disconnect();

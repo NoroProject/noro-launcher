@@ -12,6 +12,7 @@ pub mod cabinet_sessions;
 pub mod file_serve;
 pub mod health;
 pub mod launcher;
+pub mod moderation_defaults;
 pub mod moderation_messages;
 pub mod public_settings;
 pub mod range;

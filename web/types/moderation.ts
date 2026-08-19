@@ -67,4 +67,7 @@ export const MODERATION_MESSAGE_FIELDS: MessageField[] = [
   { key: 'broadcast', label: 'admin-moderation-broadcast', hint: 'admin-moderation-broadcast-hint', rows: 2 },
   { key: 'actor_receipt', label: 'admin-moderation-receipt', hint: 'admin-moderation-receipt-hint', rows: 2 },
   { key: 'reason_by_rule', label: 'admin-moderation-reason', hint: 'admin-moderation-reason-hint', rows: 1 },
+  { key: 'no_account', label: 'admin-moderation-no-account', hint: 'admin-moderation-no-account-hint', rows: 4 },
+  { key: 'no_access', label: 'admin-moderation-no-access', hint: 'admin-moderation-no-access-hint', rows: 4 },
+  { key: 'maintenance', label: 'admin-moderation-maintenance', hint: 'admin-moderation-maintenance-hint', rows: 4 },
 ]

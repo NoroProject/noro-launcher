@@ -1202,6 +1202,12 @@ admin-moderation-mute-bar-hint = One line, no line breaks: the actionbar cuts of
 admin-moderation-warn-bar = Warning over the hotbar
 admin-moderation-reason = Reason built from a rule
 admin-moderation-reason-hint = Used when the moderator named a rule and wrote nothing. A rule with its own wording wins over this.
+admin-moderation-no-account = No account screen
+admin-moderation-no-account-hint = Shown to someone the master does not know — the real access boundary, reachable without the launcher
+admin-moderation-no-access = No access screen
+admin-moderation-no-access-hint = Shown when the account exists but has no access to this pack
+admin-moderation-maintenance = Maintenance screen
+admin-moderation-maintenance-hint = Shown while the server is under maintenance; holders of noro.server.maintenance.bypass still get in
 admin-moderation-var-rule-title = Title of the rule
 admin-moderation-var-rule-link = Clickable rule code
 

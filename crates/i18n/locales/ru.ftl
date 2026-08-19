@@ -1207,6 +1207,12 @@ admin-moderation-mute-bar-hint = Одна строка без переносов
 admin-moderation-warn-bar = Предупреждение над хотбаром
 admin-moderation-reason = Причина по правилу
 admin-moderation-reason-hint = Берётся, когда модератор назвал правило и ничего не написал. Своя формулировка у пункта важнее этого шаблона.
+admin-moderation-no-account = Экран «нет аккаунта»
+admin-moderation-no-account-hint = Видит тот, кого мастер не знает, — настоящая граница доступа, до сервера можно дойти и мимо лаунчера
+admin-moderation-no-access = Экран «нет доступа»
+admin-moderation-no-access-hint = Видит тот, у кого аккаунт есть, а доступа к этой сборке нет
+admin-moderation-maintenance = Экран техработ
+admin-moderation-maintenance-hint = Видят все, кроме обладателей noro.server.maintenance.bypass
 admin-moderation-var-rule-title = Название правила
 admin-moderation-var-rule-link = Кликабельный код правила
 

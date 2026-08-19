@@ -276,23 +276,27 @@ async function selectCape(capeId: string | null) {
           </UBadge>
         </div>
 
-        <SkinPreview3D :skin-url="currentSkinUrl" :cape-url="currentCapeUrl" />
+        <SkinPreview3D :skin-url="currentSkinUrl" :cape-url="currentCapeUrl" :slim="currentSlim" />
 
-        <div v-if="currentSkinUrl" class="space-y-2 pt-4 border-t border-[var(--noro-border)]">
-          <p class="noro-label">{{ t('skin-model') }}</p>
-          <div class="grid grid-cols-2 gap-2">
-            <AtomButton
+        <!-- Сегмент из двух половин, а не две кнопки: выбранная видна фоном,
+             и длинная подпись не обрезается — половины делят ширину поровну. -->
+        <div v-if="currentSkinUrl" class="pt-3 border-t border-[var(--noro-border)]">
+          <div
+            class="flex gap-1 rounded-[var(--noro-r-sm)] border border-[var(--noro-border)] p-1"
+            :title="t('skin-model-hint')"
+          >
+            <button
               v-for="option in [{ slim: false, label: t('skin-model-classic') }, { slim: true, label: t('skin-model-slim') }]"
               :key="String(option.slim)"
-              :variant="currentSlim === option.slim ? 'secondary' : 'ghost'"
+              type="button"
               :disabled="modelSaving"
-              class="justify-center text-xs"
+              class="flex-1 rounded-[var(--noro-r-xs)] px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide transition disabled:opacity-50"
+              :class="currentSlim === option.slim
+                ? 'bg-[var(--noro-cream)] text-[var(--noro-bg-deep)]'
+                : 'text-[var(--noro-muted)] hover:text-[var(--noro-text)]'"
               @click="setModel(option.slim)"
-            >
-              {{ option.label }}
-            </AtomButton>
+            >{{ option.label }}</button>
           </div>
-          <p class="text-[10px] leading-4 text-[var(--noro-muted)]">{{ t('skin-model-hint') }}</p>
         </div>
 
         <div v-if="currentSkinUrl" class="pt-2 border-t border-[var(--noro-border)]">
