@@ -14,8 +14,43 @@ function headUrl(skinUrl?: string | null) {
 }
 
 const { data: users, refresh, pending, error } = await useAsyncData('admin-users', () =>
-  auth.request<UserProfile[]>('/api/admin/users?limit=200'), { default: () => [] }
+  auth.request<UserProfile[]>('/api/admin/users?limit=500'), { default: () => [] }
 )
+
+const searchQuery = ref('')
+const statusFilter = ref<'all' | 'active' | 'banned'>('all')
+const roleFilter = ref<string>('all')
+
+const allRoleNames = computed(() => {
+  const set = new Set<string>()
+  users.value?.forEach(u => u.roles?.forEach(r => set.add(r.display_name || r.name)))
+  return Array.from(set)
+})
+
+const filteredUsers = computed(() => {
+  let list = users.value || []
+
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase()
+    list = list.filter(u =>
+      u.username.toLowerCase().includes(q) ||
+      u.discord_username.toLowerCase().includes(q) ||
+      u.uuid.toLowerCase().includes(q)
+    )
+  }
+
+  if (statusFilter.value === 'active') {
+    list = list.filter(u => !u.banned)
+  } else if (statusFilter.value === 'banned') {
+    list = list.filter(u => u.banned)
+  }
+
+  if (roleFilter.value !== 'all') {
+    list = list.filter(u => u.roles?.some(r => (r.display_name || r.name) === roleFilter.value))
+  }
+
+  return list
+})
 </script>
 
 <template>
@@ -33,8 +68,39 @@ const { data: users, refresh, pending, error } = await useAsyncData('admin-users
 
     <UAlert v-if="error" class="mb-5" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="humanError(error)" />
 
+    <!-- Filter & Search Toolbar -->
+    <div class="noro-panel p-4 mb-4 grid gap-3 md:grid-cols-[1fr_200px_200px]">
+      <div>
+        <label class="noro-label mb-1.5 block">{{ t('admin-users-search-label') }}</label>
+        <input
+          v-model="searchQuery"
+          class="noro-input w-full"
+          :placeholder="t('admin-users-search-placeholder')"
+        >
+      </div>
+
+      <div>
+        <label class="noro-label mb-1.5 block">{{ t('admin-users-status-label') }}</label>
+        <NoroSelect v-model="statusFilter" class="w-full">
+          <option value="all">{{ t('admin-users-status-all') }}</option>
+          <option value="active">{{ t('admin-users-status-active-only') }}</option>
+          <option value="banned">{{ t('admin-users-status-banned-only') }}</option>
+        </NoroSelect>
+      </div>
+
+      <div>
+        <label class="noro-label mb-1.5 block">{{ t('admin-users-role-label') }}</label>
+        <NoroSelect v-model="roleFilter" class="w-full">
+          <option value="all">{{ t('admin-users-role-all') }}</option>
+          <option v-for="rName in allRoleNames" :key="rName" :value="rName">
+            {{ rName }}
+          </option>
+        </NoroSelect>
+      </div>
+    </div>
+
     <section class="noro-panel overflow-hidden">
-      <table v-if="users?.length" class="noro-table">
+      <table v-if="filteredUsers.length" class="noro-table">
         <thead>
           <tr>
             <th>{{ t('admin-users-player') }}</th>
@@ -45,7 +111,7 @@ const { data: users, refresh, pending, error } = await useAsyncData('admin-users
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in users" :key="user.id">
+          <tr v-for="user in filteredUsers" :key="user.id">
             <td>
               <div class="flex items-center gap-3">
                 <div class="relative size-10 flex-shrink-0">

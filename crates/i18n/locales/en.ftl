@@ -1239,3 +1239,61 @@ cabinet-activity-days = { $count } days
 cabinet-activity-empty-title = No activity data
 cabinet-activity-empty-text = Played hours will appear after your first game sessions.
 
+## In-game actions tab
+admin-users-tab-game-actions = In-Game Actions
+admin-game-actions-title = In-Game Direct Actions
+admin-game-actions-subtitle = Send live commands for @{ $username } to active game server
+admin-game-actions-status-online = Online on { $server }
+admin-game-actions-status-offline = Offline
+admin-game-actions-offline-title = Player is currently offline
+admin-game-actions-offline-text = In-game actions are disabled because @{ $username } is not connected to any live game server.
+admin-game-actions-kick-title = Kick @{ $username }
+admin-game-actions-kick-desc = Immediately disconnect player from the active game server.
+admin-game-actions-kick-reason = Kick Reason
+admin-game-actions-kick-placeholder = Kicked by administrator
+admin-game-actions-kick-btn = Kick Player
+admin-game-actions-tell-title = Direct Message (/tell)
+admin-game-actions-tell-desc = Send a private in-game chat message to @{ $username }.
+admin-game-actions-tell-msg = Message Content
+admin-game-actions-tell-placeholder = Please check discord / support ticket
+admin-game-actions-tell-btn = Send Message
+
+## Server Broadcasts
+admin-gs-announce-title = In-Game Server Broadcast
+admin-gs-announce-target = Target Server
+admin-gs-announce-all = All Servers of Build
+admin-gs-announce-send = Send Broadcast
+admin-gs-announce-placeholder = Type broadcast message for players...
+
+## Mod Suggestions
+admin-mod-suggestions-title = Requested Mods from Players ({ $count })
+admin-mod-suggestions-expand = View Full List Modal
+admin-mod-suggestions-search = Search by title, author, or description...
+admin-mod-suggestions-open-external = Open mod page
+admin-mod-suggestions-accept = Accept
+admin-mod-suggestions-accept-optional = Add as Optional Mod
+admin-mod-suggestions-accept-regular = Add as Regular Mod
+admin-mod-suggestions-accept-servers = Regular + Install on Servers
+admin-mod-suggestions-reject = Reject
+admin-mod-suggestions-empty = No requested mods matching query
+
+
+
+## Quick Search (Spotlight)
+spotlight-quick-search = Quick Search...
+spotlight-placeholder = Type a command, page, user, or server name... (Ctrl+K)
+spotlight-no-results = No matching results found for "{ $query }"
+spotlight-nav-instructions = Navigate with ↑ ↓
+spotlight-open-instructions = Open with Cmd+K / Ctrl+K
+
+## Search & Filters for User List
+admin-users-search-label = Search User / UUID / Discord
+admin-users-search-placeholder = Filter by username, discord, or UUID...
+admin-users-status-label = Status
+admin-users-status-all = All Statuses
+admin-users-status-active-only = Active Only
+admin-users-status-banned-only = Banned Only
+admin-users-role-label = Role
+admin-users-role-all = All Roles
+
+

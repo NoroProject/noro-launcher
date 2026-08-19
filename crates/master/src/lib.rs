@@ -292,6 +292,7 @@ fn router(state: AppState) -> Router {
         .route("/api/me/hide-from-online", put(cabinet_online::set_hide_from_online))
         .route("/api/me/silent-join", put(cabinet_online::set_silent_join))
         .route("/api/me/punishments", get(cabinet::punishments))
+        .route("/api/me/activity-heatmap", get(cabinet_sessions::activity_heatmap))
         .route("/api/me/sessions", get(cabinet_sessions::list))
         .route(
             "/api/me/sessions/others",

@@ -32,6 +32,7 @@ const adminNavGroups = computed(() => [
             { label: t("nav-admin-news"), to: "/admin/news", icon: "i-lucide-newspaper", perms: ["noro.admin.news.view"] },
             { label: t("nav-admin-rules"), to: "/admin/rules", icon: "i-lucide-book-open", perms: ["noro.admin.rules.view"] },
             { label: t("nav-admin-reports"), to: "/admin/reports", icon: "i-lucide-flag", perms: ["noro.admin.reports.view"] },
+            { label: "AutoMod Filters", to: "/admin/automod", icon: "i-lucide-shield-alert", perms: ["noro.admin.settings.view"] },
             { label: t("nav-admin-moderation"), to: "/admin/moderation", icon: "i-lucide-message-square-warning", perms: ["noro.admin.settings.view"] },
             { label: t("nav-admin-translations"), to: "/admin/translations", icon: "i-lucide-languages", perms: ["noro.admin.translations.view"] },
             { label: t("nav-admin-wrapper"), to: "/admin/wrapper", icon: "i-lucide-package", perms: ["noro.admin.wrapper.view"] },
@@ -90,6 +91,7 @@ function linkClass(path: string) {
         ? "noro-nav-link-active"
         : "noro-nav-link-idle";
 }
+const openSpotlight = useState('noro-spotlight-open', () => false);
 </script>
 
 <template>
@@ -105,6 +107,18 @@ function linkClass(path: string) {
                 </div>
             </NuxtLink>
             <LocaleSwitch class="shrink-0" />
+        </div>
+
+        <div v-if="inAdminArea" class="px-3 pt-3">
+            <button
+                type="button"
+                class="flex w-full items-center gap-2.5 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] px-3 py-2 text-xs text-[var(--noro-muted)] transition hover:border-[var(--noro-cream)] hover:text-[var(--noro-text)]"
+                @click="openSpotlight = true"
+            >
+                <UIcon name="i-lucide-search" class="size-4 shrink-0 text-[var(--noro-blue)]" />
+                <span class="truncate">{{ t('spotlight-quick-search') }}</span>
+                <kbd class="ml-auto rounded border border-[var(--noro-border)] px-1.5 py-0.5 text-[10px] font-mono">⌘K</kbd>
+            </button>
         </div>
 
         <nav ref="navEl" class="noro-scroll flex-1 overflow-y-auto px-3 py-4" @scroll.passive="rememberScroll">
@@ -160,6 +174,7 @@ function linkClass(path: string) {
                 />
             </div>
         </div>
+        <SpotlightModal />
     </aside>
 </template>
 

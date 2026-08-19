@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UserGameActionsPanel from '~/components/admin/UserGameActionsPanel.vue'
 import type { Role, ServerRow, UserProfile } from '~/types/api'
 import type { CapeRow } from '~/types/cape'
 import type { PermissionEntry } from '~/types/permissions'
@@ -39,13 +40,14 @@ const { data: skinPresets, refresh: refreshSkinPresets } = await useAsyncData(`a
 const showImpersonate = ref(false)
 const showRequestLogs = ref(false)
 const launcherOnline = ref(false)
-type Tab = 'profile' | 'skin_capes' | 'support' | 'moderation'
+type Tab = 'profile' | 'skin_capes' | 'support' | 'moderation' | 'game_actions'
 
 const tabs = computed<{ id: Tab, label: string, icon: string, perms: string[] }[]>(() => [
   { id: 'profile', label: t('admin-users-tab-profile'), icon: 'i-lucide-user', perms: ['noro.admin.users.view'] },
   { id: 'skin_capes', label: t('admin-users-tab-skins'), icon: 'i-lucide-sparkles', perms: ['noro.admin.users.skin', 'noro.admin.users.capes'] },
   { id: 'support', label: t('admin-users-tab-support'), icon: 'i-lucide-life-buoy', perms: ['noro.admin.support.logs', 'noro.admin.users.launcher'] },
   { id: 'moderation', label: t('admin-users-tab-mod'), icon: 'i-lucide-gavel', perms: ['noro.mod.punish.view', 'noro.admin.users.notes.view'] },
+  { id: 'game_actions', label: t('admin-users-tab-game-actions') !== 'admin-users-tab-game-actions' ? t('admin-users-tab-game-actions') : 'Игровые действия', icon: 'i-lucide-gamepad-2', perms: ['noro.admin.users.view'] },
 ])
 const visibleTabs = computed(() => tabs.value.filter(tab => auth.hasAny(...tab.perms)))
 const activeTab = ref<Tab>('profile')
@@ -456,6 +458,10 @@ function onSkinFilePicked(e: Event) {
       <div v-if="activeTab === 'support'" class="grid gap-5 xl:grid-cols-2">
         <SupportBundlesPanel v-if="can('noro.admin.support.logs')" :user-id="id" @request-logs="showRequestLogs = true" />
         <DiagnosticsCard :user-id="id" :online="launcherOnline" />
+      </div>
+
+      <div v-if="activeTab === 'game_actions'" class="space-y-5">
+        <UserGameActionsPanel v-if="user" :username="user.username" :user-id="id" :target-uuid="user.uuid" />
       </div>
 
       <div v-if="activeTab === 'moderation'" class="space-y-5">

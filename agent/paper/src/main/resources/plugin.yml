@@ -43,6 +43,16 @@ commands:
   report:
     description: Report a player for a violation.
     usage: /report <player> <reason>
+  check:
+    description: View player moderation card.
+    usage: /check <player>
+  rules:
+    description: View rules catalog.
+    usage: /rules [code]
+    aliases: [rule]
+  rule:
+    description: View rules catalog.
+    usage: /rule [code]
   vanish:
     description: Toggle vanish mode.
     usage: /vanish

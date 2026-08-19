@@ -4,36 +4,46 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import dev.noro.agent.core.GameBridge;
+import dev.noro.agent.core.CheckCommand;
+import dev.noro.agent.core.FreezeCommand;
+import dev.noro.agent.core.MasterClient;
+import dev.noro.agent.core.Moderation;
 import dev.noro.agent.core.ModerationCommands;
+import dev.noro.agent.core.ReportCommand;
 import dev.noro.agent.core.RuleCatalog;
+import dev.noro.agent.core.RuleCommands;
 import java.util.function.BiConsumer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
+import org.slf4j.Logger;
 
 /**
  * Команды модерации в Brigadier. Разбор и логика — в core, здесь только дерево
  * команд и подсказки.
- *
- * <p>Аргументы после ника берутся одной жадной строкой, а не отдельными узлами:
- * срок и код правила необязательны, и в Brigadier это дало бы восемь веток на
- * команду вместо одного разбора, общего с Paper.
  */
 final class ModCommands {
 
     private final ModerationCommands commands;
+    private final FreezeCommand freezeCmd;
+    private final ReportCommand reportCmd;
+    private final CheckCommand checkCmd;
+    private final RuleCommands ruleCmds;
     private final RuleCatalog rules;
     private final ModSuggestions suggestions;
 
-    ModCommands(ModerationCommands commands, RuleCatalog rules) {
-        this.commands = commands;
+    ModCommands(MasterClient master, Moderation moderation, RuleCatalog rules, Logger log) {
+        this.commands = new ModerationCommands(master, moderation, log);
+        this.freezeCmd = new FreezeCommand(master, moderation, log);
+        this.reportCmd = new ReportCommand(master, log);
+        this.checkCmd = new CheckCommand(master, log);
+        this.ruleCmds = new RuleCommands(rules);
         this.rules = rules;
         this.suggestions = new ModSuggestions(commands, rules);
     }
 
     void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        AgentRuntime.LOG.info("Registering moderation commands in Brigadier: ban, serverban, mute, warn, unban, unmute, history");
+        AgentRuntime.LOG.info("Registering moderation commands in Brigadier: ban, serverban, mute, warn, unban, unmute, history, freeze, unfreeze, report, check, rules, rule, vanish");
         dispatcher.register(punish("ban", "ban"));
         dispatcher.register(punish("serverban", "server_ban"));
         dispatcher.register(punish("mute", "mute"));
@@ -44,6 +54,71 @@ final class ModCommands {
                 commands.revoke(new ModSender(source), "mute", new String[] {name})));
         dispatcher.register(target("history", "noro.mod.punish.view", (source, name) ->
                 commands.history(new ModSender(source), new String[] {name})));
+        dispatcher.register(target("check", "noro.mod.punish.view", (source, name) ->
+                checkCmd.check(new ModSender(source), new String[] {name}, null)));
+
+        // freeze
+        dispatcher.register(Commands.literal("freeze")
+                .requires(source -> allowed(source, "noro.mod.freeze"))
+                .then(Commands.argument("player", StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(onlineNames(context.getSource()), builder))
+                        .executes(context -> {
+                            freezeCmd.freeze(new ModSender(context.getSource()), new String[] { StringArgumentType.getString(context, "player") }, null);
+                            return 1;
+                        })
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .executes(context -> {
+                                    String player = StringArgumentType.getString(context, "player");
+                                    String reason = StringArgumentType.getString(context, "reason");
+                                    freezeCmd.freeze(new ModSender(context.getSource()), new String[] { player, reason }, null);
+                                    return 1;
+                                }))));
+
+        // unfreeze
+        dispatcher.register(target("unfreeze", "noro.mod.freeze", (source, name) ->
+                freezeCmd.unfreeze(new ModSender(source), new String[] {name}, null)));
+
+        // report
+        dispatcher.register(Commands.literal("report")
+                .then(Commands.argument("player", StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(onlineNames(context.getSource()), builder))
+                        .then(Commands.argument("reason", StringArgumentType.greedyString())
+                                .executes(context -> {
+                                    String player = StringArgumentType.getString(context, "player");
+                                    String reason = StringArgumentType.getString(context, "reason");
+                                    reportCmd.execute(new ModSender(context.getSource()), new String[] { player, reason }, null);
+                                    return 1;
+                                }))));
+
+        // rules / rule
+        LiteralArgumentBuilder<CommandSourceStack> rulesNode = Commands.literal("rules")
+                .executes(context -> {
+                    ruleCmds.rules(new ModSender(context.getSource()), new String[0], null);
+                    return 1;
+                })
+                .then(Commands.argument("code", StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(rules.matching(""), builder))
+                        .executes(context -> {
+                            String code = StringArgumentType.getString(context, "code");
+                            ruleCmds.rules(new ModSender(context.getSource()), new String[] { code }, null);
+                            return 1;
+                        }));
+        dispatcher.register(rulesNode);
+
+        LiteralArgumentBuilder<CommandSourceStack> ruleNode = Commands.literal("rule")
+                .executes(context -> {
+                    ruleCmds.rules(new ModSender(context.getSource()), new String[0], null);
+                    return 1;
+                })
+                .then(Commands.argument("code", StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(rules.matching(""), builder))
+                        .executes(context -> {
+                            String code = StringArgumentType.getString(context, "code");
+                            ruleCmds.rules(new ModSender(context.getSource()), new String[] { code }, null);
+                            return 1;
+                        }));
+        dispatcher.register(ruleNode);
+
         dispatcher.register(vanishCommand("vanish"));
         dispatcher.register(vanishCommand("v"));
     }

@@ -1,5 +1,6 @@
 package dev.noro.agent.paper;
 
+import dev.noro.agent.core.CheckCommand;
 import dev.noro.agent.core.FreezeCommand;
 import dev.noro.agent.core.GameBridge;
 import dev.noro.agent.core.MasterClient;
@@ -7,6 +8,7 @@ import dev.noro.agent.core.Moderation;
 import dev.noro.agent.core.ModerationCommands;
 import dev.noro.agent.core.ReportCommand;
 import dev.noro.agent.core.RuleCatalog;
+import dev.noro.agent.core.RuleCommands;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +29,8 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
     private final ModerationCommands commands;
     private final FreezeCommand freezeCmd;
     private final ReportCommand reportCmd;
+    private final CheckCommand checkCmd;
+    private final RuleCommands ruleCmds;
     private final GameBridge bridge;
     private final RuleCatalog rules;
 
@@ -36,6 +40,8 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
         this.commands = new ModerationCommands(master, moderation, log);
         this.freezeCmd = new FreezeCommand(master, moderation, log);
         this.reportCmd = new ReportCommand(master, log);
+        this.checkCmd = new CheckCommand(master, log);
+        this.ruleCmds = new RuleCommands(rules);
         this.bridge = bridge;
         this.rules = rules;
         this.vanishManager = vanishManager;
@@ -53,6 +59,8 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
             case "unban" -> commands.revoke(actor, "ban", args, lang);
             case "unmute" -> commands.revoke(actor, "mute", args, lang);
             case "history" -> commands.history(actor, args, lang);
+            case "check" -> checkCmd.check(actor, args, lang);
+            case "rules", "rule" -> ruleCmds.rules(actor, args, lang);
             case "freeze" -> freezeCmd.freeze(actor, args, lang);
             case "unfreeze" -> freezeCmd.unfreeze(actor, args, lang);
             case "report" -> reportCmd.execute(actor, args, lang);
@@ -76,11 +84,17 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
+        String name = command.getName().toLowerCase(Locale.ROOT);
+        if (name.equals("rules") || name.equals("rule")) {
+            if (args.length == 1) {
+                return rules.matching(args[0].replaceFirst("^@", ""));
+            }
+            return List.of();
+        }
         if (args.length == 1) {
             return prefixed(bridge.onlineNames(), args[0]);
         }
-        String name = command.getName().toLowerCase(Locale.ROOT);
-        if (name.equals("unban") || name.equals("unmute") || name.equals("history") || name.equals("freeze") || name.equals("unfreeze") || name.equals("report") || name.equals("vanish") || name.equals("v")) {
+        if (name.equals("unban") || name.equals("unmute") || name.equals("history") || name.equals("check") || name.equals("freeze") || name.equals("unfreeze") || name.equals("report") || name.equals("vanish") || name.equals("v")) {
             return List.of();
         }
         // Второй аргумент — срок, если он у команды есть и ещё не назван.
@@ -108,6 +122,6 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
 
     /** Имена, которые надо объявить в {@code plugin.yml}. */
     static List<String> names() {
-        return List.of("ban", "serverban", "mute", "warn", "unban", "unmute", "history", "freeze", "unfreeze", "report", "vanish", "v");
+        return List.of("ban", "serverban", "mute", "warn", "unban", "unmute", "history", "check", "rules", "rule", "freeze", "unfreeze", "report", "vanish", "v");
     }
 }

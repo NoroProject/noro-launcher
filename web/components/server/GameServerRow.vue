@@ -8,8 +8,15 @@ const emit = defineEmits<{
     save: [form: GameServerForm];
 }>();
 
+const auth = useAuth();
+const notify = useNotify();
 const { t } = useT();
+
 const editing = ref(false);
+const showingAnnounce = ref(false);
+const announceMsg = ref("");
+const busyAnnounce = ref(false);
+
 const draft = reactive<GameServerForm>({
     name: props.item.name,
     mc_host: props.item.mc_host,
@@ -34,6 +41,24 @@ const lastSeen = computed(() => {
 function save() {
     emit("save", { ...draft });
     editing.value = false;
+}
+
+async function sendServerAnnounce() {
+    if (!announceMsg.value.trim()) return;
+    busyAnnounce.value = true;
+    try {
+        await auth.request('/api/admin/game/announce', {
+            method: 'POST',
+            body: { server_id: props.item.id, message: announceMsg.value.trim() },
+        });
+        notify.ok();
+        announceMsg.value = "";
+        showingAnnounce.value = false;
+    } catch (e) {
+        notify.fail(e);
+    } finally {
+        busyAnnounce.value = false;
+    }
 }
 </script>
 
@@ -84,6 +109,14 @@ function save() {
                     <div class="text-xs text-[var(--noro-muted)]">{{ lastSeen }}</div>
                 </div>
                 <div class="flex items-center gap-1">
+                    <UTooltip :text="t('admin-moderation-broadcast')">
+                        <AtomButton
+                            icon="i-lucide-megaphone"
+                            variant="ghost"
+                            :class="showingAnnounce ? 'text-sky-400' : ''"
+                            @click="showingAnnounce = !showingAnnounce"
+                        />
+                    </UTooltip>
                     <UTooltip v-if="!isProxy" :text="t('admin-gs-control-tooltip')">
                         <AtomButton icon="i-lucide-sliders-horizontal" variant="ghost" :to="manageTo" />
                     </UTooltip>
@@ -110,7 +143,27 @@ function save() {
             </div>
         </div>
 
-        <form v-else class="grid gap-3 p-2" @submit.prevent="save">
+        <!-- Inline Announce Row -->
+        <div v-if="showingAnnounce && !editing" class="flex flex-wrap items-center gap-2 border-t border-[var(--noro-border)] pt-3">
+            <input
+                v-model="announceMsg"
+                class="noro-input flex-1 min-w-[200px] text-xs"
+                :placeholder="t('admin-gs-announce-placeholder')"
+                @keydown.enter="sendServerAnnounce"
+            >
+            <AtomButton
+                icon="i-lucide-send"
+                variant="primary"
+                size="sm"
+                :loading="busyAnnounce"
+                :disabled="!announceMsg.trim()"
+                @click="sendServerAnnounce"
+            >
+                {{ t('admin-gs-announce-send') }}
+            </AtomButton>
+        </div>
+
+        <form v-else-if="editing" class="grid gap-3 p-2" @submit.prevent="save">
             <div class="grid gap-3 md:grid-cols-[1fr_1fr_110px_130px_auto_auto]">
                 <input v-model="draft.name" class="noro-input" :placeholder="t('admin-roles-name')">
                 <input v-model="draft.mc_host" class="noro-input" :placeholder="t('admin-gs-host')">

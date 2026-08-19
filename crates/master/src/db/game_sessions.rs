@@ -83,8 +83,14 @@ pub async fn end_session(pool: &PgPool, mc_uuid: Uuid, game_server_id: Uuid, rea
 /// Запросить сетку активности игрока за последние 365 дней.
 pub async fn get_activity_heatmap(pool: &PgPool, user_id: Uuid) -> Result<Vec<ActivityDayRow>> {
     Ok(sqlx::query_as::<_, ActivityDayRow>(
-        "SELECT day, minutes FROM player_activity_days
-         WHERE user_id = $1 AND day >= CURRENT_DATE - INTERVAL '365 days'
+        "SELECT day, SUM(minutes)::INT AS minutes FROM (
+             SELECT day, minutes FROM player_activity_days WHERE user_id = $1 AND day >= CURRENT_DATE - INTERVAL '365 days'
+             UNION ALL
+             SELECT CURRENT_DATE AS day, GREATEST(1, EXTRACT(EPOCH FROM (NOW() - started_at)) / 60)::INT AS minutes
+             FROM player_sessions
+             WHERE user_id = $1 AND ended_at IS NULL
+         ) s
+         GROUP BY day
          ORDER BY day ASC",
     )
     .bind(user_id)

@@ -10,6 +10,7 @@ interface ReportRow {
   y: number
   z: number
   status: string
+  claimed_by_username?: string | null
   created_at: string
   resolved_at: string | null
 }
@@ -31,6 +32,16 @@ async function load() {
     notify.fail(e, 'Failed to load reports')
   } finally {
     pending.value = false
+  }
+}
+
+async function claimReport(id: string) {
+  try {
+    await auth.request(`/api/admin/reports/${id}/claim`, { method: 'POST' })
+    notify.ok()
+    await load()
+  } catch (e) {
+    notify.fail(e)
   }
 }
 
@@ -69,14 +80,17 @@ onMounted(() => load())
         class="noro-panel p-4 flex flex-wrap items-center justify-between gap-4"
       >
         <div class="space-y-1">
-          <div class="flex items-center gap-2 text-sm font-bold text-[var(--noro-cream)]">
+          <div class="flex flex-wrap items-center gap-2 text-sm font-bold text-[var(--noro-cream)]">
             <span class="text-red-400">@{{ rep.target_username }}</span>
             <span class="text-xs text-[var(--noro-muted)]">от @{{ rep.reporter_username }}</span>
             <span
               class="px-2 py-0.5 text-[10px] rounded uppercase font-bold"
-              :class="rep.status === 'open' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'"
+              :class="rep.status === 'open' ? 'bg-amber-500/20 text-amber-400' : rep.status === 'in_progress' ? 'bg-sky-500/20 text-sky-400' : 'bg-emerald-500/20 text-emerald-400'"
             >
               {{ rep.status }}
+            </span>
+            <span v-if="rep.claimed_by_username" class="text-xs text-sky-400 font-normal">
+              (в работе: @{{ rep.claimed_by_username }})
             </span>
           </div>
           <p class="text-xs text-[var(--noro-text)] font-mono">{{ rep.reason }}</p>
@@ -86,14 +100,24 @@ onMounted(() => load())
           </div>
         </div>
 
-        <AtomButton
-          v-if="rep.status === 'open'"
-          variant="primary"
-          icon="i-lucide-check-circle"
-          @click="resolveReport(rep.id)"
-        >
-          {{ t('admin-reports-resolve') }}
-        </AtomButton>
+        <div class="flex items-center gap-2">
+          <AtomButton
+            v-if="rep.status === 'open'"
+            variant="ghost"
+            icon="i-lucide-user-check"
+            @click="claimReport(rep.id)"
+          >
+            Взять в работу
+          </AtomButton>
+          <AtomButton
+            v-if="rep.status !== 'resolved'"
+            variant="primary"
+            icon="i-lucide-check-circle"
+            @click="resolveReport(rep.id)"
+          >
+            {{ t('admin-reports-resolve') }}
+          </AtomButton>
+        </div>
       </div>
     </div>
 

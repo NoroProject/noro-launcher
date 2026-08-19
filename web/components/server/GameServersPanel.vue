@@ -3,12 +3,20 @@ import type { GameServerForm } from "~/types/game-server";
 
 const props = defineProps<{ serverId: string }>();
 
+const auth = useAuth();
+const notify = useNotify();
 const gs = useGameServers(props.serverId);
 const { t } = useT();
 const adding = ref(false);
+
 const showingBulkMaintenance = ref(false);
 const bulkReason = ref("");
 const bulkCountdown = ref(60);
+
+const showingAnnounce = ref(false);
+const announceMessage = ref("");
+const announceTargetServerId = ref("");
+const busyAnnounce = ref(false);
 
 function blank(): GameServerForm {
     return { name: "", mc_host: "", mc_port: 25565, sort_order: 0, kind: "server", maintenance: false, maintenance_reason: "", countdown_seconds: 60 };
@@ -38,6 +46,38 @@ async function toggleBulk(enable: boolean) {
     showingBulkMaintenance.value = false;
 }
 
+async function sendAnnounce() {
+    if (!announceMessage.value.trim()) return;
+    busyAnnounce.value = true;
+    try {
+        const targetId = announceTargetServerId.value || null;
+        if (targetId) {
+            await auth.request('/api/admin/game/announce', {
+                method: 'POST',
+                body: { server_id: targetId, message: announceMessage.value.trim() },
+            });
+        } else {
+            for (const s of gs.items.value) {
+                try {
+                    await auth.request('/api/admin/game/announce', {
+                        method: 'POST',
+                        body: { server_id: s.id, message: announceMessage.value.trim() },
+                    });
+                } catch {
+                    // ignore
+                }
+            }
+        }
+        notify.ok();
+        announceMessage.value = "";
+        showingAnnounce.value = false;
+    } catch (e) {
+        notify.fail(e);
+    } finally {
+        busyAnnounce.value = false;
+    }
+}
+
 onMounted(gs.load);
 </script>
 
@@ -55,10 +95,17 @@ onMounted(gs.load);
                     {{ totalOnline }} online
                 </span>
                 <AtomButton
+                    icon="i-lucide-megaphone"
+                    variant="ghost"
+                    @click="showingAnnounce = !showingAnnounce; showingBulkMaintenance = false"
+                >
+                    {{ t('admin-moderation-broadcast') }}
+                </AtomButton>
+                <AtomButton
                     icon="i-lucide-wrench"
                     variant="ghost"
                     :class="anyInMaintenance ? 'text-amber-400 border border-amber-500/30' : ''"
-                    @click="showingBulkMaintenance = !showingBulkMaintenance"
+                    @click="showingBulkMaintenance = !showingBulkMaintenance; showingAnnounce = false"
                 >
                     {{ t('admin-gs-maintenance') }}
                 </AtomButton>
@@ -76,14 +123,52 @@ onMounted(gs.load);
             :description="gs.error.value"
         />
 
+        <!-- Announce Panel -->
+        <div v-if="showingAnnounce" class="noro-panel p-5 grid gap-3 border-sky-500/30 bg-sky-500/5">
+            <h3 class="text-sm font-bold text-sky-400 flex items-center gap-2 whitespace-nowrap">
+                <UIcon name="i-lucide-megaphone" class="size-4 shrink-0" />
+                {{ t('admin-gs-announce-title') }}
+            </h3>
+            <div class="grid gap-3 sm:grid-cols-[1fr_220px]">
+                <label class="min-w-0">
+                    <span class="noro-label mb-1 block truncate">{{ t('admin-gs-announce-target') }}</span>
+                    <input
+                        v-model="announceMessage"
+                        class="noro-input w-full"
+                        :placeholder="t('admin-gs-announce-placeholder')"
+                    >
+                </label>
+                <label class="min-w-0">
+                    <span class="noro-label mb-1 block truncate">{{ t('admin-gs-announce-target') }}</span>
+                    <NoroSelect v-model="announceTargetServerId" class="w-full">
+                        <option value="">{{ t('admin-gs-announce-all') }}</option>
+                        <option v-for="s in gs.items.value" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    </NoroSelect>
+                </label>
+            </div>
+            <div class="flex items-center gap-3">
+                <AtomButton
+                    icon="i-lucide-send"
+                    variant="primary"
+                    class="whitespace-nowrap"
+                    :loading="busyAnnounce"
+                    :disabled="!announceMessage.trim()"
+                    @click="sendAnnounce"
+                >
+                    {{ t('admin-gs-announce-send') }}
+                </AtomButton>
+            </div>
+        </div>
+
+        <!-- Bulk Maintenance Panel -->
         <div v-if="showingBulkMaintenance" class="noro-panel p-5 grid gap-3 border-amber-500/30 bg-amber-500/5">
-            <h3 class="text-sm font-bold text-amber-400 flex items-center gap-2">
-                <UIcon name="i-lucide-wrench" class="size-4" />
+            <h3 class="text-sm font-bold text-amber-400 flex items-center gap-2 whitespace-nowrap">
+                <UIcon name="i-lucide-wrench" class="size-4 shrink-0" />
                 {{ t('admin-gs-maintenance') }} — {{ t('admin-gs-title') }}
             </h3>
             <div class="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <label class="min-w-0">
-                    <span class="noro-label mb-1 block">{{ t('admin-gs-maintenance-reason') }}</span>
+                    <span class="noro-label mb-1 block truncate">{{ t('admin-gs-maintenance-reason') }}</span>
                     <input
                         v-model="bulkReason"
                         class="noro-input w-full"
@@ -91,7 +176,7 @@ onMounted(gs.load);
                     >
                 </label>
                 <label class="min-w-0">
-                    <span class="noro-label mb-1 block">{{ t('admin-gs-maintenance-countdown') }}</span>
+                    <span class="noro-label mb-1 block truncate">{{ t('admin-gs-maintenance-countdown') }}</span>
                     <NoroSelect v-model.number="bulkCountdown" class="w-full min-w-[200px]">
                         <option :value="0">{{ t('admin-gs-maintenance-countdown-imm') }}</option>
                         <option :value="30">{{ t('admin-gs-maintenance-countdown-30s') }}</option>
@@ -101,10 +186,10 @@ onMounted(gs.load);
                 </label>
             </div>
             <div class="flex items-center gap-3">
-                <AtomButton icon="i-lucide-power" variant="primary" class="bg-amber-600 hover:bg-amber-500 text-white" @click="toggleBulk(true)">
+                <AtomButton icon="i-lucide-power" variant="primary" class="bg-amber-600 hover:bg-amber-500 text-white whitespace-nowrap" @click="toggleBulk(true)">
                     {{ t('admin-gs-maintenance-enable-all') }}
                 </AtomButton>
-                <AtomButton icon="i-lucide-power-off" variant="ghost" @click="toggleBulk(false)">
+                <AtomButton icon="i-lucide-power-off" variant="ghost" class="whitespace-nowrap" @click="toggleBulk(false)">
                     {{ t('admin-gs-maintenance-disable-all') }}
                 </AtomButton>
             </div>

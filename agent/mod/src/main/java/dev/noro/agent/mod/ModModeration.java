@@ -64,7 +64,7 @@ final class ModModeration implements AutoCloseable {
 
     /** Дерево команд собирается на каждом лоадере своим событием. */
     void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
-        new ModCommands(new ModerationCommands(client, moderation, log), rules).register(dispatcher);
+        new ModCommands(client, moderation, rules, log).register(dispatcher);
     }
 
     /** Подключить перечитывание профилей: применяет их платформа. */

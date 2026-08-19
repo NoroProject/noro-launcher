@@ -54,3 +54,12 @@ pub async fn revoke_others(
         crate::db::revoke_all_sessions(&state.db, user.user_id, current_token(&headers)).await?;
     Ok(Json(json!({ "revoked": revoked })))
 }
+
+/// GET /api/me/activity-heatmap — карточки активности игрока за год.
+pub async fn activity_heatmap(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<Value>> {
+    let days = crate::db::game_sessions::get_activity_heatmap(&state.db, user.user_id).await?;
+    Ok(Json(json!(days)))
+}

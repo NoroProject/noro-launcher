@@ -14,6 +14,8 @@ const emit = defineEmits<{
 }>();
 
 const notify = useNotify();
+const auth = useAuth();
+const { t } = useT();
 const search = ref("");
 const dropActive = ref(false);
 const viewMode = ref<"grid" | "list">("grid");
@@ -47,6 +49,15 @@ const serverIdRef = computed(() => props.serverId);
 const { suggestions, accept, reject } = useModSuggestions(serverIdRef);
 
 const acceptingId = ref<string | null>(null);
+const showSuggestionsModal = ref(false);
+
+function modExternalUrl(provider: string, projectId: string): string {
+    if (projectId?.startsWith('http://') || projectId?.startsWith('https://')) return projectId;
+    const p = provider?.toLowerCase() || '';
+    if (p === 'modrinth') return `https://modrinth.com/mod/${projectId}`;
+    if (p === 'curseforge') return `https://www.curseforge.com/minecraft/mc-mods/${projectId}`;
+    return `https://modrinth.com/mod/${projectId}`;
+}
 
 async function acceptSuggestion(id: string, mode: "optional" | "regular", installOnServers: boolean) {
     acceptingId.value = id;
@@ -109,13 +120,23 @@ function handleDrop(e: DragEvent) {
     >
         <!-- Pending Mod Suggestions from Launcher Players -->
         <div v-if="suggestions.length" class="rounded-lg border border-[var(--noro-amber)]/40 bg-[var(--noro-amber)]/10 p-4 mb-2">
-            <h3 class="flex items-center gap-2 font-bold text-sm text-[var(--noro-amber)] mb-3">
-                <UIcon name="i-lucide-sparkles" class="size-4" />
-                Requested Mods from Players ({{ suggestions.length }})
-            </h3>
+            <div class="flex items-center justify-between gap-4 mb-3">
+                <h3 class="flex items-center gap-2 font-bold text-sm text-[var(--noro-amber)]">
+                    <UIcon name="i-lucide-sparkles" class="size-4" />
+                    {{ t('admin-mod-suggestions-title', { count: suggestions.length }) }}
+                </h3>
+                <AtomButton
+                    variant="dark"
+                    size="sm"
+                    icon="i-lucide-maximize-2"
+                    @click="showSuggestionsModal = true"
+                >
+                    {{ t('admin-mod-suggestions-expand') }}
+                </AtomButton>
+            </div>
             <div class="grid gap-2.5">
                 <div
-                    v-for="item in suggestions"
+                    v-for="item in suggestions.slice(0, 3)"
                     :key="item.id"
                     class="flex min-w-0 items-center justify-between gap-3 rounded bg-[var(--noro-panel)] p-3 border border-[var(--noro-border)]"
                 >
@@ -126,7 +147,16 @@ function handleDrop(e: DragEvent) {
                         </div>
                         <div class="min-w-0">
                             <div class="flex min-w-0 items-center gap-2">
-                                <span class="truncate font-bold text-sm text-[var(--noro-text)]">{{ item.title }}</span>
+                                <a
+                                    :href="modExternalUrl(item.provider, item.project_id)"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="truncate font-bold text-sm text-[var(--noro-text)] hover:underline flex items-center gap-1 group"
+                                    :title="t('admin-mod-suggestions-open-external')"
+                                >
+                                    <span class="truncate">{{ item.title }}</span>
+                                    <UIcon name="i-lucide-external-link" class="size-3 text-[var(--noro-muted)] group-hover:text-[var(--noro-cream)] transition shrink-0" />
+                                </a>
                                 <span class="shrink-0 rounded bg-[var(--noro-input)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--noro-blue)]">
                                     {{ item.suggested_by_name || "unknown" }}
                                 </span>
@@ -139,17 +169,17 @@ function handleDrop(e: DragEvent) {
                             :items="[
                                 [
                                     {
-                                        label: 'Add as Optional Mod',
+                                        label: t('admin-mod-suggestions-accept-optional'),
                                         icon: 'i-lucide-toggle-right',
                                         onSelect: () => acceptSuggestion(item.id, 'optional', false),
                                     },
                                     {
-                                        label: 'Add as Regular Mod',
+                                        label: t('admin-mod-suggestions-accept-regular'),
                                         icon: 'i-lucide-package-plus',
                                         onSelect: () => acceptSuggestion(item.id, 'regular', false),
                                     },
                                     {
-                                        label: 'Add as Regular + Install on Servers',
+                                        label: t('admin-mod-suggestions-accept-servers'),
                                         icon: 'i-lucide-server',
                                         onSelect: () => acceptSuggestion(item.id, 'regular', true),
                                     },
@@ -162,16 +192,23 @@ function handleDrop(e: DragEvent) {
                                 icon="i-lucide-check"
                                 :loading="acceptingId === item.id"
                             >
-                                Accept
+                                {{ t('admin-mod-suggestions-accept') }}
                             </AtomButton>
                         </UDropdownMenu>
                         <AtomButton variant="dark" size="sm" icon="i-lucide-x" @click="rejectSuggestion(item.id)">
-                            Reject
+                            {{ t('admin-mod-suggestions-reject') }}
                         </AtomButton>
                     </div>
                 </div>
             </div>
         </div>
+
+        <ServerModSuggestionsModal
+            v-model="showSuggestionsModal"
+            :items="suggestions"
+            @accept="acceptSuggestion"
+            @reject="rejectSuggestion"
+        />
         <!-- Header & Action Bar -->
         <div class="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--noro-border)] pb-4">
             <div class="flex items-center gap-3">

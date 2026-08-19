@@ -1244,3 +1244,61 @@ cabinet-activity-days = { $count } дней
 cabinet-activity-empty-title = Нет данных об активности
 cabinet-activity-empty-text = Сыгранные часы отобразятся после первых игровых сессий.
 
+## Вкладка действий и внутриигровые команды
+admin-users-tab-game-actions = Игровые действия
+admin-game-actions-title = Прямые игровые действия
+admin-game-actions-subtitle = Отправка команд на активный игровой сервер для @{ $username }
+admin-game-actions-status-online = Онлайн на { $server }
+admin-game-actions-status-offline = Офлайн
+admin-game-actions-offline-title = Игрок вне игры
+admin-game-actions-offline-text = Игровые действия недоступны, так как игрок @{ $username } сейчас не подключён ни к одному серверу.
+admin-game-actions-kick-title = Кикнуть @{ $username }
+admin-game-actions-kick-desc = Принудительно отключить игрока от активного сервера.
+admin-game-actions-kick-reason = Причина кика
+admin-game-actions-kick-placeholder = Кикнут администрацией
+admin-game-actions-kick-btn = Кикнуть игрока
+admin-game-actions-tell-title = Личное сообщение (/tell)
+admin-game-actions-tell-desc = Отправить приватное чат-сообщение игроку @{ $username }.
+admin-game-actions-tell-msg = Текст сообщения
+admin-game-actions-tell-placeholder = Проверьте дискорд / тикет поддержки
+admin-game-actions-tell-btn = Отправить сообщение
+
+## Объявления на серверах
+admin-gs-announce-title = Объявление на игровые серверы
+admin-gs-announce-target = Целевой сервер
+admin-gs-announce-all = Все серверы сборки
+admin-gs-announce-send = Отправить объявление
+admin-gs-announce-placeholder = Введите текст объявления для игроков...
+
+## Предложенные моды
+admin-mod-suggestions-title = Предложенные моды от игроков ({ $count })
+admin-mod-suggestions-expand = Посмотреть списком в окне
+admin-mod-suggestions-search = Поиск по названию, автору или описанию...
+admin-mod-suggestions-open-external = Перейти на страницу мода
+admin-mod-suggestions-accept = Принять
+admin-mod-suggestions-accept-optional = Добавить как опциональный мод
+admin-mod-suggestions-accept-regular = Добавить как обычный мод
+admin-mod-suggestions-accept-servers = Обычный + установить на серверы
+admin-mod-suggestions-reject = Отклонить
+admin-mod-suggestions-empty = Нет предложенных модов по запросу
+
+
+
+## Быстрый поиск (Spotlight)
+spotlight-quick-search = Быстрый поиск...
+spotlight-placeholder = Введите команду, страницу, ник или сервер... (Ctrl+K)
+spotlight-no-results = Ничего не найдено по запросу "{ $query }"
+spotlight-nav-instructions = Перемещение с помощью ↑ ↓
+spotlight-open-instructions = Открыть через Cmd+K / Ctrl+K
+
+## Поиск и фильтры списка пользователей
+admin-users-search-label = Поиск игрока / UUID / Discord
+admin-users-search-placeholder = Поиск по нику, дискорду или UUID...
+admin-users-status-label = Статус
+admin-users-status-all = Все статусы
+admin-users-status-active-only = Только активные
+admin-users-status-banned-only = Только забаненные
+admin-users-role-label = Роль
+admin-users-role-all = Все роли
+
+
