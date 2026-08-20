@@ -12,25 +12,19 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  # Сборка нативно на self-hosted раннерах (`self-hosted`, `Linux`) —
-  # бесплатные воркеры на собственном сервере.
-  #
-  # Сборка пушит образ по digest, без тега: тег ставится один раз в `merge`.
   build:
+    runs-on: [self-hosted, Linux]
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: false
       matrix:
-        image: [noro-master, noro-web]
-        platform: [amd64]
         include:
           - image: noro-master
             file: ./Dockerfile.master
           - image: noro-web
             file: ./Dockerfile.web
-    runs-on: [self-hosted, Linux]
 
     steps:
       - name: Checkout repository
@@ -53,90 +47,23 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ matrix.image }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push by digest
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.file }}
-          platforms: linux/${{ matrix.platform }}
-          labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
-          # Scope включает и образ, и платформу: с общим scope половины матрицы
-          # затирали кеш друг друга и каждая сборка начиналась почти с нуля.
-          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.platform }}
-
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          echo "${{ steps.build.outputs.digest }}" >"/tmp/digests/${{ matrix.platform }}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digest-${{ matrix.image }}-${{ matrix.platform }}
-          path: /tmp/digests/*
-          retention-days: 1
-
-  # Склейка мультиарх-манифеста из готовых digest'ов. Только здесь появляются
-  # `latest`, `sha-…` и теги релиза.
-  merge:
-    needs: build
-    runs-on: [self-hosted, Linux]
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [noro-master, noro-web]
-
-    steps:
-      - name: Set environment variables
-        run: |
-          echo "REPO_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
-        shell: bash
-
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp/digests
-          pattern: digest-${{ matrix.image }}-*
-          merge-multiple: true
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=tag
             type=sha,format=short
 
-      - name: Create manifest list and push
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<<"${DOCKER_METADATA_OUTPUT_JSON}") \
-            $(for f in *; do printf '%s/%s/%s@%s ' "${REGISTRY}" "${REPO_OWNER}" "${{ matrix.image }}" "$(cat "$f")"; done)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Inspect
-        run: |
-          docker buildx imagetools inspect "${REGISTRY}/${REPO_OWNER}/${{ matrix.image }}:${{ steps.meta.outputs.version }}"
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}-amd64
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
