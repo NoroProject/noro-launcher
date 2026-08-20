@@ -24,7 +24,7 @@ concurrency:
 jobs:
   rust:
     name: rust fmt + clippy + test
-    runs-on: noro-arm64
+    runs-on: [self-hosted, Linux]
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +55,7 @@ jobs:
 
   web:
     name: web typecheck
-    runs-on: noro-arm64
+    runs-on: [self-hosted, Linux]
     defaults:
       run:
         working-directory: web
