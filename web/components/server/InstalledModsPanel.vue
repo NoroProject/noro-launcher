@@ -216,13 +216,13 @@ function handleDrop(e: DragEvent) {
                     <UIcon name="i-lucide-puzzle" class="size-6" />
                 </div>
                 <div>
-                    <h2 class="font-bold text-[var(--noro-text)] text-base">Assembly Mods</h2>
+                    <h2 class="font-bold text-[var(--noro-text)] text-base">{{ t('admin-installed-mods-title') }}</h2>
                     <p class="text-xs text-[var(--noro-muted)]">
                         <template v-if="search">
-                            {{ filteredMods.length }} of {{ mods.length }} mods found
+                            {{ t('admin-installed-mods-found', { count: filteredMods.length, total: mods.length }) }}
                         </template>
                         <template v-else>
-                            {{ mods.length }} mods installed in build
+                            {{ t('admin-installed-mods-count', { count: mods.length }) }}
                         </template>
                     </p>
                 </div>
@@ -235,7 +235,7 @@ function handleDrop(e: DragEvent) {
                     <input
                         v-model="search"
                         type="text"
-                        placeholder="Search mods..."
+                        :placeholder="t('admin-installed-mods-search')"
                         class="noro-input-sm !pl-9 !pr-8 w-44 md:w-56 h-full text-xs rounded-lg !py-0"
                     />
                     <button
@@ -254,7 +254,7 @@ function handleDrop(e: DragEvent) {
                         type="button"
                         class="p-1.5 rounded transition-colors"
                         :class="viewMode === 'grid' ? 'bg-[var(--noro-cream)]/20 text-[var(--noro-cream)]' : 'text-[var(--noro-muted)] hover:text-[var(--noro-text)]'"
-                        title="Grid view"
+                        :title="t('admin-installed-mods-grid')"
                         @click="viewMode = 'grid'"
                     >
                         <UIcon name="i-lucide-layout-grid" class="size-4" />
@@ -263,7 +263,7 @@ function handleDrop(e: DragEvent) {
                         type="button"
                         class="p-1.5 rounded transition-colors"
                         :class="viewMode === 'list' ? 'bg-[var(--noro-cream)]/20 text-[var(--noro-cream)]' : 'text-[var(--noro-muted)] hover:text-[var(--noro-text)]'"
-                        title="List view"
+                        :title="t('admin-installed-mods-list')"
                         @click="viewMode = 'list'"
                     >
                         <UIcon name="i-lucide-list" class="size-4" />
@@ -273,7 +273,7 @@ function handleDrop(e: DragEvent) {
                 <!-- Upload JAR Button -->
                 <label class="noro-btn noro-btn-dark !min-h-[36px] !px-3 cursor-pointer text-xs uppercase font-bold flex items-center gap-1.5 rounded-lg border border-[var(--noro-border)]">
                     <UIcon name="i-lucide-upload" class="size-4" />
-                    <span>Upload JAR</span>
+                    <span>{{ t('admin-installed-mods-upload') }}</span>
                     <input
                         type="file"
                         accept=".jar"
@@ -289,33 +289,33 @@ function handleDrop(e: DragEvent) {
                     size="sm"
                     icon="i-lucide-compass"
                 >
-                    Mod Catalog
+                    {{ t('admin-installed-mods-catalog') }}
                 </AtomButton>
             </div>
         </div>
 
         <!-- Mods List / Grid Content -->
         <div v-if="!buildId" class="py-12 text-center text-xs text-[var(--noro-muted)]">
-            Select or create a build version above to manage installed mods.
+            {{ t('admin-installed-mods-no-build') }}
         </div>
 
         <div v-else-if="!mods.length" class="py-12 text-center">
             <div class="mx-auto mb-3 grid size-12 place-items-center rounded-xl bg-[var(--noro-input)] text-[var(--noro-cream)]">
                 <UIcon name="i-lucide-package" class="size-6" />
             </div>
-            <h3 class="font-bold text-sm text-[var(--noro-text)]">No Mods Installed</h3>
+            <h3 class="font-bold text-sm text-[var(--noro-text)]">{{ t('admin-installed-mods-empty-title') }}</h3>
             <p class="text-xs text-[var(--noro-muted)] max-w-sm mx-auto mt-1 mb-4">
-                Browse Modrinth catalog to add compatible mods or drag & drop custom jar files here.
+                {{ t('admin-installed-mods-empty-text') }}
             </p>
             <div class="flex justify-center gap-2">
                 <AtomButton :to="catalogUrl" variant="primary" icon="i-lucide-compass" size="sm">
-                    Browse Modrinth Catalog
+                    {{ t('admin-installed-mods-browse') }}
                 </AtomButton>
             </div>
         </div>
 
         <div v-else-if="!filteredMods.length" class="py-8 text-center text-xs text-[var(--noro-muted)]">
-            No mods matching "{{ search }}"
+            {{ t('admin-installed-mods-no-match', { query: search }) }}
         </div>
 
         <!-- Grid View -->

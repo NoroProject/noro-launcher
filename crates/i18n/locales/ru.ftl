@@ -1282,6 +1282,22 @@ admin-mod-suggestions-accept-servers = Обычный + установить н�
 admin-mod-suggestions-reject = Отклонить
 admin-mod-suggestions-empty = Нет предложенных модов по запросу
 
+## Установленные моды сборки
+admin-installed-mods-title = Моды сборки
+admin-installed-mods-found = Найдено { $count } из { $total } модов
+admin-installed-mods-count = Установлено модов в сборке: { $count }
+admin-installed-mods-search = Поиск модов...
+admin-installed-mods-grid = Сетка
+admin-installed-mods-list = Список
+admin-installed-mods-upload = Загрузить JAR
+admin-installed-mods-catalog = Каталог модов
+admin-installed-mods-no-build = Выберите или создайте версию сборки выше, чтобы управлять установленными модами.
+admin-installed-mods-empty-title = Моды еще не установлены
+admin-installed-mods-empty-text = Откройте каталог Modrinth для выбора модов или перетащите файл .jar сюда.
+admin-installed-mods-browse = Открыть каталог Modrinth
+admin-installed-mods-no-match = Ничего не найдено по запросу "{ $query }"
+
+
 
 
 ## Быстрый поиск (Spotlight)

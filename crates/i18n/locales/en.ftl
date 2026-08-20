@@ -1277,6 +1277,22 @@ admin-mod-suggestions-accept-servers = Regular + Install on Servers
 admin-mod-suggestions-reject = Reject
 admin-mod-suggestions-empty = No requested mods matching query
 
+## Installed Build Mods
+admin-installed-mods-title = Assembly Mods
+admin-installed-mods-found = { $count } of { $total } mods found
+admin-installed-mods-count = { $count } mods installed in build
+admin-installed-mods-search = Search mods...
+admin-installed-mods-grid = Grid view
+admin-installed-mods-list = List view
+admin-installed-mods-upload = Upload JAR
+admin-installed-mods-catalog = Mod Catalog
+admin-installed-mods-no-build = Select or create a build version above to manage installed mods.
+admin-installed-mods-empty-title = No Mods Installed
+admin-installed-mods-empty-text = Browse Modrinth catalog to add compatible mods or drag & drop custom jar files here.
+admin-installed-mods-browse = Browse Modrinth Catalog
+admin-installed-mods-no-match = No mods matching "{ $query }"
+
+
 
 
 ## Quick Search (Spotlight)

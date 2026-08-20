@@ -98,14 +98,22 @@ function handleAccept(id: string, mode: 'optional' | 'regular', installOnServers
 
         <!-- Search & Toolbar -->
         <div class="p-4 border-b border-[var(--noro-border)] bg-[var(--noro-bg-deep)] grid gap-3 sm:grid-cols-[1fr_auto]">
-          <div class="relative">
-            <UIcon name="i-lucide-search" class="absolute left-3 top-2.5 size-4 text-[var(--noro-muted)]" />
+          <div class="relative flex items-center">
+            <UIcon name="i-lucide-search" class="absolute left-3 size-4 text-[var(--noro-muted)] pointer-events-none" />
             <input
               v-model="searchQuery"
               type="text"
-              class="noro-input w-full pl-9 text-xs"
+              class="noro-input w-full !pl-9 !pr-8 text-xs"
               :placeholder="t('admin-mod-suggestions-search')"
             >
+            <button
+              v-if="searchQuery"
+              type="button"
+              class="absolute right-2.5 text-[var(--noro-muted)] hover:text-[var(--noro-text)]"
+              @click="searchQuery = ''"
+            >
+              <UIcon name="i-lucide-x" class="size-4" />
+            </button>
           </div>
 
           <div class="flex items-center gap-1">
