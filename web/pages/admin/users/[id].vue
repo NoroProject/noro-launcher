@@ -246,6 +246,7 @@ function onSkinFilePicked(e: Event) {
             @remove="removeRole"
           />
           <AdminPermissionEditor
+            v-if="can('noro.admin.users.permissions')"
             :title="t('admin-users-direct-perms')"
             :subtitle="t('admin-users-direct-perms-hint')"
             :entries="permissions"

@@ -65,7 +65,7 @@ async function download() {
                 <AdminBackupArchive />
             </div>
 
-            <AdminBackupRestore />
+            <AdminBackupRestore v-if="auth.hasPermission('noro.admin.backup.restore')" />
 
             <NoroNote icon="i-lucide-info">{{ t('admin-backup-files-note') }}</NoroNote>
         </div>

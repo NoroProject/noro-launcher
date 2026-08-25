@@ -113,9 +113,9 @@ async function deleteCape(id: string) {
     <UAlert v-if="error" class="mb-5" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="error" />
     <UAlert v-if="message" class="mb-5" color="success" variant="subtle" icon="i-lucide-check" :description="message" />
 
-    <div class="grid gap-6 xl:grid-cols-[340px_1fr]">
+    <div class="grid gap-6" :class="can('noro.admin.capes.edit') ? 'xl:grid-cols-[340px_1fr]' : 'grid-cols-1'">
       <!-- Upload Panel -->
-      <section class="noro-panel flex flex-col p-6">
+      <section v-if="can('noro.admin.capes.edit')" class="noro-panel flex flex-col p-6">
         <h2 class="text-xl font-black text-[var(--noro-text)]">{{ t('admin-capes-add-title') }}</h2>
         <p class="mt-1 text-xs text-[var(--noro-muted)]">
           {{ t('admin-capes-add-subtitle') }}
