@@ -24,6 +24,7 @@ const {
     applyAsset,
 } = await useAdminServerEditor();
 
+const auth = useAuth();
 const { t } = useT();
 
 const builds = computed(() => buildsData.data.value || []);
