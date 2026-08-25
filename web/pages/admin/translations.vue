@@ -193,6 +193,7 @@ await load(active.value)
                     spellcheck="false"
                     class="noro-input w-full font-mono text-xs leading-5"
                     :placeholder="row.base"
+                    :disabled="!can('noro.admin.translations.edit')"
                     @input="setOverride(row.key, ($event.target as HTMLTextAreaElement).value)"
                   />
                   <input
@@ -200,6 +201,7 @@ await load(active.value)
                     :value="row.override"
                     class="noro-input w-full text-sm"
                     :placeholder="row.base"
+                    :disabled="!can('noro.admin.translations.edit')"
                     @input="setOverride(row.key, ($event.target as HTMLInputElement).value)"
                   >
                 </td>

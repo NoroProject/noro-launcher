@@ -17,7 +17,7 @@ export interface FilterDraft {
   window_secs: number
 }
 
-const props = defineProps<{ filterType: string, saving: boolean }>()
+const props = withDefaults(defineProps<{ filterType: string, saving: boolean, canEdit?: boolean }>(), { canEdit: true })
 defineEmits<{ save: [] }>()
 const draft = defineModel<FilterDraft>({ required: true })
 const { t } = useT()
@@ -59,7 +59,7 @@ const counted = computed(() => props.filterType === 'flood' || draft.value.mode 
             {{ draft.enabled ? t('admin-automod-enabled') : t('admin-automod-disabled') }}
           </span>
         </label>
-        <AtomButton icon="i-lucide-save" variant="primary" :loading="saving" @click="$emit('save')">
+        <AtomButton v-if="canEdit" icon="i-lucide-save" variant="primary" :loading="saving" @click="$emit('save')">
           {{ t('cabinet-save') }}
         </AtomButton>
       </div>

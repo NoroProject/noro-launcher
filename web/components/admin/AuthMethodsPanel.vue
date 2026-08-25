@@ -22,7 +22,7 @@ interface AuthMethodItem {
 const auth = useAuth()
 const notify = useNotify()
 const { t } = useT()
-const can = (perm: string) => auth.hasPermission(perm)
+const can = (perm: string) => auth.hasPermission(perm) || (perm === 'noro.admin.settings.edit' && auth.hasPermission('noro.admin.auth_methods.edit'))
 
 const items = ref<AuthMethodItem[]>([])
 const pending = ref(false)

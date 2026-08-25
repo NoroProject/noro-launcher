@@ -11,6 +11,7 @@ const { detail, pending, load, act } = useCase(caseId)
 const item = computed(() => detail.value?.case)
 const reporters = computed(() => detail.value?.reporters || {})
 
+const can = (perm: string) => auth.hasPermission(perm)
 </script>
 
 <template>
@@ -58,7 +59,7 @@ const reporters = computed(() => detail.value?.reporters || {})
           <AdminCaseTimeline :events="detail.events" />
         </section>
 
-        <section class="noro-panel min-w-0 p-4">
+        <section v-if="can('noro.mod.cases.chat')" class="noro-panel min-w-0 p-4">
           <div class="noro-label mb-3">{{ t('admin-case-chat') }}</div>
           <AdminCaseChat :messages="detail.messages" :allowed="detail.chat_allowed" />
         </section>
@@ -67,7 +68,7 @@ const reporters = computed(() => detail.value?.reporters || {})
       <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
         <AdminCaseActions :item="item" @act="(path, method, body) => act(path, method, body)" />
 
-        <section class="noro-panel min-w-0 p-4">
+        <section v-if="can('noro.mod.punish.warn') || can('noro.mod.punish.mute') || can('noro.mod.punish.ban')" class="noro-panel min-w-0 p-4">
           <div class="noro-label mb-3">{{ t('admin-case-punish') }}</div>
           <PunishmentForm :user-id="item.target_id" :case-id="item.id" @created="load(true)" />
         </section>

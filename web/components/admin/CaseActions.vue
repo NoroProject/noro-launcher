@@ -18,6 +18,9 @@ const verdict = ref<'confirmed' | 'rejected' | 'insufficient'>('confirmed')
 /** Что сейчас летит на сервер: плитка крутится, повторное нажатие гасится. */
 const busy = ref<string | null>(null)
 
+const auth = useAuth()
+const can = (perm: string) => auth.hasPermission(perm)
+
 const active = computed(() => ['open', 'in_review'].includes(props.item.status))
 const mine = computed(() => props.item.status === 'in_review')
 
@@ -47,17 +50,18 @@ function close() {
 <template>
   <div class="noro-panel grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 p-4">
     <AdminCaseActionTile
-      v-if="active"
+      v-if="active && can('noro.mod.cases.claim')"
       :icon="mine ? 'i-lucide-undo-2' : 'i-lucide-hand'"
       :label="mine ? t('admin-case-release') : t('admin-case-claim')"
       :hint="mine ? t('admin-case-release-hint') : t('admin-case-claim-hint')"
       @click="emit('act', mine ? 'release' : 'claim')"
     />
 
-    <section class="grid gap-2">
+    <section v-if="can('noro.mod.cases.chat') || can('noro.mod.cases.inventory') || can('noro.mod.cases.client')" class="grid gap-2">
       <span class="noro-label">{{ t('admin-case-probes') }}</span>
       <div class="grid gap-2">
         <AdminCaseActionTile
+          v-if="can('noro.mod.cases.chat')"
           icon="i-lucide-message-square"
           :label="t('admin-case-probe-chat')"
           :hint="t('admin-case-probe-chat-hint')"
@@ -65,6 +69,7 @@ function close() {
           @click="ask('chat-request')"
         />
         <AdminCaseActionTile
+          v-if="can('noro.mod.cases.inventory')"
           icon="i-lucide-backpack"
           :label="t('admin-case-probe-inventory')"
           :hint="t('admin-case-probe-inventory-hint')"
@@ -72,6 +77,7 @@ function close() {
           @click="ask('inventory-request')"
         />
         <AdminCaseActionTile
+          v-if="can('noro.mod.cases.client')"
           icon="i-lucide-shield-check"
           :label="t('admin-case-probe-client')"
           :hint="t('admin-case-probe-client-hint')"
@@ -89,7 +95,7 @@ function close() {
       </AtomButton>
     </label>
 
-    <section v-if="active" class="grid gap-3 border-t border-[var(--noro-border)] pt-4">
+    <section v-if="active && can('noro.mod.cases.resolve')" class="grid gap-3 border-t border-[var(--noro-border)] pt-4">
       <span class="noro-label">{{ t('admin-case-close') }}</span>
       <AdminCaseVerdictPicker v-model="verdict" />
       <input v-model="resolution" class="noro-input w-full" :placeholder="t('admin-case-resolution-hint')">

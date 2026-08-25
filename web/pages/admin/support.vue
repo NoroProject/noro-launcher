@@ -120,6 +120,7 @@ onMounted(() => load())
             </div>
 
             <AtomButton
+              v-if="can('noro.admin.support.download')"
               variant="primary"
               size="sm"
               icon="i-lucide-download"

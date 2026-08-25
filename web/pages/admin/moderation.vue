@@ -7,7 +7,7 @@ const { t } = useT()
 const notify = useNotify()
 await auth.loadMe()
 
-const canEdit = computed(() => auth.hasPermission('noro.admin.settings.edit'))
+const canEdit = computed(() => auth.hasPermission('noro.admin.moderation.edit') || auth.hasPermission('noro.admin.settings.edit'))
 const activeLang = ref<string>('ru')
 const map = ref<Record<string, ModerationMessages>>({})
 const defaultsMap = ref<Record<string, ModerationMessages>>({})

@@ -51,6 +51,8 @@ function toggle(version: string) {
   next.has(version) ? next.delete(version) : next.add(version)
   expanded.value = next
 }
+const auth = useAuth()
+const can = (perm: string) => auth.hasPermission(perm)
 </script>
 
 <template>
@@ -79,7 +81,7 @@ function toggle(version: string) {
               </span>
             </button>
             <AtomButton
-              v-if="group.core.length"
+              v-if="group.core.length && can('noro.admin.launcher.deploy')"
               variant="secondary"
               size="sm"
               icon="i-lucide-send"
@@ -89,7 +91,7 @@ function toggle(version: string) {
               {{ t('admin-launchver-deploy-core') }}
             </AtomButton>
             <AtomButton
-              v-if="group.bootstrapper.length"
+              v-if="group.bootstrapper.length && can('noro.admin.launcher.deploy')"
               variant="dark"
               size="sm"
               icon="i-lucide-send"
@@ -114,7 +116,7 @@ function toggle(version: string) {
           </td>
           <td class="text-right">
             <AtomButton
-              v-if="!version.is_current"
+              v-if="!version.is_current && can('noro.admin.launcher.deploy')"
               variant="primary"
               size="sm"
               icon="i-lucide-send"

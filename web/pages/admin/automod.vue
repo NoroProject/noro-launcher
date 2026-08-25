@@ -97,6 +97,7 @@ onMounted(() => load())
         v-model="drafts[item.filter_type]"
         :filter-type="item.filter_type"
         :saving="savingFilter === item.filter_type"
+        :can-edit="auth.hasPermission('noro.admin.chat_filters.edit')"
         @save="saveFilter(item.filter_type)"
       />
     </div>
