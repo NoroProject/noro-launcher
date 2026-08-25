@@ -6,13 +6,13 @@ use crate::state::AppState;
 use axum::extract::{Path, Query, State};
 use axum::Json;
 
-use schema::PERM_LAUNCHER_PUBLISH;
+use schema::PERM_SERVERS_VIEW;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 /// Версии Minecraft (release/snapshot) из манифеста Mojang.
 pub async fn minecraft(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Value>> {
-    admin.require(PERM_LAUNCHER_PUBLISH)?;
+    admin.require(PERM_SERVERS_VIEW)?;
     let manifest: Value = get_json(
         &state,
         "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json",
@@ -46,7 +46,7 @@ pub async fn loader(
     Path(kind): Path<String>,
     Query(q): Query<LoaderQuery>,
 ) -> AppResult<Json<Value>> {
-    admin.require(PERM_LAUNCHER_PUBLISH)?;
+    admin.require(PERM_SERVERS_VIEW)?;
     let versions = match kind.as_str() {
         "fabric" => fabric_like(&state, "https://meta.fabricmc.net/v2", &q.mc).await?,
         "quilt" => fabric_like(&state, "https://meta.quiltmc.org/v3", &q.mc).await?,
