@@ -67,12 +67,12 @@ impl Provider {
         }
     }
 
-    pub fn userinfo_url(self) -> &'static str {
+    pub fn userinfo_url(self) -> Option<&'static str> {
         match self {
-            Provider::Discord => "https://discord.com/api/users/@me",
-            Provider::Twitch => "https://api.twitch.tv/helix/users",
-            Provider::Google => "https://www.googleapis.com/oauth2/v3/userinfo",
-            Provider::Telegram => "https://oauth.telegram.org/userinfo",
+            Provider::Discord => Some("https://discord.com/api/users/@me"),
+            Provider::Twitch => Some("https://api.twitch.tv/helix/users"),
+            Provider::Google => Some("https://www.googleapis.com/oauth2/v3/userinfo"),
+            Provider::Telegram => None,
         }
     }
 
@@ -115,12 +115,12 @@ impl Provider {
                 avatar: body["picture"].as_str().map(str::to_string),
             }),
             Provider::Telegram => {
-                let id = body["sub"]
+                let id = body["id"]
                     .as_str()
                     .map(String::from)
-                    .or_else(|| body["sub"].as_i64().map(|n| n.to_string()))
-                    .or_else(|| body["id"].as_str().map(String::from))
-                    .or_else(|| body["id"].as_i64().map(|n| n.to_string()))?;
+                    .or_else(|| body["id"].as_i64().map(|n| n.to_string()))
+                    .or_else(|| body["sub"].as_str().map(String::from))
+                    .or_else(|| body["sub"].as_i64().map(|n| n.to_string()))?;
                 Some(RemoteIdentity {
                     id,
                     username: body["preferred_username"]

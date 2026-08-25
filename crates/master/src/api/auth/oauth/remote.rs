@@ -80,7 +80,10 @@ pub async fn fetch_identity(
             ))
         })?;
 
-        let mut u_req = state.http().get(p.userinfo_url()).bearer_auth(access);
+        let u_url = p.userinfo_url().ok_or_else(|| {
+            AppError::Unauthorized(format!("{} does not support userinfo endpoint", p.display_name()))
+        })?;
+        let mut u_req = state.http().get(u_url).bearer_auth(access);
         // Helix требует ещё и client_id: без заголовка ответ — 401 с пустым телом.
         if p == Provider::Twitch {
             u_req = u_req.header("Client-Id", creds.client_id.as_str());
