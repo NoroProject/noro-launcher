@@ -10,10 +10,7 @@ pub enum CapeCmd {
     /// List all capes.
     List,
     /// Upload a cape image (file path and optional display name).
-    Upload {
-        file: String,
-        name: Option<String>,
-    },
+    Upload { file: String, name: Option<String> },
     /// Delete a cape.
     Delete { id: String },
 }

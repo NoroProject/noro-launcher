@@ -27,7 +27,10 @@ pub async fn run(c: &Client, cmd: PunishmentCmd) -> Result<()> {
     match cmd {
         PunishmentCmd::List { user_id, limit } => {
             let path = match user_id {
-                Some(uid) => format!("/api/admin/punishments?user_id={}&limit={limit}", urlencode(&uid)),
+                Some(uid) => format!(
+                    "/api/admin/punishments?user_id={}&limit={limit}",
+                    urlencode(&uid)
+                ),
                 None => format!("/api/admin/punishments?limit={limit}"),
             };
             let v = c.get(&path).await?;

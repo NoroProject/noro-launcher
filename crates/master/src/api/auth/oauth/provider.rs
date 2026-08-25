@@ -20,7 +20,12 @@ pub struct RemoteIdentity {
 }
 
 impl Provider {
-    pub const ALL: [Provider; 4] = [Provider::Discord, Provider::Twitch, Provider::Google, Provider::Telegram];
+    pub const ALL: [Provider; 4] = [
+        Provider::Discord,
+        Provider::Twitch,
+        Provider::Google,
+        Provider::Telegram,
+    ];
 
     pub fn slug(self) -> &'static str {
         match self {
@@ -58,7 +63,7 @@ impl Provider {
             Provider::Discord => "https://discord.com/api/oauth2/token",
             Provider::Twitch => "https://id.twitch.tv/oauth2/token",
             Provider::Google => "https://oauth2.googleapis.com/token",
-            Provider::Telegram => "",
+            Provider::Telegram => "https://oauth.telegram.org/token",
         }
     }
 
@@ -67,7 +72,7 @@ impl Provider {
             Provider::Discord => "https://discord.com/api/users/@me",
             Provider::Twitch => "https://api.twitch.tv/helix/users",
             Provider::Google => "https://www.googleapis.com/oauth2/v3/userinfo",
-            Provider::Telegram => "",
+            Provider::Telegram => "https://oauth.telegram.org/userinfo",
         }
     }
 
@@ -76,7 +81,7 @@ impl Provider {
             Provider::Discord => "identify",
             Provider::Twitch => "",
             Provider::Google => "openid profile",
-            Provider::Telegram => "",
+            Provider::Telegram => "openid profile",
         }
     }
 
@@ -110,13 +115,21 @@ impl Provider {
                 avatar: body["picture"].as_str().map(str::to_string),
             }),
             Provider::Telegram => Some(RemoteIdentity {
-                id: body["id"].as_str()?.to_string(),
-                username: body["username"]
+                id: body["sub"]
                     .as_str()
-                    .or_else(|| body["first_name"].as_str())
-                    .unwrap_or("TelegramUser")
+                    .or_else(|| body["id"].as_str())?
                     .to_string(),
-                avatar: body["photo_url"].as_str().map(str::to_string),
+                username: body["preferred_username"]
+                    .as_str()
+                    .or_else(|| body["username"].as_str())
+                    .or_else(|| body["name"].as_str())
+                    .or_else(|| body["first_name"].as_str())
+                    .unwrap_or_else(|| body["sub"].as_str().unwrap_or("TelegramUser"))
+                    .to_string(),
+                avatar: body["picture"]
+                    .as_str()
+                    .or_else(|| body["photo_url"].as_str())
+                    .map(str::to_string),
             }),
         }
     }

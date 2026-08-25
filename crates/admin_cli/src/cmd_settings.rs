@@ -27,7 +27,9 @@ pub async fn run(c: &Client, cmd: SettingsCmd) -> Result<()> {
             print_json(&v);
         }
         SettingsCmd::RebuildPrefixes => {
-            let v = c.post("/api/admin/prefix-pack/rebuild", serde_json::json!({})).await?;
+            let v = c
+                .post("/api/admin/prefix-pack/rebuild", serde_json::json!({}))
+                .await?;
             print_json(&v);
         }
     }

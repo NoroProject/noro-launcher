@@ -34,19 +34,17 @@ pub enum GameCmd {
         reason: String,
     },
     /// Send private message to player.
-    Tell {
-        target: String,
-        message: String,
-    },
+    Tell { target: String, message: String },
     /// Broadcast announcement to all players.
-    Announce {
-        message: String,
-    },
+    Announce { message: String },
 }
 
 pub async fn run(c: &Client, cmd: GameCmd) -> Result<()> {
     match cmd {
-        GameCmd::Exec { game_server_id, command } => {
+        GameCmd::Exec {
+            game_server_id,
+            command,
+        } => {
             let gsid = resolve_game_server_id(c, &game_server_id).await?;
             let line = command.join(" ");
             if line.trim().is_empty() {
@@ -72,11 +70,17 @@ pub async fn run(c: &Client, cmd: GameCmd) -> Result<()> {
                 print_json(&v);
             }
         }
-        GameCmd::Power { game_server_id, action } => {
+        GameCmd::Power {
+            game_server_id,
+            action,
+        } => {
             let gsid = resolve_game_server_id(c, &game_server_id).await?;
             let path = format!("/api/admin/game-servers/{gsid}/wrapper/power");
             let v = c.post(&path, json!({ "action": action })).await?;
-            println!("\x1b[32mPower action '{}' sent to server {gsid}\x1b[0m", action);
+            println!(
+                "\x1b[32mPower action '{}' sent to server {gsid}\x1b[0m",
+                action
+            );
             print_json(&v);
         }
         GameCmd::Kick { target, reason } => {
@@ -103,7 +107,10 @@ async fn resolve_game_server_id(c: &Client, input: &str) -> Result<String> {
         return Ok(input.to_string());
     }
     if let Ok(v) = c.get("/api/admin/servers").await {
-        if let Some(arr) = v.as_array().or_else(|| v.get("items").and_then(|i| i.as_array())) {
+        if let Some(arr) = v
+            .as_array()
+            .or_else(|| v.get("items").and_then(|i| i.as_array()))
+        {
             for item in arr {
                 let name = item.get("name").and_then(|s| s.as_str()).unwrap_or("");
                 if name.eq_ignore_ascii_case(input) {

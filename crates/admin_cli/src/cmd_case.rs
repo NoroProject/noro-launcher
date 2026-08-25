@@ -30,7 +30,9 @@ pub async fn run(c: &Client, cmd: CaseCmd) -> Result<()> {
             print_json(&v);
         }
         CaseCmd::Get { id } => {
-            let v = c.get(&format!("/api/admin/cases/{}", urlencode(&id))).await?;
+            let v = c
+                .get(&format!("/api/admin/cases/{}", urlencode(&id)))
+                .await?;
             print_json(&v);
         }
         CaseCmd::Close { id, resolution } => {

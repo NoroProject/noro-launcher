@@ -1,8 +1,6 @@
 //! noro-admin — CLI управления мастер-сервером.
 
 mod client;
-mod format;
-mod format_tables;
 mod cmd_audit;
 mod cmd_auth_methods;
 mod cmd_backup;
@@ -25,6 +23,8 @@ mod cmd_server;
 mod cmd_settings;
 mod cmd_token;
 mod cmd_user;
+mod format;
+mod format_tables;
 mod repl;
 mod repl_completer;
 mod util;
@@ -37,7 +37,12 @@ use client::Client;
 #[command(name = "noro-admin", about = "Управление noro мастер-сервером")]
 pub struct Cli {
     /// URL мастера.
-    #[arg(long, env = "NORO_MASTER_URL", default_value = "http://localhost:8080", global = true)]
+    #[arg(
+        long,
+        env = "NORO_MASTER_URL",
+        default_value = "http://localhost:8080",
+        global = true
+    )]
     pub server: String,
     /// Admin-токен (или пользовательский Bearer с правами).
     #[arg(long, env = "NORO_ADMIN_TOKEN", default_value = "", global = true)]
@@ -49,31 +54,105 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Command {
     Interactive,
-    Server { #[command(subcommand)] cmd: cmd_server::ServerCmd },
-    Game { #[command(subcommand)] cmd: cmd_game::GameCmd },
-    Exec { game_server_id: String, command: Vec<String> },
-    Console { game_server_id: String },
-    Power { game_server_id: String, action: String },
-    Build { #[command(subcommand)] cmd: cmd_build::BuildCmd },
-    File { #[command(subcommand)] cmd: cmd_file::FileCmd },
-    Mod { #[command(subcommand)] cmd: cmd_mod::ModCmd },
-    Role { #[command(subcommand)] cmd: cmd_role::RoleCmd },
-    User { #[command(subcommand)] cmd: cmd_user::UserCmd },
-    News { #[command(subcommand)] cmd: cmd_news::NewsCmd },
-    Core { #[command(subcommand)] cmd: cmd_core::CoreCmd },
-    Token { #[command(subcommand)] cmd: cmd_token::TokenCmd },
-    Launcher { #[command(subcommand)] cmd: cmd_launcher::LauncherCmd },
-    Cape { #[command(subcommand)] cmd: cmd_cape::CapeCmd },
-    Info { #[command(subcommand)] cmd: cmd_info::InfoCmd },
-    Audit { #[command(subcommand)] cmd: cmd_audit::AuditCmd },
-    Backup { #[command(subcommand)] cmd: cmd_backup::BackupCmd },
-    Punishment { #[command(subcommand)] cmd: cmd_punishment::PunishmentCmd },
-    ChatFilter { #[command(subcommand)] cmd: cmd_chat_filter::ChatFilterCmd },
-    Blocklist { #[command(subcommand)] cmd: cmd_blocklist::BlocklistCmd },
-    Oauth { #[command(subcommand)] cmd: cmd_oauth::OauthCmd },
-    AuthMethods { #[command(subcommand)] cmd: cmd_auth_methods::AuthMethodCmd },
-    Case { #[command(subcommand)] cmd: cmd_case::CaseCmd },
-    Settings { #[command(subcommand)] cmd: cmd_settings::SettingsCmd },
+    Server {
+        #[command(subcommand)]
+        cmd: cmd_server::ServerCmd,
+    },
+    Game {
+        #[command(subcommand)]
+        cmd: cmd_game::GameCmd,
+    },
+    Exec {
+        game_server_id: String,
+        command: Vec<String>,
+    },
+    Console {
+        game_server_id: String,
+    },
+    Power {
+        game_server_id: String,
+        action: String,
+    },
+    Build {
+        #[command(subcommand)]
+        cmd: cmd_build::BuildCmd,
+    },
+    File {
+        #[command(subcommand)]
+        cmd: cmd_file::FileCmd,
+    },
+    Mod {
+        #[command(subcommand)]
+        cmd: cmd_mod::ModCmd,
+    },
+    Role {
+        #[command(subcommand)]
+        cmd: cmd_role::RoleCmd,
+    },
+    User {
+        #[command(subcommand)]
+        cmd: cmd_user::UserCmd,
+    },
+    News {
+        #[command(subcommand)]
+        cmd: cmd_news::NewsCmd,
+    },
+    Core {
+        #[command(subcommand)]
+        cmd: cmd_core::CoreCmd,
+    },
+    Token {
+        #[command(subcommand)]
+        cmd: cmd_token::TokenCmd,
+    },
+    Launcher {
+        #[command(subcommand)]
+        cmd: cmd_launcher::LauncherCmd,
+    },
+    Cape {
+        #[command(subcommand)]
+        cmd: cmd_cape::CapeCmd,
+    },
+    Info {
+        #[command(subcommand)]
+        cmd: cmd_info::InfoCmd,
+    },
+    Audit {
+        #[command(subcommand)]
+        cmd: cmd_audit::AuditCmd,
+    },
+    Backup {
+        #[command(subcommand)]
+        cmd: cmd_backup::BackupCmd,
+    },
+    Punishment {
+        #[command(subcommand)]
+        cmd: cmd_punishment::PunishmentCmd,
+    },
+    ChatFilter {
+        #[command(subcommand)]
+        cmd: cmd_chat_filter::ChatFilterCmd,
+    },
+    Blocklist {
+        #[command(subcommand)]
+        cmd: cmd_blocklist::BlocklistCmd,
+    },
+    Oauth {
+        #[command(subcommand)]
+        cmd: cmd_oauth::OauthCmd,
+    },
+    AuthMethods {
+        #[command(subcommand)]
+        cmd: cmd_auth_methods::AuthMethodCmd,
+    },
+    Case {
+        #[command(subcommand)]
+        cmd: cmd_case::CaseCmd,
+    },
+    Settings {
+        #[command(subcommand)]
+        cmd: cmd_settings::SettingsCmd,
+    },
 }
 
 #[tokio::main]
@@ -95,14 +174,34 @@ pub async fn execute_command(c: &Client, cmd: Command) -> Result<()> {
     match cmd {
         Command::Interactive => {}
         Command::Game { cmd } => cmd_game::run(c, cmd).await?,
-        Command::Exec { game_server_id, command } => {
-            cmd_game::run(c, cmd_game::GameCmd::Exec { game_server_id, command }).await?;
+        Command::Exec {
+            game_server_id,
+            command,
+        } => {
+            cmd_game::run(
+                c,
+                cmd_game::GameCmd::Exec {
+                    game_server_id,
+                    command,
+                },
+            )
+            .await?;
         }
         Command::Console { game_server_id } => {
             cmd_game::run(c, cmd_game::GameCmd::Console { game_server_id }).await?;
         }
-        Command::Power { game_server_id, action } => {
-            cmd_game::run(c, cmd_game::GameCmd::Power { game_server_id, action }).await?;
+        Command::Power {
+            game_server_id,
+            action,
+        } => {
+            cmd_game::run(
+                c,
+                cmd_game::GameCmd::Power {
+                    game_server_id,
+                    action,
+                },
+            )
+            .await?;
         }
         Command::Server { cmd } => cmd_server::run(c, cmd).await?,
         Command::Build { cmd } => cmd_build::run(c, cmd).await?,

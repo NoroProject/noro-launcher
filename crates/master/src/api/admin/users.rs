@@ -341,7 +341,10 @@ pub async fn upload_skin_for_user(
             let url = state.config.file_url(&stored.sha1);
             let slim = crate::api::skin_model::detect_slim(&data);
             crate::db::set_skin(&state.db, id, Some(&url), slim).await?;
-            let user_name = crate::db::load_profile(&state.db, id).await.map(|p| p.username).unwrap_or_else(|_| "Preset".into());
+            let user_name = crate::db::load_profile(&state.db, id)
+                .await
+                .map(|p| p.username)
+                .unwrap_or_else(|_| "Preset".into());
             let _ = sqlx::query(
                 "INSERT INTO user_skin_presets (user_id, name, skin_url, skin_slim) VALUES ($1, $2, $3, $4)",
             )
@@ -378,10 +381,12 @@ pub async fn add_skin_preset_for_user(
     let profile = crate::db::load_profile(&state.db, id).await?;
     let skin_url = match req.skin_url {
         Some(u) => u,
-        None => profile.skin_url.ok_or_else(|| AppError::BadRequest("User has no current skin".into()))?,
+        None => profile
+            .skin_url
+            .ok_or_else(|| AppError::BadRequest("User has no current skin".into()))?,
     };
     let slim = req.slim.unwrap_or(profile.skin_slim);
-    let name = req.name.unwrap_or_else(|| profile.username);
+    let name = req.name.unwrap_or(profile.username);
 
     let row = sqlx::query_as::<_, SkinPresetItem>(
         "INSERT INTO user_skin_presets (user_id, name, skin_url, skin_slim)

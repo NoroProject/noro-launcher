@@ -14,10 +14,14 @@ use crate::{execute_command, Cli};
 pub async fn run_repl(initial_server: String, initial_token: String) -> Result<()> {
     let mut server = if initial_server == "http://localhost:8080" {
         std::env::var("NORO_MASTER_URL").unwrap_or(initial_server)
-    } else { initial_server };
+    } else {
+        initial_server
+    };
     let mut token = if initial_token.is_empty() {
         std::env::var("NORO_ADMIN_TOKEN").unwrap_or(initial_token)
-    } else { initial_token };
+    } else {
+        initial_token
+    };
 
     let cache = Arc::new(RwLock::new(DynamicCache::default()));
     let helper = ReplHelper::new(cache.clone());
@@ -29,11 +33,16 @@ pub async fn run_repl(initial_server: String, initial_token: String) -> Result<(
     let history_path = dirs::home_dir().map(|h| h.join(".noro_admin_history"));
     let mut rl = Editor::<ReplHelper, DefaultHistory>::with_config(config)?;
     rl.set_helper(Some(helper));
-    if let Some(ref path) = history_path { let _ = rl.load_history(path); }
+    if let Some(ref path) = history_path {
+        let _ = rl.load_history(path);
+    }
 
     println!("\x1b[1;36m✦ noro-admin Interactive Console ✦\x1b[0m");
     println!("Server: \x1b[33m{}\x1b[0m", server);
-    println!("Token:  \x1b[33m{}\x1b[0m", if token.is_empty() { "<none>" } else { "<set>" });
+    println!(
+        "Token:  \x1b[33m{}\x1b[0m",
+        if token.is_empty() { "<none>" } else { "<set>" }
+    );
     println!("Type \x1b[32m'help'\x1b[0m for commands, \x1b[32m'connect <URL> [TOKEN]'\x1b[0m to switch server, \x1b[32m<Tab>\x1b[0m for autocomplete.\n");
 
     let client_init = Client::new(server.clone(), token.clone());
@@ -46,21 +55,32 @@ pub async fn run_repl(initial_server: String, initial_token: String) -> Result<(
         match readline {
             Ok(line) => {
                 let trimmed = line.trim();
-                if trimmed.is_empty() { continue; }
+                if trimmed.is_empty() {
+                    continue;
+                }
                 let _ = rl.add_history_entry(trimmed);
 
                 let mut words = match shell_words::split(trimmed) {
                     Ok(w) => w,
-                    Err(err) => { println!("\x1b[31mCommand parse error:\x1b[0m {err}"); continue; }
+                    Err(err) => {
+                        println!("\x1b[31mCommand parse error:\x1b[0m {err}");
+                        continue;
+                    }
                 };
 
                 let cmd_name = words[0].to_lowercase();
                 match cmd_name.as_str() {
                     "exit" | "quit" | "q" => break,
-                    "clear" | "cls" => { print!("\x1B[2J\x1B[1;1H"); continue; }
+                    "clear" | "cls" => {
+                        print!("\x1B[2J\x1B[1;1H");
+                        continue;
+                    }
                     "status" => {
                         println!("Server: {server}");
-                        println!("Token:  {}", if token.is_empty() { "<none>" } else { "<set>" });
+                        println!(
+                            "Token:  {}",
+                            if token.is_empty() { "<none>" } else { "<set>" }
+                        );
                         let c = Client::new(server.clone(), token.clone());
                         match c.get("/health").await {
                             Ok(_) => println!("Health: \x1b[32mOK\x1b[0m"),
@@ -72,12 +92,16 @@ pub async fn run_repl(initial_server: String, initial_token: String) -> Result<(
                     "connect" | "set-server" => {
                         if words.len() > 1 {
                             server = words[1].clone();
-                            if words.len() > 2 { token = words[2].clone(); }
+                            if words.len() > 2 {
+                                token = words[2].clone();
+                            }
                             println!("Connected to \x1b[33m{server}\x1b[0m");
                             let c = Client::new(server.clone(), token.clone());
                             let cache_clone = cache.clone();
                             tokio::spawn(async move { refresh_cache(&c, cache_clone).await });
-                        } else { println!("Usage: connect <URL> [TOKEN]"); }
+                        } else {
+                            println!("Usage: connect <URL> [TOKEN]");
+                        }
                         continue;
                     }
                     "set-token" => {
@@ -87,23 +111,47 @@ pub async fn run_repl(initial_server: String, initial_token: String) -> Result<(
                             let c = Client::new(server.clone(), token.clone());
                             let cache_clone = cache.clone();
                             tokio::spawn(async move { refresh_cache(&c, cache_clone).await });
-                        } else { println!("Usage: set-token <TOKEN>"); }
+                        } else {
+                            println!("Usage: set-token <TOKEN>");
+                        }
                         continue;
                     }
-                    "help" | "?" => { print_repl_help(); continue; }
-                    "servers" | "ps" => { words = vec!["server".into(), "list".into()]; }
-                    "stats" => { words = vec!["info".into(), "stats".into()]; }
-                    "agents" => { words = vec!["info".into(), "agents".into()]; }
-                    "users" => { words = vec!["user".into(), "list".into()]; }
+                    "help" | "?" => {
+                        print_repl_help();
+                        continue;
+                    }
+                    "servers" | "ps" => {
+                        words = vec!["server".into(), "list".into()];
+                    }
+                    "stats" => {
+                        words = vec!["info".into(), "stats".into()];
+                    }
+                    "agents" => {
+                        words = vec!["info".into(), "agents".into()];
+                    }
+                    "users" => {
+                        words = vec!["user".into(), "list".into()];
+                    }
                     "logs" => {
-                        if words.len() > 1 { words[0] = "console".into(); }
-                        else { println!("Usage: logs <game_server_id>"); continue; }
+                        if words.len() > 1 {
+                            words[0] = "console".into();
+                        } else {
+                            println!("Usage: logs <game_server_id>");
+                            continue;
+                        }
                     }
                     _ => {}
                 }
 
-                let mut args = vec!["noro-admin".to_string(), "--server".to_string(), server.clone()];
-                if !token.is_empty() { args.push("--token".to_string()); args.push(token.clone()); }
+                let mut args = vec![
+                    "noro-admin".to_string(),
+                    "--server".to_string(),
+                    server.clone(),
+                ];
+                if !token.is_empty() {
+                    args.push("--token".to_string());
+                    args.push(token.clone());
+                }
                 args.extend(words);
 
                 match Cli::try_parse_from(args) {
@@ -119,11 +167,16 @@ pub async fn run_repl(initial_server: String, initial_token: String) -> Result<(
                 }
             }
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
-            Err(err) => { println!("Error reading input: {:?}", err); break; }
+            Err(err) => {
+                println!("Error reading input: {:?}", err);
+                break;
+            }
         }
     }
 
-    if let Some(ref path) = history_path { let _ = rl.save_history(path); }
+    if let Some(ref path) = history_path {
+        let _ = rl.save_history(path);
+    }
     println!("Bye!");
     Ok(())
 }
@@ -135,17 +188,29 @@ async fn refresh_cache(c: &Client, cache: Arc<RwLock<DynamicCache>>) {
     let mut role_items = Vec::new();
 
     if let Ok(v) = c.get("/api/admin/servers").await {
-        if let Some(arr) = v.as_array().or_else(|| v.get("items").and_then(|i| i.as_array())) {
+        if let Some(arr) = v
+            .as_array()
+            .or_else(|| v.get("items").and_then(|i| i.as_array()))
+        {
             for item in arr {
-                let name = item.get("name").and_then(|s| s.as_str()).unwrap_or("server");
+                let name = item
+                    .get("name")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("server");
                 if let Some(id) = item.get("id").and_then(|s| s.as_str()) {
-                    server_items.push(CachedItem { id: id.to_string(), label: name.to_string() });
+                    server_items.push(CachedItem {
+                        id: id.to_string(),
+                        label: name.to_string(),
+                    });
                 }
                 if let Some(gs_arr) = item.get("game_servers").and_then(|g| g.as_array()) {
                     for gs in gs_arr {
                         let gs_name = gs.get("name").and_then(|s| s.as_str()).unwrap_or(name);
                         if let Some(gs_id) = gs.get("id").and_then(|s| s.as_str()) {
-                            server_items.push(CachedItem { id: gs_id.to_string(), label: gs_name.to_string() });
+                            server_items.push(CachedItem {
+                                id: gs_id.to_string(),
+                                label: gs_name.to_string(),
+                            });
                         }
                     }
                 }
@@ -154,35 +219,62 @@ async fn refresh_cache(c: &Client, cache: Arc<RwLock<DynamicCache>>) {
     }
 
     if let Ok(v) = c.get("/api/admin/users").await {
-        if let Some(arr) = v.as_array().or_else(|| v.get("items").and_then(|i| i.as_array())) {
+        if let Some(arr) = v
+            .as_array()
+            .or_else(|| v.get("items").and_then(|i| i.as_array()))
+        {
             for item in arr {
-                let name = item.get("username").and_then(|s| s.as_str()).unwrap_or("user");
+                let name = item
+                    .get("username")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("user");
                 if let Some(id) = item.get("id").and_then(|s| s.as_str()) {
-                    user_items.push(CachedItem { id: id.to_string(), label: name.to_string() });
+                    user_items.push(CachedItem {
+                        id: id.to_string(),
+                        label: name.to_string(),
+                    });
                 }
             }
         }
     }
 
     if let Ok(v) = c.get("/api/admin/builds").await {
-        if let Some(arr) = v.as_array().or_else(|| v.get("items").and_then(|i| i.as_array())) {
+        if let Some(arr) = v
+            .as_array()
+            .or_else(|| v.get("items").and_then(|i| i.as_array()))
+        {
             for item in arr {
-                let ver = item.get("version").and_then(|s| s.as_str()).unwrap_or("build");
-                let mc = item.get("mc_version").and_then(|s| s.as_str()).unwrap_or("");
+                let ver = item
+                    .get("version")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("build");
+                let mc = item
+                    .get("mc_version")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("");
                 let label = format!("{ver} ({mc})");
                 if let Some(id) = item.get("id").and_then(|s| s.as_str()) {
-                    build_items.push(CachedItem { id: id.to_string(), label });
+                    build_items.push(CachedItem {
+                        id: id.to_string(),
+                        label,
+                    });
                 }
             }
         }
     }
 
     if let Ok(v) = c.get("/api/admin/roles").await {
-        if let Some(arr) = v.as_array().or_else(|| v.get("items").and_then(|i| i.as_array())) {
+        if let Some(arr) = v
+            .as_array()
+            .or_else(|| v.get("items").and_then(|i| i.as_array()))
+        {
             for item in arr {
                 let name = item.get("name").and_then(|s| s.as_str()).unwrap_or("role");
                 if let Some(id) = item.get("id").and_then(|s| s.as_str()) {
-                    role_items.push(CachedItem { id: id.to_string(), label: name.to_string() });
+                    role_items.push(CachedItem {
+                        id: id.to_string(),
+                        label: name.to_string(),
+                    });
                 }
             }
         }
@@ -203,8 +295,12 @@ fn print_repl_help() {
     println!("  \x1b[36mconsole\x1b[0m      View live console logs of a game server");
     println!("  \x1b[36mpower\x1b[0m        Control server power state (start|stop|restart|kill)");
     println!("  \x1b[36mbuild\x1b[0m        List, inspect, create, publish, delete builds");
-    println!("  \x1b[36mfile\x1b[0m         Manage files in builds (upload, download, move, delete)");
-    println!("  \x1b[36mmod\x1b[0m          Search Modrinth/CurseForge and install mods into builds");
+    println!(
+        "  \x1b[36mfile\x1b[0m         Manage files in builds (upload, download, move, delete)"
+    );
+    println!(
+        "  \x1b[36mmod\x1b[0m          Search Modrinth/CurseForge and install mods into builds"
+    );
     println!("  \x1b[36mrole / user\x1b[0m  Manage roles, users, bans, permissions, capes");
     println!("  \x1b[36mnews / core\x1b[0m  Manage news posts and server core JARs");
     println!("  \x1b[36mtoken / cape\x1b[0m Manage admin tokens and player capes");
