@@ -157,6 +157,9 @@ nodes! {
     PERM_INTEGRITY_REVIEW     = "noro.admin.integrity.review",   "Safety", "Review and close flags";
     PERM_BLOCKLIST_VIEW       = "noro.admin.blocklist.view",     "Safety", "See the blocked files list";
     PERM_BLOCKLIST_EDIT       = "noro.admin.blocklist.edit",     "Safety", "Edit the blocked files list";
+    PERM_CHAT_FILTERS_VIEW    = "noro.admin.chat_filters.view",  "Safety", "See chat filters and automod";
+    PERM_CHAT_FILTERS_EDIT    = "noro.admin.chat_filters.edit",  "Safety", "Edit chat filters and automod";
+    PERM_CHAT_FILTERS_DELETE  = "noro.admin.chat_filters.delete","Safety", "Delete chat filters";
 
     // --- Поддержка ------------------------------------------------------------
     PERM_SUPPORT_LOGS         = "noro.admin.support.logs",       "Support", "Read log bundles";
@@ -169,12 +172,22 @@ nodes! {
     PERM_SUPPORT_DOWNLOAD     = "noro.admin.support.download",   "Support", "Download a log bundle";
     PERM_SUPPORT_DELETE       = "noro.admin.support.delete",     "Support", "Delete log bundles";
 
+    // --- Модераторские сообщения ----------------------------------------------
+    PERM_MODERATION_VIEW      = "noro.admin.moderation.view",    "Moderation", "See moderation templates and messages";
+    PERM_MODERATION_EDIT      = "noro.admin.moderation.edit",    "Moderation", "Edit moderation templates and messages";
+
     // --- Система --------------------------------------------------------------
     PERM_ROLES_VIEW           = "noro.admin.roles.view",         "System", "See roles";
     PERM_ROLES_EDIT           = "noro.admin.roles.edit",         "System", "Create and edit roles";
     PERM_AUDIT                = "noro.admin.audit",              "System", "Read the admin journal";
     PERM_SETTINGS_VIEW        = "noro.admin.settings.view",      "System", "See instance settings";
     PERM_SETTINGS_EDIT        = "noro.admin.settings.edit",      "System", "Change instance settings";
+    PERM_AUTH_METHODS_VIEW    = "noro.admin.auth_methods.view",  "System", "See auth methods";
+    PERM_AUTH_METHODS_EDIT    = "noro.admin.auth_methods.edit",  "System", "Configure auth methods";
+    PERM_TOKENS_VIEW          = "noro.admin.tokens.view",        "System", "See admin API tokens";
+    PERM_TOKENS_MANAGE        = "noro.admin.tokens.manage",      "System", "Create and revoke admin API tokens";
+    PERM_RESTARTS_VIEW        = "noro.admin.restarts.view",      "Servers", "See server restart schedules";
+    PERM_RESTARTS_EDIT        = "noro.admin.restarts.edit",      "Servers", "Manage server restart schedules";
     PERM_OAUTH_VIEW           = "noro.admin.oauth.view",         "System", "See OAuth2 applications";
     PERM_OAUTH_MANAGE         = "noro.admin.oauth.manage",       "System", "Review applications, grant scopes, block them";
     // Операция удаляет файлы с диска, и восстановить их можно только

@@ -673,7 +673,16 @@ admin-tokens-empty-title = No tokens yet
 admin-tokens-empty-text = Create a CLI token from the toolbar.
 admin-tokens-modal-title = NEW TOKEN
 admin-tokens-modal-subtitle = Secret will be shown once
-admin-tokens-perms-label = Permissions, one per line
+admin-tokens-perms-label = Permissions
+admin-tokens-preset-title = Role Presets:
+admin-tokens-preset-superadmin = 👑 Super Admin (*)
+admin-tokens-preset-fulladmin = 🛡️ Full Admin (noro.admin.*)
+admin-tokens-preset-senior-mod = ⚔️ Senior Moderator
+admin-tokens-preset-junior-mod = 🤝 Junior Helper
+admin-tokens-preset-custom = 🧹 Custom Set
+admin-tokens-custom-toggle = Enter permissions manually as text
+admin-tokens-select-all = Select all
+admin-tokens-deselect-all = Deselect all
 
 ## User moderation
 admin-users-version = Version

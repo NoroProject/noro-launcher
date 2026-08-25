@@ -6,6 +6,8 @@ export interface PermissionSuggestion {
   source: 'game' | 'launcher';
   /** Человекочитаемое пояснение; у игровых узлов его нет. */
   label: string | null;
+  /** Раздел для группировки в редакторе ролей. */
+  group?: string | null;
 }
 
 /** Право с контекстом сборки. `server_id: null` — глобально. */

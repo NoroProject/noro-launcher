@@ -94,8 +94,8 @@ export function useAdminNav() {
                 { label: t('nav-admin-news'), to: adminLink.news(), icon: 'i-lucide-newspaper', perms: ['noro.admin.news.view'] },
                 { label: t('nav-admin-rules'), to: adminLink.rules(), icon: 'i-lucide-book-open', perms: ['noro.admin.rules.view'] },
                 { label: t('nav-admin-cases'), to: adminLink.cases(), icon: 'i-lucide-gavel', perms: ['noro.mod.cases.view'] },
-                { label: t('nav-admin-automod'), to: adminLink.automod(), icon: 'i-lucide-shield-alert', perms: ['noro.admin.settings.view'] },
-                { label: t('nav-admin-moderation'), to: adminLink.moderation(), icon: 'i-lucide-message-square-warning', perms: ['noro.admin.settings.view'] },
+                { label: t('nav-admin-automod'), to: adminLink.automod(), icon: 'i-lucide-shield-alert', perms: ['noro.admin.chat_filters.view'] },
+                { label: t('nav-admin-moderation'), to: adminLink.moderation(), icon: 'i-lucide-message-square-warning', perms: ['noro.admin.moderation.view'] },
                 { label: t('nav-admin-translations'), to: adminLink.translations(), icon: 'i-lucide-languages', perms: ['noro.admin.translations.view'] },
                 { label: t('nav-admin-wrapper'), to: adminLink.wrapper(), icon: 'i-lucide-package', perms: ['noro.admin.wrapper.view'] },
             ],
@@ -107,7 +107,7 @@ export function useAdminNav() {
             label: t('nav-group-auth'),
             items: [
                 { label: t('nav-admin-apps'), to: adminLink.apps(), icon: 'i-lucide-app-window', perms: ['noro.admin.oauth.view'] },
-                { label: t('nav-admin-tokens'), to: adminLink.launcherTokens(), icon: 'i-lucide-key-round', perms: ['noro.admin.launcher.tokens'] },
+                { label: t('nav-admin-tokens'), to: adminLink.launcherTokens(), icon: 'i-lucide-key-round', perms: ['noro.admin.launcher.tokens', 'noro.admin.tokens.view'] },
             ],
         },
         {
@@ -117,7 +117,7 @@ export function useAdminNav() {
                 { label: t('nav-admin-launcher'), to: adminLink.launcher(), icon: 'i-lucide-rocket', perms: ['noro.admin.launcher.view'] },
                 { label: t('nav-admin-audit'), to: adminLink.audit(), icon: 'i-lucide-scroll-text', perms: ['noro.admin.audit'] },
                 { label: t('nav-admin-support'), to: adminLink.support(), icon: 'i-lucide-folder-archive', perms: ['noro.admin.support.logs'] },
-                { label: t('nav-admin-backup'), to: adminLink.backup(), icon: 'i-lucide-database-backup', perms: ['noro.admin.settings.view'] },
+                { label: t('nav-admin-backup'), to: adminLink.backup(), icon: 'i-lucide-database-backup', perms: ['noro.admin.backup'] },
                 { label: t('nav-admin-settings'), to: adminLink.settings(), icon: 'i-lucide-sliders-horizontal', perms: ['noro.admin.settings.view'] },
             ],
         },

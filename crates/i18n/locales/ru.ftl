@@ -678,7 +678,16 @@ admin-tokens-empty-title = Токенов пока нет
 admin-tokens-empty-text = Создайте токен CLI с помощью кнопки вверху.
 admin-tokens-modal-title = НОВЫЙ ТОКЕН
 admin-tokens-modal-subtitle = Секрет будет показан только один раз
-admin-tokens-perms-label = Права (по одному на строку)
+admin-tokens-perms-label = Права доступа
+admin-tokens-preset-title = Готовые шаблоны ролей:
+admin-tokens-preset-superadmin = 👑 Полный доступ (*)
+admin-tokens-preset-fulladmin = 🛡️ Админ панели (noro.admin.*)
+admin-tokens-preset-senior-mod = ⚔️ Модератор
+admin-tokens-preset-junior-mod = 🤝 Хелпер
+admin-tokens-preset-custom = 🧹 Свой набор
+admin-tokens-custom-toggle = Ввести права вручную текстом
+admin-tokens-select-all = Выбрать всё
+admin-tokens-deselect-all = Снять всё
 
 ## Модерация пользователей
 admin-users-version = Версия

@@ -117,7 +117,7 @@ async function revoke(id: string) {
     <AtomModal v-model="showCreate" :title="t('admin-tokens-modal-title')" :subtitle="t('admin-tokens-modal-subtitle')">
       <form class="grid gap-3" @submit.prevent="createToken">
         <label><span class="noro-label">{{ t('admin-roles-name') }}</span><input v-model="form.name" class="noro-input" required></label>
-        <label><span class="noro-label">{{ t('admin-tokens-perms-label') }}</span><textarea v-model="form.permissions" class="noro-input min-h-28" /></label>
+        <AdminTokenPermissionPicker v-model="form.permissions" />
         <div class="flex justify-end gap-3 pt-2">
           <AtomButton variant="secondary" @click="showCreate = false">{{ t('web-rules-cancel') }}</AtomButton>
           <AtomButton

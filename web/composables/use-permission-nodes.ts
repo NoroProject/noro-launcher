@@ -6,7 +6,7 @@ import type { PermissionSuggestion } from '~/types/permissions'
  * только вместе с контекстом сборки, поэтому каталог перезапрашивается при смене
  * контекста и кэшируется на время жизни экрана.
  */
-export function usePermissionNodes(serverId: Ref<string>) {
+export function usePermissionNodes(serverId: Ref<string> = ref('')) {
   const auth = useAuth()
   const suggestions = ref<PermissionSuggestion[]>([])
   const pending = ref(false)
