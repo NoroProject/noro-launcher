@@ -18,6 +18,9 @@ const emit = defineEmits<{
 const { t } = useT()
 const node = ref('')
 const contextDropdownOpen = ref(false)
+const contextAnchor = ref<HTMLElement | null>(null)
+const { style: contextPopupStyle } = useAnchoredPopup(contextAnchor, contextDropdownOpen)
+
 const global = ref(true)
 const picked = ref<string[]>([])
 
@@ -119,6 +122,7 @@ function removeAll(permission: string) {
       <div class="mt-1 flex items-start gap-2">
         <div class="relative w-44 shrink-0">
           <button
+            ref="contextAnchor"
             type="button"
             class="noro-input w-full !flex items-center justify-between bg-[var(--noro-input)] text-xs font-semibold text-[var(--noro-text)] cursor-pointer"
             @click="contextDropdownOpen = !contextDropdownOpen"
@@ -128,45 +132,48 @@ function removeAll(permission: string) {
           </button>
 
           <Teleport to="body">
+            <!-- Invisible backdrop to catch outside clicks without z-index issues -->
             <div
               v-if="contextDropdownOpen"
               class="fixed inset-0 z-40"
-              @click="contextDropdownOpen = false"
+              @mousedown="contextDropdownOpen = false"
             ></div>
+            
+            <div
+              v-if="contextDropdownOpen"
+              class="absolute z-50 mt-1.5 w-56 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-panel-2)] p-1 shadow-xl flex flex-col max-h-60 overflow-y-auto noro-scroll"
+              :style="contextPopupStyle"
+              @mousedown.stop
+            >
+              <button
+                type="button"
+                class="flex items-center justify-between rounded px-2.5 py-2 text-xs font-semibold transition hover:bg-[var(--noro-input)]"
+                :class="global ? 'text-[var(--noro-blue)]' : 'text-[var(--noro-text)]'"
+                @click="toggleGlobal"
+              >
+                <span>{{ t('admin-perm-all-builds') }}</span>
+                <UIcon v-if="global" name="i-lucide-check" class="size-4 shrink-0" />
+              </button>
+              
+              <div class="h-px bg-[var(--noro-border)] mx-1 my-1"></div>
+              
+              <button
+                v-for="server in servers"
+                :key="server.id"
+                type="button"
+                class="flex items-center justify-between rounded px-2.5 py-2 text-xs font-semibold transition hover:bg-[var(--noro-input)]"
+                :class="[
+                  global ? 'opacity-50 cursor-not-allowed' : '',
+                  !global && picked.includes(server.id) ? 'text-[var(--noro-blue)]' : 'text-[var(--noro-text)]'
+                ]"
+                :disabled="global"
+                @click="togglePicked(server.id)"
+              >
+                <span class="truncate">{{ server.name }}</span>
+                <UIcon v-if="!global && picked.includes(server.id)" name="i-lucide-check" class="size-4 shrink-0" />
+              </button>
+            </div>
           </Teleport>
-          
-          <div
-            v-if="contextDropdownOpen"
-            class="absolute top-full left-0 mt-1.5 w-56 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-panel-2)] p-1 shadow-xl z-50 flex flex-col max-h-60 overflow-y-auto noro-scroll"
-          >
-            <button
-              type="button"
-              class="flex items-center justify-between rounded px-2.5 py-2 text-xs font-semibold transition hover:bg-[var(--noro-input)]"
-              :class="global ? 'text-[var(--noro-blue)]' : 'text-[var(--noro-text)]'"
-              @click="toggleGlobal"
-            >
-              <span>{{ t('admin-perm-all-builds') }}</span>
-              <UIcon v-if="global" name="i-lucide-check" class="size-4 shrink-0" />
-            </button>
-            
-            <div class="h-px bg-[var(--noro-border)] mx-1 my-1"></div>
-            
-            <button
-              v-for="server in servers"
-              :key="server.id"
-              type="button"
-              class="flex items-center justify-between rounded px-2.5 py-2 text-xs font-semibold transition hover:bg-[var(--noro-input)]"
-              :class="[
-                global ? 'opacity-50 cursor-not-allowed' : '',
-                !global && picked.includes(server.id) ? 'text-[var(--noro-blue)]' : 'text-[var(--noro-text)]'
-              ]"
-              :disabled="global"
-              @click="togglePicked(server.id)"
-            >
-              <span class="truncate">{{ server.name }}</span>
-              <UIcon v-if="!global && picked.includes(server.id)" name="i-lucide-check" class="size-4 shrink-0" />
-            </button>
-          </div>
         </div>
         <div class="min-w-0 flex-1">
           <AdminPermissionInput v-model="node" :suggestions="suggestions" :loading="pending" @submit="add" />
