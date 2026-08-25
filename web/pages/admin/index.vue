@@ -3,6 +3,14 @@ const auth = useAuth()
 const { t } = useT()
 await auth.loadMe()
 
+if (!auth.hasPermission('noro.admin.stats')) {
+  const { visibleGroups } = useAdminNav()
+  const first = visibleGroups.value[0]?.items[0]?.to
+  if (first && first !== '/admin') {
+    await navigateTo(first)
+  }
+}
+
 const { data: stats, pending, refresh, error } = await useAsyncData('admin-stats', () =>
   auth.request<Record<string, number>>('/api/admin/stats')
 )

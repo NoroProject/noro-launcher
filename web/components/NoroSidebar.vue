@@ -25,6 +25,10 @@ const initials = computed(() =>
     (auth.user.value?.username || identityHandle(auth.user.value) || "N")[0].toUpperCase()
 );
 
+const firstAvailableAdminRoute = computed(() => {
+    return visibleAdminGroups.value[0]?.items[0]?.to || '/admin';
+});
+
 const navEl = ref<HTMLElement | null>(null);
 const navScroll = useState('noro-sidebar-scroll', () => 0);
 
@@ -127,7 +131,7 @@ const openSpotlight = useState('noro-spotlight-open', () => false);
         <div class="shrink-0 border-t border-[var(--noro-border)] bg-[var(--noro-sidebar)] p-4">
             <NuxtLink
                 v-if="inAdminArea || canAdmin"
-                :to="inAdminArea ? '/cabinet' : '/admin'"
+                :to="inAdminArea ? '/cabinet' : firstAvailableAdminRoute"
                 class="mb-3 flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-bold text-[var(--noro-muted)] transition-all duration-200 hover:scale-[1.02] hover:bg-[var(--noro-panel)] hover:text-[var(--noro-text)]"
             >
                 <UIcon :name="inAdminArea ? 'i-lucide-user-round' : 'i-lucide-layout-dashboard'" class="size-3.5 shrink-0" />
