@@ -1,6 +1,6 @@
 //! 3D изометрический движок рендеринга скинов с суперсемплингом высокого качества.
 
-use super::skin_render_math::{rasterize_quad_highres, Mat3, V3};
+use super::skin_render_math::{rasterize_quad_highres, Canvas, Mat3, V3};
 use super::skin_render_parts::{build_quads, BodyPart};
 use image::imageops::FilterType;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
@@ -14,7 +14,7 @@ pub fn render_3d(
     yaw_deg: f32,
     pitch_deg: f32,
     sway: f32,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, image::ImageError> {
     let is_legacy = skin.height() == 32;
     let is_slim = skin.width() == 64 && skin.get_pixel(54, 20)[3] == 0;
 
@@ -211,12 +211,14 @@ pub fn render_3d(
             skin,
             &mut canvas,
             &mut z_buf,
-            hi_cw,
-            hi_ch,
-            cx,
-            cy,
-            center_y,
-            res_mult,
+            Canvas {
+                w: hi_cw,
+                h: hi_ch,
+                cx,
+                cy,
+                center_y,
+                res_mult,
+            },
         );
     }
 
@@ -224,6 +226,6 @@ pub fn render_3d(
     let final_h = (ch * scale).max(128);
     let scaled = DynamicImage::ImageRgba8(canvas).resize(final_w, final_h, FilterType::Triangle);
     let mut bytes = Vec::new();
-    let _ = scaled.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png);
-    bytes
+    scaled.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)?;
+    Ok(bytes)
 }

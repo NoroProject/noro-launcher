@@ -1,11 +1,15 @@
 //! Админ: база запрещённых файлов.
 
 use crate::api::auth::AdminAuth;
+use crate::api::created::created;
+use crate::api::paging::Page;
+use crate::api::validate::Validation;
 use crate::audit;
 use crate::db::blocklist::BlockedFileRow;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
+use axum::response::Response;
 use axum::Json;
 use schema::{PERM_BLOCKLIST_EDIT, PERM_BLOCKLIST_VIEW};
 
@@ -16,9 +20,11 @@ use uuid::Uuid;
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<BlockedFileRow>>> {
+) -> AppResult<Json<Page<BlockedFileRow>>> {
     admin.require(PERM_BLOCKLIST_VIEW)?;
-    Ok(Json(crate::db::list_blocked_files(&state.db).await?))
+    Ok(Json(Page::whole(
+        crate::db::list_blocked_files(&state.db).await?,
+    )))
 }
 
 #[derive(Deserialize)]
@@ -39,7 +45,7 @@ pub async fn create(
     State(state): State<AppState>,
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
-) -> AppResult<Json<Value>> {
+) -> AppResult<Response> {
     admin.require(PERM_BLOCKLIST_EDIT)?;
 
     let pattern = req
@@ -50,27 +56,26 @@ pub async fn create(
         .sha1
         .map(|s| s.trim().to_lowercase())
         .filter(|s| !s.is_empty());
-    // Пустое правило матчило бы всё подряд и снесло игроку каталог.
-    if pattern.is_none() && sha1.is_none() {
-        return Err(AppError::BadRequest(
-            "either a glob or a sha1 is required".into(),
-        ));
-    }
-    if let Some(h) = &sha1 {
-        if h.len() != 40 || !h.chars().all(|c| c.is_ascii_hexdigit()) {
-            return Err(AppError::BadRequest("sha1 is 40 hex characters".into()));
-        }
-    }
-    if req.reason.trim().len() < 3 {
-        return Err(AppError::BadRequest(
-            "a reason is required: it lands in the flag an admin will read".into(),
-        ));
-    }
-
     let action = req.action.as_deref().unwrap_or("delete");
-    if !matches!(action, "delete" | "flag" | "block_launch") {
-        return Err(AppError::BadRequest("unknown action".into()));
-    }
+
+    Validation::new()
+        // Пустое правило матчило бы всё подряд и снесло игроку каталог.
+        .any_of("pattern", pattern.is_some() || sha1.is_some())
+        .rule(
+            "sha1",
+            sha1.as_ref()
+                .is_none_or(|h| h.len() == 40 && h.chars().all(|c| c.is_ascii_hexdigit())),
+            "invalid_format",
+            "sha1 is 40 hex characters",
+        )
+        .rule(
+            "reason",
+            req.reason.trim().chars().count() >= 3,
+            "too_short",
+            "a reason is required: it lands in the flag an admin will read",
+        )
+        .one_of("action", action, &["delete", "flag", "block_launch"])
+        .finish()?;
 
     let row = crate::db::create_blocked_file(
         &state.db,
@@ -92,7 +97,10 @@ pub async fn create(
     )
     .await;
 
-    Ok(Json(json!(row)))
+    Ok(created(
+        format!("/api/admin/blocklist/{}", row.id),
+        json!(row),
+    ))
 }
 
 pub async fn delete(

@@ -108,7 +108,10 @@ pub async fn revoke_punishment(
         .await?
         .ok_or_else(|| AppError::NotFound("no such punishment".into()))?;
     if !crate::db::revoke_punishment(&state.db, id, actor.id).await? {
-        return Err(AppError::BadRequest("it is already lifted".into()));
+        return Err(AppError::state(
+            crate::error_codes::ALREADY_LIFTED,
+            "it is already lifted",
+        ));
     }
     if punishment.kind == "ban" {
         crate::db::refresh_ban_flag(&state.db, punishment.user_id).await?;

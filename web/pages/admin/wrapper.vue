@@ -8,7 +8,7 @@ await auth.loadMe()
 const host = useRequestURL().host
 
 const { data: files } = await useAsyncData('admin-agents', () =>
-  auth.request<AgentFile[]>('/api/admin/agents'), { default: () => [] as AgentFile[] }
+  auth.requestList<AgentFile>('/api/admin/agents'), { default: () => [] as AgentFile[] }
 )
 
 const wrapper = computed(() => files.value.find(file => file.platform === 'wrapper') || null)

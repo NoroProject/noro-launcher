@@ -45,6 +45,9 @@ pub struct Role {
     /// Что стоит после ника. Тот же формат, что и у префикса.
     #[serde(default)]
     pub suffix: Option<String>,
+    /// Своя картинка плашки. Пусто — плашку рисует мастер сам.
+    #[serde(default)]
+    pub badge_sha1: Option<String>,
     /// Те же права, но с контекстом сборки. `permissions` остаётся плоским:
     /// проверки прав про контекст не знают, он нужен только админке.
     #[serde(default)]
@@ -59,20 +62,35 @@ pub struct Role {
     pub inherited_permissions: Vec<Permission>,
 }
 
+/// Привязка аккаунта к внешней платформе. Их у игрока может быть несколько:
+/// вход через любую ведёт в один и тот же аккаунт.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UserIdentity {
+    /// Машинное имя платформы: "discord", "twitch", "google".
+    pub provider: String,
+    /// Идентификатор на стороне платформы.
+    pub provider_user_id: String,
+    pub username: Option<String>,
+    pub avatar_url: Option<String>,
+    /// Платформа, через которую игрок зарегистрировался: из неё выведен его
+    /// MC-UUID, и отвязать её нельзя.
+    #[serde(default)]
+    pub is_primary: bool,
+    pub linked_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UserProfile {
     /// Внутренний UUID пользователя в БД мастера. Нужен админке, CLI и ACL-операциям.
     pub id: Uuid,
-    /// MC UUID (UUID v5 из discord_id).
+    /// MC UUID (UUID v5 из первичной привязки).
     pub uuid: Uuid,
     /// MC ник.
     pub username: String,
-    /// Пусто у локального аккаунта: он заведён оператором, а не Discord'ом.
+    /// Привязанные платформы. Пусто у локального аккаунта: он заведён
+    /// оператором, а не внешним входом.
     #[serde(default)]
-    pub discord_id: Option<String>,
-    #[serde(default)]
-    pub discord_username: Option<String>,
-    pub discord_avatar: Option<String>,
+    pub identities: Vec<UserIdentity>,
     pub skin_url: Option<String>,
     /// Тонкая модель (Алекс). `false` — классическая (Стив): именно её клиент
     /// подразумевает, когда метаданных у текстуры нет, поэтому она и умолчание.
@@ -88,6 +106,18 @@ pub struct UserProfile {
     pub permission_grants: Vec<PermissionGrant>,
     #[serde(default)]
     pub banned: bool,
+    /// Чем бан объяснён. Рядом с флагом, а не только в журнале: первым делом
+    /// в карточке ищут именно причину.
+    #[serde(default)]
+    pub ban_reason: Option<String>,
+    /// Когда аккаунт заведён и когда игрок заходил в последний раз.
+    ///
+    /// Опциональны: их знает только мастер, а профиль ходит и обратно — от
+    /// лаунчера, которому эти поля взять неоткуда.
+    #[serde(default)]
+    pub created_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub last_login_at: Option<DateTime<Utc>>,
     /// Заведён оператором, без привязки к Discord.
     #[serde(default)]
     pub is_local_account: bool,
@@ -106,6 +136,36 @@ pub struct UserProfile {
     pub freeze_info: Option<FreezeInfo>,
     #[serde(default)]
     pub silent_join: bool,
+}
+
+impl UserProfile {
+    /// Платформа, через которую игрок зарегистрировался. У аккаунтов, заведённых
+    /// до появления флага, первой идёт самая старая привязка — она же и была
+    /// единственной.
+    pub fn primary_identity(&self) -> Option<&UserIdentity> {
+        self.identities
+            .iter()
+            .find(|i| i.is_primary)
+            .or_else(|| self.identities.first())
+    }
+
+    /// Ник на платформе — то, как игрок называет себя вне игры. `None` у
+    /// локального аккаунта: он заведён оператором и платформы не имеет.
+    pub fn handle(&self) -> Option<&str> {
+        self.primary_identity()?.username.as_deref()
+    }
+
+    /// Аватар: с первичной платформы, а если там его нет — с любой другой.
+    pub fn avatar_url(&self) -> Option<&str> {
+        self.primary_identity()
+            .and_then(|i| i.avatar_url.as_deref())
+            .or_else(|| self.identities.iter().find_map(|i| i.avatar_url.as_deref()))
+    }
+
+    /// Привязана ли конкретная платформа.
+    pub fn identity(&self, provider: &str) -> Option<&UserIdentity> {
+        self.identities.iter().find(|i| i.provider == provider)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

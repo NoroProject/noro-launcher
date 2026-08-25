@@ -7,19 +7,6 @@ use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
-pub struct OAuthApp {
-    pub id: Uuid,
-    pub client_id: String,
-    pub client_secret_hash: String,
-    pub name: String,
-    pub icon_url: Option<String>,
-    pub description: Option<String>,
-    pub redirect_uris: String,
-    pub is_trusted: bool,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
 pub struct AuthorizedAppInfo {
     pub id: Uuid,
     pub app_id: Uuid,
@@ -29,16 +16,6 @@ pub struct AuthorizedAppInfo {
     pub description: Option<String>,
     pub scopes: String,
     pub authorized_at: DateTime<Utc>,
-}
-
-pub async fn get_oauth_app_by_client_id(db: &PgPool, client_id: &str) -> Result<Option<OAuthApp>> {
-    let row = sqlx::query_as::<_, OAuthApp>(
-        "SELECT id, client_id, client_secret_hash, name, icon_url, description, redirect_uris, is_trusted, created_at FROM oauth_applications WHERE client_id = $1"
-    )
-    .bind(client_id)
-    .fetch_optional(db)
-    .await?;
-    Ok(row)
 }
 
 pub async fn list_user_authorized_apps(
@@ -104,11 +81,15 @@ pub async fn create_oauth_code(
     app_id: Uuid,
     redirect_uri: &str,
     scopes: &str,
+    code_challenge: Option<&str>,
 ) -> Result<Uuid> {
     let code = Uuid::new_v4();
     let expires = Utc::now() + chrono::Duration::minutes(10);
     sqlx::query(
-        "INSERT INTO oauth_codes (code, user_id, app_id, redirect_uri, scopes, expires_at) VALUES ($1, $2, $3, $4, $5, $6)"
+        "INSERT INTO oauth_codes
+             (code, user_id, app_id, redirect_uri, scopes, expires_at,
+              code_challenge, code_challenge_method)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7::text IS NULL THEN NULL ELSE 'S256' END)",
     )
     .bind(code)
     .bind(user_id)
@@ -116,17 +97,28 @@ pub async fn create_oauth_code(
     .bind(redirect_uri)
     .bind(scopes)
     .bind(expires)
+    .bind(code_challenge)
     .execute(db)
     .await?;
     Ok(code)
 }
 
-pub async fn take_oauth_code(
-    db: &PgPool,
-    code: Uuid,
-) -> Result<Option<(Uuid, Uuid, String, String)>> {
-    let row = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
-        "DELETE FROM oauth_codes WHERE code = $1 AND used = FALSE AND expires_at > NOW() RETURNING user_id, app_id, redirect_uri, scopes"
+/// Выданный код. Забирается ровно один раз: строка удаляется тем же запросом,
+/// поэтому повторный обмен ничего не находит.
+#[derive(Debug, FromRow)]
+pub struct TakenCode {
+    pub user_id: Uuid,
+    pub app_id: Uuid,
+    pub redirect_uri: String,
+    pub scopes: String,
+    pub code_challenge: Option<String>,
+    pub code_challenge_method: Option<String>,
+}
+
+pub async fn take_oauth_code(db: &PgPool, code: Uuid) -> Result<Option<TakenCode>> {
+    let row = sqlx::query_as::<_, TakenCode>(
+        "DELETE FROM oauth_codes WHERE code = $1 AND used = FALSE AND expires_at > NOW()
+         RETURNING user_id, app_id, redirect_uri, scopes, code_challenge, code_challenge_method",
     )
     .bind(code)
     .fetch_optional(db)

@@ -31,15 +31,31 @@ final class ModCommands {
     private final RuleCommands ruleCmds;
     private final RuleCatalog rules;
     private final ModSuggestions suggestions;
+    private final Moderation moderation;
 
     ModCommands(MasterClient master, Moderation moderation, RuleCatalog rules, Logger log) {
+        this.moderation = moderation;
         this.commands = new ModerationCommands(master, moderation, log);
         this.freezeCmd = new FreezeCommand(master, moderation, log);
-        this.reportCmd = new ReportCommand(master, log);
+        // Мост спрашиваем лениво: applier появляется со стартом канала, а дерево
+        // команд строится раньше — как и у CaseCommands ниже.
+        this.reportCmd = new ReportCommand(master, () -> {
+            var applier = moderation.applier();
+            return applier == null ? null : applier.bridge();
+        }, log);
         this.checkCmd = new CheckCommand(master, log);
         this.ruleCmds = new RuleCommands(rules);
         this.rules = rules;
         this.suggestions = new ModSuggestions(commands, rules);
+    }
+
+    /**
+     * Команда разбора собирается на каждый вызов: {@link dev.noro.agent.core.CaseMode}
+     * появляется только со стартом канала, а дерево команд строится раньше.
+     */
+    private dev.noro.agent.core.CaseCommands caseCmd() {
+        return new dev.noro.agent.core.CaseCommands(
+                moderation.cases(), moderation.applier().bridge(), moderation.events(), freezeCmd);
     }
 
     void register(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -77,6 +93,21 @@ final class ModCommands {
         // unfreeze
         dispatcher.register(target("unfreeze", "noro.mod.freeze", (source, name) ->
                 freezeCmd.unfreeze(new ModSender(source), new String[] {name}, null)));
+
+        // case: клик по меню разбора приходит сюда же, что и набранная команда
+        dispatcher.register(Commands.literal("case")
+                .requires(source -> allowed(source, "noro.mod.cases.view"))
+                .executes(context -> {
+                    caseCmd().execute(new ModSender(context.getSource()), new String[0], null);
+                    return 1;
+                })
+                .then(Commands.argument("args", StringArgumentType.greedyString())
+                        .executes(context -> {
+                            String raw = StringArgumentType.getString(context, "args");
+                            caseCmd().execute(
+                                    new ModSender(context.getSource()), raw.trim().split("\\s+"), null);
+                            return 1;
+                        })));
 
         // report
         dispatcher.register(Commands.literal("report")

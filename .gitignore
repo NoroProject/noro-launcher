@@ -59,3 +59,9 @@ secrets/
 # у каждого свой upstream.
 # 915 МБ со своим .git внутри — одна `git add -A`, и это уедет в историю.
 /vendor/
+
+# Рабочие файлы скрипта пересоздания OCI-инстанса: конкретные OCID тенанси,
+# лог попыток и id созданного инстанса. Шаблон — scripts/oci-launch.env.example.
+/scripts/oci-launch.env
+/scripts/oci-retry-launch.log
+/scripts/.last-instance-ocid

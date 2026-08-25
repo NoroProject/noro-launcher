@@ -39,21 +39,16 @@ onMounted(() => loadPunishments())
 <template>
   <NoroShell title="PUNISHMENTS" subtitle="History of warnings, bans, and restrictions">
     <div class="space-y-4">
-      <section class="noro-panel p-6 space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-lg font-bold text-[var(--noro-text)] flex items-center gap-2">
-              <UIcon name="i-lucide-alert-triangle" class="size-5 text-amber-400" />
-              {{ t('cabinet-punishments-title') }}
-            </h2>
-            <p class="text-xs text-[var(--noro-muted)]">
-              {{ t('cabinet-punishments-lead') }}
-            </p>
-          </div>
+      <NoroCard
+        :title="t('cabinet-punishments-title')"
+        :subtitle="t('cabinet-punishments-lead')"
+        icon="i-lucide-alert-triangle"
+      >
+        <template #actions>
           <AtomButton variant="secondary" icon="i-lucide-refresh-cw" :loading="loading" @click="loadPunishments">
             {{ t('cabinet-punishments-refresh') }}
           </AtomButton>
-        </div>
+        </template>
 
         <div v-if="punishments.length" class="grid gap-3">
           <div
@@ -113,7 +108,7 @@ onMounted(() => loadPunishments())
           :title="t('cabinet-punishments-none-title')"
           :text="t('cabinet-punishments-none-text')"
         />
-      </section>
+      </NoroCard>
     </div>
   </NoroShell>
 </template>

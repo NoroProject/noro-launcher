@@ -82,7 +82,10 @@ pub async fn search(state: &AppState, q: &SearchQuery) -> AppResult<SearchPage> 
     let mr = unwrap_or_note(mr, "modrinth", &mut failed);
     let cf = unwrap_or_note(cf, "curseforge", &mut failed);
     if failed.len() == 2 {
-        return Err(AppError::BadRequest("no catalog answered".into()));
+        return Err(AppError::upstream(
+            crate::error_codes::UPSTREAM_FAILED,
+            "no catalog answered",
+        ));
     }
 
     Ok(SearchPage {
@@ -170,22 +173,30 @@ pub async fn source_for_project(
         Some(modloader),
     )
     .await?;
-    let ver = vers
-        .first()
-        .ok_or_else(|| AppError::BadRequest("no compatible versions".into()))?;
+    let ver = vers.first().ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::NO_COMPATIBLE_VERSION,
+            "no compatible versions",
+        )
+    })?;
 
     match provider {
         Provider::Modrinth => Ok(ModSource::Modrinth {
             version_id: ver.id.clone(),
         }),
         Provider::Curseforge => {
-            let pid: u64 = project_id
-                .parse()
-                .map_err(|_| AppError::BadRequest("invalid CurseForge project_id".into()))?;
-            let fid: u64 = ver
-                .id
-                .parse()
-                .map_err(|_| AppError::BadRequest("invalid CurseForge file_id".into()))?;
+            let pid: u64 = project_id.parse().map_err(|_| {
+                AppError::bad(
+                    crate::error_codes::BAD_IDENTIFIER,
+                    "invalid CurseForge project_id",
+                )
+            })?;
+            let fid: u64 = ver.id.parse().map_err(|_| {
+                AppError::bad(
+                    crate::error_codes::BAD_IDENTIFIER,
+                    "invalid CurseForge file_id",
+                )
+            })?;
             Ok(ModSource::Curseforge {
                 project_id: pid,
                 file_id: fid,

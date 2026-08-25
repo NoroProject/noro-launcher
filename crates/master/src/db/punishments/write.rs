@@ -9,8 +9,8 @@ pub async fn create_punishment(pool: &PgPool, new: NewPunishment<'_>) -> Result<
     Ok(sqlx::query_as::<_, PunishmentRow>(
         "INSERT INTO punishments
            (user_id, kind, reason, actor_id, actor_label, server_id, expires_at,
-            rule_id, rule_code)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+            rule_id, rule_code, case_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          RETURNING *",
     )
     .bind(new.user_id)
@@ -22,6 +22,7 @@ pub async fn create_punishment(pool: &PgPool, new: NewPunishment<'_>) -> Result<
     .bind(new.expires_at)
     .bind(new.rule_id)
     .bind(new.rule_code)
+    .bind(new.case_id)
     .fetch_one(pool)
     .await?)
 }

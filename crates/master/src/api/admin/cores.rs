@@ -1,6 +1,7 @@
 //! Админ: серверные ядра (server.jar) для автопатча/деплоя серверов.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::Page;
 use crate::db::models::ServerCoreRow;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -34,12 +35,12 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
     Query(q): Query<ListQuery>,
-) -> AppResult<Json<Vec<ServerCoreResp>>> {
+) -> AppResult<Json<Page<ServerCoreResp>>> {
     admin.require(PERM_CORES_EDIT)?;
     let rows = crate::db::list_server_cores(&state.db, q.server_id).await?;
-    Ok(Json(
+    Ok(Json(Page::whole(
         rows.into_iter().map(|row| with_url(&state, row)).collect(),
-    ))
+    )))
 }
 
 /// Multipart upload: `file`, `server_id`, optional `version`.
@@ -65,10 +66,12 @@ pub async fn upload(
                     .text()
                     .await
                     .map_err(|e| AppError::BadRequest(e.to_string()))?;
-                server_id = Some(
-                    raw.parse()
-                        .map_err(|_| AppError::BadRequest("server_id must be a UUID".into()))?,
-                );
+                server_id = Some(raw.parse().map_err(|_| {
+                    AppError::bad(
+                        crate::error_codes::BAD_IDENTIFIER,
+                        "server_id must be a UUID",
+                    )
+                })?);
             }
             Some("version") => {
                 version = Some(
@@ -91,9 +94,18 @@ pub async fn upload(
         }
     }
 
-    let server_id =
-        server_id.ok_or_else(|| AppError::BadRequest("missing the server_id field".into()))?;
-    let data = data.ok_or_else(|| AppError::BadRequest("missing the file field".into()))?;
+    let server_id = server_id.ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::UPLOAD_FIELD_MISSING,
+            "missing the server_id field",
+        )
+    })?;
+    let data = data.ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::UPLOAD_FIELD_MISSING,
+            "missing the file field",
+        )
+    })?;
     let version = version
         .filter(|v| !v.trim().is_empty())
         .or(filename)

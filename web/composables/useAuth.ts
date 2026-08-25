@@ -83,13 +83,10 @@ export function permissionMatches(pattern: string, target: string) {
 }
 
 export function humanError(error: unknown) {
-  if (typeof error === 'object' && error && 'data' in error) {
-    const data = (error as { data?: unknown }).data
-    if (typeof data === 'string') return data
-    if (typeof data === 'object' && data && 'message' in data) {
-      return String((data as { message?: unknown }).message)
-    }
-  }
+  // Разбор конверта — в `utils/api-error.ts`: он же нужен уведомлениям, и две
+  // копии успели разойтись в том, какие поля вообще смотрят.
+  const message = apiErrorLabel(error)
+  if (message) return message
   if (error instanceof Error) return error.message
   return 'Request failed'
 }

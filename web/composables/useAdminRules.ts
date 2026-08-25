@@ -20,9 +20,9 @@ export function useAdminRules() {
     pending.value = true
     try {
       const [c, r, s] = await Promise.all([
-        auth.request<RuleCategory[]>('/api/admin/rules/categories'),
+        auth.requestList<RuleCategory>('/api/admin/rules/categories'),
         auth.request<{ rules: Rule[], sanctions: RuleSanction[] }>('/api/admin/rules'),
-        auth.request<ServerRow[]>('/api/admin/servers'),
+        auth.requestList<ServerRow>('/api/admin/servers'),
       ])
       categories.value = c
       rules.value = r.rules

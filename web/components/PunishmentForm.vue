@@ -5,7 +5,7 @@
  */
 import type { ServerRow } from '~/types/api'
 
-const props = defineProps<{ userId: string }>()
+const props = defineProps<{ userId: string, caseId?: string }>()
 const emit = defineEmits<{ created: [] }>()
 
 const auth = useAuth()
@@ -26,7 +26,7 @@ const blocked = computed(() => !!problem.value || reason.value.trim().length < 3
 
 onMounted(async () => {
   try {
-    servers.value = await auth.request<ServerRow[]>('/api/admin/servers')
+    servers.value = await auth.requestList<ServerRow>('/api/admin/servers')
   } catch {
     // Список серверов нужен только для серверного бана: без него форма
     // остаётся рабочей для остальных видов.
@@ -50,6 +50,8 @@ async function create() {
         minutes: minutes.value,
         server_id: scoped.value && serverId.value ? serverId.value : null,
         rule_id: ruleId.value || null,
+        // Наказание из разбора встаёт в его ленту.
+        case_id: props.caseId || null,
       },
     })
     reason.value = ''
@@ -66,7 +68,7 @@ async function create() {
 </script>
 
 <template>
-  <div class="grid gap-4">
+  <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
     <PunishmentRulePicker v-model="ruleId" :rules="form.rules.value" :server-id="serverId" />
 
     <!-- Варианты правила: вид и вилка срока. Всё, что вне их, требует байпаса. -->
@@ -90,8 +92,11 @@ async function create() {
       </p>
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2">
-      <label class="block">
+    <!-- Одна колонка, а не две: поле срока висит на условии, и в сетке из
+         двух колонок выбор «Предупреждение» оставлял «Вид» половиной пустой
+         строки — ширина прыгала на каждом переключении. -->
+    <div class="grid gap-4">
+      <label class="block min-w-0">
         <span class="noro-label mb-2 block">{{ t('admin-punish-kind') }}</span>
         <NoroSelect v-model="kind" class="w-full" :disabled="!canBypass && !!sanction">
           <option v-for="option in form.allowedKinds.value" :key="option" :value="option">
@@ -113,7 +118,7 @@ async function create() {
       </NoroSelect>
     </label>
 
-    <label class="block">
+    <label class="block min-w-0">
       <span class="noro-label mb-2 block">{{ t('admin-punish-reason') }}</span>
       <textarea
         v-model="reason"
@@ -126,8 +131,9 @@ async function create() {
     <!-- Почему кнопка не нажимается — на месте, а не после отказа сервера. -->
     <p v-if="problem" class="text-sm font-bold text-[var(--noro-magenta)]">{{ problem }}</p>
 
-    <div class="flex items-center gap-3">
+    <div class="grid gap-2">
       <AtomButton
+        class="w-full"
         :variant="kind === 'ban' || kind === 'server_ban' ? 'danger' : 'warning'"
         icon="i-lucide-gavel"
         :loading="busy"

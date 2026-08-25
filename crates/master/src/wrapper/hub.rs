@@ -40,19 +40,26 @@ impl Conn {
         frame["id"] = json!(id);
         if self.tx.send(frame.to_string()).is_err() {
             self.pending.remove(&id);
-            return Err(AppError::BadRequest("the wrapper disconnected".into()));
+            return Err(AppError::state(
+                crate::error_codes::WRAPPER_OFFLINE,
+                "the wrapper disconnected",
+            ));
         }
 
         match tokio::time::timeout(op.timeout(), reply_rx).await {
             Ok(Ok(Ok(data))) => Ok(data),
             Ok(Ok(Err(message))) => Err(AppError::BadRequest(message)),
-            Ok(Err(_)) => Err(AppError::BadRequest("the wrapper connection closed".into())),
+            Ok(Err(_)) => Err(AppError::state(
+                crate::error_codes::WRAPPER_OFFLINE,
+                "the wrapper connection closed",
+            )),
             Err(_) => {
                 // Ответ уже не придёт вовремя — снимаем ожидание, иначе карта
                 // ожиданий растёт на каждый зависший вызов.
                 self.pending.remove(&id);
-                Err(AppError::BadRequest(
-                    "the wrapper did not answer in time".into(),
+                Err(AppError::state(
+                    crate::error_codes::WRAPPER_OFFLINE,
+                    "the wrapper did not answer in time",
                 ))
             }
         }
@@ -137,7 +144,10 @@ impl WrapperHub {
 
     pub fn require(&self, game_server_id: Uuid) -> AppResult<Arc<Conn>> {
         self.get(game_server_id).ok_or_else(|| {
-            AppError::BadRequest("the wrapper for this server is not connected".into())
+            AppError::state(
+                crate::error_codes::WRAPPER_OFFLINE,
+                "the wrapper for this server is not connected",
+            )
         })
     }
 

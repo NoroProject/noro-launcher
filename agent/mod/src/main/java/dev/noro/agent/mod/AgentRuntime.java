@@ -72,7 +72,7 @@ public final class AgentRuntime {
         client = new MasterClient(http);
         permissions = new ModPermissions(client, config);
         moderation = new ModModeration(http, client, LOG);
-        join = new ModJoin(config, client, profiles, moderation);
+        join = new ModJoin(config, client, profiles, moderation, prefixes, this::refreshPrefixPack);
         presence = new ModPresence(moderation);
         return true;
     }
@@ -87,8 +87,62 @@ public final class AgentRuntime {
         return permissions;
     }
 
+    /**
+     * Работающий агент — миксинам, у которых своего пути к нему нет.
+     *
+     * <p>Одна на процесс: агент в игре ровно один, второго быть не может.
+     */
+    private static volatile AgentRuntime current;
+
+    public static AgentRuntime current() {
+        return current;
+    }
+
+    /** Плашки ролей: что рисовать и кто согласился их видеть. */
+    public final dev.noro.agent.core.PrefixService prefixes = new dev.noro.agent.core.PrefixService();
+
+    /**
+     * Перечитать состав пака у мастера и раздать его тем, кто уже в сети.
+     *
+     * <p>Зовётся при старте и после правки ролей: пак меняется вместе с ними, и
+     * ждать перезахода игрока незачем — клиент применяет выданный пак на ходу.
+     */
+    public void refreshPrefixPack() {
+        String had = prefixes.pack().sha1();
+        try {
+            prefixes.pack(client.prefixPack());
+        } catch (Exception e) {
+            LOG.warn("Prefix pack is unavailable, roles keep their text prefixes: {}", e.toString());
+            return;
+        }
+        ModBridge bridge = moderation.bridge();
+        if (!prefixes.usable() || server == null || bridge == null) {
+            return;
+        }
+        var pack = prefixes.pack();
+        // Только если состав правда сменился. Иначе каждый опрос мастера гнал бы
+        // игрокам один и тот же пак, а с ним и перезагрузку ресурсов.
+        if (pack.sha1().equals(had)) {
+            return;
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            // Пришедшему из лаунчера пак не выдаём: у него он приехал вместе со
+            // сборкой, а смену подхватит живая синхронизация лаунчера — молча,
+            // без ванильного окна «скачать набор?». Остальным окно неизбежно:
+            // другого способа отдать пак чужому клиенту нет.
+            //#if NEOFORGE && MC>=12100
+            //$$ if (ModHelloChannel.present(player)) {
+            //$$     continue;
+            //$$ }
+            //#endif
+            bridge.sendResourcePack(player.getUUID(), pack.url(), pack.sha1());
+        }
+    }
+
     public void onServerStarted(MinecraftServer server) {
         this.server = server;
+        current = this;
+        dev.noro.agent.core.NoroAgentApi.attachPrefixes(prefixes);
         // LuckPerms грузится тоже модом, поэтому спрашиваем его после старта
         // сервера, а не в инициализации — там порядок не гарантирован.
         roleSync = LuckPermsSupport.tryCreate(LOG);
@@ -101,6 +155,9 @@ public final class AgentRuntime {
         // Тоже после старта и по той же причине: Text Placeholder API — мод,
         // и до этого момента его может не быть в пути классов.
         ModPlaceholders.register(profiles);
+        // Состав плашек — мимо главного потока: старт сервера не должен ждать
+        // мастера, а без плашек сервер прекрасно работает.
+        java.util.concurrent.CompletableFuture.runAsync(this::refreshPrefixPack);
         // Каталог узлов уходит мимо главного потока: старт сервера не должен
         // ждать сеть ради подсказки в админке.
         CompletableFuture.runAsync(permissions::report);
@@ -128,6 +185,12 @@ public final class AgentRuntime {
     public boolean checkChatMessage(ServerPlayer player, String rawText) {
         if (silenced(player)) {
             return true;
+        }
+        // Буфер держит окно разговора, из которого потом соберётся срез для
+        // дела. Пишем до фильтров: заблокированное сообщение как раз и есть то,
+        // что интересно разбору.
+        if (moderation != null) {
+            moderation.chatRing().message(player.getUUID(), player.getScoreboardName(), "public", rawText);
         }
         if (moderation != null) {
             dev.noro.agent.core.automod.ChatFilters.Result res = moderation.checkChatMessage(player.getUUID(), rawText);

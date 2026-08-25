@@ -1,10 +1,14 @@
 //! Админ: API-токены для CLI/CI.
 
 use crate::api::auth::{admin_token, AdminAuth};
+use crate::api::created::created;
+use crate::api::paging::Page;
+use crate::api::validate::Validation;
 use crate::audit::{self, target};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, State};
+use axum::response::Response;
 use axum::Json;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,7 +32,7 @@ pub struct TokenItem {
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<TokenItem>>> {
+) -> AppResult<Json<Page<TokenItem>>> {
     admin.require(schema::PERM_ADMIN_ALL)?;
     let items = crate::db::list_admin_tokens(&state.db)
         .await?
@@ -42,7 +46,7 @@ pub async fn list(
             legacy_hash: t.token_hash.is_none(),
         })
         .collect();
-    Ok(Json(items))
+    Ok(Json(Page::whole(items)))
 }
 
 #[derive(Deserialize)]
@@ -57,8 +61,14 @@ pub async fn create(
     State(state): State<AppState>,
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
-) -> AppResult<Json<Value>> {
+) -> AppResult<Response> {
     admin.require(schema::PERM_ADMIN_ALL)?;
+    // Имя — единственное, по чему токен потом опознают в списке и в аудите.
+    Validation::new()
+        .required("name", &req.name)
+        .max_len("name", &req.name, 64)
+        .finish()?;
+
     let secret = admin_token::generate();
     let hash = admin_token::hash(&secret).map_err(AppError::Other)?;
     let perms = if req.permissions.is_empty() {
@@ -82,7 +92,8 @@ pub async fn create(
         json!({ "name": req.name, "permissions": perms }),
     )
     .await;
-    Ok(Json(
+    Ok(created(
+        format!("/api/admin/tokens/{id}"),
         json!({ "id": id, "token": secret, "permissions": perms }),
     ))
 }

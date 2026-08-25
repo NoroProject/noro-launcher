@@ -4,7 +4,7 @@
 
 use crate::directories::LauncherDirectories;
 use crate::sync::integrity::sha256_hex;
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use schema::LauncherVersion;
 use std::path::PathBuf;
 
@@ -77,8 +77,14 @@ pub async fn install_update(
     }
 
     // Сохранить текущую версию.
+    //
+    // Не «по возможности»: по этому файлу решается, надо ли обновляться. Если
+    // он не записался, лаунчер при каждом запуске считает себя устаревшим и
+    // качает одно и то же обновление заново — молча и бесконечно.
     let version_file = dirs.root().join("version");
-    tokio::fs::write(&version_file, &version.version).await.ok();
+    tokio::fs::write(&version_file, &version.version)
+        .await
+        .with_context(|| format!("запись {}", version_file.display()))?;
 
     Ok(dest)
 }

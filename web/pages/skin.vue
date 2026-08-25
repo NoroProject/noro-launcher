@@ -263,18 +263,17 @@ async function selectCape(capeId: string | null) {
 <template>
   <NoroShell :title="t('skin-title')" :subtitle="t('skin-subtitle')">
     <template #actions>
-      <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">{{ t('web-nav-cabinet') }}</AtomButton>
+      <AtomButton variant="secondary" icon="i-lucide-arrow-left" :to="link.cabinet()">{{ t('web-nav-cabinet') }}</AtomButton>
     </template>
 
     <div class="grid gap-6 xl:grid-cols-[340px_1fr] items-start">
       <!-- Left Column: 3D Character Preview -->
-      <section class="noro-panel bg-[var(--noro-bg-deep)] p-5 space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="noro-label">{{ t('skin-3d-character') }}</h2>
+      <NoroCard :title="t('skin-3d-character')" icon="i-lucide-user-round">
+        <template #actions>
           <UBadge :color="currentSkinUrl ? 'success' : 'neutral'" variant="subtle">
             {{ currentSkinUrl ? t('skin-custom-badge') : t('skin-default-badge') }}
           </UBadge>
-        </div>
+        </template>
 
         <SkinPreview3D :skin-url="currentSkinUrl" :cape-url="currentCapeUrl" :slim="currentSlim" />
 
@@ -309,7 +308,7 @@ async function selectCape(capeId: string | null) {
             {{ t('skin-reset-default') }}
           </AtomButton>
         </div>
-      </section>
+      </NoroCard>
 
       <!-- Right Column: Skins & Capes Manager -->
       <div class="space-y-6">
@@ -318,16 +317,11 @@ async function selectCape(capeId: string | null) {
         <UAlert v-else-if="message" color="success" variant="subtle" icon="i-lucide-check" :description="message" />
 
         <!-- 1. Saved custom skins and presets -->
-        <section class="noro-panel p-5 space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
-                <UIcon name="i-lucide-bookmark" class="size-4 text-[var(--noro-cream)]" />
-                {{ t('skin-your-skins') }}
-              </h2>
-              <p class="text-xs text-[var(--noro-muted)]">{{ t('skin-drop-hint') }}</p>
-            </div>
-          </div>
+        <NoroCard
+          :title="t('skin-your-skins')"
+          :subtitle="t('skin-drop-hint')"
+          icon="i-lucide-bookmark"
+        >
 
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             <!-- Add Skin Dropzone Tile Card (+) -->
@@ -394,17 +388,14 @@ async function selectCape(capeId: string | null) {
               <span v-else class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-text)] font-semibold">{{ t('skin-equip') }}</span>
             </div>
           </div>
-        </section>
+        </NoroCard>
 
         <!-- 2. Standard Mojang presets -->
-        <section class="noro-panel p-5 space-y-4">
-          <div>
-            <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
-              <UIcon name="i-lucide-sparkles" class="size-4 text-[var(--noro-cream)]" />
-              {{ t('skin-official-skins') }}
-            </h2>
-            <p class="text-xs text-[var(--noro-muted)]">{{ t('skin-mojang-desc') }}</p>
-          </div>
+        <NoroCard
+          :title="t('skin-official-skins')"
+          :subtitle="t('skin-mojang-desc')"
+          icon="i-lucide-sparkles"
+        >
 
           <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             <div
@@ -418,20 +409,17 @@ async function selectCape(capeId: string | null) {
               <span class="text-[10px] text-[var(--noro-muted)] group-hover:text-[var(--noro-cream)] font-bold">{{ t('skin-equip') }}</span>
             </div>
           </div>
-        </section>
+        </NoroCard>
 
         <!-- 3. Capes grid -->
-        <section class="noro-panel p-5 space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
-                <UIcon name="i-lucide-layers" class="size-4 text-[var(--noro-cream)]" />
-                {{ t('skin-available-capes') }}
-              </h2>
-              <p class="text-xs text-[var(--noro-muted)]">{{ t('skin-pick-cape-desc') }}</p>
-            </div>
+        <NoroCard
+          :title="t('skin-available-capes')"
+          :subtitle="t('skin-pick-cape-desc')"
+          icon="i-lucide-layers"
+        >
+          <template #actions>
             <UBadge color="neutral" variant="subtle">{{ t('skin-capes-count', { count: capes.length }) }}</UBadge>
-          </div>
+          </template>
 
           <div v-if="capes.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             <!-- Option 0: Disable Cape -->
@@ -469,7 +457,7 @@ async function selectCape(capeId: string | null) {
             :title="t('skin-no-capes-title')"
             :text="t('skin-no-capes-desc')"
           />
-        </section>
+        </NoroCard>
       </div>
     </div>
   </NoroShell>

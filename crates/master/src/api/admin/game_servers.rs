@@ -1,6 +1,7 @@
 //! Админ: игровые сервера сборки и их секреты.
 
 use crate::api::auth::{generate_agent_secret, hash_agent_secret, AdminAuth};
+use crate::api::paging::Page;
 use crate::db::game_servers::GameServerRow;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -31,17 +32,17 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
     Path(server_id): Path<Uuid>,
-) -> AppResult<Json<Vec<GameServerResp>>> {
+) -> AppResult<Json<Page<GameServerResp>>> {
     admin.require(PERM_SERVERS_AGENTS)?;
     let rows = crate::db::list_game_servers(&state.db, server_id).await?;
-    Ok(Json(
+    Ok(Json(Page::whole(
         rows.into_iter()
             .map(|row| GameServerResp {
                 live: row.live(),
                 row,
             })
             .collect(),
-    ))
+    )))
 }
 
 #[derive(Deserialize)]
@@ -107,13 +108,15 @@ pub async fn update(
     crate::db::update_game_server(
         &state.db,
         id,
-        req.name.trim(),
-        req.mc_host.trim(),
-        req.mc_port,
-        req.sort_order,
-        req.kind(),
-        req.maintenance,
-        req.maintenance_reason.as_deref(),
+        crate::db::game_servers::GameServerFields {
+            name: req.name.trim(),
+            mc_host: req.mc_host.trim(),
+            mc_port: req.mc_port,
+            sort_order: req.sort_order,
+            kind: req.kind(),
+            maintenance: req.maintenance,
+            maintenance_reason: req.maintenance_reason.as_deref(),
+        },
     )
     .await?;
     if req.maintenance {

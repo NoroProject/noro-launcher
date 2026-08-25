@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const props = withDefaults(defineProps<{
-  variant?: 'primary' | 'secondary' | 'dark' | 'warning' | 'danger' | 'outline' | 'outline-blue' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'dark' | 'warning' | 'danger' | 'danger-soft' | 'outline' | 'outline-blue' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
   icon?: string
   iconRight?: string
@@ -62,6 +62,7 @@ const classes = computed(() => {
     dark: 'noro-btn-dark',
     warning: 'noro-btn-warning',
     danger: 'noro-btn-danger',
+    'danger-soft': 'noro-btn-danger-soft',
     outline: 'noro-btn-outline',
     'outline-blue': 'noro-btn-outline-blue',
     ghost: 'noro-btn-dark !bg-transparent hover:!bg-white/5',

@@ -113,17 +113,27 @@ pub async fn create_game_server(
     .await?)
 }
 
-pub async fn update_game_server(
-    pool: &PgPool,
-    id: Uuid,
-    name: &str,
-    mc_host: &str,
-    mc_port: i32,
-    sort_order: i32,
-    kind: &str,
-    maintenance: bool,
-    maintenance_reason: Option<&str>,
-) -> Result<()> {
+/// Что меняем у игрового сервера. По образцу `RoleFields`.
+pub struct GameServerFields<'a> {
+    pub name: &'a str,
+    pub mc_host: &'a str,
+    pub mc_port: i32,
+    pub sort_order: i32,
+    pub kind: &'a str,
+    pub maintenance: bool,
+    pub maintenance_reason: Option<&'a str>,
+}
+
+pub async fn update_game_server(pool: &PgPool, id: Uuid, f: GameServerFields<'_>) -> Result<()> {
+    let GameServerFields {
+        name,
+        mc_host,
+        mc_port,
+        sort_order,
+        kind,
+        maintenance,
+        maintenance_reason,
+    } = f;
     sqlx::query(
         "UPDATE game_servers
          SET name=$2, mc_host=$3, mc_port=$4, sort_order=$5, kind=$6, maintenance=$7, maintenance_reason=$8

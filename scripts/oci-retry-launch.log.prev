@@ -1,0 +1,24 @@
+2026-08-21 02:53:23 targets: tiTw:UK-LONDON-1-AD-1=ocid1.bootvolume.oc1.uk-london-1.abwgiljtkap62z24hecgir2cni3gwolwulwly55piuhmwzhgfiiubzwbri2a tiTw:UK-LONDON-1-AD-2=ocid1.bootvolume.oc1.uk-london-1.abwgiljrkchiqc3mpyvckkkjyefksyvul6gfrk6vy3owru4zgscr6esjgk4q
+2026-08-21 02:53:23 shape=VM.Standard.A1.Flex configs='1:1 1:4 1:6 2:12' name=noro-prod
+02:53:25 #1 tiTw:UK-LONDON-1-AD-1 1c/1G: no capacity
+02:53:27 #2 tiTw:UK-LONDON-1-AD-2 1c/1G: no capacity
+02:53:29 #3 tiTw:UK-LONDON-1-AD-1 1c/4G: no capacity
+02:53:30 #4 tiTw:UK-LONDON-1-AD-2 1c/4G: no capacity
+02:53:32 #5 tiTw:UK-LONDON-1-AD-1 1c/6G: no capacity
+02:53:34 #6 tiTw:UK-LONDON-1-AD-2 1c/6G: no capacity
+02:53:36 #7 tiTw:UK-LONDON-1-AD-1 2c/12G: no capacity
+02:53:38 #8 tiTw:UK-LONDON-1-AD-2 2c/12G: no capacity
+02:54:36 #10 tiTw:UK-LONDON-1-AD-2 1c/1G: no capacity
+02:54:38 #11 tiTw:UK-LONDON-1-AD-1 1c/4G: no capacity
+02:54:40 #12 tiTw:UK-LONDON-1-AD-2 1c/4G: no capacity
+2026-08-21 02:54:40 #13 tiTw:UK-LONDON-1-AD-1: throttled, sleeping 300s
+02:59:42 #14 tiTw:UK-LONDON-1-AD-2 1c/6G: no capacity
+02:59:44 #15 tiTw:UK-LONDON-1-AD-1 2c/12G: no capacity
+02:59:45 #16 tiTw:UK-LONDON-1-AD-2 2c/12G: no capacity
+03:00:32 #17 tiTw:UK-LONDON-1-AD-1 1c/1G: no capacity
+03:00:34 #18 tiTw:UK-LONDON-1-AD-2 1c/1G: no capacity
+03:00:35 #19 tiTw:UK-LONDON-1-AD-1 1c/4G: no capacity
+03:00:37 #20 tiTw:UK-LONDON-1-AD-2 1c/4G: no capacity
+03:00:39 #21 tiTw:UK-LONDON-1-AD-1 1c/6G: no capacity
+03:00:41 #22 tiTw:UK-LONDON-1-AD-2 1c/6G: no capacity
+2026-08-21 03:00:42 #23 tiTw:UK-LONDON-1-AD-1: throttled, sleeping 300s

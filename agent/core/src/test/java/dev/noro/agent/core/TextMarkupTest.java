@@ -64,6 +64,52 @@ class TextMarkupTest {
         assertEquals("https://noro.example/support", raw.get(raw.size() - 1).url());
     }
 
+    /**
+     * Внутри метки ссылки работает та же разметка, что снаружи.
+     *
+     * <p>Пока не работала, кнопки меню разбора уезжали в чат строкой
+     * «#e6e6e6чат#8b8b8b»: цвет был виден решётками, а сама кнопка — серой.
+     */
+    @Test
+    void parsesMarkupInsideLinkLabel() {
+        List<TextSpan> spans = TextMarkup.parse("#8b8b8b [#e6e6e6чат#8b8b8b](cmd:/case chat)");
+
+        List<TextSpan> linked = spans.stream().filter(TextSpan::linked).toList();
+        assertEquals(1, linked.size());
+        assertEquals("чат", linked.get(0).text());
+        assertEquals(0xe6e6e6, linked.get(0).color());
+        assertEquals("cmd:/case chat", linked.get(0).url());
+    }
+
+    /**
+     * Кнопка меню разбора: скобки видны в чате и кликаются вместе со словом.
+     *
+     * <p>Метка кончается на `](`, поэтому внутренняя `]` остаётся меткой, а не
+     * обрывает ссылку на середине.
+     */
+    @Test
+    void keepsBracketsInsideButtonLabel() {
+        List<TextSpan> spans = TextMarkup.parse("[#b8c4e0[#f3e7b3чат#b8c4e0]](cmd:/case chat)");
+
+        assertEquals(3, spans.size());
+        assertEquals("[", spans.get(0).text());
+        assertEquals("чат", spans.get(1).text());
+        assertEquals("]", spans.get(2).text());
+        assertEquals(0xf3e7b3, spans.get(1).color());
+        // Кликается вся кнопка: попасть мышью в три буквы тяжелее, чем кажется.
+        assertTrue(spans.stream().allMatch(TextSpan::linked));
+    }
+
+    /** Метка без своего цвета берёт цвет вокруг ссылки, а не сбрасывает его. */
+    @Test
+    void linkLabelInheritsSurroundingColor() {
+        List<TextSpan> spans = TextMarkup.parse("#8b8b8b[чат](cmd:/case chat)");
+
+        TextSpan link = spans.get(spans.size() - 1);
+        assertTrue(link.linked());
+        assertEquals(0x8b8b8b, link.color());
+    }
+
     /** Одинокий амперсанд остаётся собой, а не съедается разбором. */
     @Test
     void keepsPlainTextIntact() {
@@ -87,5 +133,54 @@ class TextMarkupTest {
     void emptyMarkupGivesNoSpans() {
         assertTrue(TextMarkup.parse("").isEmpty());
         assertTrue(TextMarkup.parse(null).isEmpty());
+    }
+
+    /** Именованный цвет и hex MiniMessage — то же самое, что legacy-коды. */
+    @Test
+    void readsMiniMessageColors() {
+        assertEquals(0xFF5555, TextMarkup.parse("<red>стоп").get(0).color());
+        assertEquals(0xff8c82, TextMarkup.parse("<#ff8c82>роль").get(0).color());
+        assertEquals("стоп", TextMarkup.parse("<red>стоп").get(0).text());
+    }
+
+    /**
+     * Парный тег действует до своего закрытия, а не до конца строки.
+     *
+     * <p>В этом и разница с legacy: `&l` включает жирный навсегда, `<bold>` —
+     * только внутри себя.
+     */
+    @Test
+    void closesPairedTags() {
+        List<TextSpan> spans = TextMarkup.parse("<red>алый <bold>жирный</bold> снова алый");
+
+        assertEquals(3, spans.size());
+        assertTrue(spans.get(1).bold(), "внутри тега жирный");
+        assertTrue(!spans.get(2).bold(), "после закрытия жирность снята");
+        assertEquals(0xFF5555, spans.get(2).color(), "цвет пережил вложенный тег");
+    }
+
+    /** Шрифт: им плашка роли отличается от обычного текста. */
+    @Test
+    void readsFontTag() {
+        List<TextSpan> spans = TextMarkup.parse("<font:noro:prefix>\uE000</font> Steve");
+
+        assertEquals("noro:prefix", spans.get(0).font());
+        assertTrue(!spans.get(1).hasFont(), "после закрытия шрифт обычный");
+    }
+
+    /** Клик тегом — то же, что и ссылкой в квадратных скобках. */
+    @Test
+    void readsClickTag() {
+        List<TextSpan> spans = TextMarkup.parse("<click:run_command:'/case chat'>чат</click>");
+
+        assertTrue(spans.get(0).linked());
+        assertEquals("cmd:/case chat", spans.get(0).url());
+    }
+
+    /** «1 < 2» остаётся собой: незнакомый тег не съедается. */
+    @Test
+    void leavesPlainAngleBracketsAlone() {
+        assertEquals("1 < 2", TextMarkup.parse("1 < 2").get(0).text());
+        assertEquals("<неведомый>", TextMarkup.parse("<неведомый>").get(0).text());
     }
 }

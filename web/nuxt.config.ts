@@ -10,7 +10,24 @@ export default defineNuxtConfig({
   sentry: {
     sourceMapsUploadOptions: { enabled: false, telemetry: false }
   },
+  // Интерфейс тёмный по замыслу, светлой версии у него нет. Без этого Nuxt UI
+  // слушал системную тему браузера, и у половины людей его собственные окна —
+  // модалки, поповеры — приезжали белыми поверх тёмной страницы.
+  colorMode: {
+    preference: 'dark',
+    fallback: 'dark',
+    // Ключ хранения сменён намеренно: в браузерах уже лежит `system` с тех
+    // пор, когда тема шла за настройкой ОС, и сохранённое значение сильнее
+    // `preference` — со старым ключом светлая тема возвращалась бы вечно.
+    storageKey: 'noro-theme',
+  },
   css: ['~/assets/css/main.css'],
+  // Логотипы платформ входа. Свои SVG, а не коллекция бренд-иконок с npm:
+  // их ровно три, и тянуть ради них ещё один пакет и его серверный бандл
+  // незачем. Иконки одноцветные — цвет задаёт вёрстка через `currentColor`.
+  icon: {
+    customCollections: [{ prefix: 'brand', dir: './assets/icons' }]
+  },
   // No fallback domain here on purpose: a build without these variables used to
   // point at one specific production deployment, and nothing said so.
   // `useApi` reports the missing variable instead.

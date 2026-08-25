@@ -1,5 +1,7 @@
 package dev.noro.agent.core;
 
+import com.google.gson.annotations.SerializedName;
+
 import com.google.gson.Gson;
 import java.util.UUID;
 
@@ -42,6 +44,31 @@ public final class AgentEvents {
         send(new TickStall("tick_stall", stalledSeconds));
     }
 
+    /** Модератор взял дело командой в игре. Замок ставит мастер. */
+    public void caseClaim(java.util.UUID caseId, UUID moderator) {
+        send(new CaseClaim("case_claim", caseId, moderator));
+    }
+
+    /** Что модератор сделал в разборе: телепорт, слежка, заморозка. */
+    public void caseAction(
+            java.util.UUID caseId, UUID moderator, String kind, java.util.Map<String, String> payload) {
+        send(new CaseAction("case_action", caseId, moderator, kind, payload));
+    }
+
+    /** Срез чата: окно вокруг события, а не весь буфер. */
+    public void caseChatSlice(java.util.UUID caseId, java.util.List<ChatRing.Entry> messages) {
+        java.util.List<Line> lines = new java.util.ArrayList<>();
+        for (ChatRing.Entry entry : messages) {
+            lines.add(new Line(entry.at(), entry.sender(), entry.senderName(), entry.channel(), entry.content()));
+        }
+        send(new CaseChatSlice("case_chat_slice", caseId, lines));
+    }
+
+    public void caseInventory(
+            java.util.UUID caseId, UUID moderator, java.util.List<GameBridge.Slot> items) {
+        send(new CaseInventory("case_inventory", caseId, moderator, java.util.Map.of("items", items)));
+    }
+
     private void send(Object frame) {
         outbox.offer(gson.toJson(frame));
     }
@@ -55,4 +82,24 @@ public final class AgentEvents {
     private record PlayerLeave(String type, UUID uuid, String reason) {}
 
     private record TickStall(String type, int stalledSecs) {}
+
+    private record CaseClaim(String type, @SerializedName("case") java.util.UUID caseId, UUID moderator) {}
+
+    private record CaseAction(
+            String type,
+            @SerializedName("case") java.util.UUID caseId,
+            UUID moderator,
+            String kind,
+            java.util.Map<String, String> payload) {}
+
+    private record CaseChatSlice(String type, @SerializedName("case") java.util.UUID caseId, java.util.List<Line> messages) {}
+
+    private record Line(
+            java.time.Instant at, UUID sender, String senderName, String channel, String content) {}
+
+    private record CaseInventory(
+            String type,
+            @SerializedName("case") java.util.UUID caseId,
+            UUID moderator,
+            java.util.Map<String, Object> items) {}
 }

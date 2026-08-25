@@ -34,6 +34,9 @@ public final class Main {
         // До запуска: иначе лоадер прочитает старое значение и наш обработчик
         // прав останется незамеченным до следующего рестарта.
         PermissionHandlerConfig.ensure(config, detected.platform(), LOG);
+        // Тоже до запуска и по той же причине: server.properties читается один
+        // раз, и дописанный позже пак остался бы до следующего рестарта.
+        PrefixPackConfig.ensure(config, LOG);
 
         String javaagent = new AuthlibInjector(config, LOG).jvmArg();
         Supervisor supervisor = new Supervisor(config, javaagent, LOG);

@@ -110,10 +110,18 @@
 //$$         runtime.registerCommands(event.getDispatcher());
 //$$     }
 //$$
-//$$     /** Мут: сообщение отменяется до того, как его увидит чей-либо чат-мод. */
+//$$     /**
+//$$      * Мут и буфер разговора: сообщение отменяется до того, как его увидит
+//$$      * чей-либо чат-мод, а до этого попадает в кольцо, из которого потом
+//$$      * собирается срез для дела.
+//$$      *
+//$$      * <p>Через {@code checkChatMessage}, а не через один {@code silenced}:
+//$$      * иначе кольцо на этой платформе остаётся пустым навсегда, и срез чата
+//$$      * приходит пустым, сколько его ни проси.
+//$$      */
 //$$     @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.HIGHEST)
 //$$     public void onChat(ServerChatEvent event) {
-//$$         if (runtime.silenced(event.getPlayer())) {
+//$$         if (runtime.checkChatMessage(event.getPlayer(), event.getMessage().getString())) {
 //$$             event.setCanceled(true);
 //$$         }
 //$$     }

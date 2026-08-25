@@ -3,10 +3,11 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::{
-    agents, audit, backup, blocklist, build_routes, capes, catalog, chat_filters, cores,
-    freezes_and_reports, game_actions, game_servers, impersonate, integrity, launcher,
-    launcher_clients, log_requests, mod_install, mod_suggestions, moderation_messages, news, notes,
-    optional_upload, permission_nodes, punishments, remote, restarts, roles, rules, servers,
+    agents, audit, auth_methods, backup, backup_restore, blocklist, build_routes, capes, cases,
+    catalog, chat_filters, cores, freezes_and_reports, game_actions, game_servers, impersonate,
+    integrity, launcher, launcher_clients, log_requests, mod_install, mod_suggestions,
+    moderation_messages, news, notes, oauth_apps, optional_upload, permission_nodes,
+    prefix_preview, prefix_sync, punishments, remote, restarts, role_badge, roles, rules, servers,
     settings, stats, storage, tokens, user_launcher, users, versions, wrapper, wrapper_backups,
     wrapper_fs,
 };
@@ -26,6 +27,28 @@ pub fn router() -> Router<AppState> {
         .route(
             "/api/admin/reports/{id}/resolve",
             put(freezes_and_reports::resolve_report),
+        )
+        .route("/api/admin/cases", get(cases::list))
+        // Строго до `/{id}`: иначе `dossier` уедет в него как uuid и не разберётся.
+        .route("/api/admin/cases/dossier", get(cases::dossier))
+        .route("/api/admin/cases/{id}", get(cases::get))
+        .route("/api/admin/cases/{id}/quote", post(cases::quote))
+        .route("/api/admin/cases/{id}/claim", post(cases::claim))
+        .route("/api/admin/cases/{id}/release", post(cases::release))
+        .route("/api/admin/cases/{id}/resolve", put(cases::resolve))
+        .route("/api/admin/cases/{id}/notes", post(cases::note))
+        .route("/api/admin/cases/{id}/attachments", post(cases::upload))
+        .route(
+            "/api/admin/cases/{id}/chat-request",
+            post(cases::request_chat),
+        )
+        .route(
+            "/api/admin/cases/{id}/inventory-request",
+            post(cases::request_inventory),
+        )
+        .route(
+            "/api/admin/cases/{id}/client-check",
+            post(cases::request_client_check),
         )
         .route(
             "/api/admin/restarts",
@@ -77,11 +100,32 @@ pub fn router() -> Router<AppState> {
             get(settings::list).put(settings::save),
         )
         .route("/api/admin/settings/env", get(settings::export_env))
+        .route("/api/admin/auth-methods", get(auth_methods::list))
+        .route("/api/admin/auth-methods/{method}", put(auth_methods::save))
         .route(
-            "/api/admin/settings/hero-image",
-            post(settings::upload_hero_image),
+            "/api/admin/settings/image/{key}",
+            post(settings::upload_image),
         )
         .route("/api/admin/diagnostics", get(settings::diagnostics))
+        // OAuth2-приложения: очередь модерации, выдача scope'ов, выключатели.
+        .route("/api/admin/oauth-apps", get(oauth_apps::list))
+        .route(
+            "/api/admin/oauth-apps/settings",
+            put(oauth_apps::set_toggles),
+        )
+        .route("/api/admin/oauth-apps/{id}", delete(oauth_apps::delete))
+        .route(
+            "/api/admin/oauth-apps/{id}/status",
+            put(oauth_apps::set_status),
+        )
+        .route(
+            "/api/admin/oauth-apps/{id}/scopes",
+            put(oauth_apps::set_scopes),
+        )
+        .route(
+            "/api/admin/oauth-apps/{id}/icon",
+            post(oauth_apps::upload_icon),
+        )
         .route(
             "/api/admin/builds/{id}/optional-mods",
             post(optional_upload::upload),
@@ -175,23 +219,23 @@ fn catalog_router() -> Router<AppState> {
         )
         .route("/api/admin/mods/install", post(mod_install::install))
         .route(
-            "/api/mod_suggestions",
+            "/api/mod-suggestions",
             post(mod_suggestions::create_suggestion),
         )
         .route(
-            "/api/admin/mod_suggestions",
+            "/api/admin/mod-suggestions",
             get(mod_suggestions::list_suggestions),
         )
         .route(
-            "/api/admin/mod_suggestions/{id}/approve",
+            "/api/admin/mod-suggestions/{id}/approve",
             post(mod_suggestions::approve_suggestion),
         )
         .route(
-            "/api/admin/mod_suggestions/{id}/reject",
+            "/api/admin/mod-suggestions/{id}/reject",
             post(mod_suggestions::reject_suggestion),
         )
         .route(
-            "/api/admin/mod_suggestions/{id}/accept",
+            "/api/admin/mod-suggestions/{id}/accept",
             post(mod_suggestions::accept_suggestion),
         )
 }
@@ -213,6 +257,10 @@ fn users_router() -> Router<AppState> {
             delete(user_launcher::revoke_session),
         )
         .route("/api/admin/users/{id}/ban", put(users::ban))
+        .route(
+            "/api/admin/users/{id}/identities/{provider}",
+            delete(users::unlink_identity),
+        )
         .route("/api/admin/users/{id}/cape", put(users::set_cape))
         .route(
             "/api/admin/users/{id}/capes",
@@ -250,6 +298,12 @@ fn users_router() -> Router<AppState> {
 
 fn roles_router() -> Router<AppState> {
     Router::new()
+        .route("/api/admin/prefix-badge", get(prefix_preview::badge))
+        .route("/api/admin/roles/sync-badges", post(prefix_sync::sync))
+        .route(
+            "/api/admin/roles/{id}/badge",
+            put(role_badge::upload).delete(role_badge::clear),
+        )
         .route("/api/admin/roles", get(roles::list).post(roles::create))
         .route(
             "/api/admin/roles/{id}",
@@ -276,7 +330,7 @@ fn content_router() -> Router<AppState> {
         .route("/api/admin/news/image", post(news::upload_image))
         .route(
             "/api/admin/news/{id}",
-            put(news::update).delete(news::delete),
+            get(news::get_one).put(news::update).delete(news::delete),
         )
 }
 
@@ -387,7 +441,20 @@ fn system_router() -> Router<AppState> {
         .route("/api/admin/tokens", get(tokens::list).post(tokens::create))
         .route("/api/admin/tokens/{id}", delete(tokens::delete))
         .route("/api/admin/stats", get(stats::stats))
+        // Дамп базы, полный архив и восстановление из него. Разбор отделён от
+        // применения: сперва показать, что в архиве, и только потом спрашивать
+        // подтверждение — восстановление необратимо.
         .route("/api/admin/backup", get(backup::download))
+        .route("/api/admin/backup/full", get(backup::full))
+        // Скачивание из браузера: навигация не носит Authorization, а тянуть
+        // гигабайты через fetch значит держать их в памяти вкладки.
+        .route("/api/admin/backup/ticket", post(backup::ticket))
+        .route(
+            "/api/admin/backup/full/{ticket}",
+            get(backup::full_by_ticket),
+        )
+        .route("/api/admin/backup/inspect", post(backup_restore::inspect))
+        .route("/api/admin/backup/restore", post(backup_restore::restore))
         .route(
             "/api/admin/launcher/clients",
             get(launcher_clients::clients),

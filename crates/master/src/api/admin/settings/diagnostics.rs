@@ -43,6 +43,7 @@ pub async fn diagnostics(
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_SETTINGS_VIEW)?;
     let cfg = &state.config;
+    let ready = crate::api::auth::oauth::config::enabled(&state.db).await?;
 
     let mut checks = vec![
         check(
@@ -72,17 +73,23 @@ pub async fn diagnostics(
             },
         ),
         check(
-            "discord",
-            "Discord OAuth",
-            !cfg.discord_client_id.is_empty() && !cfg.discord_client_secret.is_empty(),
+            "sign_in",
+            "Вход через платформы",
+            !ready.is_empty(),
+            // Инстанс без единого внешнего входа — не поломка: остаются
+            // passkey и recovery-коды. Но игроков туда не пустить.
             true,
-            match (
-                cfg.discord_client_id.is_empty(),
-                cfg.discord_client_secret.is_empty(),
-            ) {
-                (false, false) => "Client ID и секрет заданы".into(),
-                (true, _) => "Не задан DISCORD_CLIENT_ID — вход через Discord выключен".into(),
-                (_, true) => "Не задан DISCORD_CLIENT_SECRET — вход через Discord выключен".into(),
+            if ready.is_empty() {
+                "Ни одна платформа не настроена — войти могут только операторы".into()
+            } else {
+                format!(
+                    "Готовы: {}",
+                    ready
+                        .iter()
+                        .map(|p| p.display_name())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             },
         ),
         check(

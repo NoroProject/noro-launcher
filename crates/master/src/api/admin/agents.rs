@@ -5,6 +5,7 @@
 //! а jar'ы агентов не секрет — они и так подписаны.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::Page;
 use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::State;
@@ -28,7 +29,7 @@ pub struct AgentFile {
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<AgentFile>>> {
+) -> AppResult<Json<Page<AgentFile>>> {
     admin.require(PERM_ADMIN_AGENTS)?;
 
     let dir = state.config.data_dir.join("agents");
@@ -36,7 +37,7 @@ pub async fn list(
     // Каталога может не быть, если агентов ещё не собирали, — это не ошибка,
     // а пустой список и подсказка в админке.
     let Ok(mut entries) = tokio::fs::read_dir(&dir).await else {
-        return Ok(Json(files));
+        return Ok(Json(Page::whole(files)));
     };
 
     while let Ok(Some(entry)) = entries.next_entry().await {
@@ -71,5 +72,5 @@ pub async fn list(
     }
 
     files.sort_by(|a, b| a.file.cmp(&b.file));
-    Ok(Json(files))
+    Ok(Json(Page::whole(files)))
 }

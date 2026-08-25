@@ -32,17 +32,30 @@ pub struct ReportFeedback {
     pub resolution: String,
 }
 
-pub async fn create_report(
-    pool: &PgPool,
-    reporter_id: Uuid,
-    target_id: Uuid,
-    game_server_id: Uuid,
-    reason: &str,
-    world: Option<&str>,
-    x: Option<f64>,
-    y: Option<f64>,
-    z: Option<f64>,
-) -> Result<Uuid> {
+/// Новая жалоба. Место — четыре поля, которые едут вместе: без мира координаты
+/// ничего не значат, а без координат мир бесполезен.
+pub struct NewReport<'a> {
+    pub reporter_id: Uuid,
+    pub target_id: Uuid,
+    pub game_server_id: Uuid,
+    pub reason: &'a str,
+    pub world: Option<&'a str>,
+    pub x: Option<f64>,
+    pub y: Option<f64>,
+    pub z: Option<f64>,
+}
+
+pub async fn create_report(pool: &PgPool, r: NewReport<'_>) -> Result<Uuid> {
+    let NewReport {
+        reporter_id,
+        target_id,
+        game_server_id,
+        reason,
+        world,
+        x,
+        y,
+        z,
+    } = r;
     let row: (Uuid,) = sqlx::query_as(
         "INSERT INTO player_reports (reporter_id, target_id, game_server_id, reason, world, x, y, z)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
@@ -60,13 +73,36 @@ pub async fn create_report(
     Ok(row.0)
 }
 
-pub async fn list_reports(pool: &PgPool, open_only: bool) -> Result<Vec<ReportRow>> {
-    let sql = if open_only {
-        "SELECT * FROM player_reports WHERE status IN ('open', 'claimed') ORDER BY created_at DESC"
+/// Жалобы со счётчиком по тому же условию.
+///
+/// Зашитый `LIMIT 100` без счётчика прятал остальные и выглядел как «жалоб
+/// больше нет»; открытые при этом не ограничивались ничем.
+pub async fn list_reports(
+    pool: &PgPool,
+    open_only: bool,
+    limit: i64,
+    offset: i64,
+) -> Result<(Vec<ReportRow>, i64)> {
+    let where_sql = if open_only {
+        "WHERE status IN ('open', 'claimed')"
     } else {
-        "SELECT * FROM player_reports ORDER BY created_at DESC LIMIT 100"
+        ""
     };
-    Ok(sqlx::query_as::<_, ReportRow>(sql).fetch_all(pool).await?)
+
+    let rows = sqlx::query_as::<_, ReportRow>(&format!(
+        "SELECT * FROM player_reports {where_sql} ORDER BY created_at DESC LIMIT $1 OFFSET $2"
+    ))
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+
+    let total: i64 =
+        sqlx::query_scalar(&format!("SELECT count(*) FROM player_reports {where_sql}"))
+            .fetch_one(pool)
+            .await?;
+
+    Ok((rows, total))
 }
 
 pub async fn claim_report(pool: &PgPool, report_id: Uuid, actor_id: Uuid) -> Result<bool> {

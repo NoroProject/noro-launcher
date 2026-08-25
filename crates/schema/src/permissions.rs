@@ -89,6 +89,15 @@ nodes! {
     PERM_FREEZE               = "noro.mod.freeze",               "Moderation", "Freeze/unfreeze a player";
     PERM_REPORTS_VIEW         = "noro.mod.reports.view",         "Moderation", "See player reports";
     PERM_REPORTS_RESOLVE      = "noro.mod.reports.resolve",      "Moderation", "Resolve player reports";
+    PERM_CASES_VIEW           = "noro.mod.cases.view",           "Moderation", "See the case queue and cards";
+    PERM_CASES_CLAIM          = "noro.mod.cases.claim",          "Moderation", "Take a case into work";
+    PERM_CASES_RESOLVE        = "noro.mod.cases.resolve",        "Moderation", "Close a case with a verdict";
+    // Срез чата — отдельный узел от самого дела: там личные сообщения, и
+    // «видеть очередь» не должно означать «читать переписку».
+    PERM_CASES_CHAT           = "noro.mod.cases.chat",           "Moderation", "Read the chat slice of a case";
+    PERM_CASES_INVENTORY      = "noro.mod.cases.inventory",      "Moderation", "Inspect the target's inventory";
+    PERM_CASES_WATCH          = "noro.mod.cases.watch",          "Moderation", "Follow the target as a spectator";
+    PERM_CASES_CLIENT         = "noro.mod.cases.client",         "Moderation", "Ask the target's launcher for a check";
 
     // --- Свод правил ----------------------------------------------------------
     PERM_RULES_VIEW           = "noro.admin.rules.view",         "Rules", "Open the rulebook editor";
@@ -166,12 +175,18 @@ nodes! {
     PERM_AUDIT                = "noro.admin.audit",              "System", "Read the admin journal";
     PERM_SETTINGS_VIEW        = "noro.admin.settings.view",      "System", "See instance settings";
     PERM_SETTINGS_EDIT        = "noro.admin.settings.edit",      "System", "Change instance settings";
+    PERM_OAUTH_VIEW           = "noro.admin.oauth.view",         "System", "See OAuth2 applications";
+    PERM_OAUTH_MANAGE         = "noro.admin.oauth.manage",       "System", "Review applications, grant scopes, block them";
     // Операция удаляет файлы с диска, и восстановить их можно только
     // перезаливкой сборки.
     PERM_STORAGE              = "noro.admin.storage",            "System", "Clean unused storage objects";
     // В дампе лежат все пользователи, их привязки и токены сессий — это самый
     // чувствительный объект в системе.
     PERM_BACKUP               = "noro.admin.backup",             "System", "Download a database dump";
+    // Отдельно от выгрузки: скачивание читает, восстановление затирает базу и
+    // файлы целиком. `noro.admin.backup` этот узел не покрывает — суффиксный
+    // wildcard требует точки со звёздочкой, так что право придётся выдать явно.
+    PERM_BACKUP_RESTORE       = "noro.admin.backup.restore",     "System", "Restore the master from an archive";
 
     // --- Игрок ----------------------------------------------------------------
     PERM_LAUNCHER_BETA        = "noro.launcher.beta",            "Player", "Launcher beta channel";

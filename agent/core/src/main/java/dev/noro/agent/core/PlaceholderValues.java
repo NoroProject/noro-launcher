@@ -76,7 +76,9 @@ public final class PlaceholderValues {
             }
             case "skin_url" -> text(profile.skinUrl());
             case "cape_url" -> text(profile.capeUrl());
-            case "prefix" -> shown == null ? "" : shown.prefixText();
+            // Плашка вместо текста — если известно, кому показываем, и у него
+            // есть пак. Иначе прежний текстовый префикс.
+            case "prefix" -> NoroAgentApi.badgeOr(shown, NoroAgentApi.viewer());
             // Без цветовых кодов: нужно там, где строку кладут в поле, которое
             // само не умеет legacy, — заголовок скорборда, лог, веб-виджет.
             case "prefix_plain" -> shown == null ? "" : PrefixFormat.plain(shown.prefixText());

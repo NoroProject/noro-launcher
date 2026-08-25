@@ -1,11 +1,15 @@
 //! Админ: серверы.
 
 use crate::api::auth::AdminAuth;
+use crate::api::created::created;
+use crate::api::paging::Page;
+use crate::api::validate::Validation;
 use crate::audit::{self, target};
 use crate::db::models::ServerRow;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, State};
+use axum::response::Response;
 use axum::Json;
 use schema::{PERM_SERVERS_DELETE, PERM_SERVERS_EDIT, PERM_SERVERS_VIEW};
 
@@ -58,9 +62,11 @@ fn broadcast_servers_changed(state: &AppState) {
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<ServerRow>>> {
+) -> AppResult<Json<Page<ServerRow>>> {
     admin.require(PERM_SERVERS_VIEW)?;
-    Ok(Json(crate::db::list_servers(&state.db, false).await?))
+    Ok(Json(Page::whole(
+        crate::db::list_servers(&state.db, false).await?,
+    )))
 }
 
 #[derive(Deserialize)]
@@ -76,8 +82,18 @@ pub async fn create(
     State(state): State<AppState>,
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
-) -> AppResult<Json<serde_json::Value>> {
+) -> AppResult<Response> {
     admin.require(PERM_SERVERS_EDIT)?;
+    Validation::new()
+        .required("name", &req.name)
+        .max_len("name", &req.name, 64)
+        .required("mc_version", &req.mc_version)
+        .one_of(
+            "modloader",
+            &req.modloader,
+            &["vanilla", "forge", "neoforge", "fabric", "quilt"],
+        )
+        .finish()?;
 
     let mut tx = state.db.begin().await?;
 
@@ -107,7 +123,10 @@ pub async fn create(
     tx.commit().await?;
     broadcast_servers_changed(&state);
 
-    Ok(Json(serde_json::json!({ "id": id })))
+    Ok(created(
+        format!("/api/admin/servers/{id}"),
+        serde_json::json!({ "id": id }),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -201,7 +220,12 @@ async fn upload_image(
             let data = tokio::task::spawn_blocking(move || optimize_for_launcher(&raw, &kind))
                 .await
                 .map_err(|e| AppError::Other(e.into()))?
-                .map_err(|e| AppError::BadRequest(format!("invalid image: {e}")))?;
+                .map_err(|e| {
+                    AppError::bad(
+                        crate::error_codes::UPLOAD_BAD_FORMAT,
+                        format!("invalid image: {e}"),
+                    )
+                })?;
             let stored = state
                 .files
                 .put_bytes(&data)
@@ -224,7 +248,10 @@ async fn upload_image(
             return Ok(Json(serde_json::json!({ "url": url })));
         }
     }
-    Err(AppError::BadRequest("missing the image field".into()))
+    Err(AppError::bad(
+        crate::error_codes::UPLOAD_FIELD_MISSING,
+        "missing the image field",
+    ))
 }
 
 pub async fn upload_icon(

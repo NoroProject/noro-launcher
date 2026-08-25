@@ -1,6 +1,7 @@
 //! Admin cape catalog.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::Page;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, State};
@@ -15,9 +16,9 @@ const MAX_CAPE_BYTES: usize = 512 * 1024;
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<CapeRow>>> {
+) -> AppResult<Json<Page<CapeRow>>> {
     admin.require(PERM_CAPES_VIEW)?;
-    Ok(Json(crate::db::list_capes(&state.db).await?))
+    Ok(Json(Page::whole(crate::db::list_capes(&state.db).await?)))
 }
 
 pub async fn upload(
@@ -91,19 +92,36 @@ pub async fn delete(
 
 fn validate_name(name: Option<String>) -> AppResult<String> {
     let name = name.unwrap_or_default().trim().to_string();
-    if !(2..=48).contains(&name.len()) {
+    // В символах, а не в байтах: по байтам «Плащ» — это восемь, и кириллическое
+    // название упиралось в потолок вдвое раньше заявленного.
+    if !(2..=48).contains(&name.chars().count()) {
         return Err(AppError::BadRequest("cape name must be 2-48 chars".into()));
     }
     Ok(name)
 }
 
 fn validate_png(data: Option<Bytes>) -> AppResult<Bytes> {
-    let data = data.ok_or_else(|| AppError::BadRequest("missing cape field".into()))?;
+    let data = data.ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::UPLOAD_FIELD_MISSING,
+            "missing cape field",
+        )
+    })?;
     if data.len() < 8 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
-        return Err(AppError::BadRequest("PNG expected".into()));
+        return Err(AppError::bad(
+            crate::error_codes::UPLOAD_BAD_FORMAT,
+            "PNG expected",
+        ));
     }
     if data.len() > MAX_CAPE_BYTES {
-        return Err(AppError::BadRequest("cape is too large".into()));
+        return Err(AppError::bad(
+            crate::error_codes::UPLOAD_TOO_LARGE,
+            "cape is too large",
+        ));
     }
     Ok(data)
 }
+
+#[cfg(test)]
+#[path = "capes_tests.rs"]
+mod tests;

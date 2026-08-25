@@ -45,9 +45,6 @@ impl Config {
                 .unwrap_or_default(),
             instance_name: get(keys::INSTANCE_NAME).unwrap_or_else(|| "Noro Network".into()),
 
-            discord_client_id: get(keys::DISCORD_CLIENT_ID).unwrap_or_default(),
-            discord_client_secret: env_opt("DISCORD_CLIENT_SECRET").unwrap_or_default(),
-
             curseforge_api_key: env_opt("CURSEFORGE_API_KEY"),
             signing_key_hex: env_opt("NORO_SIGNING_KEY"),
 

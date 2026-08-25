@@ -1,6 +1,7 @@
 //! Admin endpoints for chat filters.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::Page;
 use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::State;
@@ -32,7 +33,7 @@ pub struct ChatFilterItem {
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<ChatFilterItem>>> {
+) -> AppResult<Json<Page<ChatFilterItem>>> {
     admin.require(schema::PERM_PUNISH_MUTE)?;
     let rows = sqlx::query(
         "SELECT filter_type, mode, enabled, rule_code, whitelist, words, threshold, min_length, max_messages, window_secs
@@ -41,7 +42,7 @@ pub async fn list(
     .fetch_all(&state.db)
     .await?;
 
-    Ok(Json(
+    Ok(Json(Page::whole(
         rows.into_iter()
             .map(|r| ChatFilterItem {
                 filter_type: r.get("filter_type"),
@@ -56,7 +57,7 @@ pub async fn list(
                 window_secs: r.get("window_secs"),
             })
             .collect(),
-    ))
+    )))
 }
 
 pub async fn save(

@@ -23,7 +23,7 @@ export function usePermissionNodes(serverId: Ref<string>) {
     error.value = null
     try {
       const query = id ? `?server_id=${encodeURIComponent(id)}` : ''
-      const list = await auth.request<PermissionSuggestion[]>(`/api/admin/permission-nodes${query}`)
+      const list = await auth.requestList<PermissionSuggestion>(`/api/admin/permission-nodes${query}`)
       cache.set(id, list)
       suggestions.value = list
     } catch (e) {

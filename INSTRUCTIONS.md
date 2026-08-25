@@ -478,7 +478,7 @@ Every component must handle these states explicitly:
 ### 9.6 No Anti-Patterns
 
 - No prop-drilling more than 2 levels — use composables / state.
-- No god-components (>150 lines).
+- No god-components — see §21.1 for the size rule.
 - No inline magic numbers — use theme tokens.
 - No `any` in TypeScript.
 - No unhandled promises — always `.catch()` or `await` in a `try/catch`.
@@ -1304,13 +1304,36 @@ DELETE /admin/builds/:id/files/:fileId
 
 ### 21.1 The 150-Line Rule
 
-**Every file must be ≤ 150 lines.**
+**150 lines is the target. 400 is the hard ceiling.**
 
-This is a hard requirement, not a suggestion.
-If a file grows past 150 lines:
+The target is not aspirational — it is what the codebase already does. Half the
+files are under 100 lines and three quarters are under 145. When a file crosses
+150, that is a signal to look, not an automatic failure.
+
+**Over 150 lines:** allowed, but the file needs a one-line reason in its module
+doc — what holds it together and why splitting would separate things that are
+read together. A file without that reason is a file nobody decided on.
+
+**Over 400 lines:** not allowed in new code. Split it:
 1. Extract a sub-module.
 2. Extract a helper function or struct into its own file.
 3. Ask: "Is this component doing too much?"
+
+**The existing backlog** is short and named, so it can be closed rather than
+quietly tolerated — sixteen files exceed 400, and these are the worst:
+
+| Файл | Строк |
+|---|---|
+| `crates/master/src/db/queries.rs` | 1638 |
+| `crates/frontend/src/state.rs` | 1469 |
+| `crates/backend/src/backend_handler.rs` | 1461 |
+| `crates/master/src/api/admin/builds.rs` | 945 |
+
+Why the rule was rewritten: it used to say «every file must be ≤ 150 lines, this
+is a hard requirement», and 22% of files broke it. A requirement that is broken
+one time in five stops being read as a requirement — including the rules next to
+it in this document. The numbers above are the ones the codebase can actually
+hold.
 
 ### 21.2 One Component = One File
 

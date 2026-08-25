@@ -105,6 +105,20 @@ public class ModVanishManager {
             }
             ModText.send(player, AgentStrings.get(lang, "vanish_disabled"));
         }
+        announce();
+    }
+
+    /**
+     * Сказать клиентским модам, кто теперь скрыт.
+     *
+     * <p>Каждому свой список: право видеть скрытого проверяется здесь же, а не
+     * на клиенте. Там, где канала нет — старые версии, другие лоадеры, — не
+     * меняется ничего: ваниш работал и без него.
+     */
+    public void announce() {
+        //#if NEOFORGE && MC>=12100
+        //$$ ModVanishChannel.broadcast(server);
+        //#endif
     }
 
     public void sendStaffChat(ServerPlayer vanishedPlayer, String rawMessage) {

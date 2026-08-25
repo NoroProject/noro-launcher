@@ -41,6 +41,7 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
                 ip = ip_hash.as_deref().unwrap_or("-"),
                 "игрок вошёл"
             );
+            restore_case_mode(state, server, uuid).await;
         }
         FromAgent::PlayerLeave { uuid, reason } => {
             state.roster.leave(server.id, uuid);
@@ -61,6 +62,23 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
                 "игрок вышел"
             );
         }
+        FromAgent::CaseClaim { case, moderator } => {
+            super::cases::claim_from_game(state, case, moderator).await;
+        }
+        FromAgent::CaseAction {
+            case,
+            moderator,
+            kind,
+            payload,
+        } => super::cases::action(state, case, moderator, &kind, payload).await,
+        FromAgent::CaseChatSlice { case, messages } => {
+            super::cases::chat_slice(state, case, &messages).await
+        }
+        FromAgent::CaseInventory {
+            case,
+            moderator,
+            items,
+        } => super::cases::inventory(state, server, case, moderator, items).await,
         // Рестарт по зависанию — п.39, он приходит вместе с расписаниями и
         // правом дёргать враппер. Пока это сигнал в журнал: сервер, который не
         // тикает минуту, обязан быть виден оператору, даже если чинить его
@@ -78,5 +96,28 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
                 }
             }
         }
+    }
+}
+
+/// Вернуть модератору режим разбора при входе в игру.
+///
+/// Замок на деле ставится на мастере и живёт в базе, а сессия разбора у
+/// агента — в памяти сервера. Их разводит любой перезапуск сервера и любое
+/// взятие дела с сайта: панель показывает «в работе», а команды `/case …`
+/// отвечают «вы не ведёте разбор». Кадр на входе снова их сводит.
+async fn restore_case_mode(state: &AppState, server: &GameServerRow, mc_uuid: uuid::Uuid) {
+    let Ok(Some(user)) = crate::db::user_by_mc_uuid(&state.db, mc_uuid).await else {
+        return;
+    };
+    let cases = match crate::db::cases::claimed_on_server(&state.db, user.id, server.id).await {
+        Ok(cases) => cases,
+        Err(e) => {
+            tracing::warn!(player = %mc_uuid, error = %e, "дела модератора не прочитались");
+            return;
+        }
+    };
+    for case in &cases {
+        tracing::debug!(player = %mc_uuid, case = %case.id, "возвращаем режим разбора");
+        super::cases::assigned(state, case, mc_uuid).await;
     }
 }

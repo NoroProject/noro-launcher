@@ -49,23 +49,14 @@ pub async fn resolve_skin_bytes(state: &AppState, q: &RenderQuery) -> AppResult<
         .username
         .as_deref()
         .or(q.uuid.as_deref())
-        .or(q.discord.as_deref())
+        .or(q.identity.as_deref())
     else {
         // Ничего конкретного не просили — дефолтный скин и есть ответ.
         return Ok(STEVE.to_vec());
     };
 
-    let user = crate::db::list_users(&state.db, 500, 0)
+    let user = crate::db::find_user_by_any_name(&state.db, name)
         .await?
-        .into_iter()
-        .find(|u| {
-            u.mc_username.eq_ignore_ascii_case(name)
-                || u.mc_uuid.to_string() == name
-                || u.discord_username
-                    .as_deref()
-                    .is_some_and(|n| n.eq_ignore_ascii_case(name))
-                || u.discord_id.as_deref() == Some(name)
-        })
         .ok_or_else(|| AppError::NotFound(format!("player {name}")))?;
 
     match &user.skin_url {
@@ -76,17 +67,22 @@ pub async fn resolve_skin_bytes(state: &AppState, q: &RenderQuery) -> AppResult<
 }
 
 async fn fetch(url: &str) -> AppResult<Vec<u8>> {
-    let resp = reqwest::get(url)
-        .await
-        .map_err(|e| AppError::BadRequest(format!("could not download the skin {url}: {e}")))?;
+    let resp = reqwest::get(url).await.map_err(|e| {
+        AppError::upstream(
+            crate::error_codes::UPSTREAM_FAILED,
+            format!("could not download the skin {url}: {e}"),
+        )
+    })?;
     if !resp.status().is_success() {
         return Err(AppError::BadRequest(format!(
             "скин {url} отдан со статусом {}",
             resp.status()
         )));
     }
-    resp.bytes()
-        .await
-        .map(|b| b.to_vec())
-        .map_err(|e| AppError::BadRequest(format!("could not read the skin {url}: {e}")))
+    resp.bytes().await.map(|b| b.to_vec()).map_err(|e| {
+        AppError::upstream(
+            crate::error_codes::UPSTREAM_FAILED,
+            format!("could not read the skin {url}: {e}"),
+        )
+    })
 }

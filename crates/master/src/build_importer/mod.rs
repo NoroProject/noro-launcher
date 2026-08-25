@@ -21,6 +21,35 @@ pub struct ImportProgress {
     pub recommended_modloader_version: Option<String>,
 }
 
+/// Путь внутри сборки, либо `None`, если он опасен.
+///
+/// Лаунчер разложит эти пути по диску у игрока, поэтому выход за корень сборки
+/// отсекается здесь, а не на клиенте: `instance_dir.join(path)` на Windows
+/// принимает и `\\` как разделитель, и `C:` как корень, так что путь вида
+/// `..\\..\\evil.exe` уехал бы мимо инстанса, ничем себя не выдав.
+///
+/// Живёт в общем модуле, потому что входов у путей сборки три: zip-импорт,
+/// mrpack и переименование в админке. Пока проверка была только у первого,
+/// остальные два принимали что угодно.
+pub(crate) fn safe_path(raw: &str) -> Option<String> {
+    let normalized = raw.replace('\\', "/");
+    if normalized.starts_with('/') || normalized.contains(':') {
+        return None;
+    }
+    if normalized
+        .split('/')
+        .any(|part| part == ".." || part.trim().is_empty())
+    {
+        return None;
+    }
+    let trimmed = normalized.trim_start_matches("./").to_string();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
+#[cfg(test)]
+#[path = "safe_path_tests.rs"]
+mod safe_path_tests;
+
 /// Вытащить байты файла из поля `file` multipart-формы.
 pub(crate) async fn read_upload(mut multipart: Multipart) -> Result<Vec<u8>> {
     while let Some(field) = multipart.next_field().await? {

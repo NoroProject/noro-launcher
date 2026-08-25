@@ -67,6 +67,40 @@ pub async fn save(
     Ok(Json(json!({ "ok": true, "saved": values.len() })))
 }
 
+#[derive(Deserialize)]
+pub struct SignInReq {
+    /// "discord" | "twitch" | "google".
+    pub method: String,
+    pub client_id: String,
+    pub client_secret: Option<String>,
+}
+
+/// Настроить вход через платформу на этапе визарда.
+///
+/// Отдельно от `save`: ключи приложения живут не в `instance_settings`, а в
+/// `auth_methods` — там же, где потом их правит админка.
+pub async fn save_sign_in(
+    State(state): State<AppState>,
+    _auth: SetupAuth,
+    Json(req): Json<SignInReq>,
+) -> AppResult<Json<Value>> {
+    let p = crate::api::auth::oauth::Provider::from_slug(&req.method)
+        .ok_or_else(|| AppError::BadRequest(format!("unknown sign-in method: {}", req.method)))?;
+
+    let secret = req
+        .client_secret
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let client_id = req.client_id.trim();
+    // Платформа без ключей включённой быть не может: кнопка на странице входа
+    // упиралась бы в отказ.
+    let enabled = !client_id.is_empty();
+
+    crate::db::auth_methods::save(&state.db, p.slug(), client_id, secret, enabled).await?;
+    Ok(Json(json!({ "ok": true, "enabled": enabled })))
+}
+
 #[derive(Serialize)]
 pub struct SigningKeyRes {
     /// Приватный seed. Показывается ОДИН раз и нигде не сохраняется — ни в БД,

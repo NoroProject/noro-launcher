@@ -27,11 +27,12 @@ pub async fn github_latest(
     admin: AdminAuth,
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_LAUNCHER_VIEW)?;
-    let repo = state
-        .config
-        .github_repo
-        .clone()
-        .ok_or_else(|| AppError::BadRequest("NORO_GITHUB_REPO is not set".into()))?;
+    let repo = state.config.github_repo.clone().ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::NOT_CONFIGURED,
+            "NORO_GITHUB_REPO is not set",
+        )
+    })?;
     let url = format!("https://api.github.com/repos/{repo}/releases/latest");
     let mut req = state.http().get(&url).header("User-Agent", "noro-master");
     if let Some(tok) = &state.config.github_token {

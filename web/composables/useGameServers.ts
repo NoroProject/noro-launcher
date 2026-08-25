@@ -18,7 +18,7 @@ export function useGameServers(serverId: string) {
     pending.value = true;
     error.value = null;
     try {
-      items.value = await api.request<GameServer[]>(base);
+      items.value = await api.requestList<GameServer>(base);
     } catch (err) {
       error.value = "Could not load game servers.";
       console.error(err);

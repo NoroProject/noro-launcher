@@ -1,0 +1,20 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mixins]]
+config = "noro-core.mixins.json"
+
+[[mods]]
+modId = "noro_core"
+version = "${version}"
+displayName = "Noro Core"
+authors = "noro"
+description = '''Shared core for Noro client mods: launcher link and the launcher's look.'''
+
+[[dependencies.noro_core]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21,)"
+ordering = "NONE"
+side = "CLIENT"

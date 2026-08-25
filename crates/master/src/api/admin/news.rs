@@ -1,10 +1,14 @@
 //! Админ: новости.
 
 use crate::api::auth::AdminAuth;
+use crate::api::created::created;
+use crate::api::paging::{Page, PageQuery};
+use crate::api::validate::Validation;
 use crate::db::models::NewsRow;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use axum::extract::{Multipart, Path, State};
+use axum::extract::{Multipart, Path, Query, State};
+use axum::response::Response;
 use axum::Json;
 use schema::{PERM_NEWS_DELETE, PERM_NEWS_EDIT, PERM_NEWS_VIEW};
 
@@ -16,12 +20,16 @@ fn broadcast_news_changed(state: &AppState) {
     state.ws.broadcast(&schema::ServerWsMsg::NewsChanged);
 }
 
+/// `GET /api/admin/news` — страница новостей, `q` ищет по заголовку и телу.
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<NewsRow>>> {
+    Query(q): Query<PageQuery>,
+) -> AppResult<Json<Page<NewsRow>>> {
     admin.require(PERM_NEWS_VIEW)?;
-    Ok(Json(crate::db::list_news(&state.db, 100).await?))
+    let (items, total) =
+        crate::db::list_news(&state.db, q.like().as_deref(), q.limit(), q.offset()).await?;
+    Ok(Json(Page::new(items, total)))
 }
 
 #[derive(Deserialize)]
@@ -37,8 +45,13 @@ pub async fn create(
     State(state): State<AppState>,
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
-) -> AppResult<Json<Value>> {
+) -> AppResult<Response> {
     admin.require(PERM_NEWS_EDIT)?;
+    Validation::new()
+        .required("title", &req.title)
+        .max_len("title", &req.title, 200)
+        .required("body", &req.body)
+        .finish()?;
     let id = crate::db::create_news(
         &state.db,
         &req.title,
@@ -49,7 +62,30 @@ pub async fn create(
     )
     .await?;
     broadcast_news_changed(&state);
-    Ok(Json(json!({ "id": id })))
+    Ok(created(
+        format!("/api/admin/news/{id}"),
+        json!({ "id": id }),
+    ))
+}
+
+/// `GET /api/admin/news/{id}` — одна запись.
+///
+/// Страница редактирования раньше тянула весь список и искала нужную запись в
+/// нём. С пагинацией это перестало работать: запись со второй страницы просто
+/// не находилась, и форма открывалась пустой.
+pub async fn get_one(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<uuid::Uuid>,
+) -> AppResult<Json<NewsRow>> {
+    admin.require(PERM_NEWS_VIEW)?;
+    sqlx::query_as::<_, NewsRow>("SELECT * FROM news WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|e| AppError::Other(e.into()))?
+        .map(Json)
+        .ok_or_else(|| AppError::NotFound("news".into()))
 }
 
 pub async fn update(
@@ -107,7 +143,12 @@ pub async fn upload_image(
         let data = tokio::task::spawn_blocking(move || fit_preview(&raw))
             .await
             .map_err(|e| AppError::Other(e.into()))?
-            .map_err(|e| AppError::BadRequest(format!("invalid image: {e}")))?;
+            .map_err(|e| {
+                AppError::bad(
+                    crate::error_codes::UPLOAD_BAD_FORMAT,
+                    format!("invalid image: {e}"),
+                )
+            })?;
         let stored = state
             .files
             .put_bytes(&data)
@@ -122,7 +163,10 @@ pub async fn upload_image(
         };
         return Ok(Json(json!({ "url": url })));
     }
-    Err(AppError::BadRequest("missing the image field".into()))
+    Err(AppError::bad(
+        crate::error_codes::UPLOAD_FIELD_MISSING,
+        "missing the image field",
+    ))
 }
 
 /// Превью показывается карточкой, поэтому 1280px по ширине с запасом хватает.

@@ -27,11 +27,14 @@ pub async fn set_username(
     user: AuthUser,
     Json(req): Json<UsernameReq>,
 ) -> AppResult<Json<UserProfile>> {
-    if !valid_username(&req.username) {
-        return Err(AppError::BadRequest(
-            "username: 3-16 chars, latin letters, digits, or underscore".into(),
-        ));
-    }
+    crate::api::validate::Validation::new()
+        .rule(
+            "username",
+            valid_username(&req.username),
+            "invalid_format",
+            "3 to 16 characters: latin letters, digits or underscore",
+        )
+        .finish()?;
     let taken: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM users WHERE mc_username = $1 AND id <> $2)",
     )
@@ -77,10 +80,16 @@ pub async fn upload_skin(
                     .map_err(|e| AppError::BadRequest(e.to_string()))?;
                 // Простая проверка PNG-сигнатуры.
                 if data.len() < 8 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
-                    return Err(AppError::BadRequest("PNG expected".into()));
+                    return Err(AppError::bad(
+                        crate::error_codes::UPLOAD_BAD_FORMAT,
+                        "PNG expected",
+                    ));
                 }
                 if data.len() > 256 * 1024 {
-                    return Err(AppError::BadRequest("skin is too large".into()));
+                    return Err(AppError::bad(
+                        crate::error_codes::UPLOAD_TOO_LARGE,
+                        "skin is too large",
+                    ));
                 }
                 skin = Some(data.to_vec());
             }
@@ -112,7 +121,10 @@ pub async fn upload_skin(
         );
         return Ok(Json(profile));
     }
-    Err(AppError::BadRequest("missing skin field".into()))
+    Err(AppError::bad(
+        crate::error_codes::UPLOAD_FIELD_MISSING,
+        "missing skin field",
+    ))
 }
 
 pub async fn delete_skin(
@@ -146,12 +158,12 @@ pub async fn upload_skin_from_username(
         return Err(AppError::BadRequest("Username is required".into()));
     }
     let url = format!("https://minotar.net/skin/{username}");
-    let resp = state
-        .http
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| AppError::BadRequest(format!("Failed to fetch skin: {e}")))?;
+    let resp = state.http.get(&url).send().await.map_err(|e| {
+        AppError::upstream(
+            crate::error_codes::UPSTREAM_FAILED,
+            format!("Failed to fetch skin: {e}"),
+        )
+    })?;
 
     if !resp.status().is_success() {
         return Err(AppError::BadRequest("Skin for player not found".into()));

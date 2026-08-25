@@ -22,11 +22,15 @@ watch(
   }
 )
 
+/** Что мастер не принял, по полям. Пусто — ошибок формы нет. */
+const fieldErrors = ref<Record<string, string>>({})
+
 async function saveUsername() {
   const nextName = username.value.trim()
   if (!nextName) return
   saving.value = true
   saved.value = false
+  fieldErrors.value = {}
   try {
     auth.user.value = await auth.request<UserProfile>('/api/me/username', {
       method: 'PUT',
@@ -36,7 +40,10 @@ async function saveUsername() {
     saved.value = true
     notify.ok()
   } catch (e) {
-    notify.fail(e)
+    // Правило про ник приезжает привязанным к полю, а не абзацем под формой:
+    // подпись у самого поля показывает, что именно исправлять.
+    fieldErrors.value = apiFieldMessages(e)
+    if (!Object.keys(fieldErrors.value).length) notify.fail(e)
   } finally {
     saving.value = false
   }
@@ -46,12 +53,11 @@ async function saveUsername() {
 <template>
   <NoroShell :title="t('cabinet-title')" :subtitle="t('cabinet-subtitle')">
     <div class="grid gap-4">
-      <!-- Profile & Username -->
-      <section class="noro-panel p-6">
+      <NoroCard :title="t('cabinet-profile-title')" icon="i-lucide-user-round">
         <div class="flex flex-wrap items-center gap-4">
           <img
-            v-if="auth.user.value?.discord_avatar"
-            :src="auth.user.value.discord_avatar"
+            v-if="identityAvatar(auth.user.value)"
+            :src="identityAvatar(auth.user.value)!"
             alt=""
             class="size-16 rounded-[var(--noro-r-sm)] object-cover"
           >
@@ -66,17 +72,26 @@ async function saveUsername() {
               {{ auth.user.value?.username || t('cabinet-player') }}
             </h2>
             <p class="mt-2 truncate text-sm text-[var(--noro-muted)]">
-              @{{ auth.user.value?.discord_username || 'discord' }}
+              {{ identityHandle(auth.user.value) ? `@${identityHandle(auth.user.value)}` : auth.user.value?.username }}
             </p>
           </div>
         </div>
 
-        <form class="mt-6 grid gap-3 md:grid-cols-[1fr_auto]" @submit.prevent="saveUsername">
+        <form class="mt-5 grid gap-3 md:grid-cols-[1fr_auto]" @submit.prevent="saveUsername">
           <label class="min-w-0">
             <span class="noro-label">{{ t('cabinet-mc-name') }}</span>
-            <input v-model="username" class="noro-input mt-2" maxlength="16" autocomplete="off">
-            <span class="mt-2 block text-xs text-[var(--noro-muted)]">
-              {{ t('cabinet-mc-name-hint') }}
+            <input
+              v-model="username"
+              class="noro-input mt-2"
+              :class="fieldErrors.username && 'border-[var(--noro-magenta)]'"
+              maxlength="16"
+              autocomplete="off"
+            >
+            <span
+              class="mt-2 block text-xs"
+              :class="fieldErrors.username ? 'text-[var(--noro-magenta)]' : 'text-[var(--noro-muted)]'"
+            >
+              {{ fieldErrors.username || t('cabinet-mc-name-hint') }}
             </span>
           </label>
           <AtomButton
@@ -98,21 +113,21 @@ async function saveUsername() {
           icon="i-lucide-check"
           :description="t('cabinet-profile-updated')"
         />
-      </section>
+      </NoroCard>
 
       <!-- Activity Heatmap -->
       <ActivityHeatmap />
 
-      <!-- Launcher Download -->
-      <section class="noro-panel p-6">
-        <h2 class="mb-4 font-bold text-[var(--noro-text)]">{{ t('cabinet-launcher-title') }}</h2>
+      <NoroCard :title="t('cabinet-launcher-title')" icon="i-lucide-download">
         <LauncherDownload compact />
-      </section>
+      </NoroCard>
 
       <!-- Roles & Permissions -->
       <section class="grid gap-4 xl:grid-cols-2">
-        <div class="noro-panel p-6">
-          <h2 class="noro-label mb-4">{{ t('cabinet-roles-title', { count: roles.length }) }}</h2>
+        <NoroCard :title="t('cabinet-roles-card')" icon="i-lucide-shield">
+          <template #actions>
+            <span class="text-xs text-[var(--noro-muted)]">{{ roles.length }}</span>
+          </template>
           <div v-if="roles.length" class="grid gap-2">
             <div
               v-for="role in roles"
@@ -120,16 +135,9 @@ async function saveUsername() {
               class="flex items-center justify-between gap-3 rounded-[var(--noro-r-sm)] border border-[var(--noro-border)] bg-[var(--noro-input)] px-4 py-3"
             >
               <div class="flex min-w-0 items-center gap-3">
-                <span
-                  v-if="role.icon"
-                  class="w-4 shrink-0 text-center text-sm"
-                  :style="{ color: role.color || 'var(--noro-magenta)' }"
-                >{{ role.icon }}</span>
-                <span
-                  v-else
-                  class="size-3 shrink-0 rounded-[2px]"
-                  :style="{ backgroundColor: role.color || 'var(--noro-magenta)' }"
-                />
+                <!-- Плашка вместо иконки и кружка: игрок уже видел её в чате,
+                     и узнаёт роль по ней быстрее, чем по цвету квадратика. -->
+                <RoleBadge :role-id="role.id" :color="role.color" :height="14" />
                 <div class="min-w-0">
                   <div class="truncate text-sm font-bold text-[var(--noro-text)]">
                     {{ role.display_name }}
@@ -148,10 +156,12 @@ async function saveUsername() {
             :title="t('cabinet-roles-none-title')"
             :text="t('cabinet-roles-none-text')"
           />
-        </div>
+        </NoroCard>
 
-        <div class="noro-panel p-6">
-          <h2 class="noro-label mb-4">{{ t('cabinet-direct-perms-title', { count: permissions.length }) }}</h2>
+        <NoroCard :title="t('cabinet-direct-card')" icon="i-lucide-key">
+          <template #actions>
+            <span class="text-xs text-[var(--noro-muted)]">{{ permissions.length }}</span>
+          </template>
           <div v-if="permissions.length" class="flex flex-wrap gap-2">
             <code
               v-for="perm in permissions"
@@ -167,7 +177,7 @@ async function saveUsername() {
             :title="t('cabinet-direct-none-title')"
             :text="t('cabinet-direct-none-text')"
           />
-        </div>
+        </NoroCard>
       </section>
     </div>
   </NoroShell>

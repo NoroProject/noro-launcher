@@ -3,17 +3,32 @@ use anyhow::Result;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+/// Предложение мода от игрока.
+pub struct NewModSuggestion<'a> {
+    pub server_id: Uuid,
+    pub build_id: Option<Uuid>,
+    pub provider: &'a str,
+    pub project_id: &'a str,
+    pub title: &'a str,
+    pub icon_url: Option<&'a str>,
+    pub description: Option<&'a str>,
+    pub suggested_by: Uuid,
+}
+
 pub async fn create_mod_suggestion(
     pool: &PgPool,
-    server_id: Uuid,
-    build_id: Option<Uuid>,
-    provider: &str,
-    project_id: &str,
-    title: &str,
-    icon_url: Option<&str>,
-    description: Option<&str>,
-    suggested_by: Uuid,
+    s: NewModSuggestion<'_>,
 ) -> Result<ModSuggestionRow> {
+    let NewModSuggestion {
+        server_id,
+        build_id,
+        provider,
+        project_id,
+        title,
+        icon_url,
+        description,
+        suggested_by,
+    } = s;
     let row = sqlx::query_as::<_, ModSuggestionRow>(
         r#"
         INSERT INTO mod_suggestions 

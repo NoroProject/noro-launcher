@@ -1,190 +1,249 @@
 <script setup lang="ts">
+/**
+ * Экран согласия: единственное место, где игрок решает, что отдать приложению.
+ *
+ * Показываем то, что решает: чьё приложение, что именно оно получит и куда
+ * вернётся. Раньше здесь была заглушка — любой `client_id` рисовался как
+ * «официальное приложение» с одной строкой про профиль, потому что данные брались
+ * из ручки, которая на самом деле отдаёт редирект и всегда падала в catch.
+ */
+
 const route = useRoute()
 const auth = useAuth()
 const { t } = useT()
 
-definePageMeta({
-  layout: false
-})
+definePageMeta({ layout: false })
 
 const clientId = computed(() => String(route.query.client_id || ''))
 const redirectUri = computed(() => String(route.query.redirect_uri || ''))
-const scope = computed(() => String(route.query.scope || 'profile'))
+const scope = computed(() => String(route.query.scope || ''))
 const state = computed(() => String(route.query.state || ''))
-const responseType = computed(() => String(route.query.response_type || 'code'))
+const challenge = computed(() => String(route.query.code_challenge || ''))
 
-const busy = ref(false)
-const appInfo = ref<{
-  id: string
-  client_id: string
+interface ConsentScope { name: string; title: string; tier: 'basic' | 'privileged' }
+interface Consent {
   name: string
-  description: string | null
   icon_url: string | null
-  is_official: boolean
-} | null>(null)
+  description: string | null
+  official: boolean
+  owner: string | null
+  status: string
+  usable: boolean
+  scopes: ConsentScope[]
+}
+
+const consent = ref<Consent | null>(null)
+const busy = ref(true)
 const errorMsg = ref<string | null>(null)
+
+/** Куда вернётся игрок. Домен, а не весь адрес: он и решает, кому доверять. */
+const returnHost = computed(() => {
+  try {
+    return new URL(redirectUri.value).host
+  } catch {
+    return redirectUri.value
+  }
+})
+
+/** Значок доступа. Привилегированные заметно строже — их выдаёт оператор. */
+function scopeIcon(s: ConsentScope) {
+  const icons: Record<string, string> = {
+    identity: 'i-lucide-user',
+    profile: 'i-lucide-id-card',
+    skins: 'i-lucide-shirt',
+    capes: 'i-lucide-flag',
+    punishments: 'i-lucide-gavel',
+    servers: 'i-lucide-server',
+    'skins:write': 'i-lucide-pencil',
+    identities: 'i-lucide-link',
+    journal: 'i-lucide-scroll-text',
+    launcher: 'i-lucide-shield-alert',
+  }
+  return icons[s.name] || 'i-lucide-check'
+}
+
+/** Перевод доступа, если он есть; иначе формулировка мастера. */
+const scopeText = (s: ConsentScope) => {
+  const key = `oauth-scope-${s.name.replace(':', '-')}`
+  const translated = t(key)
+  return translated === key ? s.title : translated
+}
 
 onMounted(async () => {
   if (!clientId.value || !redirectUri.value) {
-    errorMsg.value = 'Missing required query parameters: client_id and redirect_uri'
+    busy.value = false
+    errorMsg.value = t('oauth-missing-params')
     return
   }
-
-  // Check login status
   if (!auth.token.value) {
-    const returnUrl = route.fullPath
-    await navigateTo(`/login?next=${encodeURIComponent(returnUrl)}`)
+    await navigateTo(link.login(route.fullPath))
     return
   }
+  if (!auth.user.value) await auth.loadMe()
 
-  if (!auth.user.value) {
-    await auth.loadMe()
-  }
-
-  busy.value = true
   try {
-    const res = await auth.request<any>(`/oauth2/authorize?client_id=${encodeURIComponent(clientId.value)}&redirect_uri=${encodeURIComponent(redirectUri.value)}&scope=${encodeURIComponent(scope.value)}&state=${encodeURIComponent(state.value)}&response_type=${encodeURIComponent(responseType.value)}`)
-    if (res && res.app) {
-      appInfo.value = res.app
-    } else {
-      appInfo.value = {
-        id: 'noro_launcher',
+    consent.value = await auth.request<Consent>('/api/oauth2/consent', {
+      query: {
         client_id: clientId.value,
-        name: clientId.value === 'noro_launcher' ? 'Noro Launcher' : clientId.value,
-        description: t('cabinet-apps-default-desc'),
-        icon_url: null,
-        is_official: true
-      }
-    }
+        redirect_uri: redirectUri.value,
+        scope: scope.value,
+      },
+    })
   } catch (e) {
-    appInfo.value = {
-      id: clientId.value,
-      client_id: clientId.value,
-      name: clientId.value === 'noro_launcher' ? 'Noro Launcher' : clientId.value,
-      description: t('cabinet-apps-default-desc'),
-      icon_url: null,
-      is_official: true
-    }
+    errorMsg.value = apiErrorMessage(e) || String(e)
   } finally {
     busy.value = false
   }
 })
 
-async function onAuthorize() {
+async function allow() {
   busy.value = true
   errorMsg.value = null
   try {
-    const res = await auth.request<any>('/oauth2/authorize/accept', {
+    const res = await auth.request<{ redirect: string }>('/api/oauth2/authorize/accept', {
       method: 'POST',
       body: {
         client_id: clientId.value,
         redirect_uri: redirectUri.value,
         scopes: scope.value,
-        state: state.value
-      }
+        state: state.value,
+        code_challenge: challenge.value || null,
+      },
     })
-
-    if (res && res.redirect) {
-      window.location.href = res.redirect
-    } else if (res && res.code) {
-      const sep = redirectUri.value.includes('?') ? '&' : '?'
-      window.location.href = `${redirectUri.value}${sep}code=${res.code}&state=${encodeURIComponent(state.value)}`
-    } else {
-      const sep = redirectUri.value.includes('?') ? '&' : '?'
-      window.location.href = `${redirectUri.value}${sep}code=authorized&state=${encodeURIComponent(state.value)}`
-    }
-  } catch (e: any) {
-    errorMsg.value = e?.message || e?.data?.error || String(e)
+    window.location.href = res.redirect
+  } catch (e) {
+    errorMsg.value = apiErrorMessage(e) || String(e)
     busy.value = false
   }
 }
 
-function onDeny() {
+/** Отказ возвращает приложение ни с чем — так требует OAuth 2.0. */
+function deny() {
   const sep = redirectUri.value.includes('?') ? '&' : '?'
   window.location.href = `${redirectUri.value}${sep}error=access_denied&state=${encodeURIComponent(state.value)}`
 }
 </script>
 
 <template>
-  <div class="relative grid min-h-screen place-items-center overflow-hidden bg-[var(--noro-bg-deep)] px-4 py-8">
-    <div class="pointer-events-none absolute left-1/2 top-1/4 size-[500px] -translate-x-1/2 rounded-full bg-[var(--noro-magenta)]/15 blur-[120px]" />
-    <div class="pointer-events-none absolute bottom-1/4 right-1/4 size-[400px] rounded-full bg-[var(--noro-blue)]/10 blur-[100px]" />
+  <div class="grid min-h-screen place-items-center bg-[var(--noro-bg-deep)] px-4 py-10">
+    <div class="w-full max-w-md">
+      <div class="noro-panel p-8">
+        <div v-if="busy && !consent" class="flex flex-col items-center gap-4 py-12">
+          <UIcon name="i-lucide-loader-2" class="size-7 animate-spin text-[var(--noro-blue)]" />
+          <span class="text-xs text-[var(--noro-muted)]">{{ t('oauth-loading-app') }}</span>
+        </div>
 
-    <div class="noro-panel relative z-10 w-full max-w-md border border-[var(--noro-border)] bg-[var(--noro-panel)]/90 p-8 shadow-2xl backdrop-blur-xl md:p-10">
-      <div v-if="busy && !appInfo" class="flex flex-col items-center justify-center gap-4 py-12">
-        <UIcon name="i-lucide-loader-2" class="size-8 animate-spin text-[var(--noro-magenta)]" />
-        <span class="text-sm font-semibold text-[var(--noro-muted)]">{{ t('oauth-loading-app') }}</span>
-      </div>
-
-      <template v-else>
-        <div class="text-center">
-          <div class="mx-auto mb-4 flex size-20 items-center justify-center rounded-2xl border-2 border-[var(--noro-magenta)] bg-[var(--noro-magenta)]/10 shadow-[0_0_30px_rgba(232,90,165,0.35)]">
-            <img v-if="appInfo?.icon_url" :src="appInfo.icon_url" class="size-full rounded-2xl object-cover" />
-            <UIcon v-else name="i-lucide-shield-check" class="size-10 text-[var(--noro-magenta)]" />
+        <template v-else-if="consent">
+          <!-- Кто и кому: приложение слева, игрок справа. -->
+          <div class="flex items-center justify-center gap-4">
+            <div class="grid size-16 place-items-center overflow-hidden rounded-2xl border border-[var(--noro-border)] bg-[var(--noro-panel-2)]">
+              <img v-if="consent.icon_url" :src="consent.icon_url" alt="" class="size-full object-cover">
+              <UIcon v-else name="i-lucide-app-window" class="size-7 text-[var(--noro-muted)]" />
+            </div>
+            <UIcon name="i-lucide-arrow-right" class="size-4 text-[var(--noro-muted)]" />
+            <!-- Аватар платформы, которой игрок вошёл. Раньше здесь стоял
+                 `/api/avatar/{ник}` — такой ручки нет ни у сайта, ни у мастера,
+                 и картинка всегда молча падала в запасной значок. -->
+            <div class="grid size-16 place-items-center overflow-hidden rounded-2xl border border-[var(--noro-border)] bg-[var(--noro-panel-2)]">
+              <img
+                v-if="identityAvatar(auth.user.value)"
+                :src="identityAvatar(auth.user.value)!"
+                alt=""
+                class="size-full object-cover"
+              >
+              <span v-else class="text-xl font-black text-[var(--noro-cream)]">
+                {{ (auth.user.value?.username || '?').slice(0, 1).toUpperCase() }}
+              </span>
+            </div>
           </div>
 
-          <div class="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--noro-magenta)]/30 bg-[var(--noro-magenta)]/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--noro-magenta)]">
-            <UIcon name="i-lucide-badge-check" class="size-3.5" />
-            {{ t('oauth-official-app') }}
-          </div>
-
-          <h1 class="noro-pixel text-2xl text-[var(--noro-cream)]">
-            {{ appInfo?.name || clientId }}
+          <h1 class="mt-6 text-center text-xl font-black text-[var(--noro-cream)]">
+            {{ consent.name }}
           </h1>
-          <p class="mt-2 text-xs leading-relaxed text-[var(--noro-muted)]">
-            {{ appInfo?.description || t('oauth-app-access-request') }}
+          <p class="mt-1 text-center text-sm text-[var(--noro-muted)]">
+            {{ t('oauth-wants-access', { user: auth.user.value?.username || '' }) }}
           </p>
-        </div>
 
-        <div v-if="auth.user.value" class="my-6 flex items-center gap-3 rounded-xl border border-[var(--noro-border)] bg-[var(--noro-input)] p-3.5">
-          <div class="size-10 overflow-hidden rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg)]">
-            <img :src="`/api/avatar/${auth.user.value.username}`" class="size-full object-cover" onerror="this.src='/icon.png'" />
+          <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <span
+              v-if="consent.official"
+              class="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--noro-blue)_18%,transparent)] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[var(--noro-blue)]"
+            >
+              <UIcon name="i-lucide-badge-check" class="size-3" />
+              {{ t('oauth-official-app') }}
+            </span>
+            <span v-else-if="consent.owner" class="text-xs text-[var(--noro-muted)]">
+              {{ t('oauth-by-developer', { owner: consent.owner }) }}
+            </span>
           </div>
-          <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-bold text-[var(--noro-cream)]">{{ auth.user.value.username }}</div>
-            <div class="truncate text-xs text-[var(--noro-muted)]">{{ t('oauth-discord-connected') }}</div>
+
+          <!-- Приложение ещё не проверено: автор так может отладить интеграцию,
+               но игрок должен понимать, во что входит. -->
+          <UAlert
+            v-if="consent.status === 'pending'"
+            class="mt-5"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-clock"
+            :description="t('oauth-app-pending')"
+          />
+
+          <div class="mt-6">
+            <div class="noro-label mb-2">{{ t('oauth-requested-permissions') }}</div>
+            <ul class="grid gap-2">
+              <li
+                v-for="s in consent.scopes"
+                :key="s.name"
+                class="flex items-start gap-3 rounded-[var(--noro-r-sm)] border border-[var(--noro-border)] bg-[var(--noro-input)] px-4 py-3"
+              >
+                <UIcon
+                  :name="scopeIcon(s)"
+                  class="mt-0.5 size-4 shrink-0"
+                  :class="s.tier === 'privileged' ? 'text-[var(--noro-magenta)]' : 'text-[var(--noro-blue)]'"
+                />
+                <span class="text-xs leading-relaxed text-[var(--noro-text)]">{{ scopeText(s) }}</span>
+              </li>
+            </ul>
           </div>
-          <UIcon name="i-lucide-check-circle-2" class="size-5 text-[var(--noro-green)]" />
-        </div>
 
-        <div class="mb-6 rounded-xl border border-[var(--noro-border)] bg-[var(--noro-bg)]/60 p-4">
-          <div class="mb-2 text-[10px] font-black uppercase tracking-wider text-[var(--noro-muted)]">{{ t('oauth-requested-permissions') }}</div>
-          <div class="flex items-center gap-2.5 text-xs font-semibold text-[var(--noro-text)]">
-            <UIcon name="i-lucide-user-check" class="size-4 text-[var(--noro-magenta)]" />
-            <span>{{ t('oauth-scope-profile', { scope }) }}</span>
+          <p class="mt-4 text-center text-[11px] text-[var(--noro-muted)]">
+            {{ t('oauth-will-return-to', { host: returnHost }) }}
+          </p>
+
+          <UAlert
+            v-if="errorMsg"
+            class="mt-5"
+            color="error"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            :description="errorMsg"
+          />
+
+          <div class="mt-6 grid grid-cols-2 gap-3">
+            <AtomButton variant="secondary" :disabled="busy" @click="deny">
+              {{ t('oauth-deny') }}
+            </AtomButton>
+            <AtomButton icon="i-lucide-check" :loading="busy" :disabled="!consent.usable" @click="allow">
+              {{ t('oauth-allow') }}
+            </AtomButton>
           </div>
-        </div>
 
-        <UAlert
-          v-if="errorMsg"
-          color="error"
-          variant="subtle"
-          icon="i-lucide-triangle-alert"
-          :description="errorMsg"
-          class="mb-6"
-        />
+          <p class="mt-4 text-center text-[11px] text-[var(--noro-muted)]">
+            {{ t('oauth-revoke-hint') }}
+          </p>
+        </template>
 
-        <div class="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            class="flex items-center justify-center rounded-xl border border-[var(--noro-border)] bg-[var(--noro-input)] py-3 text-xs font-bold text-[var(--noro-muted)] transition hover:border-[var(--noro-muted)] hover:text-[var(--noro-text)]"
-            :disabled="busy"
-            @click="onDeny"
-          >
-            {{ t('oauth-deny') }}
-          </button>
-
-          <button
-            type="button"
-            class="noro-cta flex items-center justify-center gap-2 py-3 text-xs font-bold"
-            :disabled="busy"
-            @click="onAuthorize"
-          >
-            <UIcon v-if="busy" name="i-lucide-loader-2" class="size-4 animate-spin" />
-            <span v-else>{{ t('oauth-allow') }}</span>
-          </button>
-        </div>
-      </template>
+        <!-- Приложение не найдено, адрес возврата чужой, доступ закрыт: всё это
+             видно здесь, а не после молчаливого редиректа неизвестно куда. -->
+        <template v-else>
+          <div class="flex flex-col items-center gap-4 py-8 text-center">
+            <UIcon name="i-lucide-shield-x" class="size-10 text-[var(--noro-danger)]" />
+            <h1 class="text-lg font-black text-[var(--noro-cream)]">{{ t('oauth-cannot-continue') }}</h1>
+            <p class="text-xs text-[var(--noro-muted)]">{{ errorMsg }}</p>
+            <AtomButton variant="secondary" :to="link.home()">{{ t('oauth-back-home') }}</AtomButton>
+          </div>
+        </template>
+      </div>
     </div>
   </div>
 </template>

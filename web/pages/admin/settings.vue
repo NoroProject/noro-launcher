@@ -1,12 +1,24 @@
 <script setup lang="ts">
+/**
+ * Настройки инстанса.
+ *
+ * Вкладками, а не простынёй секций: полей десяток, но читаются они группами —
+ * брендинг правят раз в полгода, а URL-ы и интеграции живут своей жизнью.
+ * Способы входа переехали сюда же со своей страницы: это те же настройки, и
+ * отдельным разделом сайдбара они только удлиняли список.
+ */
+
 import {
-  SECTIONS,
+  BRANDING_IMAGES,
+  SETTINGS_TABS,
   SETTING_LABELS,
   type DiagnosticCheck,
   type SettingsResponse,
 } from '~/types/settings'
 
 const auth = useAuth()
+const route = useRoute()
+const router = useRouter()
 const { t } = useT()
 const can = (perm: string) => auth.hasPermission(perm)
 const notify = useNotify()
@@ -17,31 +29,30 @@ const checks = ref<DiagnosticCheck[]>([])
 const draft = ref<Record<string, string>>({})
 const pending = ref(false)
 const restartRequired = ref(false)
-const heroFileInput = ref<HTMLInputElement | null>(null)
-const uploadingHero = ref(false)
 
-async function uploadHeroImage(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
+// Вкладка в адресе: ссылкой на «настройки» обычно зовут в конкретное место.
+const tab = computed({
+  get: () => SETTINGS_TABS.find(x => x.id === route.query.tab)?.id ?? SETTINGS_TABS[0]!.id,
+  set: (id: string) => router.replace({ query: { ...route.query, tab: id } }),
+})
+const current = computed(() => SETTINGS_TABS.find(x => x.id === tab.value)!)
 
-  uploadingHero.value = true
-  try {
-    const formData = new FormData()
-    formData.append('image', file)
-    const res = await auth.request<{ ok: boolean; url: string }>('/api/admin/settings/hero-image', {
-      method: 'POST',
-      body: formData,
-    })
-    draft.value['hero_image_url'] = res.url
-    notify.ok()
-  } catch (e) {
-    notify.fail(e, 'Failed to upload hero image')
-  } finally {
-    uploadingHero.value = false
-    if (input) input.value = ''
-  }
-}
+const imageKeys = new Set<string>(BRANDING_IMAGES.map(i => i.key))
+const settings = computed(() => data.value?.settings ?? [])
+/** Поля вкладки. Картинки исключены: они живут в своих карточках с превью. */
+const fields = computed(() =>
+  settings.value.filter(
+    s => SETTING_LABELS[s.key]?.section === current.value.section && !imageKeys.has(s.key),
+  ),
+)
+/** Картинки, которые мастер знает: список ключей у сайта свой, и он может
+ *  разъехаться со списком настроек — тогда карточки просто нет. */
+const images = computed(() =>
+  BRANDING_IMAGES.flatMap((img) => {
+    const found = settings.value.find(s => s.key === img.key)
+    return found ? [{ ...img, item: found }] : []
+  }),
+)
 
 async function load() {
   pending.value = true
@@ -62,9 +73,7 @@ async function save() {
   pending.value = true
   try {
     const editable = Object.fromEntries(
-      (data.value?.settings ?? [])
-        .filter((s) => !s.from_env)
-        .map((s) => [s.key, draft.value[s.key] ?? ''])
+      settings.value.filter((s) => !s.from_env).map((s) => [s.key, draft.value[s.key] ?? '']),
     )
     const res = await auth.request<{ changed: number; restart_required?: boolean }>(
       '/api/admin/settings',
@@ -94,9 +103,6 @@ async function exportEnv() {
   }
 }
 
-const inSection = (name: string) =>
-  (data.value?.settings ?? []).filter((s) => SETTING_LABELS[s.key]?.section === name)
-
 onMounted(() => load())
 </script>
 
@@ -104,7 +110,12 @@ onMounted(() => load())
   <NoroShell :title="t('admin-settings-title')" :subtitle="t('admin-settings-subtitle')">
     <template #actions>
       <AtomButton icon="i-lucide-download" variant="dark" @click="exportEnv">{{ t('admin-settings-export-env') }}</AtomButton>
-      <AtomButton v-if="can('noro.admin.settings.edit')" icon="i-lucide-save" :loading="pending" @click="save">{{ t('cabinet-save') }}</AtomButton>
+      <AtomButton
+        v-if="can('noro.admin.settings.edit') && current.section"
+        icon="i-lucide-save"
+        :loading="pending"
+        @click="save"
+      >{{ t('cabinet-save') }}</AtomButton>
     </template>
 
     <UAlert
@@ -117,65 +128,69 @@ onMounted(() => load())
       :description="t('admin-settings-restart-desc')"
     />
 
-    <div class="grid gap-4 xl:grid-cols-[1fr_360px]">
-      <div class="grid gap-4">
-        <section v-for="name in SECTIONS" :key="name" class="noro-panel p-6">
-          <h2 class="mb-4 text-lg font-black text-[var(--noro-text)]">
-            {{ name === 'General' ? t('admin-settings-sec-general') : name === 'Auth' ? t('admin-settings-sec-auth') : name === 'Storage' ? t('admin-settings-sec-storage') : t('admin-settings-sec-integrations') }}
-          </h2>
+    <!-- `shrink-0` обязателен: полоса лежит во флекс-колонке страницы, и стоит
+         содержимому вкладки перерасти экран, как она сжимается в свою рамку —
+         вкладки видно ровно до того, как приедут данные. -->
+    <div class="noro-scroll mb-4 flex shrink-0 gap-1 overflow-x-auto border-b border-[var(--noro-border)]">
+      <button
+        v-for="entry in SETTINGS_TABS"
+        :key="entry.id"
+        type="button"
+        class="flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition"
+        :class="entry.id === tab
+          ? 'border-[var(--noro-cream)] text-[var(--noro-cream)]'
+          : 'border-transparent text-[var(--noro-muted)] hover:text-[var(--noro-text)]'"
+        @click="tab = entry.id"
+      >
+        <UIcon :name="entry.icon" class="size-4" />
+        {{ t(entry.label) }}
+      </button>
+    </div>
 
-          <div v-if="name === 'General'" class="mb-4 rounded-[var(--noro-r-sm)] border border-[var(--noro-border)] bg-[var(--noro-panel-2)] p-4">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 class="text-sm font-bold uppercase text-[var(--noro-cream)]">{{ t('admin-settings-hero-title') }}</h3>
-                <p class="text-xs text-[var(--noro-muted)]">{{ t('admin-settings-hero-desc') }}</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <input ref="heroFileInput" type="file" accept="image/*" class="hidden" @change="uploadHeroImage" />
-                <AtomButton icon="i-lucide-upload" variant="secondary" size="sm" :loading="uploadingHero" @click="heroFileInput?.click()">
-                  {{ t('admin-settings-hero-upload') }}
-                </AtomButton>
-              </div>
-            </div>
-            <div v-if="draft['hero_image_url']" class="mt-3 flex items-center gap-4">
-              <img :src="draft['hero_image_url']" alt="Hero Render Preview" class="h-20 w-32 rounded-lg border border-[var(--noro-border)] object-cover shadow" />
-              <span class="min-w-0 flex-1 truncate font-mono text-xs text-[var(--noro-muted)]">
-                {{ draft['hero_image_url'] }}
-              </span>
-            </div>
-          </div>
+    <AdminAuthMethodsPanel v-if="tab === 'sign-in'" />
 
-          <div class="grid gap-4">
-            <SettingsField
-              v-for="item in inSection(name)"
-              :key="item.key"
-              v-model="draft[item.key]"
-              :item="item"
-            />
-          </div>
-        </section>
-
-        <section class="noro-panel p-6">
-          <h2 class="mb-1 text-lg font-black text-[var(--noro-text)]">{{ t('admin-settings-secrets-title') }}</h2>
-          <p class="mb-4 text-xs text-[var(--noro-muted)]">
-            {{ t('admin-settings-secrets-lead') }}
-          </p>
-          <ul class="grid gap-2">
-            <li
-              v-for="(present, name) in data?.secrets ?? {}"
-              :key="name"
-              class="flex items-center justify-between rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] px-3 py-2 text-xs"
-            >
-              <code>{{ name }}</code>
-              <span :class="present ? 'text-[var(--noro-blue)]' : 'text-[var(--noro-muted)]'">
-                {{ present ? t('admin-settings-secret-set') : t('admin-settings-secret-unset') }}
-              </span>
-            </li>
-          </ul>
-        </section>
-      </div>
+    <div v-else-if="tab === 'health'" class="grid gap-4 xl:grid-cols-[1fr_360px]">
+      <section class="noro-panel p-6">
+        <h2 class="mb-1 text-lg font-black text-[var(--noro-text)]">{{ t('admin-settings-secrets-title') }}</h2>
+        <p class="mb-4 text-xs text-[var(--noro-muted)]">
+          {{ t('admin-settings-secrets-lead') }}
+        </p>
+        <ul class="grid gap-2">
+          <li
+            v-for="(present, name) in data?.secrets ?? {}"
+            :key="name"
+            class="flex items-center justify-between rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] px-3 py-2 text-xs"
+          >
+            <code>{{ name }}</code>
+            <span :class="present ? 'text-[var(--noro-blue)]' : 'text-[var(--noro-muted)]'">
+              {{ present ? t('admin-settings-secret-set') : t('admin-settings-secret-unset') }}
+            </span>
+          </li>
+        </ul>
+      </section>
 
       <DiagnosticsPanel :checks="checks" />
     </div>
+
+    <section v-else class="noro-panel grid gap-4 p-6">
+      <SettingsField
+        v-for="entry in fields"
+        :key="entry.key"
+        v-model="draft[entry.key]"
+        :item="entry"
+      />
+
+      <AdminSettingsImage
+        v-for="img in (tab === 'branding' ? images : [])"
+        :key="img.key"
+        v-model="draft[img.key]"
+        :item="img.item"
+        :title="t(img.title)"
+        :desc="t(img.desc)"
+        :transparent="data?.transparency?.[img.key] === true"
+        :can-edit="can('noro.admin.settings.edit')"
+        @uploaded="load"
+      />
+    </section>
   </NoroShell>
 </template>

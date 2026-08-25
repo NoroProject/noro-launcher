@@ -8,9 +8,10 @@ const can = (perm: string) => auth.hasPermission(perm)
 const notify = useNotify()
 await auth.loadMe()
 
-const { data: news, refresh, pending } = await useAsyncData('admin-news', () =>
-  auth.request<NewsRow[]>('/api/admin/news'), { default: () => [] }
-)
+const list = usePagedList<NewsRow>('admin-news', '/api/admin/news')
+const news = list.items
+const pending = list.pending
+const refresh = list.refresh
 
 const form = reactive({ title: '', body: '', preview_img_url: '', pinned: false })
 const creating = ref(false)
@@ -49,6 +50,11 @@ async function createNews() {
       <AtomButton v-if="can('noro.admin.news.edit')" variant="primary" icon="i-lucide-plus" @click="showCreate = true">{{ t('admin-news-new-post') }}</AtomButton>
     </template>
 
+    <div class="noro-panel mb-4 p-4">
+      <label class="noro-label mb-2 block">{{ t('admin-users-search-label') }}</label>
+      <input v-model="list.search.value" class="noro-input w-full" :placeholder="t('admin-news-search-placeholder')">
+    </div>
+
     <section class="grid gap-3">
       <NuxtLink
         v-for="item in news"
@@ -64,7 +70,20 @@ async function createNews() {
           <UBadge v-if="item.pinned" color="warning" variant="subtle">{{ t('admin-news-pinned') }}</UBadge>
         </div>
       </NuxtLink>
-      <EmptyState v-if="!news?.length" icon="i-lucide-newspaper" :title="t('admin-news-empty-title')" :text="t('admin-news-empty-text')" />
+      <EmptyState
+        v-if="!news?.length"
+        icon="i-lucide-newspaper"
+        :title="list.search.value ? t('paging-empty') : t('admin-news-empty-title')"
+        :text="list.search.value ? '' : t('admin-news-empty-text')"
+      />
+
+      <NoroPager
+        :page="list.page.value"
+        :pages="list.pages.value"
+        :total="list.total.value"
+        :per-page="list.perPage"
+        @go="list.goTo"
+      />
     </section>
 
     <AtomModal v-model="showCreate" :title="t('admin-news-modal-title')" :subtitle="t('admin-news-modal-subtitle')" wide>

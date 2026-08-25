@@ -1,7 +1,7 @@
 //! GET /api/agent/chat-filters & POST /api/agent/automod-triggers
 
 use crate::api::auth::AgentAuth;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::State;
 use axum::Json;
@@ -68,8 +68,17 @@ pub async fn record_trigger(
 ) -> AppResult<Json<Value>> {
     let user_row = crate::db::user_by_mc_uuid(&state.db, req.player_uuid).await?;
     let user_id = match user_row {
+        // Сработал фильтр на игрока, которого мастер не знает: записать триггер
+        // некуда. Отдельный код, а не 200 с `{"ok": false}`, — иначе агент не
+        // отличает «записал» от «не записал», не читая тело.
+        None => {
+            return Err(AppError::coded(
+                axum::http::StatusCode::NOT_FOUND,
+                crate::error_codes::PLAYER_NOT_FOUND,
+                "no such player on the master",
+            ))
+        }
         Some(u) => u.id,
-        None => return Ok(Json(json!({ "ok": false }))),
     };
 
     sqlx::query(

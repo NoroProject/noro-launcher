@@ -4,7 +4,9 @@ Essential summary. Full rules in **[INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
 
 ## Hard Requirements
 - **Keep it Simple.** No unnecessary abstractions or "костыли".
-- **≤150 lines per file**, **one component = one file**.
+- **≤150 lines per file** — target for new code; **400 is the hard ceiling**.
+  Over 150 needs a one-line reason at the top. See INSTRUCTIONS §21.1.
+- **One component = one file.**
 - **Dark-first**, ATOM style. **Colors from tokens only.**
 - **4-pt Grid.** Every dimension must be a multiple of 4.
 - **UI is English-only.**

@@ -137,13 +137,11 @@ onMounted(() => load())
             </button>
           </div>
           <p class="text-xs text-[var(--noro-muted)]">{{ t(field.hint) }}</p>
-          <UTextarea
+          <NoroTextarea
             v-if="currentDraft"
             v-model="currentDraft[field.key]"
             :rows="field.rows"
             :disabled="!canEdit"
-            autoresize
-            class="font-mono text-xs"
           />
         </div>
       </section>

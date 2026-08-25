@@ -27,20 +27,6 @@ const searchQuery = ref('')
 const selectedProvider = ref<'all' | 'modrinth' | 'curseforge'>('all')
 const acceptingId = ref<string | null>(null)
 
-function modExternalUrl(provider: string, projectId: string): string {
-  if (projectId?.startsWith('http://') || projectId?.startsWith('https://')) {
-    return projectId
-  }
-  const p = provider?.toLowerCase() || ''
-  if (p === 'modrinth') {
-    return `https://modrinth.com/mod/${projectId}`
-  }
-  if (p === 'curseforge') {
-    return `https://www.curseforge.com/minecraft/mc-mods/${projectId}`
-  }
-  return `https://modrinth.com/mod/${projectId}`
-}
-
 const filteredItems = computed(() => {
   let list = props.items || []
 
@@ -168,7 +154,7 @@ function handleAccept(id: string, mode: 'optional' | 'regular', installOnServers
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                   <a
-                    :href="modExternalUrl(item.provider, item.project_id)"
+                    :href="externalLink.mod(item.provider, item.project_id)"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="font-bold text-sm text-[var(--noro-text)] hover:underline flex items-center gap-1 group"

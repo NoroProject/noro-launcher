@@ -64,7 +64,7 @@ const buildEditor = useAdminBuildEditor(
         :subtitle="t('admin-servers-subtitle')"
     >
         <template #actions>
-            <AtomButton to="/admin/clients" icon="i-lucide-arrow-left" variant="dark">
+            <AtomButton :to="adminLink.clients()" icon="i-lucide-arrow-left" variant="dark">
                 {{ t('nav-admin-servers') }}
             </AtomButton>
             <AtomButton

@@ -140,7 +140,7 @@ async function deleteBuild() {
         await auth.request(`/api/admin/builds/${buildId.value}`, {
             method: "DELETE",
         });
-        await navigateTo(`/admin/clients/${serverId.value}`);
+        await navigateTo(adminLink.client(serverId.value));
     });
 }
 
@@ -198,7 +198,7 @@ async function importPack() {
                 importTimer = setInterval(async () => {
                     try {
                         const prog = await auth.request<ImportProgress>(
-                            `/api/admin/builds/${buildId.value}/import_progress/${resp.job_id}`
+                            `/api/admin/builds/${buildId.value}/import-progress/${resp.job_id}`
                         );
                         importProgress.value = prog;
                         if (prog.done) {

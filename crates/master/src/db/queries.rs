@@ -14,45 +14,39 @@ use uuid::Uuid;
 // Пользователи
 // ---------------------------------------------------------------------------
 
-/// Найти пользователя по Discord ID или создать нового (первый вход).
+/// Найти пользователя по привязке к платформе или создать нового (первый вход).
 /// Возвращает (user_id, is_new).
 pub async fn find_or_create_user(
     pool: &PgPool,
-    discord_id: &str,
-    discord_username: &str,
-    discord_avatar: Option<&str>,
+    provider: &str,
+    provider_user_id: &str,
+    username: &str,
+    avatar: Option<&str>,
 ) -> Result<(Uuid, bool)> {
-    if let Some(row) = sqlx::query_as::<_, UserRow>("SELECT * FROM users WHERE discord_id = $1")
-        .bind(discord_id)
-        .fetch_optional(pool)
-        .await?
-    {
-        // Обновим актуальные данные Discord.
-        sqlx::query(
-            "UPDATE users SET discord_username = $2, discord_avatar = $3, last_login_at = NOW() WHERE id = $1",
-        )
-        .bind(row.id)
-        .bind(discord_username)
-        .bind(discord_avatar)
-        .execute(pool)
-        .await?;
-        return Ok((row.id, false));
+    if let Some(user_id) = super::identities::find_user(pool, provider, provider_user_id).await? {
+        // Ник и аватар на той стороне могли поменяться с прошлого входа.
+        super::identities::touch(pool, provider, provider_user_id, username, avatar).await?;
+        sqlx::query("UPDATE users SET last_login_at = NOW() WHERE id = $1")
+            .bind(user_id)
+            .execute(pool)
+            .await?;
+        return Ok((user_id, false));
     }
 
-    let mc_uuid = schema::mc_uuid_from_discord(discord_id);
-    let mc_username = unique_mc_username(pool, discord_username).await?;
+    let mc_uuid = schema::mc_uuid_from_identity(provider, provider_user_id);
+    let mc_username = unique_mc_username(pool, username).await?;
 
     let id: Uuid = sqlx::query_scalar(
-        "INSERT INTO users (discord_id, discord_username, discord_avatar, mc_uuid, mc_username, last_login_at)
-         VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id",
+        "INSERT INTO users (mc_uuid, mc_username, last_login_at)
+         VALUES ($1, $2, NOW()) RETURNING id",
     )
-    .bind(discord_id)
-    .bind(discord_username)
-    .bind(discord_avatar)
     .bind(mc_uuid)
     .bind(&mc_username)
     .fetch_one(pool)
     .await?;
+
+    // Первичная: из неё выведен mc_uuid, и отвязать её нельзя.
+    super::identities::link(pool, id, provider, provider_user_id, username, avatar, true).await?;
 
     // Выдать дефолтные роли.
     sqlx::query(
@@ -67,8 +61,8 @@ pub async fn find_or_create_user(
 }
 
 /// Подобрать уникальный MC-ник: санитизация + суффикс при коллизии.
-async fn unique_mc_username(pool: &PgPool, discord_username: &str) -> Result<String> {
-    let base: String = discord_username
+async fn unique_mc_username(pool: &PgPool, source_username: &str) -> Result<String> {
+    let base: String = source_username
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
         .take(14)
@@ -96,6 +90,24 @@ async fn unique_mc_username(pool: &PgPool, discord_username: &str) -> Result<Str
         }
     }
     anyhow::bail!("не удалось подобрать уникальный MC-ник")
+}
+
+/// Найти игрока по любому его имени: MC-нику, MC-UUID или нику/идентификатору
+/// на любой из привязанных платформ. Сравнение точное — вхождение подстроки
+/// отдало бы скин «AlexBuilder» на запрос «Alex».
+pub async fn find_user_by_any_name(pool: &PgPool, name: &str) -> Result<Option<UserRow>> {
+    let row = sqlx::query_as::<_, UserRow>(
+        "SELECT u.* FROM users u
+          WHERE lower(u.mc_username) = lower($1)
+             OR u.mc_uuid::text = $1
+             OR EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = u.id
+                          AND (lower(i.username) = lower($1) OR i.provider_user_id = $1))
+          LIMIT 1",
+    )
+    .bind(name)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row)
 }
 
 /// Собрать полный UserProfile (роли + права).
@@ -126,13 +138,13 @@ pub async fn profile_from_row(pool: &PgPool, u: UserRow) -> Result<UserProfile> 
     let freeze_info = crate::db::freezes::active_freeze_for_user(pool, u.id).await?;
     let frozen = freeze_info.is_some();
 
+    let identities = super::identities::list(pool, u.id).await?;
+
     Ok(UserProfile {
         id: u.id,
         uuid: u.mc_uuid,
         username: u.mc_username,
-        discord_id: u.discord_id,
-        discord_username: u.discord_username,
-        discord_avatar: u.discord_avatar,
+        identities,
         skin_url: u.skin_url,
         skin_slim: u.skin_slim,
         cape_url: u.cape_url,
@@ -140,6 +152,9 @@ pub async fn profile_from_row(pool: &PgPool, u: UserRow) -> Result<UserProfile> 
         permissions,
         permission_grants,
         banned: u.banned,
+        ban_reason: u.ban_reason,
+        created_at: Some(u.created_at),
+        last_login_at: u.last_login_at,
         is_local_account: u.is_local_account,
         can_play: u.can_play,
         is_root: u.is_root,
@@ -274,6 +289,7 @@ pub async fn role_with_perms(pool: &PgPool, r: RoleRow) -> Result<Role> {
         icon: r.icon,
         prefix: r.prefix,
         suffix: r.suffix,
+        badge_sha1: r.badge_sha1,
         permission_grants,
         parent_id: r.parent_id,
         inherited_permissions,
@@ -316,24 +332,92 @@ pub async fn role_parent_links(pool: &PgPool) -> Result<Vec<(Uuid, Option<Uuid>)
 }
 
 pub async fn user_by_access_token(pool: &PgPool, token: Uuid) -> Result<Option<UserRow>> {
-    let row = sqlx::query_as::<_, UserRow>(
-        "SELECT u.* FROM users u JOIN oauth_sessions s ON s.user_id = u.id
+    Ok(session_by_access_token(pool, token).await?.map(|(u, _)| u))
+}
+
+/// Тот же поиск, но со scope сессии.
+///
+/// Scope решает, что токеном вообще можно делать: наш собственный вход — это
+/// полный доступ, а токен, выданный приложению, пускают только в `/api/oauth/*`
+/// и только за теми данными, которые игрок ему разрешил.
+pub async fn session_by_access_token(
+    pool: &PgPool,
+    token: Uuid,
+) -> Result<Option<(UserRow, String)>> {
+    #[derive(sqlx::FromRow)]
+    struct SessionRow {
+        #[sqlx(flatten)]
+        user: UserRow,
+        scope: String,
+    }
+
+    let row = sqlx::query_as::<_, SessionRow>(
+        "SELECT u.*, s.scope FROM users u JOIN oauth_sessions s ON s.user_id = u.id
          WHERE s.access_token = $1 AND s.expires_at > NOW()",
     )
     .bind(token)
     .fetch_optional(pool)
     .await?;
-    Ok(row)
+    Ok(row.map(|r| (r.user, r.scope)))
 }
 
-pub async fn list_users(pool: &PgPool, limit: i64, offset: i64) -> Result<Vec<UserRow>> {
-    Ok(sqlx::query_as::<_, UserRow>(
-        "SELECT * FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2",
-    )
+/// Отбор игроков. Пустые поля не сужают выборку.
+#[derive(Debug, Default)]
+pub struct UserFilter<'a> {
+    /// Готовый `ILIKE`-шаблон из `api::paging`: экранирование пользовательского
+    /// ввода живёт там, слой БД получает безопасную строку.
+    pub like: Option<&'a str>,
+    pub banned: Option<bool>,
+    /// Имя роли — отображаемое или системное.
+    pub role: Option<&'a str>,
+}
+
+/// Условие отбора. Держится рядом со счётчиком намеренно: разойдись они —
+/// пагинация обещала бы страницы, которых нет.
+const USERS_WHERE: &str = "WHERE ($1::text IS NULL
+             OR u.mc_username ILIKE $1 ESCAPE '\\'
+             OR EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = u.id
+                          AND (i.username ILIKE $1 ESCAPE '\\'
+                               OR i.provider_user_id ILIKE $1 ESCAPE '\\'))
+             OR u.mc_uuid::text ILIKE $1 ESCAPE '\\'
+             OR u.id::text ILIKE $1 ESCAPE '\\')
+           AND ($2::bool IS NULL OR u.banned = $2)
+           AND ($3::text IS NULL OR EXISTS (
+                 SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+                  WHERE ur.user_id = u.id AND (r.display_name = $3 OR r.name = $3)))";
+
+/// Страница игроков вместе с общим числом подходящих.
+///
+/// Ищет по нику, Discord и обоим идентификаторам сразу — админ вставляет то, что
+/// у него под рукой. Без поиска в базе клиент мог лишь фильтровать первую
+/// загруженную страницу, то есть игрока за её пределами не находил вовсе.
+///
+/// Сортировка по нику, а не по дате регистрации: это справочник игроков, и с
+/// пагинацией предсказуемый алфавитный порядок важнее «кто пришёл последним».
+pub async fn list_users(
+    pool: &PgPool,
+    f: &UserFilter<'_>,
+    limit: i64,
+    offset: i64,
+) -> Result<(Vec<UserRow>, i64)> {
+    let rows = sqlx::query_as::<_, UserRow>(&format!(
+        "SELECT u.* FROM users u {USERS_WHERE} ORDER BY u.mc_username LIMIT $4 OFFSET $5"
+    ))
+    .bind(f.like)
+    .bind(f.banned)
+    .bind(f.role)
     .bind(limit)
     .bind(offset)
     .fetch_all(pool)
-    .await?)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM users u {USERS_WHERE}"))
+        .bind(f.like)
+        .bind(f.banned)
+        .bind(f.role)
+        .fetch_one(pool)
+        .await?;
+    Ok((rows, total))
 }
 
 pub async fn get_user(pool: &PgPool, id: Uuid) -> Result<Option<UserRow>> {
@@ -458,41 +542,9 @@ pub struct NewSession {
     pub expires_at: DateTime<Utc>,
 }
 
-/// Выдать лаунчеру одноразовый код, по которому он заберёт токены сессии.
-///
-/// Живёт минуты: код едет в URL loopback-редиректа, и чем короче окно, тем
-/// меньше стоит его перехват.
-pub async fn create_launcher_code(
-    pool: &PgPool,
-    user_id: Uuid,
-    session: &NewSession,
-) -> Result<Uuid> {
-    let code = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO launcher_auth_codes (code, user_id, access_token, refresh_token, expires_at)
-         VALUES ($1, $2, $3, $4, $5)",
-    )
-    .bind(code)
-    .bind(user_id)
-    .bind(session.access_token)
-    .bind(session.refresh_token)
-    .bind(Utc::now() + Duration::minutes(5))
-    .execute(pool)
-    .await?;
-    Ok(code)
-}
-
-/// Забрать токены по коду. Код одноразовый: DELETE ... RETURNING не даст двум
-/// параллельным запросам получить одну и ту же сессию.
-pub async fn take_launcher_code(pool: &PgPool, code: Uuid) -> Result<Option<(Uuid, Uuid, Uuid)>> {
-    Ok(sqlx::query_as(
-        "DELETE FROM launcher_auth_codes WHERE code = $1 AND expires_at > NOW()
-         RETURNING user_id, access_token, refresh_token",
-    )
-    .bind(code)
-    .fetch_optional(pool)
-    .await?)
-}
+// Одноразовые коды `launcher_auth_codes` больше не выдаются: лаунчер входит
+// через сайт и получает токены на `/oauth2/token`. Таблица остаётся — её
+// подчищает `db::cleanup`, а старые строки протухают сами.
 
 pub async fn create_session(
     pool: &PgPool,
@@ -500,14 +552,27 @@ pub async fn create_session(
     scope: &str,
     ttl: Duration,
 ) -> Result<NewSession> {
+    create_app_session(pool, user_id, scope, ttl, None).await
+}
+
+/// Сессия, выданная приложению: помнит, кому именно, — чтобы отзыв доступа
+/// в кабинете гасил и сам токен, а не только право просить новый.
+pub async fn create_app_session(
+    pool: &PgPool,
+    user_id: Uuid,
+    scope: &str,
+    ttl: Duration,
+    app_id: Option<Uuid>,
+) -> Result<NewSession> {
     let expires_at = Utc::now() + ttl;
     let row: (Uuid, Uuid) = sqlx::query_as(
-        "INSERT INTO oauth_sessions (user_id, scope, expires_at) VALUES ($1, $2, $3)
+        "INSERT INTO oauth_sessions (user_id, scope, expires_at, app_id) VALUES ($1, $2, $3, $4)
          RETURNING access_token, refresh_token",
     )
     .bind(user_id)
     .bind(scope)
     .bind(expires_at)
+    .bind(app_id)
     .fetch_one(pool)
     .await?;
     Ok(NewSession {
@@ -515,6 +580,25 @@ pub async fn create_session(
         refresh_token: row.1,
         expires_at,
     })
+}
+
+/// Погасить токены, выданные приложению этому игроку.
+pub async fn revoke_sessions_for_app(pool: &PgPool, user_id: Uuid, app_id: Uuid) -> Result<u64> {
+    let res = sqlx::query("DELETE FROM oauth_sessions WHERE user_id = $1 AND app_id = $2")
+        .bind(user_id)
+        .bind(app_id)
+        .execute(pool)
+        .await?;
+    Ok(res.rows_affected())
+}
+
+/// Погасить все токены приложения — когда его заблокировали или удалили.
+pub async fn revoke_all_sessions_for_app(pool: &PgPool, app_id: Uuid) -> Result<u64> {
+    let res = sqlx::query("DELETE FROM oauth_sessions WHERE app_id = $1")
+        .bind(app_id)
+        .execute(pool)
+        .await?;
+    Ok(res.rows_affected())
 }
 
 pub async fn refresh_session(
@@ -998,16 +1082,27 @@ pub async fn get_base_build(
     .await?)
 }
 
-pub async fn upsert_base_build(
-    pool: &PgPool,
-    mc_version: &str,
-    modloader: &str,
-    modloader_version: Option<&str>,
-    main_class: &str,
-    jvm_args: &serde_json::Value,
-    game_args: &serde_json::Value,
-    assets_index_name: &str,
-) -> Result<Uuid> {
+/// Ключ и параметры базовой сборки: версия игры плюс то, чем её запускать.
+pub struct BaseBuild<'a> {
+    pub mc_version: &'a str,
+    pub modloader: &'a str,
+    pub modloader_version: Option<&'a str>,
+    pub main_class: &'a str,
+    pub jvm_args: &'a serde_json::Value,
+    pub game_args: &'a serde_json::Value,
+    pub assets_index_name: &'a str,
+}
+
+pub async fn upsert_base_build(pool: &PgPool, b: BaseBuild<'_>) -> Result<Uuid> {
+    let BaseBuild {
+        mc_version,
+        modloader,
+        modloader_version,
+        main_class,
+        jvm_args,
+        game_args,
+        assets_index_name,
+    } = b;
     Ok(sqlx::query_scalar(
         "INSERT INTO base_builds (mc_version, modloader, modloader_version, main_class, jvm_args, game_args, assets_index_name)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -1026,16 +1121,27 @@ pub async fn upsert_base_build(
     .await?)
 }
 
-pub async fn upsert_base_build_file(
-    pool: &PgPool,
-    base_build_id: Uuid,
-    path: &str,
-    sha1: &str,
-    size: i64,
-    side: &str,
-    kind: &str,
-    platform: Option<&str>,
-) -> Result<()> {
+/// Один файл базовой сборки.
+pub struct BaseBuildFile<'a> {
+    pub base_build_id: Uuid,
+    pub path: &'a str,
+    pub sha1: &'a str,
+    pub size: i64,
+    pub side: &'a str,
+    pub kind: &'a str,
+    pub platform: Option<&'a str>,
+}
+
+pub async fn upsert_base_build_file(pool: &PgPool, f: BaseBuildFile<'_>) -> Result<()> {
+    let BaseBuildFile {
+        base_build_id,
+        path,
+        sha1,
+        size,
+        side,
+        kind,
+        platform,
+    } = f;
     sqlx::query(
         "INSERT INTO base_build_files (base_build_id, path, sha1, size, side, kind, platform)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -1190,13 +1296,35 @@ pub async fn delete_server_core(pool: &PgPool, id: Uuid) -> Result<()> {
 // Новости
 // ---------------------------------------------------------------------------
 
-pub async fn list_news(pool: &PgPool, limit: i64) -> Result<Vec<NewsRow>> {
-    Ok(sqlx::query_as::<_, NewsRow>(
-        "SELECT * FROM news ORDER BY pinned DESC, published_at DESC LIMIT $1",
-    )
+/// Страница новостей с поиском по заголовку и телу.
+///
+/// Раньше отдавались первые сто без счётчика: сто первая новость просто
+/// переставала существовать для админки, и заметить это было неоткуда.
+/// Закреплённые остаются сверху — на первой странице, где их и ищут.
+pub async fn list_news(
+    pool: &PgPool,
+    like: Option<&str>,
+    limit: i64,
+    offset: i64,
+) -> Result<(Vec<NewsRow>, i64)> {
+    const WHERE: &str = "WHERE ($1::text IS NULL
+             OR title ILIKE $1 ESCAPE '\\'
+             OR body ILIKE $1 ESCAPE '\\')";
+
+    let rows = sqlx::query_as::<_, NewsRow>(&format!(
+        "SELECT * FROM news {WHERE}
+          ORDER BY pinned DESC, published_at DESC LIMIT $2 OFFSET $3"
+    ))
+    .bind(like)
     .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
-    .await?)
+    .await?;
+    let total: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM news {WHERE}"))
+        .bind(like)
+        .fetch_one(pool)
+        .await?;
+    Ok((rows, total))
 }
 
 pub async fn create_news(

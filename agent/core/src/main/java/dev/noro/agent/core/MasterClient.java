@@ -40,6 +40,19 @@ public final class MasterClient {
     }
 
     /**
+     * Пак плашек: адрес, контрольная сумма и таблица «роль → символ».
+     *
+     * <p>Спрашивается при старте и после правки ролей. Мастер собирает пак на
+     * каждый запрос заново, поэтому устаревшего состава здесь не бывает.
+     *
+     * @return пустой пак, если мастер о плашках не знает — сервер просто
+     *         останется со старыми текстовыми префиксами
+     */
+    public PrefixPack prefixPack() throws IOException, InterruptedException {
+        return http.get("/api/agent/prefix-pack", PrefixPack.class).orElseGet(PrefixPack::none);
+    }
+
+    /**
      * Профиль по нику. Нужен командам модерации: наказывают и того, кого сейчас
      * нет на сервере, а ванильный кэш имён знает только заходивших сюда.
      */
@@ -93,8 +106,23 @@ public final class MasterClient {
         http.post("/api/agent/nodes", new Nodes(List.copyOf(nodes)));
     }
 
-    public void createReport(UUID reporter, UUID target, String reason) throws IOException, InterruptedException {
-        http.post("/api/agent/reports", new CreateReportPayload(reporter, target, reason));
+    /**
+     * Жалоба вместе с местом, где её написали. {@code at} может быть
+     * {@code null} — тогда координат в деле не будет вовсе, и это честнее
+     * выдуманной точки.
+     */
+    public void createReport(UUID reporter, UUID target, String reason, GameBridge.Position at)
+            throws IOException, InterruptedException {
+        http.post(
+                "/api/agent/reports",
+                new CreateReportPayload(
+                        reporter,
+                        target,
+                        reason,
+                        at == null ? null : at.world(),
+                        at == null ? null : at.x(),
+                        at == null ? null : at.y(),
+                        at == null ? null : at.z()));
     }
 
     private static long heapUsedMb() {
@@ -141,5 +169,6 @@ public final class MasterClient {
     /** Тело батч-запроса профилей. */
     private record Batch(List<UUID> uuids) {}
 
-    private record CreateReportPayload(UUID reporter, UUID target, String reason) {}
+    private record CreateReportPayload(
+            UUID reporter, UUID target, String reason, String world, Double x, Double y, Double z) {}
 }

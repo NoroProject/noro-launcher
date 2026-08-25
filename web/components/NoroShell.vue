@@ -14,7 +14,9 @@ defineProps<{
                  раскладки, и при равном значении он выигрывал по порядку в DOM
                  и перекрывал шапку. -->
             <header class="shrink-0 z-30 bg-[var(--noro-bg-deep)] px-5 md:px-8 border-b border-[var(--noro-border)]">
-                <div class="mx-auto flex min-h-20 max-w-[1440px] items-center justify-between gap-5">
+                <!-- Минус пиксель на границу: у сайдбара она входит в его 80px, а здесь
+                 рисуется сверх — и линии под шапками расходились на пиксель. -->
+            <div class="mx-auto flex min-h-[calc(5rem-1px)] max-w-[1440px] items-center justify-between gap-5">
                     <div class="min-w-0">
                         <h1 class="noro-pixel truncate text-2xl uppercase text-[var(--noro-cream)]">
                         <slot name="title">{{ $props.title }}</slot>

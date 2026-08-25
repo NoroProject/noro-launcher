@@ -6,7 +6,6 @@ use super::sidebar_user::user_card;
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent};
-use i18n::t;
 
 pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let collapsed = ui.sidebar_collapsed;

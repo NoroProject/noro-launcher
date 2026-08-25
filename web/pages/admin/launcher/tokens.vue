@@ -9,7 +9,7 @@ const notify = useNotify()
 await auth.loadMe()
 
 const { data: tokens, refresh, pending } = await useAsyncData('admin-tokens', () =>
-  auth.request<AdminTokenRow[]>('/api/admin/tokens'), { default: () => [] }
+  auth.requestList<AdminTokenRow>('/api/admin/tokens'), { default: () => [] }
 )
 
 const form = reactive({ name: '', permissions: 'noro.admin.*' })

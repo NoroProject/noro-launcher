@@ -37,7 +37,66 @@ impl FromRequestParts<AppState> for AuthUser {
             bearer(parts).ok_or_else(|| AppError::Unauthorized("missing bearer token".into()))?;
         let token_uuid =
             Uuid::parse_str(&token).map_err(|_| AppError::Unauthorized("invalid token".into()))?;
-        let row = crate::db::user_by_access_token(&state.db, token_uuid)
+        let (row, scope) = crate::db::session_by_access_token(&state.db, token_uuid)
+            .await?
+            .ok_or_else(|| AppError::Unauthorized("session not found or expired".into()))?;
+        // Токен, выданный стороннему приложению, сюда не проходит. Раньше
+        // проходил: scope не проверялся нигде, и любое приложение получало
+        // аккаунт целиком — вместе с админкой, если игрок был оператором.
+        if !schema::is_internal(&scope) {
+            return Err(AppError::Forbidden(
+                "this token was issued to an application: use /api/oauth/*".into(),
+            ));
+        }
+        let user_id = row.id;
+        let profile = crate::db::profile_from_row(&state.db, row).await?;
+        if profile.banned {
+            return Err(AppError::Forbidden("account is banned".into()));
+        }
+        Ok(AuthUser { user_id, profile })
+    }
+}
+
+/// Аккаунт, открытый стороннему приложению ровно на выданные scope'ы.
+///
+/// Отдельный extractor, а не флаг в [`AuthUser`]: ручка обязана назвать scope,
+/// который ей нужен, и забыть проверку нельзя — без вызова `require` из
+/// экстрактора не достать ни профиль, ни идентификатор.
+pub struct AppAuth {
+    user_id: Uuid,
+    profile: UserProfile,
+    scopes: Vec<String>,
+}
+
+impl AppAuth {
+    /// Профиль и идентификатор — только вместе с проверкой scope'а.
+    pub fn require(&self, scope: &'static str) -> Result<(Uuid, &UserProfile), AppError> {
+        if self.scopes.iter().any(|s| s == scope) {
+            return Ok((self.user_id, &self.profile));
+        }
+        Err(AppError::Forbidden(format!(
+            "the player did not grant the {scope} scope to this application"
+        )))
+    }
+
+    /// Что игрок разрешил приложению — для ручек, отдающих разный объём данных.
+    pub fn has(&self, scope: &str) -> bool {
+        self.scopes.iter().any(|s| s == scope)
+    }
+}
+
+impl FromRequestParts<AppState> for AppAuth {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let token =
+            bearer(parts).ok_or_else(|| AppError::Unauthorized("missing bearer token".into()))?;
+        let token_uuid =
+            Uuid::parse_str(&token).map_err(|_| AppError::Unauthorized("invalid token".into()))?;
+        let (row, scope) = crate::db::session_by_access_token(&state.db, token_uuid)
             .await?
             .ok_or_else(|| AppError::Unauthorized("session not found or expired".into()))?;
         let user_id = row.id;
@@ -45,7 +104,21 @@ impl FromRequestParts<AppState> for AuthUser {
         if profile.banned {
             return Err(AppError::Forbidden("account is banned".into()));
         }
-        Ok(AuthUser { user_id, profile })
+        // Наш собственный вход умеет всё, что умеет приложение: лаунчеру и
+        // сайту незачёт отдельный токен ради тех же данных.
+        let scopes = if schema::is_internal(&scope) {
+            schema::ALL_SCOPES
+                .iter()
+                .map(|s| s.name.to_string())
+                .collect()
+        } else {
+            schema::parse_scopes(&scope)
+        };
+        Ok(AppAuth {
+            user_id,
+            profile,
+            scopes,
+        })
     }
 }
 
@@ -121,9 +194,18 @@ impl FromRequestParts<AppState> for AdminAuth {
             return Ok(t);
         }
 
-        // Иначе — пользовательский токен.
+        // Иначе — пользовательский токен. Токен приложения админкой не считается
+        // никогда: игрок разрешал ему свои скины, а не выдачу банов от своего
+        // имени — и права оператора в этот момент были бы правами приложения.
         if let Ok(token_uuid) = Uuid::parse_str(&token) {
-            if let Some(row) = crate::db::user_by_access_token(&state.db, token_uuid).await? {
+            if let Some((row, scope)) =
+                crate::db::session_by_access_token(&state.db, token_uuid).await?
+            {
+                if !schema::is_internal(&scope) {
+                    return Err(AppError::Forbidden(
+                        "this token was issued to an application".into(),
+                    ));
+                }
                 let user_id = row.id;
                 let profile = crate::db::profile_from_row(&state.db, row).await?;
                 let permissions: Vec<String> =

@@ -10,6 +10,9 @@ package dev.noro.agent.core;
  *
  * @param color {@code 0xrrggbb} либо {@code -1}, если цвет не задан
  * @param url ссылка, если этот кусок кликабельный
+ * @param font шрифт вида {@code noro:prefix} либо {@code null}. Им плашка роли
+ *        отличается от обычного текста: тот же символ в другом шрифте — другая
+ *        картинка
  */
 public record TextSpan(
         String text,
@@ -19,7 +22,8 @@ public record TextSpan(
         boolean underlined,
         boolean strikethrough,
         boolean obfuscated,
-        String url) {
+        String url,
+        String font) {
 
     /** Цвет не задан — кусок наследует цвет контекста. */
     public static final int NO_COLOR = -1;
@@ -30,5 +34,18 @@ public record TextSpan(
 
     public boolean linked() {
         return url != null && !url.isEmpty();
+    }
+
+    public boolean hasFont() {
+        return font != null && !font.isEmpty();
+    }
+
+    /** Тот же кусок, но кликабельный: так метка ссылки собирается из разметки. */
+    TextSpan linkedTo(String url) {
+        return linkedTo(url, color);
+    }
+
+    TextSpan linkedTo(String url, int color) {
+        return new TextSpan(text, color, bold, italic, underlined, strikethrough, obfuscated, url, font);
     }
 }

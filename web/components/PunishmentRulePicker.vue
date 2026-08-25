@@ -25,7 +25,7 @@ const picked = computed(() => props.rules.find(r => r.id === selected.value) || 
 </script>
 
 <template>
-  <div class="grid gap-2">
+  <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-2">
     <span class="noro-label">{{ t('admin-punish-rule-label') }}</span>
 
     <div v-if="picked" class="flex flex-wrap items-center gap-2 rounded-[var(--noro-r-sm)] border border-[var(--noro-border)] bg-[var(--noro-input)] px-3 py-2">
@@ -44,7 +44,7 @@ const picked = computed(() => props.rules.find(r => r.id === selected.value) || 
         <input v-model="search" class="noro-input w-full !pl-10" :placeholder="t('admin-punish-rule-search')">
       </label>
 
-      <div v-if="found.length" class="grid gap-1">
+      <div v-if="found.length" class="grid grid-cols-[minmax(0,1fr)] gap-1">
         <button
           v-for="rule in found"
           :key="rule.id"

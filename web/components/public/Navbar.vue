@@ -3,6 +3,7 @@
 const auth = useAuth()
 const route = useRoute()
 const { t } = useT()
+const brand = usePublicSettings()
 
 const links = computed(() => [
   { label: t('web-nav-home'), to: '/' },
@@ -28,9 +29,9 @@ watch(() => route.fullPath, () => { open.value = false })
 <template>
   <header class="sticky top-0 z-40 border-b border-[var(--noro-border)] bg-[var(--noro-bg-deep)]/95 backdrop-blur">
     <div class="mx-auto flex max-w-7xl items-center gap-4 px-5 py-4">
-      <NuxtLink to="/" class="flex items-center gap-3">
-        <img src="/icon.png" class="size-10" alt="">
-        <span class="noro-pixel text-lg uppercase text-[var(--noro-cream)]">Noro</span>
+      <NuxtLink :to="link.home()" class="flex min-w-0 items-center gap-3">
+        <img :src="brand.logo_url || '/icon.png'" class="size-10 shrink-0 object-contain" alt="">
+        <span class="noro-pixel truncate text-lg uppercase text-[var(--noro-cream)]">{{ brand.instance_name }}</span>
       </NuxtLink>
 
       <nav class="ml-6 hidden items-center gap-1 md:flex">
@@ -55,8 +56,8 @@ watch(() => route.fullPath, () => { open.value = false })
             : 'noro-cta'"
         >
           <img
-            v-if="auth.loggedIn.value && auth.user.value?.discord_avatar"
-            :src="auth.user.value.discord_avatar"
+            v-if="auth.loggedIn.value && identityAvatar(auth.user.value)"
+            :src="identityAvatar(auth.user.value)!"
             alt=""
             class="size-5 rounded object-cover"
           >
@@ -90,8 +91,8 @@ watch(() => route.fullPath, () => { open.value = false })
         :class="auth.loggedIn.value ? 'bg-[var(--noro-panel)] text-[var(--noro-cream)]' : 'noro-cta'"
       >
         <img
-          v-if="auth.loggedIn.value && auth.user.value?.discord_avatar"
-          :src="auth.user.value.discord_avatar"
+          v-if="auth.loggedIn.value && identityAvatar(auth.user.value)"
+          :src="identityAvatar(auth.user.value)!"
           alt=""
           class="size-5 rounded object-cover"
         >

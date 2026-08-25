@@ -10,7 +10,7 @@ mod splash;
 mod verify;
 
 use anyhow::Context;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -177,7 +177,7 @@ fn run_core(path: &std::path::Path) -> ExitCode {
 ///
 /// Сеть недоступна или мастер молчит — запускаем что есть: игру важнее открыть,
 /// чем упереться в обновление.
-async fn update_pending(app_dir: &PathBuf) -> bool {
+async fn update_pending(app_dir: &Path) -> bool {
     let installed = std::fs::read_to_string(app_dir.join("version")).unwrap_or_default();
     let installed = installed.trim();
     if installed.is_empty() {
@@ -200,8 +200,8 @@ async fn update_pending(app_dir: &PathBuf) -> bool {
 }
 
 async fn download_core(
-    app_dir: &PathBuf,
-    dest: &PathBuf,
+    app_dir: &Path,
+    dest: &Path,
     report: &splash::Reporter,
 ) -> anyhow::Result<()> {
     let say = |label: &str, done: u64, total: u64| {

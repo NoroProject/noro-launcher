@@ -64,7 +64,7 @@ pub async fn launch(
     add_base_jvm_args(&mut cmd, config, &natives_dir);
     add_modlauncher_args(&mut cmd, &primary_game_artifact);
 
-    let legacy_cp_path = write_legacy_classpath(&instance_dir, &classpath).await;
+    let legacy_cp_path = write_legacy_classpath(&instance_dir, &classpath).await?;
     cmd.arg(format!(
         "-DlegacyClassPath.file={}",
         legacy_cp_path.to_string_lossy()
@@ -125,15 +125,25 @@ fn add_modlauncher_args(cmd: &mut Command, primary_game_artifact: &str) {
     cmd.arg("-Dcpw.mods.modlauncher.add-exports=java.base/sun.net.www.protocol.http=ALL-UNNAMED,java.base/sun.net.www.protocol.https=ALL-UNNAMED");
 }
 
-async fn write_legacy_classpath(instance_dir: &std::path::Path, classpath: &str) -> PathBuf {
+/// Файл со списком classpath для forge-лаунча.
+///
+/// Отказ записи возвращается наверх, а не глотается: без этого файла игра
+/// стартует и падает внутри Java, где причина уже не видна — а здесь она ещё
+/// известна дословно.
+async fn write_legacy_classpath(
+    instance_dir: &std::path::Path,
+    classpath: &str,
+) -> anyhow::Result<PathBuf> {
     let legacy_cp_path = instance_dir.join(".forge_classpath");
     let content = classpath
         .split(classpath_separator())
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("\n");
-    tokio::fs::write(&legacy_cp_path, content).await.ok();
-    legacy_cp_path
+    tokio::fs::write(&legacy_cp_path, content)
+        .await
+        .with_context(|| format!("запись {}", legacy_cp_path.display()))?;
+    Ok(legacy_cp_path)
 }
 
 async fn add_authlib(

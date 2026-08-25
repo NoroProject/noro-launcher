@@ -4,6 +4,7 @@ members = [
     "crates/schema",
     "crates/i18n",
     "crates/bridge",
+    "crates/mod_link",
     "crates/backend",
     "crates/frontend",
     "crates/master",
@@ -13,7 +14,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.7.5"
+version = "1.7.6"
 edition = "2021"
 license = "MIT"
 authors = ["noro"]
@@ -25,6 +26,7 @@ unic-langid = "0.9"
 schema = { path = "crates/schema" }
 i18n = { path = "crates/i18n" }
 bridge = { path = "crates/bridge" }
+mod_link = { path = "crates/mod_link" }
 backend = { path = "crates/backend" }
 
 # Async
@@ -128,6 +130,9 @@ zip = "2"
 # Разжать logs/*.log.gz, чтобы санитизировать содержимое: отправить сжатый лог
 # как есть значит отправить токен, которого мы в нём не видели.
 flate2 = "1"
+# Полный архив мастера. tar, а не zip: записи пишутся и читаются потоком, так
+# что архив в гигабайты не приходится держать на диске целиком.
+tar = "0.4"
 # NBT: servers.dat игрового клиента
 fastnbt = "2"
 walkdir = "2"

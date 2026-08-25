@@ -50,6 +50,21 @@ export default defineNuxtPlugin(async () => {
     console.error('locale catalog unavailable', e)
   }
 
+  // В разработке каталог перечитывается при возврате во вкладку.
+  //
+  // Плагин отрабатывает один раз за жизнь приложения, а HMR его не
+  // перезапускает: правишь .ftl, пересобираешь мастер — и вкладка продолжает
+  // жить со старым каталогом, показывая новые ключи как есть. Выглядит это как
+  // «перевод потерялся», хотя на мастере он уже есть. Возврат во вкладку —
+  // ровно тот момент, когда разработчик пришёл смотреть результат.
+  if (import.meta.dev && import.meta.client) {
+    document.addEventListener('visibilitychange', async () => {
+      if (document.hidden) return
+      cache.value = {}
+      await apply(locale.value).catch(() => {})
+    })
+  }
+
   return {
     provide: {
       i18n: {

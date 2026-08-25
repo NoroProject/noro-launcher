@@ -51,6 +51,7 @@ public final class TextMarkup {
             case '§' -> legacy(text, at, cursor, true);
             case '&' -> text.startsWith("&#", at) ? webColor(text, at + 1, cursor, 1) : legacy(text, at, cursor, false);
             case '#' -> webColor(text, at, cursor, 0);
+            case '<' -> tag(text, at, cursor);
             case '[' -> link(text, at, cursor);
             case 'h', 'H' -> rawUrl(text, at, cursor);
             default -> 0;
@@ -121,17 +122,40 @@ public final class TextMarkup {
         return 7 + extra;
     }
 
-    /** `[текст](ссылка)` — так в шаблон кладут ссылку на свод правил. */
+    /**
+     * Тег MiniMessage: `<red>`, `<#ff8c82>`, `<bold>`, `<font:noro:prefix>`.
+     *
+     * <p>Незакрытая скобка и незнакомый тег остаются текстом: «1 < 2» не должно
+     * превращаться в разметку, а опечатку в шаблоне лучше увидеть в игре, чем
+     * потерять молча.
+     */
+    private static int tag(String text, int at, MarkupCursor cursor) {
+        int end = text.indexOf('>', at);
+        if (end < 0) {
+            return 0;
+        }
+        String body = text.substring(at + 1, end);
+        return MiniTag.apply(body, cursor) ? end - at + 1 : 0;
+    }
+
+    /**
+     * `[текст](ссылка)` — так в шаблон кладут ссылку на свод правил.
+     *
+     * <p>Метка кончается на `](`, а не на первой же `]`: в самой метке скобка
+     * встречается. Кнопки меню разбора рисуются как `[[чат]](cmd:…)` — квадратные
+     * скобки видны в чате и отделяют кнопки друг от друга, — и по первой `]`
+     * ссылка обрывалась на середине, оставляя вторую скобку болтаться текстом.
+     */
     private static int link(String text, int at, MarkupCursor cursor) {
-        int label = text.indexOf(']', at);
-        if (label < 0 || label + 1 >= text.length() || text.charAt(label + 1) != '(') {
+        int label = text.indexOf("](", at);
+        if (label < 0) {
             return 0;
         }
         int end = text.indexOf(')', label + 2);
         if (end < 0) {
             return 0;
         }
-        cursor.linked(text.substring(at + 1, label), text.substring(label + 2, end));
+        cursor.linked(parse(text.substring(at + 1, label)), text.substring(label + 2, end));
         return end - at + 1;
     }
 
@@ -144,7 +168,7 @@ public final class TextMarkup {
             end++;
         }
         String url = text.substring(at, end);
-        cursor.linked(url, url);
+        cursor.linked(url);
         return end - at;
     }
 

@@ -14,11 +14,12 @@ const API: &str = "https://api.curseforge.com/v1";
 const GAME_ID: u32 = 432;
 
 fn api_key(state: &AppState) -> AppResult<&str> {
-    state
-        .config
-        .curseforge_api_key
-        .as_deref()
-        .ok_or_else(|| AppError::BadRequest("CURSEFORGE_API_KEY is not set".into()))
+    state.config.curseforge_api_key.as_deref().ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::NOT_CONFIGURED,
+            "CURSEFORGE_API_KEY is not set",
+        )
+    })
 }
 
 pub async fn search(state: &AppState, q: &SearchQuery) -> AppResult<SearchPage> {
@@ -101,10 +102,12 @@ pub async fn download_url(state: &AppState, project_id: u64, file_id: u64) -> Ap
     let key = api_key(state)?;
     let url = format!("{API}/mods/{project_id}/files/{file_id}/download-url");
     let resp = fetch_json(state, &url, Some(key)).await?;
-    resp["data"]
-        .as_str()
-        .map(String::from)
-        .ok_or_else(|| AppError::BadRequest("the mod forbids third-party downloads".into()))
+    resp["data"].as_str().map(String::from).ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::NOT_DISTRIBUTABLE,
+            "the mod forbids third-party downloads",
+        )
+    })
 }
 
 pub async fn file_meta(
@@ -118,6 +121,10 @@ pub async fn file_meta(
 }
 
 fn numeric(id: &str) -> AppResult<u64> {
-    id.parse()
-        .map_err(|_| AppError::BadRequest(format!("a CurseForge id must be a number, not {id}")))
+    id.parse().map_err(|_| {
+        AppError::bad(
+            crate::error_codes::BAD_IDENTIFIER,
+            format!("a CurseForge id must be a number, not {id}"),
+        )
+    })
 }

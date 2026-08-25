@@ -106,6 +106,13 @@ pub async fn import(
         let Some(path) = f["path"].as_str() else {
             continue;
         };
+        // .mrpack приезжает из интернета, и путь в его манифесте — чужой ввод.
+        // Раньше он уходил в базу как есть, то есть архив мог назначить себе
+        // любое место на диске игрока. Отказываем, а не пропускаем файл:
+        // импорт с тихо выпавшим модом выглядит удачным и ломается уже у игрока.
+        let path = super::safe_path(path)
+            .ok_or_else(|| anyhow!("путь выходит за корень сборки: {path}"))?;
+        let path = path.as_str();
         if f["env"]["client"].as_str() == Some("unsupported") {
             current += 1;
             continue;
@@ -138,6 +145,8 @@ pub async fn import(
     }
 
     for (rel, data) in overrides {
+        let rel = super::safe_path(&rel)
+            .ok_or_else(|| anyhow!("overrides: путь выходит за корень сборки: {rel}"))?;
         if let Some(mut prog) = state.import_jobs.get_mut(&job_id) {
             prog.current = current;
             prog.current_file = rel.clone();

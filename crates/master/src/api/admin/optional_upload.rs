@@ -44,17 +44,22 @@ pub async fn upload(
     admin.require(PERM_BUILDS_EDIT)?;
     let form = read_form(multipart).await?;
 
-    let data = form
-        .file
-        .as_ref()
-        .ok_or_else(|| AppError::BadRequest("attach the mod file".into()))?;
+    let data = form.file.as_ref().ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::UPLOAD_FIELD_MISSING,
+            "attach the mod file",
+        )
+    })?;
     let filename = form
         .filename
         .clone()
         .ok_or_else(|| AppError::BadRequest("the file has no name".into()))?;
     let name = form.name.trim();
     if name.is_empty() {
-        return Err(AppError::BadRequest("name the mod".into()));
+        return Err(AppError::bad(
+            crate::error_codes::UPLOAD_FIELD_MISSING,
+            "name the mod",
+        ));
     }
 
     let path = format!("mods/{filename}");
@@ -71,6 +76,14 @@ pub async fn upload(
     .await?;
 
     let mods = add_mod(&state, id, &form, name, &path).await?;
+
+    // Лаунчер держит манифест сборки в памяти и перечитывает его только по
+    // этому кадру. Без него загруженный мод не доезжает ни до кого, у кого
+    // лаунчер уже открыт: файл лежит на мастере, а игра запускается со старым
+    // набором — и выглядит это как «мод не установился».
+    let server_id = super::builds::build_server_id(&state, id).await?;
+    super::builds::broadcast_builds_changed(&state, server_id);
+
     Ok(Json(
         json!({ "path": path, "sha1": stored.sha1, "optional_mods": mods }),
     ))

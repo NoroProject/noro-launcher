@@ -30,6 +30,11 @@ final class ChatGuard implements Listener {
         }
 
         String plainText = PlainTextComponentSerializer.plainText().serialize(event.message());
+        // Буфер держит окно разговора: срез из него уедет в дело, когда
+        // появится повод. Пишем до фильтров — заблокированная реплика как раз
+        // и есть то, что интересно разбору.
+        moderation.chatRing().message(player.getUniqueId(), player.getName(), "public", plainText);
+
         ChatFilters.Result res = moderation.checkChatMessage(player.getUniqueId(), plainText);
         if (res.action() == ChatFilters.Action.DENY || res.action() == ChatFilters.Action.PUNISH || res.action() == ChatFilters.Action.ESCALATE) {
             event.setCancelled(true);
@@ -39,6 +44,8 @@ final class ChatGuard implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST)
     public void onCommand(PlayerCommandPreprocessEvent event) {
+        Player player = event.getPlayer();
+        moderation.chatRing().command(player.getUniqueId(), player.getName(), event.getMessage());
         if (ChatCommands.speaks(event.getMessage())) {
             denyMute(event.getPlayer(), event);
         }

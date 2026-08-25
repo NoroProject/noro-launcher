@@ -128,6 +128,81 @@ public final class NoroAgentApi {
      *
      * @return {@code null} на неизвестный ключ или неизвестного игрока
      */
+    /**
+     * Плашки ролей: их состав и то, кто согласился их видеть.
+     *
+     * <p>Ставится агентом при старте. Пока не поставлена, префикс остаётся
+     * текстовым — ровно как до появления плашек.
+     */
+    private static volatile PrefixService prefixes;
+
+    public static void attachPrefixes(PrefixService service) {
+        prefixes = service;
+    }
+
+    /**
+     * Кому сейчас собирается текст.
+     *
+     * <p>Плейсхолдеру {@code %noro:prefix%} зритель нужен, а передать его через
+     * API плейсхолдеров некуда: там на входе только автор. Поток здесь тот же —
+     * чат рассылается получателям по очереди в серверном потоке, — поэтому
+     * значение живёт ровно на время сборки одного сообщения.
+     *
+     * <p>Ставит и снимает его тот, кто рассылает: форки TAB и StyledChat.
+     */
+    private static final ThreadLocal<UUID> VIEWER = new ThreadLocal<>();
+
+    public static void viewer(UUID uuid) {
+        if (uuid == null) {
+            VIEWER.remove();
+        } else {
+            VIEWER.set(uuid);
+        }
+    }
+
+    public static UUID viewer() {
+        return VIEWER.get();
+    }
+
+    /**
+     * Префикс игрока глазами зрителя.
+     *
+     * <p>Двумя игроками, а не одним, потому что плашка — картинка из
+     * ресурспака: у кого пака нет, тот увидел бы на её месте белый квадрат.
+     * Поэтому принявшему уходит символ в шрифте {@code noro:prefix}, а всем
+     * остальным — прежний текстовый префикс.
+     *
+     * <p>Зовут это форки TAB и StyledChat: чат и таб они собирают на каждого
+     * получателя отдельно, и подставить разное там есть куда.
+     *
+     * @param viewer кому показываем; {@code null} — не знаем, значит без плашки
+     * @return строка в разметке MiniMessage, никогда не {@code null}
+     */
+    public static String prefixFor(UUID uuid, UUID viewer) {
+        return badgeOr(prefixRole(uuid), viewer);
+    }
+
+    /**
+     * Плашка роли либо её текстовый префикс.
+     *
+     * <p>Роль передаётся готовой, а не ищется по игроку: там, где она уже
+     * разобрана, второй поход в кэш давал бы пусто для профиля, которого в кэше
+     * нет, — ровно так и ломался плейсхолдер.
+     */
+    public static String badgeOr(RoleInfo role, UUID viewer) {
+        if (role == null) {
+            return "";
+        }
+        PrefixService service = prefixes;
+        String glyph = service == null ? null : service.glyph(viewer, role);
+        // Пробел после плашки: без него картинка упирается в ник и читается
+        // как одно слово. В самой картинке его не заложить — она обрезана по
+        // краю, и лишний столбец пикселей сдвинул бы фон, а не текст.
+        return glyph == null
+                ? role.prefixText()
+                : "<font:" + PrefixService.FONT + ">" + glyph + "</font> ";
+    }
+
     public static String value(UUID uuid, String key) {
         return PlaceholderValues.resolve(profile(uuid), key);
     }

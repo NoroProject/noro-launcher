@@ -18,7 +18,7 @@ const {
     error,
 } = await useAsyncData(
     "admin-servers",
-    () => auth.request<ServerRow[]>("/api/admin/servers"),
+    () => auth.requestList<ServerRow>("/api/admin/servers"),
     { default: () => [] },
 );
 

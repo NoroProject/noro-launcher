@@ -119,7 +119,7 @@ async function saveCategory(body: Record<string, unknown>) {
             <option v-for="s in servers" :key="s.id" :value="s.id">{{ t('admin-rule-server-only', { name: s.name }) }}</option>
           </NoroSelect>
         </label>
-        <NuxtLink to="/rules" target="_blank" class="shrink-0">
+        <NuxtLink :to="link.rules()" target="_blank" class="shrink-0">
           <AtomButton variant="ghost" icon="i-lucide-external-link">{{ t('admin-rules-public-page') }}</AtomButton>
         </NuxtLink>
       </div>

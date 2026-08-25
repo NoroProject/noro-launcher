@@ -34,7 +34,7 @@ export function useLocalizedDraft() {
     let rows: TranslationRow[] = []
     if (path) {
       try {
-        rows = await auth.request<TranslationRow[]>(path)
+        rows = await auth.requestList<TranslationRow>(path)
       } catch (e) {
         console.error(e)
       }

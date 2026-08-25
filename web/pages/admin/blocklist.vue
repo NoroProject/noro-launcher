@@ -23,10 +23,21 @@ const action = ref<BlockedFile['action']>('delete')
 const pending = ref(false)
 
 const load = async () => {
-  rows.value = await auth.request<BlockedFile[]>('/api/admin/blocklist')
+  rows.value = await auth.requestList<BlockedFile>('/api/admin/blocklist')
 }
 
+/** Маска короче трёх знаков совпадёт почти со всем в папке игры. */
+const tooWide = computed(() => {
+  const value = pattern.value.replace(/\*/g, '').trim()
+  return !!pattern.value && value.length < 3
+})
+const badHash = computed(() => !!sha1.value && !/^[0-9a-fA-F]{40}$/.test(sha1.value.trim()))
+
 async function add() {
+  if (tooWide.value || badHash.value) {
+    notify.fail(new Error(tooWide.value ? t('admin-blocklist-too-wide') : t('admin-blocklist-bad-hash')))
+    return
+  }
   pending.value = true
   try {
     await auth.request('/api/admin/blocklist', {
@@ -68,15 +79,14 @@ onMounted(() => load())
       {{ t('admin-blocklist-note') }}
     </NoroNote>
 
-    <section class="noro-panel mb-4 grid gap-4 p-4 md:grid-cols-[1fr_1fr_1fr_140px_auto]">
+    <AdminBlocklistPresets class="mb-4" @pick="(p, r) => { pattern = p; reason = r }" />
+
+    <section class="noro-panel mb-4 grid items-start gap-4 p-4 md:grid-cols-[1fr_1fr_1fr_140px_auto]">
       <label class="block">
         <span class="noro-label mb-1.5 block">{{ t('admin-blocklist-mask') }}</span>
         <input v-model="pattern" class="noro-input w-full" :placeholder="t('admin-blocklist-mask-placeholder')">
       </label>
-      <label class="block">
-        <span class="noro-label mb-1.5 block">{{ t('admin-blocklist-sha1') }}</span>
-        <input v-model="sha1" class="noro-input w-full font-mono" :placeholder="t('admin-blocklist-sha1-placeholder')">
-      </label>
+      <AdminSha1Field v-model="sha1" />
       <label class="block">
         <span class="noro-label mb-1.5 block">{{ t('admin-blocklist-reason') }}</span>
         <input v-model="reason" class="noro-input w-full" :placeholder="t('admin-blocklist-reason-placeholder')">
@@ -89,7 +99,8 @@ onMounted(() => load())
           <option value="block_launch">{{ t('admin-blocklist-act-block') }}</option>
         </NoroSelect>
       </label>
-      <div class="flex items-end">
+      <div class="grid content-start">
+        <span class="noro-label invisible" aria-hidden="true">.</span>
         <AtomButton v-if="can('noro.admin.blocklist.edit')" icon="i-lucide-plus" :loading="pending" @click="add">
           {{ t('admin-notes-add') }}
         </AtomButton>

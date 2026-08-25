@@ -11,15 +11,15 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .user
         .as_ref()
         .map(|u| u.username.clone())
-        .unwrap_or_else(|| t("sidebar-signed-out").into());
-    let discord = ui
+        .unwrap_or_else(|| t("sidebar-signed-out"));
+    let handle = ui
         .user
         .as_ref()
-        .map(|u| match &u.discord_username {
+        .map(|u| match u.handle() {
             Some(name) => format!("@{name}"),
             None => u.username.clone(),
         })
-        .unwrap_or_else(|| t("sidebar-no-discord").into());
+        .unwrap_or_else(|| t("sidebar-no-identity"));
 
     div()
         .id("profile-card")
@@ -40,7 +40,7 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             cx.notify();
         }))
         .child(avatar(ui))
-        .child(identity(username, discord))
+        .child(identity(username, handle))
         .into_any_element()
 }
 
@@ -75,7 +75,7 @@ fn avatar(ui: &LauncherUI) -> AnyElement {
         .user
         .as_ref()
         .map(|u| u.username.clone())
-        .unwrap_or_else(|| t("sidebar-signed-out").into());
+        .unwrap_or_else(|| t("sidebar-signed-out"));
     let color = ui
         .user
         .as_ref()
@@ -102,7 +102,7 @@ fn avatar(ui: &LauncherUI) -> AnyElement {
         .into_any_element()
 }
 
-fn identity(username: String, discord: String) -> AnyElement {
+fn identity(username: String, handle: String) -> AnyElement {
     div()
         // Без flex_1 блок сжимался до ширины содержимого и ник обрезался,
         // хотя до иконок оставалось свободное место.
@@ -125,7 +125,7 @@ fn identity(username: String, discord: String) -> AnyElement {
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(11.))
                 .text_color(rgb(TEXT_MUTED))
-                .child(discord),
+                .child(handle),
         )
         .into_any_element()
 }

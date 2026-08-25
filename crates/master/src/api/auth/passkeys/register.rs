@@ -17,6 +17,7 @@ pub async fn register_options(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> AppResult<Json<ChallengeRes<CreationChallengeResponse>>> {
+    crate::api::auth::oauth::methods::require_passkey_enabled(&state).await?;
     let profile = crate::db::load_profile(&state.db, user.user_id).await?;
 
     // Уже привязанные ключи исключаются: иначе игрок молча заводит второй ключ

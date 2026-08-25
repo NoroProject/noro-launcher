@@ -92,7 +92,7 @@ fn broken_selection_is_reported_once_per_pair() {
         .filter(|i| matches!(i, SelectionIssue::Conflict { .. }))
         .count();
     assert_eq!(conflicts, 1);
-    assert!(found.is_empty() == false);
+    assert!(!found.is_empty());
 }
 
 #[test]

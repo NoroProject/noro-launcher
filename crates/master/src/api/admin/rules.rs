@@ -1,6 +1,7 @@
 //! Админ: свод правил — разделы, правила и их порядок.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::Page;
 use crate::db::rules::{
     CategoryInput, CategoryTranslationRow, RuleCategoryRow, RuleInput, RuleRow, RuleSanctionRow,
     RuleTranslationRow, SanctionInput, TranslationInput,
@@ -65,9 +66,11 @@ pub struct ReorderReq {
 pub async fn list_categories(
     State(state): State<AppState>,
     admin: AdminAuth,
-) -> AppResult<Json<Vec<RuleCategoryRow>>> {
+) -> AppResult<Json<Page<RuleCategoryRow>>> {
     admin.require(PERM_RULES_VIEW)?;
-    Ok(Json(crate::db::list_all_rule_categories(&state.db).await?))
+    Ok(Json(Page::whole(
+        crate::db::list_all_rule_categories(&state.db).await?,
+    )))
 }
 
 pub async fn create_category(
@@ -128,11 +131,11 @@ pub async fn category_translations(
     State(state): State<AppState>,
     admin: AdminAuth,
     Path(id): Path<Uuid>,
-) -> AppResult<Json<Vec<CategoryTranslationRow>>> {
+) -> AppResult<Json<Page<CategoryTranslationRow>>> {
     admin.require(PERM_RULES_VIEW)?;
-    Ok(Json(
+    Ok(Json(Page::whole(
         crate::db::translations_of_category(&state.db, id).await?,
-    ))
+    )))
 }
 
 /// Удаление раздела не трогает правила: они всплывают в «без раздела» и видны
@@ -210,9 +213,11 @@ pub async fn rule_translations(
     State(state): State<AppState>,
     admin: AdminAuth,
     Path(id): Path<Uuid>,
-) -> AppResult<Json<Vec<RuleTranslationRow>>> {
+) -> AppResult<Json<Page<RuleTranslationRow>>> {
     admin.require(PERM_RULES_VIEW)?;
-    Ok(Json(crate::db::translations_of_rule(&state.db, id).await?))
+    Ok(Json(Page::whole(
+        crate::db::translations_of_rule(&state.db, id).await?,
+    )))
 }
 
 pub async fn delete_rule(
@@ -256,7 +261,10 @@ fn rule_input(req: &RuleReq) -> AppResult<RuleInput<'_>> {
         if sanction.min_minutes.is_some_and(|m| m <= 0)
             || sanction.max_minutes.is_some_and(|m| m <= 0)
         {
-            return Err(AppError::BadRequest("duration must be positive".into()));
+            return Err(AppError::bad(
+                crate::error_codes::BAD_DURATION,
+                "duration must be positive",
+            ));
         }
         // Перевёрнутая вилка означала бы правило, по которому нельзя выдать
         // вообще ничего, — и обнаружилось бы это в момент выдачи бана.

@@ -15,13 +15,13 @@ const { data: user, refresh: refreshUser } = await useAsyncData(`admin-user-${id
   auth.request<UserProfile>(`/api/admin/users/${id.value}`)
 )
 const { data: roles } = await useAsyncData('admin-user-roles-list', () =>
-  auth.request<Role[]>('/api/admin/roles'), { default: () => [] }
+  auth.requestList<Role>('/api/admin/roles'), { default: () => [] }
 )
 const { data: capes } = await useAsyncData('admin-user-capes-list', () =>
-  auth.request<CapeRow[]>('/api/admin/capes'), { default: () => [] }
+  auth.requestList<CapeRow>('/api/admin/capes'), { default: () => [] }
 )
 const { data: servers } = await useAsyncData('admin-user-servers', () =>
-  auth.request<ServerRow[]>('/api/admin/servers'), { default: () => [] }
+  auth.requestList<ServerRow>('/api/admin/servers'), { default: () => [] }
 )
 const { data: userCapesData, refresh: refreshUserCapes } = await useAsyncData(`admin-user-capes-access-${id.value}`, () =>
   auth.request<{ granted_cape_ids: string[] }>(`/api/admin/users/${id.value}/capes`), { default: () => ({ granted_cape_ids: [] }) }
@@ -34,7 +34,7 @@ interface SkinPresetItem {
 }
 
 const { data: skinPresets, refresh: refreshSkinPresets } = await useAsyncData(`admin-user-skin-presets-${id.value}`, () =>
-  auth.request<SkinPresetItem[]>(`/api/admin/users/${id.value}/skin-presets`), { default: () => [] }
+  auth.requestList<SkinPresetItem>(`/api/admin/users/${id.value}/skin-presets`), { default: () => [] }
 )
 
 const showImpersonate = ref(false)
@@ -137,6 +137,13 @@ async function removeRole(roleId: string) {
   await run(`role-${roleId}`, () => auth.request(`/api/admin/users/${id.value}/roles/${roleId}`, { method: 'DELETE' }))
 }
 
+/** Снять привязку платформы. Ту, через которую регистрировались, мастер не отдаст. */
+async function unlinkIdentity(provider: string) {
+  await run(`identity-${provider}`, () =>
+    auth.request(`/api/admin/users/${id.value}/identities/${provider}`, { method: 'DELETE' })
+  )
+}
+
 async function addPermission(entries: PermissionEntry[]) {
   await run(entries.length === 1 ? `perm-${entries[0]!.permission}` : 'perm', () =>
     grants.addMany(entries)
@@ -179,9 +186,9 @@ function onSkinFilePicked(e: Event) {
 </script>
 
 <template>
-  <NoroShell :title="user?.username || 'USER'" :subtitle="user?.discord_username">
+  <NoroShell :title="user?.username || 'USER'" :subtitle="identityHandle(user) || undefined">
     <template #actions>
-      <AtomButton variant="dark" icon="i-lucide-arrow-left" to="/admin/users">{{ t('nav-admin-users') }}</AtomButton>
+      <AtomButton variant="dark" icon="i-lucide-arrow-left" :to="adminLink.users()">{{ t('nav-admin-users') }}</AtomButton>
     </template>
 
     <EmptyState v-if="!user" icon="i-lucide-search-x" :title="t('admin-users-not-found')" />
@@ -204,18 +211,15 @@ function onSkinFilePicked(e: Event) {
         <div class="space-y-5">
         <div class="noro-panel h-fit p-5 space-y-4">
           <div class="flex items-center gap-4">
-            <img v-if="user.discord_avatar" :src="user.discord_avatar" alt="" class="size-16 rounded-lg object-cover">
+            <img v-if="identityAvatar(user)" :src="identityAvatar(user)!" alt="" class="size-16 rounded-lg object-cover">
             <div v-else class="grid size-16 place-items-center rounded-lg bg-[var(--noro-magenta)] text-2xl font-black text-[var(--noro-white)]">{{ user.username.slice(0, 1).toUpperCase() }}</div>
             <div class="min-w-0">
               <h2 class="truncate text-xl font-black text-[var(--noro-text)]">{{ user.username }}</h2>
-              <p class="truncate text-sm text-[var(--noro-muted)]">{{ user.discord_username }}</p>
+              <p class="truncate text-sm text-[var(--noro-muted)]">{{ identityHandle(user) || "—" }}</p>
               <UBadge class="mt-2" :color="user.banned ? 'error' : 'success'" variant="subtle">{{ user.banned ? t('admin-users-banned') : t('admin-users-active') }}</UBadge>
             </div>
           </div>
-          <div class="rounded-lg bg-[var(--noro-input)] p-3">
-            <span class="text-xs uppercase tracking-wider text-[var(--noro-muted)] font-bold block mb-1">UUID</span>
-            <code class="break-all text-xs text-[var(--noro-text)]">{{ user.uuid }}</code>
-          </div>
+          <AdminUserFacts :user="user" />
         </div>
         <UserLauncherPanel
           v-if="can('noro.admin.users.launcher')"
@@ -227,6 +231,12 @@ function onSkinFilePicked(e: Event) {
         </div>
 
         <div class="grid gap-5">
+          <AdminUserIdentities
+            :identities="user.identities || []"
+            :can-edit="can('noro.admin.users.edit')"
+            :busy="busy"
+            @unlink="unlinkIdentity"
+          />
           <AdminUserRoles
             v-if="can('noro.admin.users.roles')"
             :roles="roles"

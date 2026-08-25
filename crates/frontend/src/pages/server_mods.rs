@@ -136,7 +136,10 @@ fn mod_row(ui: &LauncherUI, server_id: Uuid, m: &OptionalModInfo, cx: &mut Cx) -
         .child(mod_icon(ui, m, color))
         .child(mod_text(m, None, 60))
         .child(div().flex_1())
-        .when(m.limited, |d| d.child(badge("VIP", WARNING)))
+        // Мод с ограничением: его ставит не каждый, а тот, кому выдали право.
+        // Раньше метка называлась «VIP» — от старой затеи с донатом; к правам
+        // это отношения не имеет и путало.
+        .when(m.limited, |d| d.child(badge(t("mods-limited"), WARNING)))
         .child(badge(m.category.clone(), color))
         .child(mod_toggle(
             SharedString::from(format!("mods-tgl-{server_id}-{}", m.name)),

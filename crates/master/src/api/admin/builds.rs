@@ -202,7 +202,11 @@ async fn rebuild_manifest(
     }
     .map_err(AppError::Other)?;
 
-    let build = crate::db::get_build(&state.db, id).await?.unwrap();
+    // Сборку могли удалить, пока шёл bootstrap: он идёт минутами. Это 404, а не
+    // повод уронить воркер.
+    let build = crate::db::get_build(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("build".into()))?;
     crate::manifest::ensure_signed(state, &build)
         .await
         .map_err(AppError::Other)
@@ -315,12 +319,17 @@ pub async fn upload_file(
         }
     }
 
-    let data = data.ok_or_else(|| AppError::BadRequest("missing the file field".into()))?;
+    let data = data.ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::UPLOAD_FIELD_MISSING,
+            "missing the file field",
+        )
+    })?;
     // Путь: явный, иначе mods/<filename>.
     let path = path
         .filter(|p| !p.is_empty())
         .or_else(|| filename.map(|f| format!("mods/{f}")))
-        .ok_or_else(|| AppError::BadRequest("no path given".into()))?;
+        .ok_or_else(|| AppError::bad(crate::error_codes::UPLOAD_FIELD_MISSING, "no path given"))?;
 
     let stored = state
         .files
@@ -389,8 +398,12 @@ pub async fn get_file_content(
         .await
         .map_err(|e| AppError::Other(e.into()))?;
 
-    let content =
-        String::from_utf8(buf).map_err(|_| AppError::BadRequest("not a valid text file".into()))?;
+    let content = String::from_utf8(buf).map_err(|_| {
+        AppError::bad(
+            crate::error_codes::UPLOAD_BAD_FORMAT,
+            "not a valid text file",
+        )
+    })?;
 
     Ok(Json(json!({
         "path": file.path,
@@ -456,7 +469,10 @@ pub async fn update_file_content(
     admin.require(PERM_BUILDS_EDIT)?;
     let data = req.content.as_bytes();
     if data.len() > 512 * 1024 {
-        return Err(AppError::BadRequest("content too large".into()));
+        return Err(AppError::bad(
+            crate::error_codes::UPLOAD_TOO_LARGE,
+            "content too large",
+        ));
     }
 
     let stored = state.files.put_bytes(data).await.map_err(AppError::Other)?;
@@ -561,14 +577,18 @@ pub async fn move_files(
     Ok(Json(json!({ "moved": targets.len() })))
 }
 
-/// Путь внутри сборки: без ведущих и хвостовых слэшей, без `..` и пустых
-/// сегментов — иначе переименование стало бы способом писать мимо сборки.
+/// Путь внутри сборки — иначе переименование стало бы способом писать мимо неё.
+///
+/// Разбор общий с импортом модпаков: своя проверка здесь искала `..` только
+/// между `/` и пропускала `..\..\evil.exe`, который на Windows-клиенте
+/// раскрывается в те же два уровня вверх.
 fn clean_path(raw: &str) -> AppResult<String> {
-    let path = raw.trim().trim_matches('/');
-    if path.is_empty() || path.split('/').any(|part| part == ".." || part.is_empty()) {
-        return Err(AppError::BadRequest(format!("invalid path: {raw}")));
-    }
-    Ok(path.to_string())
+    crate::build_importer::safe_path(raw.trim().trim_matches('/')).ok_or_else(|| {
+        AppError::bad(
+            crate::error_codes::PATH_ESCAPES_BUILD,
+            format!("invalid path: {raw}"),
+        )
+    })
 }
 
 fn guess_kind(path: &str) -> &'static str {
@@ -896,8 +916,8 @@ pub async fn set_paths(
     admin.require(PERM_BUILDS_EDIT)?;
     sqlx::query("UPDATE builds SET unmanaged_paths=$2, user_managed_paths=$3 WHERE id=$1")
         .bind(id)
-        .bind(serde_json::to_value(&req.unmanaged_paths).unwrap())
-        .bind(serde_json::to_value(&req.user_managed_paths).unwrap())
+        .bind(serde_json::to_value(&req.unmanaged_paths)?)
+        .bind(serde_json::to_value(&req.user_managed_paths)?)
         .execute(&state.db)
         .await?;
     let server_id = build_server_id(&state, id).await?;

@@ -16,7 +16,7 @@ const dragging = ref(false)
 const confirmDeleteId = ref<string | null>(null)
 
 const { data: capes, refresh, pending } = await useAsyncData('admin-capes', () =>
-  auth.request<CapeRow[]>('/api/admin/capes'), { default: () => [] }
+  auth.requestList<CapeRow>('/api/admin/capes'), { default: () => [] }
 )
 
 

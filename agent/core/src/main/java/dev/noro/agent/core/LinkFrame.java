@@ -1,5 +1,6 @@
 package dev.noro.agent.core;
 
+import com.google.gson.annotations.SerializedName;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -17,7 +18,20 @@ record LinkFrame(
         String actorLabel,
         String message,
         Integer countdownSeconds,
-        String reason) {
+        String reason,
+        // Мастер зовёт это поле `case`: `rename_all = "snake_case"` у него
+        // переименовывает варианты, а не поля. Без явного имени Gson искал бы
+        // `case_id`, получал null — и разбор молча не работал бы весь.
+        @SerializedName("case") UUID caseId,
+        UUID moderator,
+        UUID reporter,
+        String reporterName,
+        String world,
+        Double x,
+        Double y,
+        Double z,
+        Boolean closed,
+        Integer beforeSecs) {
 
     void deliver(AgentLink.Listener listener) {
         switch (type == null ? "" : type) {
@@ -56,6 +70,20 @@ record LinkFrame(
                 return;
             case "maintenance_cancel":
                 listener.onMaintenanceCancel();
+                return;
+            case "case_assigned":
+                listener.onCaseAssigned(new CaseSession(
+                        caseId, target, targetName, reporter, reporterName,
+                        reason == null ? "" : reason, world, x, y, z, null, false), moderator);
+                return;
+            case "case_finished":
+                listener.onCaseFinished(moderator, caseId, Boolean.TRUE.equals(closed));
+                return;
+            case "case_chat_request":
+                listener.onCaseChatRequest(caseId, beforeSecs == null ? 0 : beforeSecs);
+                return;
+            case "case_inventory_request":
+                listener.onCaseInventoryRequest(caseId, target);
                 return;
             default:
                 throw new IllegalArgumentException("unknown frame type " + type);

@@ -73,6 +73,13 @@ pub async fn create_punishment(
         .minutes
         .map(|m| chrono::Utc::now() + chrono::Duration::minutes(m.max(1)));
 
+    // Наказание из игры встаёт в идущий разбор, если он есть: модератор в
+    // режиме дела наказывает кнопкой, и результат обязан попасть в ленту.
+    let case = crate::db::find_open_case(&state.db, target.id, Some(server_id))
+        .await
+        .ok()
+        .flatten();
+
     let punishment = crate::db::create_punishment(
         &state.db,
         NewPunishment {
@@ -85,9 +92,29 @@ pub async fn create_punishment(
             expires_at,
             rule_id: rule.as_ref().map(|r| r.id),
             rule_code: rule.as_ref().map(|r| r.code.as_str()),
+            case_id: case.as_ref().map(|c| c.id),
         },
     )
     .await?;
+
+    if let Some(case) = &case {
+        crate::cases::event(
+            &state,
+            case.id,
+            actor.id,
+            &actor.label,
+            "game",
+            "punishment",
+            serde_json::json!({
+                "punishment_id": punishment.id,
+                "kind": punishment.kind,
+                "reason": punishment.reason,
+                "expires_at": punishment.expires_at,
+                "rule": punishment.rule_code,
+            }),
+        )
+        .await?;
+    }
 
     if req.kind == "ban" {
         crate::db::refresh_ban_flag(&state.db, target.id).await?;

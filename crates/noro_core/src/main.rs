@@ -34,6 +34,8 @@ fn main() {
         .read(true)
         .write(true)
         .create(true)
+        // Явно: файл — это замок, его содержимое не наше и обнулять его нельзя.
+        .truncate(false)
         .open(&lockfile_path)
     {
         Ok(f) => f,

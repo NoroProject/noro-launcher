@@ -30,6 +30,8 @@ actions! {
     AUTH_LOGIN            = "auth.login",                  "Auth",  "Signed in";
     AUTH_RECOVERY_CODE    = "auth.recovery_code",          "Auth",  "Signed in with a recovery code";
     AUTH_RECOVERY_REISSUE = "auth.recovery_codes.reissue", "Auth",  "Recovery codes reissued";
+    AUTH_IDENTITY_LINK    = "auth.identity.link",          "Auth",  "Platform linked";
+    AUTH_IDENTITY_UNLINK  = "auth.identity.unlink",        "Auth",  "Platform unlinked";
     SESSION_REVOKE        = "user.session.revoke",         "Auth",  "Session ended";
     SESSIONS_REVOKE       = "user.sessions.revoke",        "Auth",  "All sessions ended";
 
@@ -54,6 +56,7 @@ actions! {
     PUNISHMENT_SERVER_BAN = "punishment.server_ban",       "Users", "Punishment: server access";
     PUNISHMENT_MUTE       = "punishment.mute",             "Users", "Punishment: mute";
     PUNISHMENT_REVOKE     = "punishment.revoke",           "Users", "Punishment lifted";
+    USER_IDENTITY_UNLINK  = "user.identity.unlink",        "Users", "Platform unlinked by staff";
     USER_FREEZE           = "user.freeze",                 "Users", "Player frozen";
     USER_UNFREEZE         = "user.unfreeze",               "Users", "Player unfrozen";
     REPORT_CREATE         = "report.create",               "Users", "Report filed";
@@ -85,11 +88,16 @@ actions! {
     SERVER_DELETE         = "server.delete",               "Content", "Server deleted";
     LAUNCHER_DEPLOY       = "launcher.deploy",             "System", "Launcher version deployed";
     SETTINGS_UPDATE       = "settings.update",             "System", "Settings changed";
+    OAUTH_APP_REVIEW      = "oauth.app.review",            "System", "Application reviewed";
+    OAUTH_APP_SCOPES      = "oauth.app.scopes",            "System", "Application scopes changed";
+    OAUTH_APP_DELETE      = "oauth.app.delete",            "System", "Application deleted";
+    OAUTH_APP_TOGGLE      = "oauth.app.toggle",            "System", "Third-party applications toggled";
     STORAGE_GC            = "storage.gc",                  "System", "Storage cleaned up";
     ADMIN_TOKEN_CREATE    = "admin_token.create",          "System", "Admin token created";
     ADMIN_TOKEN_DELETE    = "admin_token.delete",          "System", "Admin token deleted";
     BLOCKLIST_ADD         = "blocklist.add",               "System", "Blocklist rule added";
     BLOCKLIST_REMOVE      = "blocklist.remove",            "System", "Blocklist rule removed";
+    BACKUP_RESTORE        = "backup.restore",              "System", "Master restored from an archive";
 }
 
 /// Группы в порядке показа.

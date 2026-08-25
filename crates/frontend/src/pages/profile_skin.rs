@@ -3,7 +3,6 @@
 use super::common::{panel, Cx};
 use super::profile_skin_pick::on_upload_click;
 use super::skin_drag;
-use crate::components::btn;
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;

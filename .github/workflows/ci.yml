@@ -42,16 +42,44 @@ jobs:
         run: cargo fmt --all -- --check
 
       # Серверная часть: она деплоится непрерывно, и регресс здесь виден не
-      # сразу. Крейты с GPUI (frontend, noro_launcher, noro_core) сюда не
-      # входят — им нужен графический стек, их собирает release-launcher.
+      # сразу. Крейты с GPUI проверяет отдельный джоб ниже — на self-hosted
+      # раннере может не быть системных библиотек, которых требует их сборка.
       - name: clippy
         run: |
           cargo clippy --all-targets \
-            -p schema -p i18n -p bridge -p backend -p master -p admin_cli \
-            -- -D warnings -A clippy::too_many_arguments
+            -p schema -p i18n -p bridge -p mod_link -p backend -p master -p admin_cli \
+            -- -D warnings
 
       - name: test
-        run: cargo test -p schema -p i18n -p bridge -p backend -p master -p admin_cli
+        run: cargo test -p schema -p i18n -p bridge -p mod_link -p backend -p master -p admin_cli
+
+  # Лаунчер. Раньше его крейты не проверялись вовсе, и в них накопились мёртвые
+  # функции и неиспользуемые импорты — их не видел никто, потому что release
+  # собирает бинарник без clippy.
+  #
+  # `ubuntu-latest`, а не self-hosted: release-launcher уже собирает на нём
+  # `x86_64-unknown-linux-gnu` без доустановки пакетов, то есть GPUI там
+  # компилируется. Перенос на self-hosted сэкономит минуты GitHub, но сперва
+  # надо убедиться, что на раннере есть те же системные библиотеки.
+  launcher:
+    name: launcher clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ci-launcher
+
+      - name: clippy
+        run: |
+          cargo clippy --all-targets \
+            -p frontend -p noro_launcher -p noro_core \
+            -- -D warnings
 
   web:
     name: web typecheck

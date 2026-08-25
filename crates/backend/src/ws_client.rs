@@ -20,6 +20,13 @@ impl WsClient {
         let _ = self.out.send(msg);
     }
 
+    /// Токен сессии, если лаунчер вошёл. Держится здесь один раз на всех: у
+    /// панели дел та же сессия, что у сокета, и второй копии токена быть не
+    /// должно — в JVM игры не уходит ни та, ни другая.
+    pub fn token(&self) -> Option<String> {
+        self.token.read().clone()
+    }
+
     /// Обновить токен (логин/логаут). При следующем коннекте уйдёт Authenticate.
     pub fn set_token(&self, token: Option<String>) {
         *self.token.write() = token.clone();

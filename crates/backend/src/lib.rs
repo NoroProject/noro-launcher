@@ -14,6 +14,7 @@ pub mod game_runner;
 pub mod impersonation;
 pub mod log_reader;
 pub mod mod_icon;
+pub mod mod_link;
 pub mod persistent;
 pub mod remote_actions;
 pub mod servers_dat;

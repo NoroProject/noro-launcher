@@ -49,6 +49,7 @@ function adminPagePermission(path: string): string | null {
     ['/admin/launcher', 'noro.admin.launcher.view'],
     ['/admin/audit', 'noro.admin.audit'],
     ['/admin/support', 'noro.admin.support.logs'],
+    ['/admin/apps', 'noro.admin.oauth.view'],
     ['/admin/settings', 'noro.admin.settings.view'],
   ]
   return rules.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] || null

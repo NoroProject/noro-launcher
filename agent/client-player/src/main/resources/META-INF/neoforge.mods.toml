@@ -1,0 +1,24 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mods]]
+modId = "noro_player"
+version = "${version}"
+displayName = "Noro Player"
+authors = "noro"
+description = '''Player-facing screens: the rule book, your punishments and the report form.'''
+
+[[dependencies.noro_player]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.noro_player]]
+modId = "noro_core"
+type = "required"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "CLIENT"

@@ -28,7 +28,7 @@ export function useModSuggestions(serverId: Ref<string | undefined>) {
         loading.value = true;
         try {
             const res = await auth.request<any[]>(
-                `/api/admin/mod_suggestions?server_id=${serverId.value}&status=pending`,
+                `/api/admin/mod-suggestions?server_id=${serverId.value}&status=pending`,
             );
             suggestions.value = res?.length ? res : MOCK_SUGGESTIONS;
         } catch (e) {
@@ -42,7 +42,7 @@ export function useModSuggestions(serverId: Ref<string | undefined>) {
     }
 
     async function approve(id: string) {
-        await auth.request(`/api/admin/mod_suggestions/${id}/approve`, { method: "POST" });
+        await auth.request(`/api/admin/mod-suggestions/${id}/approve`, { method: "POST" });
         await fetchSuggestions();
     }
 
@@ -51,7 +51,7 @@ export function useModSuggestions(serverId: Ref<string | undefined>) {
         mode: "optional" | "regular",
         installOnServers = false,
     ) {
-        await auth.request(`/api/admin/mod_suggestions/${id}/accept`, {
+        await auth.request(`/api/admin/mod-suggestions/${id}/accept`, {
             method: "POST",
             body: { mode, install_on_servers: installOnServers },
         });
@@ -59,7 +59,7 @@ export function useModSuggestions(serverId: Ref<string | undefined>) {
     }
 
     async function reject(id: string) {
-        await auth.request(`/api/admin/mod_suggestions/${id}/reject`, { method: "POST" });
+        await auth.request(`/api/admin/mod-suggestions/${id}/reject`, { method: "POST" });
         await fetchSuggestions();
     }
 

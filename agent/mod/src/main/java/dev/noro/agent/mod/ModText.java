@@ -48,10 +48,43 @@ final class ModText {
         if (span.hasColor()) {
             style = style.withColor(TextColor.fromRgb(span.color()));
         }
+        if (span.hasFont()) {
+            style = withFont(style, span.font());
+        }
         return span.linked() ? withLink(style, span.url()) : style;
     }
 
+    /**
+     * Шрифт куска: им плашка роли отличается от обычного текста.
+     *
+     * <p>Кривое имя шрифта роняло бы разбор целиком, а с ним и всё сообщение,
+     * поэтому такой кусок просто остаётся обычным.
+     */
+    private static Style withFont(Style base, String font) {
+        try {
+            // Два независимых разрыва: с 1.21.9 шрифт описывается не
+            // идентификатором, а FontDescription; с 1.21.11 сам идентификатор
+            // переименован в Identifier.
+            //#if MC>=12111
+            //$$ return base.withFont(new net.minecraft.network.chat.FontDescription.Resource(
+            //$$         net.minecraft.resources.Identifier.tryParse(font)));
+            //#elseif MC>=12109
+            //$$ return base.withFont(new net.minecraft.network.chat.FontDescription.Resource(
+            //$$         net.minecraft.resources.ResourceLocation.tryParse(font)));
+            //#else
+            return base.withFont(net.minecraft.resources.ResourceLocation.tryParse(font));
+            //#endif
+        } catch (RuntimeException e) {
+            return base;
+        }
+    }
+
     private static Style withLink(Style base, String url) {
+        // `cmd:` — кнопка меню разбора: клик выполняет команду, а не открывает
+        // адрес. Схема живёт в самой ссылке, чтобы core не знал про платформы.
+        if (url.startsWith("cmd:")) {
+            return withCommand(base, url.substring(4));
+        }
         //#if MC>=12105
         //$$ return base.withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(url)))
         //$$         .withHoverEvent(new HoverEvent.ShowText(Component.literal(url)));
@@ -62,6 +95,20 @@ final class ModText {
         //$$ return base.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, url))
         //$$         .withHoverEvent(new HoverEvent(
         //$$                 HoverEvent.Action.SHOW_TEXT, new net.minecraft.network.chat.TextComponent(url)));
+        //#endif
+    }
+
+    private static Style withCommand(Style base, String command) {
+        //#if MC>=12105
+        //$$ return base.withClickEvent(new ClickEvent.RunCommand(command))
+        //$$         .withHoverEvent(new HoverEvent.ShowText(Component.literal(command)));
+        //#elseif MC>=11900
+        return base.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(command)));
+        //#else
+        //$$ return base.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
+        //$$         .withHoverEvent(new HoverEvent(
+        //$$                 HoverEvent.Action.SHOW_TEXT, new net.minecraft.network.chat.TextComponent(command)));
         //#endif
     }
 

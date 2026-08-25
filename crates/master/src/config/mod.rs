@@ -36,10 +36,6 @@ pub struct Config {
     /// Имя инстанса — для заголовков и писем.
     pub instance_name: String,
 
-    /// Discord OAuth. Секрет остаётся в env, id переезжает в БД.
-    pub discord_client_id: String,
-    pub discord_client_secret: String,
-
     pub curseforge_api_key: Option<String>,
 
     /// ed25519 приватный ключ (hex, 32 байта seed). Если пусто — dev-режим.
@@ -76,14 +72,6 @@ impl Config {
         format!("{}/api/textures/default-skin", self.public_url)
     }
 
-    pub fn discord_redirect_uri(&self) -> String {
-        format!("{}/auth/discord/callback", self.public_url)
-    }
-
-    pub fn discord_launcher_redirect_uri(&self) -> String {
-        format!("{}/auth/discord/launcher/callback", self.public_url)
-    }
-
     pub fn is_dev_signing(&self) -> bool {
         self.signing_key_hex.is_none()
     }
@@ -112,8 +100,6 @@ impl Config {
             public_url: public_url.trim_end_matches('/').to_string(),
             web_url: "https://example.dev".into(),
             instance_name: "Noro Test".into(),
-            discord_client_id: "test-id".into(),
-            discord_client_secret: "test-secret".into(),
             curseforge_api_key: None,
             signing_key_hex: None,
             github_repo: None,

@@ -19,7 +19,7 @@ const canForce = computed(() => auth.hasPermission('noro.admin.support.logs.forc
 
 async function loadServers() {
   try {
-    servers.value = (await auth.request<ServerRow[]>('/api/admin/servers')) ?? []
+    servers.value = (await auth.requestList<ServerRow>('/api/admin/servers')) ?? []
   } catch (e) {
     // Ignore error
   }

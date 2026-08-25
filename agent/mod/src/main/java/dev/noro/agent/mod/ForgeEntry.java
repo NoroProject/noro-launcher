@@ -101,10 +101,19 @@
 //$$         runtime.registerCommands(event.getDispatcher());
 //$$     }
 //$$
-//$$     /** Мут: сообщение отменяется до того, как его увидит чей-либо чат-мод. */
+//$$     /**
+//$$      * Мут и буфер разговора: см. пояснение в NeoForgeEntry — без записи в
+//$$      * кольцо срез чата на этой платформе всегда пустой.
+//$$      */
 //$$     @SubscribeEvent
 //$$     public void onChat(ServerChatEvent event) {
-//$$         if (runtime.silenced(event.getPlayer())) {
+//$$         // До 1.19.1 сообщение приходило строкой, дальше — компонентом.
+//#if MC>=11901
+//$$         String text = event.getMessage().getString();
+//#else
+//$$         String text = event.getMessage();
+//#endif
+//$$         if (runtime.checkChatMessage(event.getPlayer(), text)) {
 //$$             event.setCanceled(true);
 //$$         }
 //$$     }

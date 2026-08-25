@@ -56,4 +56,6 @@ pub struct NewPunishment<'a> {
     pub expires_at: Option<DateTime<Utc>>,
     pub rule_id: Option<Uuid>,
     pub rule_code: Option<&'a str>,
+    /// Разбор, из которого выдали. `None` — наказание вне дела.
+    pub case_id: Option<Uuid>,
 }

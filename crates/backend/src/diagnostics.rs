@@ -63,7 +63,13 @@ fn free_space_mb(path: &Path) -> u64 {
             if libc::statvfs(c_path.as_ptr(), &mut stat) != 0 {
                 return 0;
             }
-            (stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64) / 1_048_576
+            // Ширина полей `statvfs` у платформ разная: на macOS `f_bavail` —
+            // 32-битный, на Linux оба поля уже 64-битные. Приведение нужно там
+            // и лишнее здесь, поэтому lint глушится, а не «исправляется»:
+            // любая правка под одну платформу ломает сборку под другую.
+            #[allow(clippy::unnecessary_cast)]
+            let free = (stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64);
+            free / 1_048_576
         }
     }
     #[cfg(not(unix))]

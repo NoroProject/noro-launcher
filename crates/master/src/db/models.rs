@@ -8,9 +8,6 @@ use uuid::Uuid;
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct UserRow {
     pub id: Uuid,
-    pub discord_id: Option<String>,
-    pub discord_username: Option<String>,
-    pub discord_avatar: Option<String>,
     pub mc_uuid: Uuid,
     pub mc_username: String,
     pub skin_url: Option<String>,
@@ -48,6 +45,8 @@ pub struct RoleRow {
     pub prefix: Option<String>,
     pub suffix: Option<String>,
     pub parent_id: Option<Uuid>,
+    /// Своя картинка плашки. Пусто — рисуем сами.
+    pub badge_sha1: Option<String>,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize)]

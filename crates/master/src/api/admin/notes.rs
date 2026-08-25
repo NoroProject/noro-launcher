@@ -1,10 +1,11 @@
 //! Админ: заметки и журнал запусков на карточке игрока.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::{Page, PageQuery};
 use crate::db::notes::{NoteRow, PlaySessionRow};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use schema::{
     PERM_USERS_JOURNAL, PERM_USERS_NOTES_DELETE, PERM_USERS_NOTES_VIEW, PERM_USERS_NOTES_WRITE,
@@ -18,9 +19,11 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
     Path(id): Path<Uuid>,
-) -> AppResult<Json<Vec<NoteRow>>> {
+    Query(page): Query<PageQuery>,
+) -> AppResult<Json<Page<NoteRow>>> {
     admin.require(PERM_USERS_NOTES_VIEW)?;
-    Ok(Json(crate::db::list_notes(&state.db, id).await?))
+    let (items, total) = crate::db::list_notes(&state.db, id, page.limit(), page.offset()).await?;
+    Ok(Json(Page::new(items, total)))
 }
 
 #[derive(Deserialize)]

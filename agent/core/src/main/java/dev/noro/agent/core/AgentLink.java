@@ -53,6 +53,16 @@ public final class AgentLink implements AutoCloseable {
         default void onMaintenanceStart(int countdownSeconds, String reason) {}
 
         default void onMaintenanceCancel() {}
+
+        /** Дело отдали модератору — включить режим разбора. */
+        default void onCaseAssigned(CaseSession session, UUID moderator) {}
+
+        /** Дело отпустили или закрыли. */
+        default void onCaseFinished(UUID moderator, UUID caseId, boolean closed) {}
+
+        default void onCaseChatRequest(UUID caseId, int beforeSecs) {}
+
+        default void onCaseInventoryRequest(UUID caseId, UUID target) {}
     }
 
     private final AgentConfig config;

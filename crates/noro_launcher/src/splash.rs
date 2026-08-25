@@ -138,6 +138,9 @@ impl gpui::AssetSource for SplashAssetSource {
     }
 }
 
+/// Что позвать, когда работа закончилась, но окно ещё живо.
+pub type OnDone<T> = Box<dyn FnOnce(&T) + Send + 'static>;
+
 /// Показать окно и держать его, пока `work` не закончит. Возвращает результат
 /// работы: сама закачка идёт в фоне, GPUI требует главный поток себе.
 ///
@@ -149,7 +152,7 @@ impl gpui::AssetSource for SplashAssetSource {
 pub fn run_with<T, F>(
     rx: UnboundedReceiver<Progress>,
     work: F,
-    on_done: Option<Box<dyn FnOnce(&T) + Send + 'static>>,
+    on_done: Option<OnDone<T>>,
 ) -> Option<T>
 where
     T: Send + 'static,
@@ -191,7 +194,7 @@ where
             });
             cx.spawn(async move |cx| {
                 quit.await;
-                let _ = cx.update(|cx| cx.quit());
+                cx.update(|cx| cx.quit());
             })
             .detach();
         });

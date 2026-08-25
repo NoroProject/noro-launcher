@@ -63,7 +63,7 @@ export function useAdminServerBase() {
   
   const serversData = useAsyncData(
     "admin-server-list-for-edit",
-    () => auth.request<ServerRow[]>("/api/admin/servers"),
+    () => auth.requestList<ServerRow>("/api/admin/servers"),
     { default: () => [] },
   );
   const servers = serversData.data;

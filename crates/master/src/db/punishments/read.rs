@@ -17,6 +17,17 @@ pub async fn list_punishments(pool: &PgPool, user_id: Uuid) -> Result<Vec<Punish
     .await?)
 }
 
+/// Наказания одного разбора. Их бывает несколько: мут за чат и бан за чит
+/// выдаются по одному делу.
+pub async fn list_by_case(pool: &PgPool, case_id: Uuid) -> Result<Vec<PunishmentRow>> {
+    Ok(sqlx::query_as::<_, PunishmentRow>(
+        "SELECT * FROM punishments WHERE case_id = $1 ORDER BY created_at",
+    )
+    .bind(case_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 pub async fn punishment_by_id(pool: &PgPool, id: Uuid) -> Result<Option<PunishmentRow>> {
     Ok(
         sqlx::query_as::<_, PunishmentRow>("SELECT * FROM punishments WHERE id = $1")

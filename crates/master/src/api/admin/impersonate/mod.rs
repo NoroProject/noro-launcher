@@ -75,7 +75,13 @@ pub async fn start(
         ));
     }
     if !crate::db::step_up_active(&state.db, actor_id).await? {
-        return Err(AppError::Forbidden("step_up_required".into()));
+        // Отдельный код, а не текст: по нему админка открывает подтверждение
+        // passkey. Раньше она искала подстроку в сообщении об ошибке.
+        return Err(AppError::coded(
+            axum::http::StatusCode::FORBIDDEN,
+            crate::error_codes::STEP_UP_REQUIRED,
+            "confirm it is you before acting as someone else",
+        ));
     }
 
     let grant = crate::db::create_grant(&state.db, actor_id, target_id, reason).await?;

@@ -2,13 +2,16 @@
 //! т.к. компиляция идёт без живой БД.
 
 pub mod audit;
+pub mod auth_methods;
 pub mod blocklist;
 pub mod build_copy;
 pub mod capes;
+pub mod cases;
 pub mod cleanup;
 pub mod freezes;
 pub mod game_servers;
 pub mod game_sessions;
+pub mod identities;
 pub mod impersonation;
 pub mod instance;
 pub mod integrity;
@@ -19,6 +22,7 @@ pub mod mod_suggestions;
 pub mod models;
 pub mod notes;
 pub mod oauth2;
+pub mod oauth_apps;
 pub mod passkeys;
 pub mod punishments;
 pub mod queries;
@@ -36,6 +40,7 @@ pub use audit::*;
 pub use blocklist::*;
 pub use build_copy::*;
 pub use capes::*;
+pub use cases::*;
 pub use freezes::*;
 pub use game_servers::*;
 pub use game_sessions::*;
@@ -48,6 +53,7 @@ pub use log_requests::*;
 pub use mod_suggestions::*;
 pub use notes::*;
 pub use oauth2::*;
+pub use oauth_apps::*;
 pub use passkeys::*;
 pub use punishments::*;
 pub use queries::*;
@@ -86,6 +92,20 @@ pub async fn connect_and_migrate(database_url: &str) -> Result<PgPool> {
 
     tracing::info!("миграции применены");
     Ok(pool)
+}
+
+/// Самая свежая миграция, зашитая в этот бинарник.
+///
+/// Нужна бэкапу: дамп со схемой 62 нельзя лить в мастер, который знает 58.
+/// Миграции вперёд не откатываются, и он поднялся бы на данных, которых не
+/// понимает. Считается из тех же файлов, что применяет `connect_and_migrate`,
+/// поэтому разъехаться с реальностью не может.
+pub fn known_schema_version() -> i64 {
+    sqlx::migrate!("./migrations")
+        .iter()
+        .map(|m| m.version)
+        .max()
+        .unwrap_or(0)
 }
 
 #[cfg(test)]

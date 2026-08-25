@@ -111,7 +111,7 @@ onMounted(() => load())
     <!-- Integrity alert banner if flags exist -->
     <NuxtLink
       v-if="status?.open_integrity_flags"
-      to="/admin/integrity"
+      :to="adminLink.integrity()"
       class="flex items-center justify-between rounded-xl border border-[color-mix(in_srgb,var(--noro-magenta)_30%,transparent)] bg-[color-mix(in_srgb,var(--noro-magenta)_10%,transparent)] px-3 py-2 text-xs font-semibold text-[var(--noro-magenta)] transition hover:bg-[color-mix(in_srgb,var(--noro-magenta)_18%,transparent)]"
     >
       <span class="flex items-center gap-2">

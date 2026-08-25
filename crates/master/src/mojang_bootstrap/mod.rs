@@ -70,13 +70,15 @@ impl<'a> BootstrapCtx<'a> {
 
         crate::db::upsert_base_build_file(
             &self.state.db,
-            self.base_build_id,
-            path,
-            &stored.sha1,
-            stored.size as i64,
-            side,
-            crate::manifest::kind_to_str(kind),
-            platform_tag(kind, self.platform),
+            crate::db::BaseBuildFile {
+                base_build_id: self.base_build_id,
+                path,
+                sha1: &stored.sha1,
+                size: stored.size as i64,
+                side,
+                kind: crate::manifest::kind_to_str(kind),
+                platform: platform_tag(kind, self.platform),
+            },
         )
         .await?;
         Ok(())
@@ -99,13 +101,15 @@ impl<'a> BootstrapCtx<'a> {
         };
         crate::db::upsert_base_build_file(
             &self.state.db,
-            self.base_build_id,
-            path,
-            &stored.sha1,
-            stored.size as i64,
-            side,
-            crate::manifest::kind_to_str(kind),
-            platform_tag(kind, self.platform),
+            crate::db::BaseBuildFile {
+                base_build_id: self.base_build_id,
+                path,
+                sha1: &stored.sha1,
+                size: stored.size as i64,
+                side,
+                kind: crate::manifest::kind_to_str(kind),
+                platform: platform_tag(kind, self.platform),
+            },
         )
         .await?;
         Ok(stored.sha1)
@@ -194,13 +198,15 @@ where
     // Временная запись — чтобы получить UUID для файлов.
     let base_build_id = crate::db::upsert_base_build(
         &state.db,
-        mc_version,
-        modloader,
-        modloader_version,
-        "",
-        &serde_json::Value::Array(Vec::new()),
-        &serde_json::Value::Array(Vec::new()),
-        "",
+        crate::db::BaseBuild {
+            mc_version,
+            modloader,
+            modloader_version,
+            main_class: "",
+            jvm_args: &serde_json::Value::Array(Vec::new()),
+            game_args: &serde_json::Value::Array(Vec::new()),
+            assets_index_name: "",
+        },
     )
     .await?;
 
@@ -244,21 +250,26 @@ where
     // Сохраняем итоговые аргументы и mainClass.
     crate::db::upsert_base_build(
         &state.db,
-        mc_version,
-        modloader,
-        modloader_version,
-        &ctx.main_class,
-        &serde_json::to_value(&ctx.jvm_args)?,
-        &serde_json::to_value(&ctx.game_args)?,
-        &ctx.assets_index_name,
+        crate::db::BaseBuild {
+            mc_version,
+            modloader,
+            modloader_version,
+            main_class: &ctx.main_class,
+            jvm_args: &serde_json::to_value(&ctx.jvm_args)?,
+            game_args: &serde_json::to_value(&ctx.game_args)?,
+            assets_index_name: &ctx.assets_index_name,
+        },
     )
     .await?;
 
     ctx.logf("Глобальный bootstrap завершён");
 
     // Возвращаем обновленный base_build.
-    let base = crate::db::get_base_build(&state.db, mc_version, modloader, modloader_version)
+    // Строку только что записали выше. Если её всё-таки нет — это наша поломка,
+    // и сказать о ней надо ошибкой, а не паникой посреди сборки.
+    crate::db::get_base_build(&state.db, mc_version, modloader, modloader_version)
         .await?
-        .unwrap();
-    Ok(base)
+        .ok_or_else(|| {
+            anyhow::anyhow!("base_build {mc_version}/{modloader} пропал сразу после записи")
+        })
 }

@@ -90,6 +90,9 @@ fn auth_content(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
+/// Кнопка входа ровно одна: способов авторизации стало много, и все они на
+/// сайте. Держать их список ещё и здесь значило бы обновлять лаунчер каждый
+/// раз, когда оператор включает новую платформу.
 fn login_buttons(logging_in: bool, cx: &mut Cx) -> AnyElement {
     if logging_in {
         return waiting_box();
@@ -102,7 +105,7 @@ fn login_buttons(logging_in: bool, cx: &mut Cx) -> AnyElement {
         .gap(px(12.))
         .child(
             div()
-                .id("discord-login-btn")
+                .id("web-login-btn")
                 .h(px(48.))
                 .w_full()
                 .rounded(px(R_MD))
@@ -124,37 +127,17 @@ fn login_buttons(logging_in: bool, cx: &mut Cx) -> AnyElement {
                         .text_size(px(14.))
                         .font_weight(FontWeight::BOLD)
                         .text_color(rgb(ON_CTA))
-                        .child(t("login-sign-in-discord")),
+                        .child(t("login-sign-in-web")),
                 ),
         )
         .child(
             div()
-                .id("web-login-btn")
-                .h(px(48.))
-                .w_full()
-                .rounded(px(R_MD))
-                .bg(rgb(BG_CARD))
-                .border_1()
-                .border_color(rgb(BORDER))
-                .hover(|s| s.border_color(rgb(CTA)).bg(rgb(BG_INPUT)))
-                .cursor_pointer()
-                .flex()
-                .items_center()
-                .justify_center()
-                .gap(px(10.))
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.start_oauth2_login();
-                    cx.notify();
-                }))
-                .child(ic("key-round", 20., CTA))
-                .child(
-                    div()
-                        .font_family(FONT_PIXEL_ALT)
-                        .text_size(px(14.))
-                        .font_weight(FontWeight::BOLD)
-                        .text_color(rgb(TEXT_PRIMARY))
-                        .child(t("login-sign-in-passkey")),
-                ),
+                .text_center()
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(11.))
+                .line_height(px(16.))
+                .text_color(rgb(TEXT_MUTED))
+                .child(t("login-web-hint")),
         )
         .into_any_element()
 }

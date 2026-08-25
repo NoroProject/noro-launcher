@@ -6,6 +6,7 @@
 //! ограниченный опциональный мод — право на него.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::Page;
 use crate::error::AppResult;
 use crate::state::AppState;
 use axum::extract::{Query, State};
@@ -37,7 +38,7 @@ pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
     Query(query): Query<NodesQuery>,
-) -> AppResult<Json<Vec<Suggestion>>> {
+) -> AppResult<Json<Page<Suggestion>>> {
     // Подсказками пользуются и на экране ролей, и на экране пользователя,
     // поэтому одного права на серверы мало: иначе редактор ролей получал бы
     // 403 и молча терял автодополнение.
@@ -105,7 +106,7 @@ pub async fn list(
 
     out.sort_by(|a, b| a.node.cmp(&b.node));
     out.dedup_by(|a, b| a.node == b.node);
-    Ok(Json(out))
+    Ok(Json(Page::whole(out)))
 }
 
 /// Права ограниченных опциональных модов. Лежат в JSONB сборки, поэтому

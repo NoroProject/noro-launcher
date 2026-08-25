@@ -3,9 +3,8 @@ definePageMeta({ layout: 'public' })
 
 const auth = useAuth()
 const { t } = useT()
+const brand = usePublicSettings()
 const { servers, online, pending } = usePublicServers()
-
-const { data: publicSettings } = await useFetch<{ hero_image_url: string; instance_name: string }>('/api/public/settings')
 
 const target = computed(() => (auth.loggedIn.value ? '/cabinet' : '/login'))
 /** На главной — витрина, а не полный список: остальное на своей странице. */
@@ -39,20 +38,22 @@ const features = computed(() => [
           <span class="size-2 rounded-full" :class="online ? 'bg-[var(--noro-green)] shadow-[0_0_8px_var(--noro-green)]' : 'bg-[var(--noro-muted)]'" />
           {{ t('web-home-online-now', { count: online }) }}
         </div>
+        <!-- Название инстанса, а не «Noro Launcher» намертво: заголовок главной
+             — часть брендинга, и правится он там же, где логотип. -->
         <h1 class="noro-pixel text-4xl leading-none text-[var(--noro-cream)] md:text-6xl">
-          NORO LAUNCHER
+          {{ brand.instance_name }}
         </h1>
         <p class="mt-6 max-w-2xl text-lg font-medium leading-8 text-[var(--noro-text)]">
           {{ t('web-home-lead') }}
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
           <NuxtLink :to="target" class="noro-cta px-6 py-3">
-            {{ auth.loggedIn.value ? t('web-home-cta-cabinet') : t('web-home-cta-discord') }}
+            {{ auth.loggedIn.value ? t('web-home-cta-cabinet') : t('web-home-cta-sign-in') }}
           </NuxtLink>
-          <AtomButton variant="secondary" icon="i-lucide-server" to="/servers">
+          <AtomButton variant="secondary" icon="i-lucide-server" :to="link.servers()">
             {{ t('web-nav-servers') }}
           </AtomButton>
-          <AtomButton variant="ghost" icon="i-lucide-book-open" to="/rules">
+          <AtomButton variant="ghost" icon="i-lucide-book-open" :to="link.rules()">
             {{ t('web-nav-rules') }}
           </AtomButton>
         </div>
@@ -64,19 +65,10 @@ const features = computed(() => [
       </div>
 
       <!-- Right Column: Pure 3D Minecraft Character Render Showcase -->
-      <div class="group relative flex items-center justify-center">
-        <!-- Ambient Glow Backing -->
-        <div class="absolute inset-0 rounded-3xl bg-gradient-to-tr from-[var(--noro-blue)]/20 via-transparent to-[var(--noro-cream)]/20 blur-2xl transition-all duration-500 group-hover:scale-105" />
-
-        <!-- Render Container -->
-        <div class="relative overflow-hidden rounded-3xl border border-[var(--noro-border)] bg-[var(--noro-panel)] p-2 shadow-2xl transition-all duration-500 group-hover:border-[var(--noro-cream)]">
-          <img
-            :src="publicSettings?.hero_image_url || '/hero-character.jpg'"
-            alt="Minecraft 3D Character Render"
-            class="h-auto w-full rounded-2xl object-cover transition-transform duration-700 group-hover:scale-[1.02]"
-          >
-        </div>
-      </div>
+      <PublicHeroArt
+        :src="brand.hero_image_url || '/hero-character.jpg'"
+        :transparent="brand.hero_image_transparent"
+      />
     </section>
 
     <!-- Серверы -->
@@ -90,7 +82,7 @@ const features = computed(() => [
             {{ t('web-home-worlds-title') }}
           </h2>
         </div>
-        <AtomButton variant="secondary" icon-right="i-lucide-arrow-right" to="/servers">
+        <AtomButton variant="secondary" icon-right="i-lucide-arrow-right" :to="link.servers()">
           {{ t('web-home-worlds-all') }}
         </AtomButton>
       </div>
@@ -148,7 +140,7 @@ const features = computed(() => [
             {{ t('web-home-rules-text') }}
           </p>
         </div>
-        <AtomButton variant="dark" icon="i-lucide-book-open" to="/rules">
+        <AtomButton variant="dark" icon="i-lucide-book-open" :to="link.rules()">
           {{ t('web-home-rules-cta') }}
         </AtomButton>
       </div>

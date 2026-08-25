@@ -14,8 +14,8 @@ pub async fn load_image_from_url(url: String) -> Result<Arc<Image>, String> {
     }
     let (tx, rx) = tokio::sync::oneshot::channel();
     std::thread::spawn(move || {
-        let result = fetch_image(url)
-            .and_then(|image| Ok(Arc::new(Image::from_bytes(image.format, image.bytes))));
+        let result =
+            fetch_image(url).map(|image| Arc::new(Image::from_bytes(image.format, image.bytes)));
         let _ = tx.send(result);
     });
     rx.await.map_err(|_| "image loader stopped".to_string())?

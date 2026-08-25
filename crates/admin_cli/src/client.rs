@@ -134,10 +134,45 @@ impl Client {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
         if !status.is_success() {
-            bail!("HTTP {status}: {text}");
+            bail!("HTTP {status}: {}", explain(&text));
         }
         Ok(serde_json::from_str(&text).unwrap_or(Value::String(text)))
     }
+}
+
+/// Человеческая часть отказа мастера.
+///
+/// Мастер отвечает `{"error": {"code", "message"}}`. Печатать конверт целиком
+/// значит показывать администратору фигурные скобки вместо причины.
+fn explain(body: &str) -> String {
+    serde_json::from_str::<Value>(body)
+        .ok()
+        .and_then(|v| {
+            let e = v.get("error")?;
+            let message = e.get("message")?.as_str()?.to_string();
+            let mut out = match e.get("code").and_then(Value::as_str) {
+                Some(code) => format!("{message} [{code}]"),
+                None => message,
+            };
+            // Отказ по форме объясняют поля: без них остаётся «request
+            // validation failed», по которому нечего исправлять.
+            for field in e
+                .get("details")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                let (Some(name), Some(text)) = (
+                    field.get("field").and_then(Value::as_str),
+                    field.get("message").and_then(Value::as_str),
+                ) else {
+                    continue;
+                };
+                out.push_str(&format!("\n  {name}: {text}"));
+            }
+            Some(out)
+        })
+        .unwrap_or_else(|| body.to_string())
 }
 
 /// Вывести JSON красиво.

@@ -21,8 +21,7 @@ async function refresh() {
     busy.value = true
     error.value = null
     try {
-        rows.value = await auth.request<RestartSchedule[]>(
-            `/api/admin/restarts?game_server_id=${props.gameServerId}`,
+        rows.value = await auth.requestList<RestartSchedule>(`/api/admin/restarts?game_server_id=${props.gameServerId}`,
         )
     } catch (e: unknown) {
         error.value = e instanceof Error ? e.message : String(e)

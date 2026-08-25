@@ -15,6 +15,10 @@ use webauthn_rs::prelude::*;
 pub async fn login_options(
     State(state): State<AppState>,
 ) -> AppResult<Json<ChallengeRes<RequestChallengeResponse>>> {
+    // Выключенный оператором способ входа обязан быть выключен и для того, кто
+    // зовёт API напрямую, а не только для кнопки на сайте.
+    crate::api::auth::oauth::methods::require_passkey_enabled(&state).await?;
+
     let (options, auth_state) = state
         .webauthn()?
         .start_discoverable_authentication()

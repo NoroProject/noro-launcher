@@ -56,11 +56,25 @@ pub struct Ctx {
     pub running: Arc<Mutex<HashMap<Uuid, RunningGame>>>,
     pub internal: UnboundedSender<InternalEvent>,
     pub rpc: crate::discord_rpc::DiscordRpc,
+    /// Канал с клиентским модом разбора. Живёт столько же, сколько лаунчер;
+    /// слушатель поднимается только на время игры.
+    pub mod_link: crate::mod_link::ModLink,
+    /// Профиль вошедшего. Копия того, что лежит в главном цикле: панели дел он
+    /// нужен из фоновой задачи, а тянуть туда весь `BackendState` незачем.
+    pub(crate) profile: Arc<parking_lot::RwLock<Option<UserProfile>>>,
 }
 
 impl Ctx {
     pub fn send(&self, msg: MessageToFrontend) {
         self.frontend.send(msg);
+    }
+
+    pub fn profile(&self) -> Option<UserProfile> {
+        self.profile.read().clone()
+    }
+
+    pub fn set_profile(&self, user: Option<UserProfile>) {
+        *self.profile.write() = user;
     }
 }
 
@@ -160,6 +174,8 @@ async fn run(
         running: Arc::new(Mutex::new(HashMap::new())),
         internal: internal_tx,
         rpc,
+        mod_link: crate::mod_link::ModLink::default(),
+        profile: Arc::new(parking_lot::RwLock::new(None)),
     };
 
     let mut state = BackendState {
@@ -289,10 +305,10 @@ impl BackendState {
             .map(|(host, port)| ServerConnect { host, port })
     }
 
-    /// Восстановить профиль по сохранённому токену (REST /auth/me).
+    /// Восстановить профиль по сохранённому токену (REST /api/me).
     async fn restore_session(&mut self) {
         let url = format!(
-            "{}/auth/me",
+            "{}/api/me",
             self.ctx.config.get().master_url.trim_end_matches('/')
         );
         let Some(token) = &self.access_token else {
@@ -389,7 +405,7 @@ impl BackendState {
 
     async fn restore_session_no_refresh(&mut self) {
         let url = format!(
-            "{}/auth/me",
+            "{}/api/me",
             self.ctx.config.get().master_url.trim_end_matches('/')
         );
         if let Some(token) = self.access_token.clone() {
@@ -454,19 +470,37 @@ fn build_launcher_version(v: &serde_json::Value) -> serde_json::Value {
     })
 }
 
+/// Всё, что нужно, чтобы синхронизировать сборку и запустить игру.
+///
+/// Девять позиционных аргументов складывались в вызов, где `user` и `login`
+/// стояли рядом и различались только типом: перепутать их местами компилятор бы
+/// не дал, а вот `connect` и `server` — вполне.
+pub struct Launch {
+    pub ctx: Ctx,
+    pub server_id: Uuid,
+    pub manifest: BuildManifest,
+    pub user: UserProfile,
+    pub login: LoginInfo,
+    pub connect: Option<ServerConnect>,
+    pub enabled_optional: Vec<String>,
+    /// Карточка сборки — её игровые серверы уедут в servers.dat инстанса.
+    pub server: Option<ServerEntry>,
+    pub modal: bridge::ModalAction,
+}
+
 /// Запустить синхронизацию и игру в фоне.
-pub fn spawn_sync_and_launch(
-    ctx: Ctx,
-    server_id: Uuid,
-    manifest: BuildManifest,
-    user: UserProfile,
-    login: LoginInfo,
-    connect: Option<ServerConnect>,
-    enabled_optional: Vec<String>,
-    // Карточка сборки — её игровые серверы уедут в servers.dat инстанса.
-    server: Option<ServerEntry>,
-    modal: bridge::ModalAction,
-) {
+pub fn spawn_sync_and_launch(req: Launch) {
+    let Launch {
+        ctx,
+        server_id,
+        manifest,
+        user,
+        login,
+        connect,
+        enabled_optional,
+        server,
+        modal,
+    } = req;
     tokio::spawn(async move {
         let instance_dir = ctx.dirs.instance(&server_id);
 
@@ -589,6 +623,12 @@ pub fn spawn_sync_and_launch(
             .unwrap_or_else(|| "Minecraft".into());
         let online = server.as_ref().and_then(|s| s.online);
         let max_online = server.as_ref().and_then(|s| s.max_online);
+
+        // Канал с модом разбора поднимаем до запуска: мод читает файл
+        // рукопожатия на старте игры, и опоздать здесь значит остаться без
+        // панели до следующего входа.
+        ctx.mod_link.start(&ctx, instance_dir.clone()).await;
+
         match game_runner::launch(
             &ctx.http,
             &launch_config,
@@ -604,6 +644,7 @@ pub fn spawn_sync_and_launch(
                 run_game_process(ctx, server_id, server_name, online, max_online, child).await;
             }
             Err(e) => {
+                ctx.mod_link.stop().await;
                 ctx.send(MessageToFrontend::SyncFailed {
                     server_id,
                     reason: format!("запуск не удался: {e}"),
@@ -696,6 +737,10 @@ async fn run_game_process(
             }
         }
     };
+
+    // Игра закрылась — гасим канал и убираем ключ: оставить файл рукопожатия
+    // лежать значит обещать доступ, которого больше нет.
+    ctx.mod_link.stop().await;
 
     let playtime = started.elapsed().as_secs();
     ctx.running.lock().remove(&server_id);

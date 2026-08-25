@@ -115,7 +115,7 @@ pub async fn run(c: &Client, cmd: BuildCmd) -> Result<()> {
             c.upload(&format!("/api/admin/builds/{id}/import/zip"), &file, None).await?
         }
         BuildCmd::ImportProgress { id, job_id } => {
-            c.get(&format!("/api/admin/builds/{id}/import_progress/{job_id}")).await?
+            c.get(&format!("/api/admin/builds/{id}/import-progress/{job_id}")).await?
         }
         BuildCmd::OptionalMods { id } => c.get(&format!("/api/admin/builds/{id}/optional-mods")).await?,
     };

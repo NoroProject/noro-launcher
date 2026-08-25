@@ -779,6 +779,28 @@ impl LauncherUI {
                 s.syncing = false;
                 s.stage = "Launching...".into();
             }
+            MessageToFrontend::LiveSynced {
+                server_id,
+                updated,
+                locked,
+            } => {
+                // Игра запущена, и в ней появились новые паки. Само по себе это
+                // не видно: клиенту нужна перезагрузка ресурсов, а решает это
+                // игрок — посреди боя она некстати.
+                let s = self.sync.entry(server_id).or_default();
+                s.stage = if locked.is_empty() {
+                    format!(
+                        "Обновлено наборов: {}. Нажмите F3+T, чтобы применить",
+                        updated.len()
+                    )
+                } else {
+                    format!(
+                        "Обновлено наборов: {}. Ещё {} встанут при следующем запуске",
+                        updated.len(),
+                        locked.len()
+                    )
+                };
+            }
             MessageToFrontend::SyncFailed { server_id, reason } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = false;
@@ -1019,20 +1041,12 @@ impl LauncherUI {
 
     // --- Действия из UI ---
 
+    /// Вход через сайт: платформ много, и все они живут там.
     pub fn start_login(&mut self) {
         self.logging_in = true;
         self.login_error = None;
-        let modal = bridge::ModalAction::new("Discord sign in");
-        self.backend.send(MessageToBackend::StartDiscordLogin {
-            modal_action: modal,
-        });
-    }
-
-    pub fn start_oauth2_login(&mut self) {
-        self.logging_in = true;
-        self.login_error = None;
-        let modal = bridge::ModalAction::new("OAuth2 sign in");
-        self.backend.send(MessageToBackend::StartOAuth2Login {
+        let modal = bridge::ModalAction::new("Website sign in");
+        self.backend.send(MessageToBackend::StartWebLogin {
             modal_action: modal,
         });
     }
@@ -1421,7 +1435,7 @@ impl LauncherUI {
                     cx.on_release(|_: &mut ConsoleWindow, cx| {
                         if let Some(ui) = cx.try_global::<GlobalLauncherUI>() {
                             let ui = ui.0.clone();
-                            let _ = ui.update(cx, |this_ui, cx| {
+                            ui.update(cx, |this_ui, cx| {
                                 this_ui.console_window = None;
                                 cx.notify();
                             });

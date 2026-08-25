@@ -47,16 +47,19 @@ pub async fn serve_file(
     let etag = format!("\"{sha1}\"");
     let filename = download.name.as_deref().and_then(safe_filename);
 
-    let mut magic = [0u8; 8];
-    let content_type = if total >= 8
-        && file.read_exact(&mut magic).await.is_ok()
-        && &magic[0..8] == b"\x89PNG\r\n\x1a\n"
-    {
-        "image/png"
+    let mut magic = [0u8; 12];
+    let content_type = if total >= 12 && file.read_exact(&mut magic).await.is_ok() {
+        sniff_content_type(&magic)
     } else {
         "application/octet-stream"
     };
-    let _ = file.seek(std::io::SeekFrom::Start(0)).await;
+    // Не «по возможности»: без возврата в начало отдалась бы копия без первых
+    // восьми байт — с кодом 200 и правильным ETag. Лаунчер такой файл принял бы,
+    // не сошёлся по sha1 и решил, что сборку подменили.
+    if let Err(e) = file.seek(std::io::SeekFrom::Start(0)).await {
+        tracing::error!(%sha1, error = %e, "не перемотать файл в начало");
+        return (StatusCode::INTERNAL_SERVER_ERROR, "seek failed").into_response();
+    }
 
     // Совпавший ETag на content-addressed URL не может быть протухшим.
     if header_has(&headers, header::IF_NONE_MATCH, &etag) {
@@ -127,6 +130,22 @@ fn with_name(
 }
 
 /// Заголовки, общие для всех ответов: кеш, валидатор, поддержка Range.
+/// Тип картинки по первым байтам.
+///
+/// Раньше узнавался только PNG, а всё остальное уезжало как
+/// `application/octet-stream`. Для анимации это важнее, чем кажется: браузер
+/// без типа полагается на угадывание, и часть окружений (в том числе строгий
+/// CSP и `<img>` в Safari) такую картинку просто не показывает.
+fn sniff_content_type(magic: &[u8]) -> &'static str {
+    match magic {
+        m if m.starts_with(b"\x89PNG\r\n\x1a\n") => "image/png",
+        m if m.starts_with(b"GIF87a") || m.starts_with(b"GIF89a") => "image/gif",
+        m if m.starts_with(b"\xff\xd8\xff") => "image/jpeg",
+        m if m.len() >= 12 && m.starts_with(b"RIFF") && &m[8..12] == b"WEBP" => "image/webp",
+        _ => "application/octet-stream",
+    }
+}
+
 fn base(etag: &str, content_type: &str) -> axum::http::response::Builder {
     Response::builder()
         .header(header::CONTENT_TYPE, content_type)

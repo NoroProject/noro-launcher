@@ -35,11 +35,13 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
     private final RuleCatalog rules;
 
     private final VanishManager vanishManager;
+    private final Moderation moderation;
 
     ModerationCommand(MasterClient master, Moderation moderation, RuleCatalog rules, GameBridge bridge, VanishManager vanishManager, org.slf4j.Logger log) {
+        this.moderation = moderation;
         this.commands = new ModerationCommands(master, moderation, log);
         this.freezeCmd = new FreezeCommand(master, moderation, log);
-        this.reportCmd = new ReportCommand(master, log);
+        this.reportCmd = new ReportCommand(master, () -> bridge, log);
         this.checkCmd = new CheckCommand(master, log);
         this.ruleCmds = new RuleCommands(rules);
         this.bridge = bridge;
@@ -64,6 +66,10 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
             case "freeze" -> freezeCmd.freeze(actor, args, lang);
             case "unfreeze" -> freezeCmd.unfreeze(actor, args, lang);
             case "report" -> reportCmd.execute(actor, args, lang);
+            // Клик по меню разбора приходит сюда же, что и набранная команда.
+            case "case" -> new dev.noro.agent.core.CaseCommands(
+                            moderation.cases(), bridge, moderation.events(), freezeCmd)
+                    .execute(actor, args, lang);
             case "vanish", "v" -> {
                 if (sender instanceof org.bukkit.entity.Player p) {
                     if (args.length > 0 && args[0].equalsIgnoreCase("list")) {
@@ -122,6 +128,6 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
 
     /** Имена, которые надо объявить в {@code plugin.yml}. */
     static List<String> names() {
-        return List.of("ban", "serverban", "mute", "warn", "unban", "unmute", "history", "check", "rules", "rule", "freeze", "unfreeze", "report", "vanish", "v");
+        return List.of("ban", "serverban", "mute", "warn", "unban", "unmute", "history", "check", "rules", "rule", "freeze", "unfreeze", "report", "vanish", "v", "case");
     }
 }

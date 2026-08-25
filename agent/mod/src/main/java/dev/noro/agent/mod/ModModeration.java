@@ -42,6 +42,11 @@ final class ModModeration implements AutoCloseable {
         this.moderation = new Moderation(new ModerationClient(http), client, rules, log);
     }
 
+    /** Мост к игре. {@code null}, пока сервер не запустился. */
+    ModBridge bridge() {
+        return bridge;
+    }
+
     /** Сервер запустился: с этого момента есть кого кикать и кому писать. */
     void start(MinecraftServer server) {
         ModVanishManager.getInstance().setServer(server);
@@ -50,6 +55,14 @@ final class ModModeration implements AutoCloseable {
         rules.refresh();
         link = new AgentLink(http, moderation, log);
         link.start();
+        // Разбор жалоб живёт поверх канала: меню приходит кадром, а действия
+        // уходят обратно, поэтому подключается он после его открытия.
+        moderation.attachCases(bridge, link.events(), (who, on) -> {
+            ServerPlayer player = server.getPlayerList().getPlayer(who);
+            if (player != null) {
+                ModVanishManager.getInstance().setVanish(player, on, null);
+            }
+        });
     }
 
     /**
@@ -60,6 +73,11 @@ final class ModModeration implements AutoCloseable {
     AgentEvents events() {
         AgentLink current = link;
         return current == null ? null : current.events();
+    }
+
+    /** Короткое окно чата: срез уезжает в дело, когда появился повод. */
+    dev.noro.agent.core.ChatRing chatRing() {
+        return moderation.chatRing();
     }
 
     /** Дерево команд собирается на каждом лоадере своим событием. */

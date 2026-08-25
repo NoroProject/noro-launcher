@@ -18,7 +18,9 @@ const body = ref('')
 const busy = ref(false)
 
 const load = async () => {
-  rows.value = await auth.request<Note[]>(`/api/admin/users/${props.userId}/notes`)
+  // Список отдаётся страницей `{items, total}`: у постоянного нарушителя заметок
+  // больше, чем помещалось в прежний зашитый лимит.
+  rows.value = await auth.requestList<Note>(`/api/admin/users/${props.userId}/notes`)
 }
 
 async function add() {

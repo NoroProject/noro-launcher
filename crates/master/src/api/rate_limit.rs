@@ -4,8 +4,9 @@
 //! passkeys. Yggdrasil сюда намеренно не входит — его зовёт игровой сервер при
 //! каждом заходе игрока, и лимит там резал бы вход в игру, а не перебор.
 
+use crate::error::AppError;
 use axum::extract::{ConnectInfo, Request, State};
-use axum::http::StatusCode;
+use axum::http::{header, HeaderValue, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use dashmap::DashMap;
@@ -27,6 +28,14 @@ struct Window {
     hits: u32,
 }
 
+/// Решение лимитера. `reset_after` нужен клиенту, чтобы знать, когда повторять,
+/// а не гадать: без него единственная стратегия — долбиться дальше.
+pub struct Verdict {
+    pub allowed: bool,
+    pub remaining: u32,
+    pub reset_after: u64,
+}
+
 #[derive(Default)]
 pub struct RateLimiter {
     windows: DashMap<IpAddr, Window>,
@@ -37,8 +46,7 @@ impl RateLimiter {
         Arc::new(Self::default())
     }
 
-    /// `true` — запрос в пределах лимита.
-    fn allow(&self, ip: IpAddr) -> bool {
+    fn check(&self, ip: IpAddr) -> Verdict {
         let now = Instant::now();
 
         if self.windows.len() > MAX_TRACKED_IPS {
@@ -55,7 +63,21 @@ impl RateLimiter {
             entry.hits = 0;
         }
         entry.hits += 1;
-        entry.hits <= MAX_PER_WINDOW
+
+        Verdict {
+            allowed: entry.hits <= MAX_PER_WINDOW,
+            remaining: MAX_PER_WINDOW.saturating_sub(entry.hits),
+            reset_after: WINDOW
+                .saturating_sub(now.duration_since(entry.started))
+                .as_secs()
+                .max(1),
+        }
+    }
+
+    /// `true` — запрос в пределах лимита.
+    #[cfg(test)]
+    fn allow(&self, ip: IpAddr) -> bool {
+        self.check(ip).allowed
     }
 }
 
@@ -67,15 +89,45 @@ pub async fn limit(
     next: Next,
 ) -> Response {
     let ip = client_ip(&req, peer);
-    if !limiter.allow(ip) {
+    let verdict = limiter.check(ip);
+    if !verdict.allowed {
         tracing::warn!(%ip, path = %req.uri().path(), "превышен лимит запросов");
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            "Too many requests. Try again in a minute.",
-        )
-            .into_response();
+        return too_many(&verdict);
     }
     next.run(req).await
+}
+
+/// Отказ по лимиту в том же конверте, что и любая другая ошибка API.
+///
+/// Раньше здесь была голая строка — единственный ответ мастера, который не
+/// JSON. Клиент, разбирающий тело отказа, спотыкался на нём и показывал
+/// «malformed JSON» вместо «слишком часто».
+fn too_many(verdict: &Verdict) -> Response {
+    let mut res = AppError::coded(
+        StatusCode::TOO_MANY_REQUESTS,
+        crate::error_codes::RATE_LIMITED,
+        format!(
+            "too many requests — try again in {} seconds",
+            verdict.reset_after
+        ),
+    )
+    .into_response();
+
+    let headers = res.headers_mut();
+    headers.insert(header::RETRY_AFTER, num(verdict.reset_after));
+    headers.insert("ratelimit-limit", num(MAX_PER_WINDOW as u64));
+    headers.insert("ratelimit-remaining", num(verdict.remaining as u64));
+    headers.insert("ratelimit-reset", num(verdict.reset_after));
+    res
+}
+
+/// Число в заголовок.
+///
+/// Без запасного значения: десятичная запись `u64` — всегда валидный
+/// `HeaderValue`, а подстановка «0» на отказе означала бы «повторяй немедленно»,
+/// то есть ровно противоположное тому, зачем этот заголовок нужен.
+fn num(v: u64) -> HeaderValue {
+    HeaderValue::from_str(&v.to_string()).expect("десятичное число — валидный заголовок")
 }
 
 /// Адрес клиента. Мастер стоит за Traefik, поэтому реальный IP приходит в
@@ -96,28 +148,5 @@ fn client_ip(req: &Request, peer: SocketAddr) -> IpAddr {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn ip(n: u8) -> IpAddr {
-        IpAddr::from([10, 0, 0, n])
-    }
-
-    #[test]
-    fn allows_up_to_the_cap_then_blocks() {
-        let limiter = RateLimiter::new();
-        for _ in 0..MAX_PER_WINDOW {
-            assert!(limiter.allow(ip(1)));
-        }
-        assert!(!limiter.allow(ip(1)));
-    }
-
-    #[test]
-    fn counts_each_address_separately() {
-        let limiter = RateLimiter::new();
-        for _ in 0..MAX_PER_WINDOW {
-            assert!(limiter.allow(ip(1)));
-        }
-        assert!(limiter.allow(ip(2)));
-    }
-}
+#[path = "rate_limit_tests.rs"]
+mod tests;

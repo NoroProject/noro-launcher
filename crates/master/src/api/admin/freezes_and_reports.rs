@@ -1,6 +1,7 @@
 //! Управление заморозкой игроков и репортами в админке.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::{flexible_i64, Page, PageQuery};
 use crate::audit;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -21,6 +22,10 @@ pub struct FreezeReq {
 pub struct ReportsQuery {
     #[serde(default)]
     pub open_only: bool,
+    #[serde(default, deserialize_with = "flexible_i64::deserialize")]
+    pub limit: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_i64::deserialize")]
+    pub offset: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -96,11 +101,12 @@ pub async fn list_reports(
     State(state): State<AppState>,
     admin: AdminAuth,
     Query(query): Query<ReportsQuery>,
-) -> AppResult<Json<Vec<crate::db::reports::ReportRow>>> {
+) -> AppResult<Json<Page<crate::db::reports::ReportRow>>> {
     admin.require(PERM_REPORTS_VIEW)?;
-    Ok(Json(
-        crate::db::list_reports(&state.db, query.open_only).await?,
-    ))
+    let page = PageQuery::from_parts(None, query.limit, query.offset);
+    let (items, total) =
+        crate::db::list_reports(&state.db, query.open_only, page.limit(), page.offset()).await?;
+    Ok(Json(Page::new(items, total)))
 }
 
 /// POST /api/admin/reports/{id}/claim

@@ -31,10 +31,7 @@ function isAdminRole(role: Role) {
                 class="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-white/5"
             >
                 <div class="flex min-w-0 items-center gap-3">
-                    <span
-                        class="size-3 rounded-full bg-[var(--noro-blue)]"
-                        :style="{ backgroundColor: role.color || 'var(--noro-blue)' }"
-                    />
+                    <RoleBadge :role-id="role.id" :color="role.color" :height="14" />
                     <div class="min-w-0">
                         <div class="truncate text-sm font-bold text-white">
                             {{ role.display_name }}

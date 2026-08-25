@@ -9,10 +9,12 @@ const notify = useNotify()
 await auth.loadMe()
 
 const id = computed(() => String(route.params.id))
-const { data: news, refresh } = await useAsyncData('admin-news-edit-list', () =>
-  auth.request<NewsRow[]>('/api/admin/news'), { default: () => [] }
+// Одну запись, а не весь список: со списочной пагинацией запись со второй
+// страницы в выдачу не попадала и форма открывалась пустой.
+const { data: item, refresh } = await useAsyncData(
+  () => `admin-news-${id.value}`,
+  () => auth.request<NewsRow>(`/api/admin/news/${id.value}`),
 )
-const item = computed(() => news.value.find(row => row.id === id.value))
 const form = reactive({ title: '', body: '', preview_img_url: '', pinned: false })
 const busy = ref<string | null>(null)
 
@@ -46,7 +48,7 @@ async function removeNews() {
   busy.value = 'delete'
   try {
     await auth.request(`/api/admin/news/${id.value}`, { method: 'DELETE' })
-    await navigateTo('/admin/news')
+    await navigateTo(adminLink.news())
     notify.ok()
   } catch (e) {
     notify.fail(e)

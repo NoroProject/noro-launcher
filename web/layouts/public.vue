@@ -3,7 +3,9 @@
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-[var(--noro-bg)] text-[var(--noro-text)]">
+  <!-- Без своей заливки: цвет даёт `body`, а сплошной фон здесь перекрыл бы
+       фоновый слой приложения. -->
+  <div class="flex min-h-screen flex-col text-[var(--noro-text)]">
     <PublicNavbar />
     <main class="flex-1">
       <slot />

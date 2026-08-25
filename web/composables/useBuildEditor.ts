@@ -146,7 +146,7 @@ export async function useBuildEditor() {
           importTimer = setInterval(async () => {
             try {
               const prog = await auth.request<ImportProgress>(
-                `/api/admin/builds/${buildId.value}/import_progress/${resp.job_id}`
+                `/api/admin/builds/${buildId.value}/import-progress/${resp.job_id}`
               );
               importProgress.value = prog;
               if (prog.done) {

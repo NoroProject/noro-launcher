@@ -38,7 +38,7 @@ pub fn router() -> Router<AppState> {
             post(builds::import_instance_zip),
         )
         .route(
-            "/api/admin/builds/{id}/import_progress/{job_id}",
+            "/api/admin/builds/{id}/import-progress/{job_id}",
             get(builds::import_progress),
         )
         .route(

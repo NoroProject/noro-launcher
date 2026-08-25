@@ -1,0 +1,27 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+
+[[mixins]]
+config = "noro-staff.mixins.json"
+
+[[mods]]
+modId = "noro_staff"
+version = "${version}"
+displayName = "Noro Staff"
+authors = "noro"
+description = '''Moderator tools: the case panel, evidence and review overlay.'''
+
+[[dependencies.noro_staff]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.noro_staff]]
+modId = "noro_core"
+type = "required"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "CLIENT"

@@ -36,13 +36,30 @@ pub async fn add_note(
     .await?)
 }
 
-pub async fn list_notes(pool: &PgPool, user_id: Uuid) -> Result<Vec<NoteRow>> {
-    Ok(sqlx::query_as::<_, NoteRow>(
-        "SELECT * FROM user_notes WHERE user_id = $1 ORDER BY created_at DESC LIMIT 200",
+/// Заметки о игроке со счётчиком: у постоянного нарушителя их набирается
+/// больше, чем помещалось в зашитый `LIMIT 200`, и обрезанный хвост выглядел
+/// как отсутствие записей.
+pub async fn list_notes(
+    pool: &PgPool,
+    user_id: Uuid,
+    limit: i64,
+    offset: i64,
+) -> Result<(Vec<NoteRow>, i64)> {
+    let rows = sqlx::query_as::<_, NoteRow>(
+        "SELECT * FROM user_notes WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
     )
     .bind(user_id)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
-    .await?)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM user_notes WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok((rows, total))
 }
 
 pub async fn delete_note(pool: &PgPool, id: Uuid) -> Result<bool> {

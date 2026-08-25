@@ -113,32 +113,45 @@ public final class MasterHttp {
             throw new IOException("master rejected the agent secret (HTTP 401)"
                     + " — reissue it in the build admin panel, section Game servers");
         }
-        throw new MasterRefusedException(code, explain(response.body()));
+        throw new MasterRefusedException(code, number(response.body()), explain(response.body()));
     }
 
-    /** Мастер отвечает `{"error": "..."}`; на всё остальное отдаём тело как есть. */
+    /** Номер отказа из реестра мастера; {@code 0} — его в ответе нет. */
+    private static int number(String body) {
+        try {
+            var object = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
+            if (object.has("error") && object.get("error").isJsonObject()) {
+                var error = object.getAsJsonObject("error");
+                if (error.has("number")) {
+                    return error.get("number").getAsInt();
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Не наш конверт — номера нет, и это не повод падать.
+        }
+        return 0;
+    }
+
+    /**
+     * Мастер отвечает `{"error": {"code": "...", "message": "..."}}`; на всё
+     * остальное отдаём тело как есть.
+     *
+     * Модератору в чат идёт `message`: он уже без служебного слова вроде
+     * «forbidden», потому что вид отказа переехал в `code`. Отрезать префикс
+     * здесь, как раньше, больше не нужно.
+     */
     private static String explain(String body) {
         try {
             var object = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
-            if (object.has("error")) {
-                return strip(object.get("error").getAsString());
+            if (object.has("error") && object.get("error").isJsonObject()) {
+                var error = object.getAsJsonObject("error");
+                if (error.has("message")) {
+                    return error.get("message").getAsString();
+                }
             }
         } catch (RuntimeException ignored) {
             // Не JSON — значит показываем сырое тело, оно всё равно информативнее.
         }
         return body;
-    }
-
-    /**
-     * Мастер печатает вид ошибки в самом тексте («forbidden: …»). В чате это
-     * шум: код ответа модератору ничего не говорит, а причина — говорит.
-     */
-    private static String strip(String message) {
-        for (String prefix : new String[] {"forbidden: ", "bad request: ", "not found: ", "conflict: "}) {
-            if (message.startsWith(prefix)) {
-                return message.substring(prefix.length());
-            }
-        }
-        return message;
     }
 }

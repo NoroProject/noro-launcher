@@ -9,6 +9,9 @@ impl LauncherUI {
             return;
         };
 
+        // Забираем до того, как поля профиля разъедутся по замыканиям ниже.
+        let avatar_url = user.avatar_url().map(str::to_string);
+
         // Invalidate on texture change (new url after an upload).
         if self.skin_url != user.skin_url {
             self.skin_url = user.skin_url.clone();
@@ -59,7 +62,7 @@ impl LauncherUI {
             .detach();
         }
 
-        self.load_avatar(user.discord_avatar, cx);
+        self.load_avatar(avatar_url, cx);
     }
 
     fn load_avatar(&mut self, avatar_url: Option<String>, cx: &mut Context<Self>) {

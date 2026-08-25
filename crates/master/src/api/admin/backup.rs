@@ -1,21 +1,27 @@
-//! Выгрузка дампа БД мастера.
+//! Выгрузка резервной копии мастера.
 //!
 //! Игровые сервера бэкапятся через враппер, а сама база — нет, хотя в ней
 //! личности, привязка Discord→MC, права, скины и плащи. Потеря тома означала бы,
 //! что у всех игроков одновременно слетают доступы и косметика.
 //!
-//! Дамп никуда не сохраняется на сервере: он стримится в ответ и оседает у
-//! администратора. Копия на том же томе, что и данные, не пережила бы ровно тот
-//! отказ, ради которого делается.
+//! Две ручки: `backup` — только дамп БД, `backup/full` — архив целиком, вместе
+//! с файлами `NORO_DATA_DIR` и подписью. Первая осталась как быстрый способ
+//! забрать одну базу, когда файлы копируются иначе.
+//!
+//! Ничего не сохраняется на сервере: и то и другое стримится в ответ и оседает
+//! у администратора. Копия на том же томе, что и данные, не пережила бы ровно
+//! тот отказ, ради которого делается.
 
 use crate::api::auth::AdminAuth;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::body::Body;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::header;
 use axum::response::Response;
+use axum::Json;
 use schema::PERM_BACKUP;
+use serde_json::{json, Value};
 
 use tokio::process::Command;
 
@@ -74,4 +80,32 @@ pub async fn download(State(state): State<AppState>, admin: AdminAuth) -> AppRes
         )
         .body(Body::from_stream(tokio_util::io::ReaderStream::new(stdout)))
         .map_err(|e| AppError::Other(e.into()))
+}
+
+/// `GET /api/admin/backup/full` — `noro-backup-{дата}.tar.gz`: дамп, файлы
+/// данных, паспорт и подпись. Для скриптов и CLI, где заголовок поставить есть кому.
+pub async fn full(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Response> {
+    admin.require(PERM_BACKUP)?;
+    crate::backup::build::run(&state).await
+}
+
+/// `POST /api/admin/backup/ticket` — одноразовая ссылка для браузера.
+pub async fn ticket(admin: AdminAuth) -> AppResult<Json<Value>> {
+    admin.require(PERM_BACKUP)?;
+    Ok(Json(json!({ "ticket": crate::backup::ticket::issue() })))
+}
+
+/// `GET /api/admin/backup/full/{ticket}` — то же самое, но без заголовка:
+/// браузер идёт по ссылке сам и качает потоком на диск. Право проверено при
+/// выдаче билета, здесь остаётся только погасить его.
+pub async fn full_by_ticket(
+    State(state): State<AppState>,
+    Path(ticket): Path<uuid::Uuid>,
+) -> AppResult<Response> {
+    if !crate::backup::ticket::consume(ticket) {
+        return Err(AppError::Forbidden(
+            "ссылка недействительна или просрочена — нажмите кнопку ещё раз".into(),
+        ));
+    }
+    crate::backup::build::run(&state).await
 }

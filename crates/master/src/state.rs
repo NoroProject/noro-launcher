@@ -12,6 +12,8 @@ use std::sync::Arc;
 pub struct AppState {
     pub db: PgPool,
     pub ws: WsHub,
+    /// Открытые вкладки админки. Отдельно от лаунчеров: кадры у них разные.
+    pub admin_ws: crate::ws::AdminHub,
     pub files: FileStore,
     pub signer: Signer25519,
     /// RSA-подпись профилей Yggdrasil — без неё игроки не видят чужие скины.
@@ -46,5 +48,33 @@ impl AppState {
                 "passkeys need the public website and API addresses to be set".into(),
             )
         })
+    }
+
+    /// Работают ли сторонние OAuth2-приложения.
+    ///
+    /// Читается из БД на каждый вход, а не из конфига при старте: выключатель
+    /// нужен ровно в тот момент, когда чужое приложение ведёт себя плохо, и
+    /// ждать перезапуска мастера тогда неуместно. Официальных не касается.
+    pub async fn oauth_apps_enabled(&self) -> bool {
+        self.flag(crate::config::keys::OAUTH_APPS_ENABLED).await
+    }
+
+    /// Можно ли игрокам заводить новые приложения.
+    pub async fn oauth_apps_creation_enabled(&self) -> bool {
+        self.flag(crate::config::keys::OAUTH_APPS_CREATION).await
+    }
+
+    /// Булев тумблер инстанса. Умолчание — «включено»: инстанс без записи в
+    /// таблице ведёт себя как до появления выключателя.
+    async fn flag(&self, key: &str) -> bool {
+        match crate::db::get_setting(&self.db, key).await {
+            Ok(Some(serde_json::Value::Bool(v))) => v,
+            Ok(Some(serde_json::Value::String(s))) => s != "false",
+            Ok(_) => true,
+            Err(e) => {
+                tracing::warn!("не прочитать настройку {key}: {e:#} — считаю включённой");
+                true
+            }
+        }
     }
 }

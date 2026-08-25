@@ -17,7 +17,12 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
     private final MuteSync sync;
     private final MaintenanceCountdown maintenanceCountdown;
     private final ChatFilters chatFilters;
+    /** Короткое окно чата: срез уезжает в дело, когда появился повод. */
+    private final ChatRing chatRing = new ChatRing();
     private final Logger log;
+    /** Разбор жалоб в игре. Появляется вместе с мостом: без игры он бессмыслен. */
+    private CaseMode cases;
+    private AgentEvents events;
 
     /** Читают из игрового потока на каждый отказ, пишут при обновлении с мастера. */
     private volatile MessageTemplates templates = MessageTemplates.defaults();
@@ -43,6 +48,28 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
         sync.start();
         chatFilters.refresh();
         NoroAgentApi.attachMutes((uuid, actionbar) -> muteNotice(uuid, nameOf(uuid), actionbar));
+    }
+
+    /**
+     * Подключить разбор жалоб. Отдельно от {@link #attach}: события канала
+     * нужны разбору, а канал открывается уже после моста.
+     */
+    public void attachCases(GameBridge bridge, AgentEvents events, CaseMode.VanishBridge vanish) {
+        this.events = events;
+        this.cases = new CaseMode(bridge, events, chatRing, vanish);
+    }
+
+    public CaseMode cases() {
+        return cases;
+    }
+
+    /** События канала: их шлёт разбор, когда модератор что-то делает. */
+    public AgentEvents events() {
+        return events;
+    }
+
+    public ChatRing chatRing() {
+        return chatRing;
     }
 
     private static String nameOf(UUID uuid) {
@@ -233,6 +260,40 @@ public final class Moderation implements AgentLink.Listener, AutoCloseable {
     public void onRestartNotice(int seconds, String reason) {
         GameBridge bridge = applier == null ? null : applier.bridge();
         maintenanceCountdown.start(seconds, "[RESTART] " + (reason == null ? "Planned restart" : reason), bridge, templates);
+    }
+
+    @Override
+    public void onCaseAssigned(CaseSession session, UUID moderator) {
+        if (cases != null && moderator != null) {
+            cases.assigned(session, moderator, langOf(moderator));
+        }
+    }
+
+    @Override
+    public void onCaseFinished(UUID moderator, UUID caseId, boolean closed) {
+        if (cases != null && moderator != null && caseId != null) {
+            cases.finished(moderator, caseId, closed, langOf(moderator));
+        }
+    }
+
+    @Override
+    public void onCaseChatRequest(UUID caseId, int beforeSecs) {
+        if (cases != null) {
+            cases.sendChatSlice(caseId, beforeSecs);
+        }
+    }
+
+    @Override
+    public void onCaseInventoryRequest(UUID caseId, UUID target) {
+        if (cases != null) {
+            cases.sendInventory(caseId, target, null);
+        }
+    }
+
+    /** Язык игрока: профиль знает его, иначе английский. */
+    private static String langOf(UUID uuid) {
+        PlayerProfile profile = NoroAgentApi.profile(uuid);
+        return profile == null || profile.locale() == null ? "en" : profile.locale();
     }
 
     @Override

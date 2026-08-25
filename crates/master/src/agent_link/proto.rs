@@ -81,6 +81,41 @@ pub enum ToAgent {
     },
     /// Техработы отменены.
     MaintenanceCancel,
+    /// Дело взяли в работу — выдать модератору режим разбора, если он в игре.
+    ///
+    /// Всё нужное для меню едет кадром: агент не ходит на мастер за карточкой,
+    /// иначе меню открывалось бы с задержкой ровно тогда, когда сервер занят.
+    CaseAssigned {
+        case: Uuid,
+        target: Uuid,
+        target_name: String,
+        moderator: Uuid,
+        reason: String,
+        world: Option<String>,
+        x: Option<f64>,
+        y: Option<f64>,
+        z: Option<f64>,
+        reporter: Option<Uuid>,
+        reporter_name: Option<String>,
+    },
+    /// Дело отпустили или закрыли — выйти из режима, вернуть модератора назад.
+    CaseFinished {
+        case: Uuid,
+        moderator: Uuid,
+        closed: bool,
+    },
+    /// Прислать срез чата вокруг события. `before_secs` — сколько отмотать
+    /// назад по буферу агента.
+    CaseChatRequest {
+        case: Uuid,
+        target: Uuid,
+        before_secs: u32,
+    },
+    /// Прислать снимок инвентаря цели.
+    CaseInventoryRequest {
+        case: Uuid,
+        target: Uuid,
+    },
 }
 
 /// Кадры агент → мастер.
@@ -110,4 +145,27 @@ pub enum FromAgent {
     },
     /// Игровой поток не двигался `stalled_secs` секунд.
     TickStall { stalled_secs: u32 },
+    /// Модератор взял дело из игры. Замок ставит мастер: команда в игре и
+    /// кнопка на сайте одинаково могут проиграть гонку.
+    CaseClaim { case: Uuid, moderator: Uuid },
+    /// Что модератор сделал в режиме разбора: телепорт, заморозка, слежка.
+    /// `payload` кладётся в ленту как есть — форму знает тот, кто рисует.
+    CaseAction {
+        case: Uuid,
+        moderator: Uuid,
+        kind: String,
+        #[serde(default)]
+        payload: serde_json::Value,
+    },
+    /// Срез чата по запросу или по факту жалобы.
+    CaseChatSlice {
+        case: Uuid,
+        messages: Vec<crate::db::cases::IncomingMessage>,
+    },
+    /// Снимок инвентаря цели: доказательство дюпа живёт в деле, а не в памяти.
+    CaseInventory {
+        case: Uuid,
+        moderator: Option<Uuid>,
+        items: serde_json::Value,
+    },
 }

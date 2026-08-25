@@ -22,7 +22,7 @@ const hint = computed(() => {
 </script>
 
 <template>
-  <div class="grid gap-3">
+  <div class="grid min-w-0 gap-3">
     <label class="block">
       <span class="noro-label mb-2 flex items-baseline gap-2">
         {{ t('admin-punish-duration-label') }}

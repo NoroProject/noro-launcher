@@ -21,6 +21,8 @@ interface PlaySession {
 const activeSession = ref<PlaySession | null>(null)
 const activeServerName = ref<string>('')
 const isOnline = ref(false)
+/// `false` — мастер не ответил, и про игрока мы ничего не знаем.
+const statusKnown = ref(true)
 const loading = ref(false)
 
 const kickMessage = ref('')
@@ -31,10 +33,14 @@ const busyTell = ref(false)
 
 async function checkOnlineStatus() {
   loading.value = true
+  statusKnown.value = true
   try {
+    // Без запасных пустых списков: неудавшийся запрос давал `sessions = []`,
+    // из чего панель делала вывод «игрок офлайн» и гасила кнопки. Модератор
+    // видел уверенное «Offline» там, где мастер просто не ответил.
     const [sessions, servers] = await Promise.all([
-      auth.request<PlaySession[]>(`/api/admin/users/${props.userId}/play-sessions`).catch(() => []),
-      auth.request<ServerRow[]>('/api/admin/servers').catch(() => []),
+      auth.request<PlaySession[]>(`/api/admin/users/${props.userId}/play-sessions`),
+      auth.requestList<ServerRow>('/api/admin/servers'),
     ])
     const open = sessions.find(s => s.ended_at === null)
     if (open) {
@@ -47,8 +53,11 @@ async function checkOnlineStatus() {
       activeServerName.value = ''
       isOnline.value = false
     }
-  } catch {
+  } catch (e) {
+    // Состояние неизвестно — это не то же самое, что «офлайн».
+    statusKnown.value = false
     isOnline.value = false
+    notify.fail(e)
   } finally {
     loading.value = false
   }
@@ -112,15 +121,15 @@ onMounted(() => checkOnlineStatus())
         </p>
       </div>
       <div class="flex items-center gap-3">
-        <UBadge :color="isOnline ? 'success' : 'neutral'" variant="subtle">
-          {{ isOnline ? (t('admin-game-actions-status-online', { server: activeServerName }) !== 'admin-game-actions-status-online' ? t('admin-game-actions-status-online', { server: activeServerName }) : `Онлайн на ${activeServerName}`) : t('admin-game-actions-status-offline') }}
+        <UBadge :color="!statusKnown ? 'warning' : isOnline ? 'success' : 'neutral'" variant="subtle">
+          {{ !statusKnown ? t('admin-game-actions-status-unknown') : isOnline ? t('admin-game-actions-status-online', { server: activeServerName }) : t('admin-game-actions-status-offline') }}
         </UBadge>
         <AtomButton variant="dark" icon="i-lucide-refresh-cw" :loading="loading" @click="checkOnlineStatus" />
       </div>
     </div>
 
     <!-- Offline Banner -->
-    <div v-if="!isOnline && !loading" class="rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] p-3 text-xs text-[var(--noro-muted)]">
+    <div v-if="!isOnline && statusKnown && !loading" class="rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] p-3 text-xs text-[var(--noro-muted)]">
       {{ t('admin-game-actions-offline-text', { username }) }}
     </div>
 

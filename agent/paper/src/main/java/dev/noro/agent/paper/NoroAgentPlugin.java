@@ -59,6 +59,14 @@ public final class NoroAgentPlugin extends JavaPlugin {
         link.start();
 
         VanishManager vanishManager = new VanishManager(this);
+        // Разбор жалоб живёт поверх канала: меню приходит кадром, а действия
+        // модератора уходят обратно, поэтому подключается он после его старта.
+        moderation.attachCases(bridge, link.events(), (who, on) -> {
+            org.bukkit.entity.Player player = getServer().getPlayer(who);
+            if (player != null) {
+                vanishManager.setVanish(player, on, null);
+            }
+        });
 
         getServer()
                 .getPluginManager()

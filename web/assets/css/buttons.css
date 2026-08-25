@@ -132,6 +132,25 @@
   
 }
 
+/*
+ * Тихая опасная кнопка: красный знак на почти прозрачном фоне, заливка — при
+ * наведении.
+ *
+ * Нужна там, где действие опасное, но не главное на экране: выход из аккаунта в
+ * сайдбаре, удаление в строке списка. Сплошной красный прямоугольник в таком
+ * месте перетягивает на себя весь взгляд и читается как призыв нажать.
+ */
+.noro-btn-danger-soft {
+  background: color-mix(in srgb, var(--noro-danger) 8%, transparent);
+  border-color: transparent;
+  color: var(--noro-danger);
+}
+
+.noro-btn-danger-soft:hover:not(:disabled) {
+  background: var(--noro-danger);
+  color: var(--noro-white);
+}
+
 /* Bold outline per flat design (thick border, fill on hover) */
 .noro-btn-outline {
   background: transparent;

@@ -1,6 +1,6 @@
 pub mod biometrics;
-pub mod discord_oauth;
 pub mod token_store;
+pub mod web_login;
 
-pub use discord_oauth::{login, LoginResult};
 pub use token_store::StoredAuth;
+pub use web_login::{login, LoginResult};

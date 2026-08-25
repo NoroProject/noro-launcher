@@ -29,21 +29,7 @@ fn is_junk(path: &str) -> bool {
         })
 }
 
-/// Путь внутри архива → путь внутри сборки, либо `None`, если он опасен.
-///
-/// Лаунчер разложит эти пути по диску у игрока, поэтому выход за корень
-/// сборки надо отсекать здесь, а не надеяться на клиента.
-fn safe_path(raw: &str) -> Option<String> {
-    let normalized = raw.replace('\\', "/");
-    if normalized.starts_with('/') || normalized.contains(':') {
-        return None;
-    }
-    if normalized.split('/').any(|part| part == "..") {
-        return None;
-    }
-    let trimmed = normalized.trim_start_matches("./").to_string();
-    (!trimmed.is_empty()).then_some(trimmed)
-}
+use super::safe_path;
 
 /// Если архив — это заархивированная папка сборки, отдать её префикс.
 ///
@@ -96,9 +82,12 @@ pub async fn import(
         if is_junk(&name) {
             continue;
         }
-        if let Some(path) = safe_path(&name) {
-            entries.push((i, path));
-        }
+        // Не пропускаем молча: путь мимо корня сборки — это испорченный или
+        // враждебный архив, и импорт, который «почти удался», хуже отказа.
+        // Админ иначе получал бы сборку без части файлов и без единого признака.
+        let path =
+            safe_path(&name).ok_or_else(|| anyhow!("путь выходит за корень сборки: {name}"))?;
+        entries.push((i, path));
     }
     if entries.is_empty() {
         return Err(anyhow!("в архиве нет файлов"));

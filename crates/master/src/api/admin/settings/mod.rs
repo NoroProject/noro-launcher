@@ -5,15 +5,18 @@
 //! а пользы от неё нет.
 
 mod diagnostics;
+pub(crate) mod image_prep;
 
 pub use diagnostics::diagnostics;
+
+use image_prep::{has_transparency, prepare_image};
 
 use crate::api::auth::AdminAuth;
 use crate::audit;
 use crate::config::keys;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use axum::extract::{Multipart, State};
+use axum::extract::{Multipart, Path, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -61,7 +64,21 @@ pub async fn list(State(state): State<AppState>, admin: AdminAuth) -> AppResult<
         .map(|k| (*k, crate::config::env_opt(k).is_some()))
         .collect();
 
-    Ok(Json(json!({ "settings": items, "secrets": secrets })))
+    // Прозрачность залитых картинок: по ней страница настроек объясняет, почему
+    // у одной иллюстрации на сайте есть подложка, а у другой нет.
+    let mut transparency: BTreeMap<&str, bool> = BTreeMap::new();
+    for key in IMAGE_KEYS {
+        let Some(meta) = keys::ALL.iter().find(|k| k.name == *key) else {
+            continue;
+        };
+        transparency.insert(key, image_prep::transparency(&state, &stored, *meta).await);
+    }
+
+    Ok(Json(json!({
+        "settings": items,
+        "secrets": secrets,
+        "transparency": transparency,
+    })))
 }
 
 #[derive(Deserialize)]
@@ -99,6 +116,13 @@ pub async fn save(
 
     if diff.is_empty() {
         return Ok(Json(json!({ "ok": true, "changed": 0 })));
+    }
+
+    // Адрес картинки вписали руками — что там внутри, мы не знаем: чужой файл
+    // не качаем ради одного флага. Признак прозрачности от прежней картинки
+    // тут вреднее, чем его отсутствие, поэтому сбрасываем на «непрозрачная».
+    for key in IMAGE_KEYS.iter().filter(|k| diff.contains_key(**k)) {
+        values.insert(keys::transparency_key(key), Value::Bool(false));
     }
 
     crate::db::set_settings(&state.db, &values, admin.user_id()).await?;
@@ -144,12 +168,30 @@ pub async fn export_env(State(state): State<AppState>, admin: AdminAuth) -> AppR
 }
 
 /// Загрузка баннера/иллюстрации главного экрана (Hero Render).
-pub async fn upload_hero_image(
+/// Настройки-картинки, которые можно залить файлом. Список закрытый: иначе
+/// ручка писала бы произвольный ключ настроек чужим значением.
+const IMAGE_KEYS: &[&str] = &[
+    keys::LOGO_URL.name,
+    keys::HERO_IMAGE_URL.name,
+    keys::LOGIN_IMAGE_URL.name,
+];
+
+/// Загрузить иллюстрацию и записать её адрес в настройку `key`.
+///
+/// Одна ручка на все картинки: обложка главной и картинка страницы входа
+/// отличаются только именем настройки, а копия обработчика на каждую новую
+/// разъезжалась бы в мелочах вроде допустимого размера.
+pub async fn upload_image(
     State(state): State<AppState>,
     admin: AdminAuth,
+    Path(key): Path<String>,
     mut multipart: Multipart,
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_SETTINGS_EDIT)?;
+    let key = IMAGE_KEYS
+        .iter()
+        .find(|k| **k == key)
+        .ok_or_else(|| AppError::BadRequest(format!("{key} is not an image setting")))?;
     while let Some(field) = multipart
         .next_field()
         .await
@@ -163,10 +205,22 @@ pub async fn upload_hero_image(
             .bytes()
             .await
             .map_err(|e| AppError::BadRequest(e.to_string()))?;
-        let data = tokio::task::spawn_blocking(move || fit_hero_image(&raw))
-            .await
-            .map_err(|e| AppError::Other(e.into()))?
-            .map_err(|e| AppError::BadRequest(format!("invalid image: {e}")))?;
+        // Прозрачность считаем здесь же, пока картинка в руках: по одному URL
+        // её потом не узнать — файл может уехать за CDN, который на запрос из
+        // браузера не отдаёт CORS-заголовков.
+        let (data, transparent) = tokio::task::spawn_blocking(move || {
+            let data = prepare_image(&raw)?;
+            let transparent = has_transparency(&data);
+            Ok::<_, image_prep::ImagePrepError>((data, transparent))
+        })
+        .await
+        .map_err(|e| AppError::Other(e.into()))?
+        .map_err(|e| {
+            AppError::bad(
+                crate::error_codes::UPLOAD_BAD_FORMAT,
+                format!("invalid image: {e}"),
+            )
+        })?;
         let stored = state
             .files
             .put_bytes(&data)
@@ -181,10 +235,8 @@ pub async fn upload_hero_image(
         };
 
         let mut values = BTreeMap::new();
-        values.insert(
-            keys::HERO_IMAGE_URL.name.to_string(),
-            Value::String(url.clone()),
-        );
+        values.insert(key.to_string(), Value::String(url.clone()));
+        values.insert(keys::transparency_key(key), Value::Bool(transparent));
         crate::db::set_settings(&state.db, &values, admin.user_id()).await?;
 
         audit::record(
@@ -192,28 +244,16 @@ pub async fn upload_hero_image(
             &admin.actor,
             audit::actions::SETTINGS_UPDATE,
             None,
-            json!({ "hero_image_url": url }),
+            json!({ *key: url }),
         )
         .await;
 
-        return Ok(Json(json!({ "ok": true, "url": url })));
+        return Ok(Json(
+            json!({ "ok": true, "url": url, "transparent": transparent }),
+        ));
     }
-    Err(AppError::BadRequest("missing the image field".into()))
-}
-
-fn fit_hero_image(data: &[u8]) -> Result<Vec<u8>, image::ImageError> {
-    let img = match image::load_from_memory(data) {
-        Ok(i) => i,
-        Err(_) => return Ok(data.to_vec()),
-    };
-    let img = if img.width() > 2048 || img.height() > 2048 {
-        img.resize(2048, 2048, image::imageops::FilterType::Lanczos3)
-    } else {
-        img
-    };
-    let mut out = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut out);
-    let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut cursor, 92);
-    img.write_with_encoder(encoder)?;
-    Ok(out)
+    Err(AppError::bad(
+        crate::error_codes::UPLOAD_FIELD_MISSING,
+        "missing the image field",
+    ))
 }

@@ -68,15 +68,54 @@ pub async fn launcher_client(pool: &PgPool, user_id: Uuid) -> Result<Option<Laun
     .await?)
 }
 
-/// Все известные клиенты, свежие сверху.
-pub async fn list_launcher_clients(pool: &PgPool) -> Result<Vec<LauncherClientRow>> {
-    Ok(sqlx::query_as::<_, LauncherClientRow>(
+/// Страница известных клиентов, свежие сверху.
+pub async fn list_launcher_clients(
+    pool: &PgPool,
+    limit: i64,
+    offset: i64,
+) -> Result<(Vec<LauncherClientRow>, i64)> {
+    let rows = sqlx::query_as::<_, LauncherClientRow>(
         "SELECT c.user_id, u.mc_username, c.version, c.platform, c.last_seen_at
          FROM launcher_clients c
          JOIN users u ON u.id = c.user_id
          ORDER BY c.last_seen_at DESC
-         LIMIT 500",
+         LIMIT $1 OFFSET $2",
     )
+    .bind(limit)
+    .bind(offset)
     .fetch_all(pool)
-    .await?)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM launcher_clients")
+        .fetch_one(pool)
+        .await?;
+
+    Ok((rows, total))
+}
+
+/// Сводка по всем клиентам: сколько на какой версии и платформе.
+///
+/// Считается запросом, а не перебором выданной страницы. Раньше отчёт собирался
+/// из первых 500 строк списка: на большем числе установок «всего» показывало
+/// ровно 500, а гистограмма версий строилась по случайной их части — то есть
+/// цифры выглядели правдоподобно и были неверны.
+pub async fn launcher_client_counts(pool: &PgPool, column: &str) -> Result<Vec<(String, i64)>> {
+    // `column` не из запроса: вызывается двумя фиксированными строками ниже.
+    let sql = format!(
+        "SELECT CASE WHEN {column} = '' THEN 'unknown' ELSE {column} END AS key, count(*)
+           FROM launcher_clients GROUP BY key"
+    );
+    Ok(sqlx::query_as::<_, (String, i64)>(&sql)
+        .fetch_all(pool)
+        .await?)
+}
+
+/// Сколько клиентов не на указанной версии.
+pub async fn launcher_clients_outdated(pool: &PgPool, current: &str) -> Result<i64> {
+    Ok(
+        sqlx::query_scalar("SELECT count(*) FROM launcher_clients WHERE version <> $1")
+            .bind(current)
+            .fetch_one(pool)
+            .await?,
+    )
 }

@@ -8,9 +8,10 @@ await auth.loadMe()
 
 const sessionRows = computed(() => [
   [t('cabinet-player'), auth.user.value?.username || 'Player'],
-  ['Discord', auth.user.value?.discord_username || 'Unknown'],
   ['Minecraft UUID', auth.user.value?.uuid || 'Not loaded']
 ])
+
+const methods = ref<AuthMethods>({ providers: [], passkey: false })
 
 const hideFromOnline = ref((auth.user.value as any)?.hide_from_online || false)
 
@@ -89,19 +90,22 @@ async function removePasskey(id: string) {
   }
 }
 
-onMounted(() => loadPasskeys())
+onMounted(async () => {
+  methods.value = await loadAuthMethods()
+  // Ключей нет как способа входа — и карточки их быть не должно.
+  if (methods.value.passkey) await loadPasskeys()
+})
 </script>
 
 <template>
   <NoroShell :title="t('nav-cabinet-settings')" subtitle="Your account">
     <template #actions>
-      <AtomButton variant="secondary" icon="i-lucide-arrow-left" to="/cabinet">{{ t('nav-cabinet-home') }}</AtomButton>
+      <AtomButton variant="secondary" icon="i-lucide-arrow-left" :to="link.cabinet()">{{ t('nav-cabinet-home') }}</AtomButton>
     </template>
 
     <div class="grid gap-4 w-full">
       <!-- Account Info -->
-      <section class="noro-panel p-6">
-        <h2 class="noro-label mb-4">{{ t('cabinet-settings-account') }}</h2>
+      <NoroCard :title="t('cabinet-settings-account')" icon="i-lucide-id-card">
         <div class="grid gap-2 text-sm">
           <div
             v-for="[label, value] in sessionRows"
@@ -112,27 +116,26 @@ onMounted(() => loadPasskeys())
             <span class="break-all text-[var(--noro-text)]">{{ value }}</span>
           </div>
         </div>
-      </section>
+      </NoroCard>
+
+      <CabinetLinkedPlatforms :providers="methods.providers" />
 
       <!-- Online Privacy & Vanish -->
-      <section class="noro-panel p-6 space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
-              <UIcon name="i-lucide-eye-off" class="size-4 text-[var(--noro-blue)]" />
-              {{ t('cabinet-privacy-title') }}
-            </h2>
-            <p class="text-xs text-[var(--noro-muted)]">{{ t('cabinet-privacy-hide-online') }}</p>
-          </div>
+      <NoroCard
+        :title="t('cabinet-privacy-title')"
+        :subtitle="t('cabinet-privacy-hide-online')"
+        icon="i-lucide-eye-off"
+      >
+        <template #actions>
           <input
             v-model="hideFromOnline"
             type="checkbox"
             class="size-5 accent-[var(--noro-magenta)] cursor-pointer"
             @change="toggleHideFromOnline"
           >
-        </div>
+        </template>
 
-        <div v-if="canSilentJoin" class="flex items-center justify-between border-t border-[var(--noro-border)] pt-4">
+        <div v-if="canSilentJoin" class="flex items-center justify-between border-t border-[var(--noro-border)] pt-4 -mt-1">
           <div>
             <h3 class="text-sm font-bold text-[var(--noro-text)] flex items-center gap-2">
               <UIcon name="i-lucide-ghost" class="size-4 text-[var(--noro-magenta)]" />
@@ -147,22 +150,20 @@ onMounted(() => loadPasskeys())
             @change="toggleSilentJoin"
           >
         </div>
-      </section>
+      </NoroCard>
 
-      <!-- Passkeys (WebAuthn) -->
-      <section class="noro-panel p-6 space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-base font-bold text-[var(--noro-text)] flex items-center gap-2">
-              <UIcon name="i-lucide-key-round" class="size-4 text-[var(--noro-blue)]" />
-              {{ t('cabinet-passkeys-title') }}
-            </h2>
-            <p class="text-xs text-[var(--noro-muted)]">{{ t('cabinet-passkeys-lead') }}</p>
-          </div>
+      <!-- Passkeys (WebAuthn). Способ выключен оператором — карточки нет. -->
+      <NoroCard
+        v-if="methods.passkey"
+        :title="t('cabinet-passkeys-title')"
+        :subtitle="t('cabinet-passkeys-lead')"
+        icon="i-lucide-key-round"
+      >
+        <template #actions>
           <AtomButton variant="secondary" icon="i-lucide-plus" @click="addPasskey">
             {{ t('cabinet-passkeys-add') }}
           </AtomButton>
-        </div>
+        </template>
 
         <div v-if="passkeys.length" class="grid gap-2">
           <div
@@ -197,16 +198,16 @@ onMounted(() => loadPasskeys())
           :title="t('cabinet-passkeys-none-title')"
           :text="t('cabinet-passkeys-none-text')"
         />
-      </section>
+      </NoroCard>
 
       <!-- Sign out -->
-      <section class="noro-panel p-6">
-        <h2 class="noro-label mb-2">{{ t('cabinet-settings-session') }}</h2>
-        <p class="mb-4 text-sm text-[var(--noro-muted)]">
-          {{ t('cabinet-settings-signout-hint') }}
-        </p>
-        <AtomButton variant="secondary" icon="i-lucide-log-out" @click="auth.signOut()">{{ t('profile-sign-out') }}</AtomButton>
-      </section>
+      <NoroCard
+        :title="t('cabinet-settings-session')"
+        :subtitle="t('cabinet-settings-signout-hint')"
+        icon="i-lucide-log-out"
+      >
+        <AtomButton variant="danger" icon="i-lucide-log-out" @click="auth.signOut()">{{ t('profile-sign-out') }}</AtomButton>
+      </NoroCard>
     </div>
   </NoroShell>
 </template>

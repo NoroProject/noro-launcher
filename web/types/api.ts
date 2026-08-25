@@ -24,13 +24,23 @@ export interface Role {
   inherited_permissions?: string[];
 }
 
+/** Привязка аккаунта к внешней платформе. */
+export interface UserIdentity {
+  provider: string;
+  provider_user_id: string;
+  username?: string | null;
+  avatar_url?: string | null;
+  /** Платформа регистрации: из неё выведен MC-UUID, отвязать нельзя. */
+  is_primary: boolean;
+  linked_at: string;
+}
+
 export interface UserProfile {
   id: string;
   uuid: string;
   username: string;
-  discord_id: string;
-  discord_username: string;
-  discord_avatar?: string | null;
+  /** Привязанные платформы. Пусто у локального аккаунта. */
+  identities: UserIdentity[];
   skin_url?: string | null;
   /** Тонкая модель (Алекс). `false` — классическая (Стив). */
   skin_slim?: boolean;
@@ -40,15 +50,24 @@ export interface UserProfile {
   /** Прямые права с контекстом сборки. */
   permission_grants?: PermissionEntry[];
   banned?: boolean;
+  ban_reason?: string | null;
+  created_at?: string | null;
+  last_login_at?: string | null;
   frozen?: boolean;
   hide_from_online?: boolean;
+  /** Заведён оператором, без входа через платформу. */
+  is_local_account?: boolean;
+  /** Может заходить в игру. У операторского аккаунта обычно нет. */
+  can_play?: boolean;
+  /** Единственный аккаунт, который нельзя забанить и удалить. */
+  is_root?: boolean;
+  /** Заходит на сервер без сообщения в чат. */
+  silent_join?: boolean;
 }
 
 export interface UserRow {
   id: string;
-  discord_id: string;
-  discord_username: string;
-  discord_avatar?: string | null;
+  identities?: UserIdentity[];
   mc_uuid: string;
   mc_username: string;
   skin_url?: string | null;

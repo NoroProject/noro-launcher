@@ -1,19 +1,23 @@
 //! Админ: роли и их права.
 
 use crate::api::auth::AdminAuth;
+use crate::api::created::created;
+use crate::api::paging::Page;
+use crate::api::validate::Validation;
 use crate::audit::{self, target};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Path, Query, State};
+use axum::response::Response;
 use axum::Json;
 use schema::{Role, PERM_ROLES_EDIT, PERM_ROLES_VIEW};
 
 use serde::Deserialize;
 use uuid::Uuid;
 
-pub async fn list(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Vec<Role>>> {
+pub async fn list(State(state): State<AppState>, admin: AdminAuth) -> AppResult<Json<Page<Role>>> {
     admin.require(PERM_ROLES_VIEW)?;
-    Ok(Json(crate::db::list_roles(&state.db).await?))
+    Ok(Json(Page::whole(crate::db::list_roles(&state.db).await?)))
 }
 
 #[derive(Deserialize)]
@@ -31,8 +35,17 @@ pub async fn create(
     State(state): State<AppState>,
     admin: AdminAuth,
     Json(req): Json<CreateReq>,
-) -> AppResult<Json<serde_json::Value>> {
+) -> AppResult<Response> {
     admin.require(PERM_ROLES_EDIT)?;
+    // Роли без имени раньше доезжали до базы: проверки здесь не было вовсе, а
+    // в списке такая роль выглядела пустой строкой, которую не за что нажать.
+    Validation::new()
+        .required("name", &req.name)
+        .max_len("name", &req.name, 32)
+        .required("display_name", &req.display_name)
+        .max_len("display_name", &req.display_name, 32)
+        .finish()?;
+
     let id = crate::db::create_role(
         &state.db,
         &req.name,
@@ -50,7 +63,10 @@ pub async fn create(
         serde_json::json!({ "name": req.name, "display_name": req.display_name }),
     )
     .await;
-    Ok(Json(serde_json::json!({ "id": id })))
+    Ok(created(
+        format!("/api/admin/roles/{id}"),
+        serde_json::json!({ "id": id }),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -132,6 +148,9 @@ pub async fn update(
             icon: req.icon,
             prefix: req.prefix,
             suffix: req.suffix,
+            // Запасной ответ на случай, когда роль не нашлась сразу после
+            // правки: картинку он не знает, и врать про неё не надо.
+            badge_sha1: None,
             permission_grants: vec![],
             parent_id: req.parent_id,
             inherited_permissions: vec![],

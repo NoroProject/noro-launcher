@@ -30,7 +30,7 @@ async function start() {
       : 'Your launcher is offline — open it and confirm there.'
     poll(res.grant_id)
   } catch (e: any) {
-    if (String(e?.data?.error || '').includes('step_up_required')) {
+    if (apiErrorCode(e) === 'step_up_required') {
       needStepUp.value = true
     } else {
       notify.fail(e)

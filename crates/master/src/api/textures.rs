@@ -16,7 +16,10 @@ pub struct RenderQuery {
     pub preset: Option<String>,
     pub username: Option<String>,
     pub uuid: Option<String>,
-    pub discord: Option<String>,
+    /// Ник или id на любой привязанной платформе. `discord` — прежнее имя
+    /// параметра: ссылки с ним уже разошлись по вёрстке и чужим страницам.
+    #[serde(alias = "discord")]
+    pub identity: Option<String>,
     pub scale: Option<u32>,
     pub overlay: Option<bool>,
     pub yaw: Option<f32>,
@@ -60,7 +63,8 @@ pub async fn render_endpoint(
         "flat-body" | "flat_body" => skin_render::render_body(&skin, scale, overlay),
         "cape" => skin_render::render_cape(&skin, scale),
         _ => super::skin_render_3d::render_3d(&skin, scale, overlay, mode, yaw, pitch, sway),
-    };
+    }
+    .map_err(|e| AppError::Other(anyhow::anyhow!("не удалось закодировать рендер: {e}")))?;
 
     Ok(png(bytes, "public, max-age=3600"))
 }

@@ -4,16 +4,20 @@
 pub mod agent_link;
 pub mod api;
 pub mod audit;
+pub mod backup;
 pub mod build_importer;
+pub mod cases;
 pub mod catalog;
 pub mod config;
 pub mod dav;
 pub mod db;
 pub mod error;
+pub mod error_codes;
 pub mod files;
 pub mod launcher_builder;
 pub mod manifest;
 pub mod mojang_bootstrap;
+pub mod prefix;
 pub mod setup;
 pub mod signing;
 pub mod state;
@@ -68,6 +72,7 @@ pub async fn run() -> Result<()> {
     let state = AppState {
         db,
         ws: ws::WsHub::new(),
+        admin_ws: ws::AdminHub::default(),
         files,
         signer,
         profile_signer: Arc::new(profile_signer),
@@ -108,7 +113,7 @@ fn build_webauthn(config: &Config) -> Option<Arc<webauthn_rs::Webauthn>> {
     }
     match api::auth::webauthn::build(config) {
         Ok(w) => Some(Arc::new(w)),
-        // Не валим старт: без passkey остаётся вход через Discord, а вот
+        // Не валим старт: без passkey остаётся вход через платформы, а вот
         // мастер, не поднявшийся из-за опечатки в домене, не оставляет ничего.
         Err(e) => {
             tracing::error!(error = %e, "passkey отключён: не собрать WebAuthn");
@@ -189,27 +194,20 @@ fn router(state: AppState) -> Router {
     // маршруту, иначе перебор просто чередовал бы ручки.
     let limiter = api::rate_limit::RateLimiter::new();
 
-    // Discord OAuth & Passkeys.
-    let discord = Router::new()
-        .route("/auth/discord/login", get(auth::discord::login))
-        .route("/auth/discord/callback", get(auth::discord::callback))
-        .route("/auth/discord/launcher", get(auth::discord::launcher_login))
+    // Вход через внешние платформы & Passkeys.
+    let sign_in = Router::new()
+        // Ручки общие для всех платформ: Discord, Twitch, Google отличаются
+        // только строкой в пути. Лаунчер сюда не ходит — он логинится через
+        // сайт, поэтому адрес возврата у платформы ровно один.
+        .route("/auth/{provider}/login", get(auth::oauth::flow::login))
         .route(
-            "/auth/discord/launcher/callback",
-            get(auth::discord::launcher_callback),
+            "/auth/{provider}/callback",
+            get(auth::oauth::flow::callback),
         )
-        .route(
-            "/auth/launcher/exchange",
-            post(auth::discord::launcher_exchange),
-        )
-        .route(
-            "/auth/passkeys/login/options",
-            post(auth::passkeys::login_options).options(|| async {}),
-        )
-        .route(
-            "/auth/passkeys/login/verify",
-            post(auth::passkeys::login_verify).options(|| async {}),
-        )
+        .route("/api/auth/methods", get(auth::oauth::methods::list))
+        // Passkeys живут под `/api/auth/`, как и всё остальное API. Второй
+        // комплект без префикса убран: один и тот же хендлер по двум адресам
+        // означал две ручки в поддержке и расхождение в том, какую зовёт кто.
         .route(
             "/api/auth/passkeys/login/options",
             post(auth::passkeys::login_options).options(|| async {}),
@@ -222,9 +220,10 @@ fn router(state: AppState) -> Router {
             "/api/auth/recovery/login",
             post(auth::recovery::login).options(|| async {}),
         )
-        .route("/auth/refresh", post(auth::discord::refresh))
-        .route("/auth/logout", get(auth::discord::logout))
-        .route("/auth/me", get(cabinet::me))
+        .route("/auth/refresh", post(auth::session::refresh))
+        // Выход удаляет сессию, а GET обязан быть безопасным: под ним ручку
+        // может дёрнуть предзагрузка ссылки в браузере.
+        .route("/auth/logout", post(auth::session::logout))
         .layer(axum::middleware::from_fn_with_state(
             limiter.clone(),
             api::rate_limit::limit,
@@ -233,6 +232,8 @@ fn router(state: AppState) -> Router {
     // Лаунчер.
     let launcher_api = Router::new()
         .route("/ws/launcher", get(launcher::ws_handler))
+        // Пуш админке: страница дел перестаёт опрашивать мастер каждые пять секунд.
+        .route("/ws/admin", get(api::admin::ws::ws_handler))
         .route("/api/launcher/version", get(launcher::current_version))
         .route("/api/launcher/downloads", get(launcher::downloads))
         // Инициатива игрока: кнопка «Сообщить о проблеме» и предложение после
@@ -278,6 +279,12 @@ fn router(state: AppState) -> Router {
             "/api/public/settings",
             get(api::public_settings::get_public_settings),
         )
+        // Плашка роли картинкой: её показывают и в кабинете, и в списке ролей,
+        // а роли и так видны всем — закрывать значок правом незачем.
+        .route(
+            "/api/roles/{id}/badge.png",
+            get(api::role_badge_public::badge),
+        )
         .route("/api/rules", get(api::rules::list))
         .route("/api/rules/scopes", get(api::rules::scopes))
         .route("/api/rules/servers/{server_id}", get(api::rules::by_server))
@@ -308,6 +315,13 @@ fn router(state: AppState) -> Router {
             delete(cabinet_sessions::revoke_others),
         )
         .route("/api/me/sessions/{id}", delete(cabinet_sessions::revoke))
+        // Привязки к платформам: список, добавление ещё одной, отвязка.
+        .route("/api/me/identities", get(auth::oauth::link::list))
+        .route("/api/me/identities/link", post(auth::oauth::link::start))
+        .route(
+            "/api/me/identities/{provider}",
+            delete(auth::oauth::link::unlink),
+        )
         .route("/api/me/recovery-codes", get(auth::recovery::remaining))
         .route(
             "/api/me/recovery-codes/reissue",
@@ -353,6 +367,27 @@ fn router(state: AppState) -> Router {
                 .delete(cabinet::delete_skin_preset)
                 .options(|| async {}),
         )
+        // Свои приложения игрока: заводит и правит он сам, публикует оператор.
+        .route(
+            "/api/me/apps",
+            get(api::apps::list)
+                .post(api::apps::create)
+                .options(|| async {}),
+        )
+        .route(
+            "/api/me/apps/{id}",
+            put(api::apps::update)
+                .delete(api::apps::delete)
+                .options(|| async {}),
+        )
+        .route(
+            "/api/me/apps/{id}/secret",
+            post(api::apps::rotate_secret).options(|| async {}),
+        )
+        .route(
+            "/api/me/apps/{id}/icon",
+            post(api::apps::upload_icon).options(|| async {}),
+        )
         .route(
             "/api/me/authorized-apps",
             get(auth::oauth2_provider::list_authorized_apps).options(|| async {}),
@@ -362,6 +397,30 @@ fn router(state: AppState) -> Router {
             delete(auth::oauth2_provider::revoke_authorized_app).options(|| async {}),
         );
 
+    // Единственная дверь для токенов сторонних приложений: `AuthUser` их не
+    // принимает нигде, а здесь каждая ручка называет свой scope.
+    let oauth_data_api = Router::new()
+        .route(
+            "/api/oauth/me",
+            get(api::oauth_api::me).options(|| async {}),
+        )
+        .route(
+            "/api/oauth/me/punishments",
+            get(api::oauth_api::punishments).options(|| async {}),
+        )
+        .route(
+            "/api/oauth/me/capes",
+            get(api::oauth_api::capes).options(|| async {}),
+        )
+        .route(
+            "/api/oauth/me/journal",
+            get(api::oauth_api::journal).options(|| async {}),
+        )
+        .route(
+            "/api/oauth/servers",
+            get(api::oauth_api::servers).options(|| async {}),
+        );
+
     // Полноценный OAuth 2.0 Провайдер
     let oauth2_provider_api = Router::new()
         .route(
@@ -369,8 +428,20 @@ fn router(state: AppState) -> Router {
             get(auth::oauth2_provider::authorize_page),
         )
         .route(
-            "/oauth2/authorize/accept",
-            post(auth::oauth2_provider::accept_authorize),
+            "/api/oauth2/authorize/accept",
+            post(auth::oauth2_provider::accept_authorize).options(|| async {}),
+        )
+        // Данные для экрана согласия: кто просит, о чём и от чьего имени.
+        // Страницу рисует сайт — здесь только JSON, отсюда и префикс `/api`.
+        // Голые `/oauth2/*` рядом остаются: их адреса видят сторонние
+        // разработчики, и они заданы стандартом.
+        .route(
+            "/api/oauth2/consent",
+            get(auth::oauth2_provider::consent_info).options(|| async {}),
+        )
+        .route(
+            "/api/oauth2/scopes",
+            get(auth::oauth2_provider::list_scopes),
         )
         .route("/oauth2/token", post(auth::oauth2_provider::token_endpoint))
         .layer(axum::middleware::from_fn_with_state(
@@ -408,6 +479,11 @@ fn router(state: AppState) -> Router {
             post(agent::record_automod_trigger),
         )
         .route("/api/agent/reports", post(agent::agent_create_report))
+        // Плашки ролей: агент спрашивает состав пака и таблицу символов.
+        .route(
+            "/api/agent/prefix-pack",
+            get(api::agent::prefix_pack::current),
+        )
         .route("/api/agent/artifact", get(agent_artifact::artifact))
         .route("/api/agent/pubkey", get(agent_artifact::pubkey))
         .route("/api/agent/nodes", post(agent_nodes::report))
@@ -434,6 +510,7 @@ fn router(state: AppState) -> Router {
     let setup_api = Router::new()
         .route("/api/setup/status", get(setup::api::status))
         .route("/api/setup/settings", post(setup::api::save))
+        .route("/api/setup/sign-in", post(setup::api::save_sign_in))
         .route(
             "/api/setup/signing-key",
             post(setup::api::generate_signing_key),
@@ -446,10 +523,11 @@ fn router(state: AppState) -> Router {
         .route("/health", get(api::health::health))
         .merge(setup_api)
         .merge(yggdrasil)
-        .merge(discord)
+        .merge(sign_in)
         .merge(launcher_api)
         .merge(cabinet_api)
         .merge(oauth2_provider_api)
+        .merge(oauth_data_api)
         .merge(agent_api)
         .layer(axum::extract::DefaultBodyLimit::max(PUBLIC_BODY_LIMIT));
 
@@ -471,6 +549,11 @@ fn router(state: AppState) -> Router {
             state.clone(),
             setup::gate::gate,
         ))
+        // Отказ 400 без контекста — это часы на «а какой это был запрос?».
+        // Экстракторы axum сообщают только про сам разбор («invalid type:
+        // string "25"») и молчат о пути и query-строке, а до интерфейса не
+        // доезжает и это. Здесь они пишутся в лог целиком.
+        .layer(axum::middleware::from_fn(log_bad_request))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         // WebDAV подключается ПОСЛЕ слоёв: CorsLayer сам отвечает на OPTIONS,
@@ -513,4 +596,22 @@ fn cors_layer(config: &Config) -> CorsLayer {
         .allow_origin(origins)
         .allow_methods(tower_http::cors::Any)
         .allow_headers(tower_http::cors::Any)
+}
+
+/// Записать в лог отвергнутый запрос вместе с путём и query-строкой.
+///
+/// Экстракторы axum отвечают текстом вида «Failed to deserialize query string:
+/// invalid type: string "25", expected i64» — по нему не видно ни ручки, ни
+/// самой строки, и на странице с несколькими списками искать нечего.
+async fn log_bad_request(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let method = req.method().clone();
+    let uri = req.uri().clone();
+    let res = next.run(req).await;
+    if res.status() == axum::http::StatusCode::BAD_REQUEST {
+        tracing::warn!(%method, %uri, "запрос отвергнут при разборе");
+    }
+    res
 }

@@ -1,42 +1,73 @@
 //! Админ: управление пользователями.
 
 use crate::api::auth::AdminAuth;
+use crate::api::paging::{Page, PageQuery};
 use crate::audit::{self, target};
+use crate::db::identities::UnlinkResult;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::Json;
 use schema::{
-    UserProfile, PERM_PUNISH_BAN, PERM_USERS_CAPES, PERM_USERS_PERMISSIONS, PERM_USERS_ROLES,
-    PERM_USERS_SKIN, PERM_USERS_VIEW,
+    UserProfile, PERM_PUNISH_BAN, PERM_USERS_CAPES, PERM_USERS_EDIT, PERM_USERS_PERMISSIONS,
+    PERM_USERS_ROLES, PERM_USERS_SKIN, PERM_USERS_VIEW,
 };
 
 use serde::Deserialize;
 use uuid::Uuid;
 
+/// `GET /api/admin/users` — страница игроков.
+///
+/// `q` ищет по нику, Discord и обоим идентификаторам. Без поиска в базе клиенту
+/// оставалось бы тянуть список целиком и фильтровать у себя — что спотлайт и
+/// делал, находя только тех, кто попал в первую страницу.
 #[derive(Deserialize)]
-pub struct ListQuery {
+pub struct UsersQuery {
+    // Те же три поля, что у `PageQuery`, объявлены здесь, а не подмешаны
+    // флаттеном: так serde разбирает их напрямую, без буферизации.
+    pub q: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::api::paging::flexible_i64::deserialize"
+    )]
     pub limit: Option<i64>,
+    #[serde(
+        default,
+        deserialize_with = "crate::api::paging::flexible_i64::deserialize"
+    )]
     pub offset: Option<i64>,
+    /// Только забаненные или только активные. Фильтр серверный: на клиенте он
+    /// отсеивал бы лишь текущую страницу и врал о числе найденного.
+    pub banned: Option<bool>,
+    pub role: Option<String>,
+}
+
+impl UsersQuery {
+    fn paging(&self) -> PageQuery {
+        PageQuery::from_parts(self.q.clone(), self.limit, self.offset)
+    }
 }
 
 pub async fn list(
     State(state): State<AppState>,
     admin: AdminAuth,
-    Query(q): Query<ListQuery>,
-) -> AppResult<Json<Vec<UserProfile>>> {
+    Query(q): Query<UsersQuery>,
+) -> AppResult<Json<Page<UserProfile>>> {
     admin.require(PERM_USERS_VIEW)?;
-    let rows = crate::db::list_users(
-        &state.db,
-        q.limit.unwrap_or(100).min(500),
-        q.offset.unwrap_or(0),
-    )
-    .await?;
-    let mut out = Vec::with_capacity(rows.len());
+    let page = q.paging();
+    let like = page.like();
+    let filter = crate::db::UserFilter {
+        like: like.as_deref(),
+        banned: q.banned,
+        role: q.role.as_deref(),
+    };
+    let (rows, total) =
+        crate::db::list_users(&state.db, &filter, page.limit(), page.offset()).await?;
+    let mut items = Vec::with_capacity(rows.len());
     for r in rows {
-        out.push(crate::db::profile_from_row(&state.db, r).await?);
+        items.push(crate::db::profile_from_row(&state.db, r).await?);
     }
-    Ok(Json(out))
+    Ok(Json(Page::new(items, total)))
 }
 
 pub async fn get(
@@ -89,6 +120,45 @@ pub async fn ban(
         },
     );
     Ok(Json(profile))
+}
+
+/// `DELETE /api/admin/users/{id}/identities/{provider}` — снять привязку.
+///
+/// Нужна, когда игрок потерял доступ к платформе и сам отвязать её уже не
+/// может. Платформу регистрации не снимаем и здесь: из неё выведен mc_uuid, и
+/// без неё аккаунт остаётся с UUID, который ни на что не ссылается.
+pub async fn unlink_identity(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path((id, provider)): Path<(Uuid, String)>,
+) -> AppResult<Json<UserProfile>> {
+    admin.require(PERM_USERS_EDIT)?;
+    let provider = crate::api::auth::oauth::flow::parse_provider(&provider)?;
+    match crate::db::identities::unlink(&state.db, id, provider.slug()).await? {
+        UnlinkResult::Removed => {}
+        UnlinkResult::NotLinked => {
+            return Err(AppError::NotFound(format!(
+                "{} is not linked to this account",
+                provider.display_name()
+            )))
+        }
+        UnlinkResult::Primary => {
+            return Err(AppError::BadRequest(format!(
+                "{} is the platform this account was created with — it cannot be unlinked",
+                provider.display_name()
+            )))
+        }
+    }
+
+    audit::record(
+        &state,
+        &admin.actor,
+        crate::audit::actions::USER_IDENTITY_UNLINK,
+        target("user", id),
+        serde_json::json!({ "provider": provider.slug() }),
+    )
+    .await;
+    Ok(Json(crate::db::load_profile(&state.db, id).await?))
 }
 
 pub async fn add_role(
@@ -252,10 +322,16 @@ pub async fn upload_skin_for_user(
                 .await
                 .map_err(|e| AppError::BadRequest(e.to_string()))?;
             if data.len() < 8 || &data[0..8] != b"\x89PNG\r\n\x1a\n" {
-                return Err(AppError::BadRequest("PNG expected".into()));
+                return Err(AppError::bad(
+                    crate::error_codes::UPLOAD_BAD_FORMAT,
+                    "PNG expected",
+                ));
             }
             if data.len() > 256 * 1024 {
-                return Err(AppError::BadRequest("skin is too large".into()));
+                return Err(AppError::bad(
+                    crate::error_codes::UPLOAD_TOO_LARGE,
+                    "skin is too large",
+                ));
             }
             let stored = state
                 .files
@@ -267,7 +343,10 @@ pub async fn upload_skin_for_user(
             return notify_user(&state, id).await;
         }
     }
-    Err(AppError::BadRequest("missing skin field".into()))
+    Err(AppError::bad(
+        crate::error_codes::UPLOAD_FIELD_MISSING,
+        "missing skin field",
+    ))
 }
 
 pub async fn delete_skin_for_user(
@@ -291,7 +370,7 @@ pub async fn list_skin_presets_for_user(
     State(state): State<AppState>,
     admin: AdminAuth,
     Path(id): Path<Uuid>,
-) -> AppResult<Json<Vec<SkinPresetItem>>> {
+) -> AppResult<Json<Page<SkinPresetItem>>> {
     admin.require(PERM_USERS_SKIN)?;
     let rows = sqlx::query_as::<_, SkinPresetItem>(
         "SELECT id, name, skin_url FROM user_skin_presets WHERE user_id = $1 ORDER BY created_at DESC",
@@ -301,7 +380,7 @@ pub async fn list_skin_presets_for_user(
     .await
     .map_err(|e| AppError::Other(e.into()))?;
 
-    Ok(Json(rows))
+    Ok(Json(Page::whole(rows)))
 }
 
 #[derive(Deserialize)]

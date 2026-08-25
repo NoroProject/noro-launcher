@@ -44,7 +44,7 @@ pub async fn handle(
         }
 
         ClientWsMsg::RequestNews => {
-            let rows = crate::db::list_news(&state.db, 20).await?;
+            let (rows, _) = crate::db::list_news(&state.db, None, 20, 0).await?;
             let items = super::news::news_items(state, rows).await?;
             let _ = tx.send(ServerWsMsg::News { items });
         }

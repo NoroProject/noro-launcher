@@ -191,11 +191,7 @@ fn pagination_controls(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElem
     };
 
     let current_page = (offset / limit) + 1;
-    let total_pages = if total == 0 {
-        1
-    } else {
-        (total + limit - 1) / limit
-    };
+    let total_pages = if total == 0 { 1 } else { total.div_ceil(limit) };
 
     let server = ui.servers.iter().find(|s| s.id == server_id);
     let mc_ver = server.map(|s| s.mc_version.clone());

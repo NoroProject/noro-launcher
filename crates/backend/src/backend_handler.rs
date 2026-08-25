@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crate::auth::{discord_oauth, token_store};
+use crate::auth::{token_store, web_login};
 use crate::backend::{spawn_sync_and_launch, BackendState, InternalEvent};
 use bridge::{
     ClientSettingsState, LoginErrorKind, MessageToBackend, MessageToFrontend, OptionalModInfo,
@@ -31,46 +31,17 @@ impl BackendState {
     /// Команда от frontend.
     pub async fn handle_to_backend(&mut self, msg: MessageToBackend) {
         match msg {
-            MessageToBackend::StartDiscordLogin { modal_action } => {
+            MessageToBackend::StartWebLogin { modal_action } => {
                 let master_url = self.ctx.config.get().master_url;
                 let internal = self.ctx.internal.clone();
                 let modal = modal_action.clone();
-                modal.set_stage("Waiting for Discord sign in...");
+                modal.set_stage("Waiting for sign in on the website...");
                 tokio::spawn(async move {
                     let cancelled = {
                         let m = modal.clone();
                         move || m.is_cancelled()
                     };
-                    match discord_oauth::login(&master_url, cancelled).await {
-                        Ok(res) => {
-                            let _ = internal.send(InternalEvent::LoginCompleted {
-                                auth: res.auth,
-                                user: res.user,
-                            });
-                        }
-                        Err(e) => {
-                            let kind = if e.to_string().contains("cancel") {
-                                LoginErrorKind::Cancelled
-                            } else {
-                                LoginErrorKind::Network(e.to_string())
-                            };
-                            let _ = internal.send(InternalEvent::LoginFailed { kind });
-                        }
-                    }
-                });
-            }
-
-            MessageToBackend::StartOAuth2Login { modal_action } => {
-                let master_url = self.ctx.config.get().master_url;
-                let internal = self.ctx.internal.clone();
-                let modal = modal_action.clone();
-                modal.set_stage("Waiting for Web OAuth2 sign in...");
-                tokio::spawn(async move {
-                    let cancelled = {
-                        let m = modal.clone();
-                        move || m.is_cancelled()
-                    };
-                    match discord_oauth::login_oauth2(&master_url, cancelled).await {
+                    match web_login::login(&master_url, cancelled).await {
                         Ok(res) => {
                             let _ = internal.send(InternalEvent::LoginCompleted {
                                 auth: res.auth,
@@ -178,13 +149,13 @@ impl BackendState {
                         }
                     }
 
-                    // 2. Если токена в Keyring нет — запускаем вход через Web Passkeys / OAuth в браузере
-                    modal.set_stage("Waiting for Passkey sign in in browser...");
+                    // 2. Токена в Keyring нет — обычный вход через сайт.
+                    modal.set_stage("Waiting for sign in on the website...");
                     let cancelled = {
                         let m = modal.clone();
                         move || m.is_cancelled()
                     };
-                    match crate::auth::discord_oauth::login_passkey(&master, cancelled).await {
+                    match web_login::login(&master, cancelled).await {
                         Ok(res) => {
                             modal.finish();
                             let _ = internal.send(InternalEvent::LoginCompleted {
@@ -209,6 +180,7 @@ impl BackendState {
                 let _ = token_store::clear();
                 self.access_token = None;
                 self.user = None;
+                self.ctx.set_profile(None);
                 self.ctx.ws.set_token(None);
                 self.ctx.send(MessageToFrontend::LoggedOut);
             }
@@ -317,7 +289,7 @@ impl BackendState {
                     let master_url = ctx.config.get().master_url;
 
                     let res = http
-                        .post(format!("{master_url}/api/mod_suggestions"))
+                        .post(format!("{master_url}/api/mod-suggestions"))
                         .bearer_auth(&token)
                         .json(&serde_json::json!({
                             "server_id": server_id,
@@ -735,17 +707,17 @@ impl BackendState {
         };
         let enabled = self.ctx.optional.get().for_server(&server_id);
         let connect = self.server_connect(&server_id);
-        spawn_sync_and_launch(
-            self.ctx.clone(),
+        spawn_sync_and_launch(crate::backend::Launch {
+            ctx: self.ctx.clone(),
             server_id,
             manifest,
             user,
             login,
             connect,
-            enabled,
-            self.servers.iter().find(|s| s.id == server_id).cloned(),
+            enabled_optional: enabled,
+            server: self.servers.iter().find(|s| s.id == server_id).cloned(),
             modal,
-        );
+        });
     }
 
     /// Отправить текущую конфигурацию во frontend.
@@ -778,6 +750,34 @@ impl BackendState {
             crash_reports_available: crate::telemetry::is_available(),
             master_url: c.master_url,
             server_settings,
+        });
+    }
+
+    /// Обновить паки и шейдеры, не выходя из игры.
+    ///
+    /// Молча, если обновлять нечего: кадр «синхронизировано» на каждый чих
+    /// научит игрока его не замечать.
+    fn live_sync(&self, server_id: uuid::Uuid, manifest: schema::BuildManifest) {
+        let dir = self.ctx.dirs.instance(&server_id);
+        let client = self.ctx.http.clone();
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match crate::sync::live::apply(&client, &dir, &manifest).await {
+                Ok(done) if done.nothing() => {}
+                Ok(done) => {
+                    // Файлы подменены, но игра держит в памяти прежние. Ручки
+                    // «перезагрузи ресурсы» снаружи процесса нет — просим мод.
+                    ctx.mod_link.send(mod_link::ToMod::ReloadResources {
+                        packs: done.updated.clone(),
+                    });
+                    ctx.send(MessageToFrontend::LiveSynced {
+                        server_id,
+                        updated: done.updated,
+                        locked: done.locked,
+                    });
+                }
+                Err(e) => tracing::warn!(error = %e, "живая синхронизация не удалась"),
+            }
         });
     }
 
@@ -866,6 +866,7 @@ impl BackendState {
         match msg {
             ServerWsMsg::AuthOk { user } => {
                 self.user = Some(user.clone());
+                self.ctx.set_profile(Some(user.clone()));
                 self.ctx.send(MessageToFrontend::LoginSuccess { user });
                 if let Some(token) = &self.access_token {
                     let master = self.ctx.config.get().master_url.clone();
@@ -887,6 +888,7 @@ impl BackendState {
                 let _ = token_store::clear();
                 self.access_token = None;
                 self.user = None;
+                self.ctx.set_profile(None);
                 self.ctx.ws.set_token(None);
                 self.ctx.send(MessageToFrontend::LoggedOut);
             }
@@ -906,6 +908,12 @@ impl BackendState {
                 self.send_build_state(server_id, &manifest);
                 if self.pending_launch.contains_key(&server_id) {
                     self.begin_launch(server_id, manifest);
+                } else {
+                    // Игра может быть запущена прямо сейчас. Полную
+                    // синхронизацию под ней запускать нельзя — она снесёт то,
+                    // что держит JVM, — но паки и шейдеры игра читает по
+                    // требованию, и их можно обновить не выходя из игры.
+                    self.live_sync(server_id, manifest);
                 }
             }
             ServerWsMsg::LauncherUpdate { version } => {
@@ -930,14 +938,20 @@ impl BackendState {
             ServerWsMsg::BuildsChanged { server_id } => {
                 let had_manifest = self.manifests.remove(&server_id).is_some();
                 self.ctx.ws.send(ClientWsMsg::RequestServerList);
+                // Манифест нужен и тому, кто сборку ещё не открывал в этой
+                // сессии: если папка на диске есть, значит человек в неё играет,
+                // и живая синхронизация должна дойти до него, а не ждать, пока
+                // он зайдёт на страницу сервера.
+                let installed = self.ctx.dirs.instance(&server_id).exists();
                 if self.user.is_some()
-                    && (had_manifest || self.pending_launch.contains_key(&server_id))
+                    && (had_manifest || installed || self.pending_launch.contains_key(&server_id))
                 {
                     self.ctx.ws.send(self.request_manifest_msg(server_id));
                 }
             }
             ServerWsMsg::PermissionsUpdated { user } => {
                 self.user = Some(user.clone());
+                self.ctx.set_profile(Some(user.clone()));
                 self.ctx
                     .send(MessageToFrontend::PermissionsUpdated { user });
                 self.ctx.ws.send(ClientWsMsg::RequestServerList);
@@ -988,6 +1002,12 @@ impl BackendState {
                     reason,
                     expires_in_secs,
                 });
+            }
+            // Карточка дела изменилась — перечитать её и разослать подписчикам.
+            // Игра не запущена, панели нет — кадр просто некуда класть, и это
+            // нормальный случай, а не сбой.
+            ServerWsMsg::CaseUpdated { case_id } => {
+                self.ctx.mod_link.case_updated(&self.ctx, case_id);
             }
             ServerWsMsg::Pong => {}
         }

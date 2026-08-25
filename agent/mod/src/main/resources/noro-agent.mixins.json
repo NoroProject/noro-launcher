@@ -6,7 +6,8 @@
   "mixins": [
     "ServerLevelMixin",
     "TrackedEntityMixin",
-    "ItemEntityMixin"
+    "ItemEntityMixin",
+    "ResourcePackStatusMixin"
   ],
   "injectors": {
     "defaultRequire": 0

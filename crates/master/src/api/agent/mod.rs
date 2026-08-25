@@ -12,6 +12,7 @@ pub mod chat_filters;
 pub mod heartbeat;
 pub mod history;
 pub mod player;
+pub mod prefix_pack;
 pub mod punish;
 pub mod reports;
 pub mod types;

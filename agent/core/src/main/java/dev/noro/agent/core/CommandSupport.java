@@ -25,7 +25,9 @@ final class CommandSupport {
             try {
                 action.run();
             } catch (MasterRefusedException e) {
-                sender.reply("§c" + e.getMessage());
+                // С номером: причина приходит по-английски, а номер одинаков в
+                // любом языке и читается со скриншота чата.
+                sender.reply("§c" + e.display());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {

@@ -37,9 +37,9 @@ pub fn user_card(ui: &LauncherUI, user: &schema::UserProfile, cx: &mut Cx) -> An
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(14.))
                 .text_color(rgb(TEXT_MUTED))
-                // Локальный аккаунт заведён оператором и Discord'а не имеет —
+                // Локальный аккаунт заведён оператором и платформы не имеет —
                 // показываем игровой ник, а не пустое «@».
-                .child(match &user.discord_username {
+                .child(match user.handle() {
                     Some(name) => format!("@{}", name.to_uppercase()),
                     None => user.username.to_uppercase(),
                 }),

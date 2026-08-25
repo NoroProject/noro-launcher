@@ -12,7 +12,7 @@ export function useAdminServerRoles(
   const notify = useNotify();
   const rolesData = useAsyncData(
     "admin-roles-list",
-    () => auth.request<Role[]>("/api/admin/roles"),
+    () => auth.requestList<Role>("/api/admin/roles"),
     { default: () => [] },
   );
   const roles = rolesData.data;

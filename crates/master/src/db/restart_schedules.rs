@@ -35,16 +35,31 @@ pub async fn list_restart_schedules(
     .await?)
 }
 
+/// Новое расписание. Три способа задать время взаимоисключающие, но проверяет
+/// это вызывающий: здесь они просто едут вместе.
+pub struct NewRestartSchedule<'a> {
+    pub game_server_id: Uuid,
+    pub cron_expr: Option<&'a str>,
+    pub at_times: Option<Vec<String>>,
+    pub interval_minutes: Option<i32>,
+    pub notice_minutes: i32,
+    pub online_policy: &'a str,
+    pub max_defer_minutes: i32,
+}
+
 pub async fn create_restart_schedule(
     pool: &PgPool,
-    game_server_id: Uuid,
-    cron_expr: Option<&str>,
-    at_times: Option<Vec<String>>,
-    interval_minutes: Option<i32>,
-    notice_minutes: i32,
-    online_policy: &str,
-    max_defer_minutes: i32,
+    s: NewRestartSchedule<'_>,
 ) -> Result<RestartScheduleRow> {
+    let NewRestartSchedule {
+        game_server_id,
+        cron_expr,
+        at_times,
+        interval_minutes,
+        notice_minutes,
+        online_policy,
+        max_defer_minutes,
+    } = s;
     let now = Utc::now();
     let next_run = compute_next_run(cron_expr, at_times.as_deref(), interval_minutes, now)
         .ok_or_else(|| {
@@ -170,7 +185,7 @@ fn field_matches(expr: &str, val: u32) -> bool {
         let parts: Vec<&str> = expr.split('/').collect();
         if parts.len() == 2 {
             if let Ok(step) = parts[1].parse::<u32>() {
-                return step > 0 && val % step == 0;
+                return step > 0 && val.is_multiple_of(step);
             }
         }
     }

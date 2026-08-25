@@ -21,7 +21,7 @@ export function useInstallTargets(initialServerId?: string) {
   const picked = ref<Set<string>>(new Set());
 
   async function loadServers() {
-    servers.value = (await auth.request<ServerRow[]>("/api/admin/servers")) ?? [];
+    servers.value = (await auth.requestList<ServerRow>("/api/admin/servers")) ?? [];
     if (!serverId.value && servers.value.length) {
       serverId.value = servers.value[0].id;
     }
@@ -33,8 +33,7 @@ export function useInstallTargets(initialServerId?: string) {
     try {
       const [b, g] = await Promise.all([
         auth.request<BuildRow[]>(`/api/admin/builds?server_id=${serverId.value}`),
-        auth.request<GameServer[]>(
-          `/api/admin/servers/${serverId.value}/game-servers`,
+        auth.requestList<GameServer>(`/api/admin/servers/${serverId.value}/game-servers`,
         ),
       ]);
       builds.value = b ?? [];

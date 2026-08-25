@@ -39,3 +39,10 @@ fun includeVersions(container: String) {
 includeVersions("mod")
 // Paper: имя проекта — просто версия Minecraft.
 includeVersions("paper")
+// Клиентские моды: ядро и две надстройки над ним. Контейнер у каждого
+// свой — это три разных jar, а не три сборки одного.
+includeVersions("client-core")
+// Надстройки — обычные java-проекты: версия у них одна, препроцессор им не
+// нужен, а второй контейнер мультиверсий столкнулся бы с первым по имени узла.
+include("client-staff")
+include("client-player")

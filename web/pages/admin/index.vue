@@ -67,9 +67,9 @@ const fileStoreGb = computed(() => {
       <section class="noro-panel p-5">
         <h2 class="mb-4 font-bold text-[var(--noro-text)]">{{ t('admin-dash-quick-actions') }}</h2>
         <div class="grid gap-2">
-          <QuickAction to="/admin/clients" icon="i-lucide-plus" :label="t('admin-dash-create-client')" primary />
-          <QuickAction to="/admin/news" icon="i-lucide-newspaper" :label="t('admin-dash-publish-news')" />
-          <QuickAction to="/admin/launcher" icon="i-lucide-rocket" :label="t('admin-dash-deploy-launcher')" />
+          <QuickAction :to="adminLink.clients()" icon="i-lucide-plus" :label="t('admin-dash-create-client')" primary />
+          <QuickAction :to="adminLink.news()" icon="i-lucide-newspaper" :label="t('admin-dash-publish-news')" />
+          <QuickAction :to="adminLink.launcher()" icon="i-lucide-rocket" :label="t('admin-dash-deploy-launcher')" />
         </div>
       </section>
     </div>

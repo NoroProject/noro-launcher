@@ -24,7 +24,10 @@ pub async fn request_diagnostics(
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_USERS_LAUNCHER)?;
     if !state.ws.is_user_connected(id) {
-        return Err(AppError::BadRequest("launcher is offline".into()));
+        return Err(AppError::state(
+            crate::error_codes::LAUNCHER_OFFLINE,
+            "launcher is offline",
+        ));
     }
     state
         .ws
@@ -63,7 +66,10 @@ pub async fn run_action(
 ) -> AppResult<Json<Value>> {
     admin.require(PERM_USERS_LAUNCHER)?;
     if !state.ws.is_user_connected(id) {
-        return Err(AppError::BadRequest("launcher is offline".into()));
+        return Err(AppError::state(
+            crate::error_codes::LAUNCHER_OFFLINE,
+            "launcher is offline",
+        ));
     }
 
     state.ws.send_to_user(

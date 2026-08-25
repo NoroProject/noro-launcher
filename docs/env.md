@@ -6,16 +6,19 @@
 When running from the repo root with `cargo run -p master`, copy `.env.example`
 to `.env` in the repo root.
 
-These five are **required** — `Config::from_env` fails and the master does not
+These three are **required** — `Config::from_env` fails and the master does not
 start without them:
 
 ```env
 DATABASE_URL=postgres://postgres:postgres@localhost/noro
-DISCORD_CLIENT_ID=...
-DISCORD_CLIENT_SECRET=...
 NORO_PUBLIC_URL=http://localhost:8080
 NORO_WEB_URL=http://localhost:3000
 ```
+
+Sign-in providers are no longer among them: Discord, Twitch and Google are set
+up in Admin → Sign-in and their keys live in the `auth_methods` table. Env still
+wins where it is set — `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET`,
+e.g. `TWITCH_CLIENT_SECRET`.
 
 They used to have defaults. That was a bug, not a convenience: an instance
 started without `NORO_PUBLIC_URL` came up healthy and handed out `localhost`

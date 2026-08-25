@@ -34,8 +34,13 @@ services:
       NORO_SIGNING_KEY: ${NORO_SIGNING_KEY}
       # Без них вход через Discord молча не работает: мастер поднимается,
       # а /auth/discord/login уходит в Discord с пустым client_id.
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
-      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      # Провайдеры входа настраиваются в админке; заданное здесь перекрывает БД.
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       NORO_FILES_CDN_URL: https://noro-cdn.${DOMAIN}/files
       # Из браузера в API ходит только сайт. Без этой переменной CORS открыт
       # для любого origin (см. docs/env.md).

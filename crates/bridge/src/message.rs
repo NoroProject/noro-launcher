@@ -54,11 +54,9 @@ pub struct ModProjectInfo {
 /// Frontend → Backend.
 #[derive(Debug)]
 pub enum MessageToBackend {
-    // --- Авторизация (Discord OAuth / Ключ доступа) ---
-    StartDiscordLogin {
-        modal_action: ModalAction,
-    },
-    StartOAuth2Login {
+    // --- Авторизация (вход через сайт / ключ доступа) ---
+    /// Вход через сайт: способов входа много, и живут они там.
+    StartWebLogin {
         modal_action: ModalAction,
     },
     StartKeyLogin {
@@ -417,6 +415,18 @@ pub enum MessageToFrontend {
     },
     SyncComplete {
         server_id: Uuid,
+    },
+    /// Паки и шейдеры обновились, пока игра запущена.
+    ///
+    /// Отдельно от `SyncComplete`: та говорит «сборка готова к запуску», а эта —
+    /// «в запущенной игре появилось новое, применить можно перезагрузкой
+    /// ресурсов». Файлы, которые игра держала открытыми, встанут при следующем
+    /// запуске, и о них тоже надо сказать — иначе человек будет ждать того,
+    /// чего не произошло.
+    LiveSynced {
+        server_id: Uuid,
+        updated: Vec<String>,
+        locked: Vec<String>,
     },
     SyncFailed {
         server_id: Uuid,

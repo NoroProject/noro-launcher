@@ -119,7 +119,7 @@ pub fn toolbar(view: &ConsoleWindow, logs: &[LogEntry], cx: &mut Cx) -> AnyEleme
                 if let Some(ui) = cx.try_global::<GlobalLauncherUI>() {
                     let ui = ui.0.clone();
                     let server_id = v.server_id;
-                    let _ = ui.update(cx, |ui, cx| {
+                    ui.update(cx, |ui, cx| {
                         ui.logs.remove(&server_id);
                         cx.notify();
                     });

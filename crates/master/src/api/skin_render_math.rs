@@ -48,19 +48,40 @@ pub struct Quad {
     pub is_overlay: bool,
 }
 
+/// Куда рисуем: размеры холста, центр проекции и масштаб.
+///
+/// Шесть чисел, которые всегда едут вместе и по отдельности ничего не значат.
+/// Пока они были отдельными аргументами, вызов растеризатора состоял из
+/// одиннадцати позиций, и перепутать `cx` с `cy` можно было не заметив.
+#[derive(Clone, Copy)]
+pub struct Canvas {
+    pub w: u32,
+    pub h: u32,
+    /// Центр проекции в пикселях холста.
+    pub cx: f64,
+    pub cy: f64,
+    /// Высота, относительно которой считается вертикаль модели.
+    pub center_y: f64,
+    /// Во сколько раз холст крупнее итоговой картинки.
+    pub res_mult: f64,
+}
+
 pub fn rasterize_quad_highres(
     quad: &Quad,
     mat: &Mat3,
     skin: &DynamicImage,
     canvas: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
     z_buf: &mut [f64],
-    cw: u32,
-    ch: u32,
-    cx: f64,
-    cy: f64,
-    center_y: f64,
-    res_mult: f64,
+    view: Canvas,
 ) {
+    let Canvas {
+        w: cw,
+        h: ch,
+        cx,
+        cy,
+        center_y,
+        res_mult,
+    } = view;
     let light = V3::new(0.3, 0.8, 0.5);
     let trans_norm = mat.transform(quad.normal);
     let l_dot = trans_norm.dot(light).max(0.0);
@@ -126,26 +147,30 @@ fn sample_barycentric(
     verts: &[V3; 4],
     uvs: &[(f64, f64); 4],
 ) -> Option<(f64, f64, f64)> {
-    if let Some((u, v, z)) = tri_bary(
-        x, y, &verts[0], &verts[1], &verts[2], &uvs[0], &uvs[1], &uvs[2],
+    // Квад — это два треугольника: 0-1-2 и 0-2-3. Точка попадает ровно в один.
+    if let Some(hit) = tri_bary(
+        x,
+        y,
+        [verts[0], verts[1], verts[2]],
+        [uvs[0], uvs[1], uvs[2]],
     ) {
-        return Some((u, v, z));
+        return Some(hit);
     }
     tri_bary(
-        x, y, &verts[0], &verts[2], &verts[3], &uvs[0], &uvs[2], &uvs[3],
+        x,
+        y,
+        [verts[0], verts[2], verts[3]],
+        [uvs[0], uvs[2], uvs[3]],
     )
 }
 
-fn tri_bary(
-    x: f64,
-    y: f64,
-    p0: &V3,
-    p1: &V3,
-    p2: &V3,
-    u0: &(f64, f64),
-    u1: &(f64, f64),
-    u2: &(f64, f64),
-) -> Option<(f64, f64, f64)> {
+/// Барицентрические координаты точки в треугольнике.
+///
+/// Вершины и их UV приходят массивами, а не шестью аргументами подряд: три пары
+/// «точка и её текстурная координата» обязаны совпадать по порядку, и разложенные
+/// в плоский список они разъезжались при любой правке.
+fn tri_bary(x: f64, y: f64, p: [V3; 3], uv: [(f64, f64); 3]) -> Option<(f64, f64, f64)> {
+    let ([p0, p1, p2], [u0, u1, u2]) = (p, uv);
     let den = (p1.y - p2.y) * (p0.x - p2.x) + (p2.x - p1.x) * (p0.y - p2.y);
     if den.abs() < 1e-6 {
         return None;

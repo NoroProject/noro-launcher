@@ -37,14 +37,16 @@ pub async fn create_suggestion(
 
     let row = crate::db::create_mod_suggestion(
         &state.db,
-        req.server_id,
-        build_id,
-        &req.provider,
-        &req.project_id,
-        &req.title,
-        req.icon_url.as_deref(),
-        req.description.as_deref(),
-        user.user_id,
+        crate::db::mod_suggestions::NewModSuggestion {
+            server_id: req.server_id,
+            build_id,
+            provider: &req.provider,
+            project_id: &req.project_id,
+            title: &req.title,
+            icon_url: req.icon_url.as_deref(),
+            description: req.description.as_deref(),
+            suggested_by: user.user_id,
+        },
     )
     .await?;
 

@@ -42,6 +42,19 @@ export function useApi() {
     })
   }
 
+  /**
+   * Списочная ручка мастера отдаёт `{ items, total }`, а вызывающему обычно
+   * нужен только массив.
+   *
+   * Отдельным методом, а не разворотом на каждом месте вызова: таких мест
+   * больше двадцати, и стоит забыть одно — страница молча покажет пустой
+   * список вместо ошибки. Счётчик берут те, кому он нужен, через `request`.
+   */
+  async function requestList<T>(path: string, options: FetchOptions = {}) {
+    const page = await request<{ items: T[]; total: number }>(path, options)
+    return page?.items ?? []
+  }
+
   async function upload<T>(
     path: string,
     field: string,
@@ -59,7 +72,7 @@ export function useApi() {
 
   async function logout() {
     try {
-      await request('/auth/logout', { method: 'GET' })
+      await request('/auth/logout', { method: 'POST' })
     } catch {
       // Local cleanup still matters: the token may already be expired.
     }
@@ -67,11 +80,12 @@ export function useApi() {
     refreshToken.value = null
   }
 
-  function discordLoginUrl(redirectPath = '/login') {
+  /** Ссылка входа через платформу: discord, twitch, google. */
+  function providerLoginUrl(provider: string, redirectPath = '/login') {
     const redirect = import.meta.client
       ? `${window.location.origin}${redirectPath}`
       : `${webUrl.value}${redirectPath}`
-    const url = new URL('/auth/discord/login', masterUrl.value)
+    const url = new URL(`/auth/${provider}/login`, masterUrl.value)
     url.searchParams.set('redirect', redirect)
     return url.toString()
   }
@@ -82,8 +96,9 @@ export function useApi() {
     token,
     refreshToken,
     request,
+    requestList,
     upload,
     logout,
-    discordLoginUrl
+    providerLoginUrl
   }
 }

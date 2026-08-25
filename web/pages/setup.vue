@@ -6,7 +6,7 @@ definePageMeta({ layout: false })
 const setup = useSetup()
 const notify = useNotify()
 
-const STEPS = ['Token', 'URLs', 'Discord', 'Signing', 'Operator', 'Finish'] as const
+const STEPS = ['Token', 'URLs', 'Sign-in', 'Signing', 'Operator', 'Finish'] as const
 const step = ref(0)
 const busy = ref(false)
 const done = ref(false)
@@ -20,7 +20,6 @@ const settings = ref<Record<string, string>>({
   web_url: '',
   allowed_origins: '',
   files_cdn_url: '',
-  discord_client_id: '',
 })
 
 const secretPresent = (name: string) => !!setup.status.value?.secrets?.[name]
@@ -79,7 +78,7 @@ onMounted(async () => {
   const status = await setup.loadStatus().catch(() => null)
   // Настроенный инстанс на визарде делать нечего: токена нет, а страница
   // обещала бы то, чего уже не произойдёт.
-  if (status?.setup_completed) await navigateTo('/')
+  if (status?.setup_completed) await navigateTo(link.home())
   if (setup.token.value) step.value = 1
 })
 </script>
@@ -114,12 +113,10 @@ onMounted(async () => {
 
         <SetupStepUrls v-else-if="step === 1" v-model="settings" @next="saveAnd(2)" />
 
-        <SetupStepDiscord
+        <SetupStepSignIn
           v-else-if="step === 2"
-          v-model="settings"
           :api-url="settings.public_url"
-          :secret-present="secretPresent('DISCORD_CLIENT_SECRET')"
-          @next="saveAnd(3)"
+          @next="step = 3"
         />
 
         <SetupStepSigning

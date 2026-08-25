@@ -26,6 +26,28 @@ final class MarkupCursor {
     private boolean underlined;
     private boolean strikethrough;
     private boolean obfuscated;
+    private String font;
+    private String link;
+
+    /**
+     * Стопка стилей для парных тегов MiniMessage.
+     *
+     * <p>Legacy-коды действуют «до отмены», а теги — до своего закрытия:
+     * {@code <red>алый <bold>жирный</bold> снова алый</red>}. Без стопки
+     * закрывающий тег пришлось бы понимать как полный сброс, и вложенность
+     * сломалась бы на первом же случае.
+     */
+    private final java.util.ArrayDeque<State> stack = new java.util.ArrayDeque<>();
+
+    private record State(
+            int color,
+            boolean bold,
+            boolean italic,
+            boolean underlined,
+            boolean strikethrough,
+            boolean obfuscated,
+            String font,
+            String link) {}
 
     MarkupCursor(List<TextSpan> spans) {
         this.spans = spans;
@@ -45,7 +67,15 @@ final class MarkupCursor {
             return;
         }
         spans.add(new TextSpan(
-                pending.toString(), color, bold, italic, underlined, strikethrough, obfuscated, url));
+                pending.toString(),
+                color,
+                bold,
+                italic,
+                underlined,
+                strikethrough,
+                obfuscated,
+                url == null ? link : url,
+                font));
         pending.setLength(0);
     }
 
@@ -80,11 +110,77 @@ final class MarkupCursor {
     /**
      * Кликабельный кусок. Ссылка не переходит на следующий текст: подчёркнутым и
      * кликабельным должен быть ровно тот фрагмент, который её описывает.
+     *
+     * <p>Метка приходит уже разобранной: внутри неё работает та же разметка, что
+     * снаружи. Пока не работала, кнопки меню разбора уезжали в чат строкой
+     * «#e6e6e6чат#8b8b8b» — решётки было видно, цвета нет.
+     *
+     * <p>Кусок без своего цвета берёт цвет вокруг ссылки: «[чат]» в серой строке
+     * должен остаться серым, а не стать белым только потому, что он кликабельный.
      */
-    void linked(String label, String url) {
+    /** Голая ссылка: метки нет, разбирать нечего — текст и есть адрес. */
+    void linked(String url) {
         flush();
-        pending.append(label);
+        pending.append(url);
         flush(url);
+    }
+
+    void linked(List<TextSpan> label, String url) {
+        flush();
+        for (TextSpan span : label) {
+            spans.add(span.hasColor() ? span.linkedTo(url) : span.linkedTo(url, color));
+        }
+    }
+
+    /** Запомнить текущий стиль: открылся парный тег. */
+    void push() {
+        flush();
+        stack.push(new State(color, bold, italic, underlined, strikethrough, obfuscated, font, link));
+    }
+
+    /** Вернуть стиль, каким он был до тега. Лишний закрывающий тег — не беда. */
+    void pop() {
+        flush();
+        State was = stack.poll();
+        if (was == null) {
+            return;
+        }
+        color = was.color();
+        bold = was.bold();
+        italic = was.italic();
+        underlined = was.underlined();
+        strikethrough = was.strikethrough();
+        obfuscated = was.obfuscated();
+        font = was.font();
+        link = was.link();
+    }
+
+    /** Цвет без сброса стилей: у тегов вложенность своя, стопка её и держит. */
+    void tint(int rgb) {
+        flush();
+        color = rgb;
+    }
+
+    void decorate(char code) {
+        flush();
+        switch (code) {
+            case 'l' -> bold = true;
+            case 'o' -> italic = true;
+            case 'n' -> underlined = true;
+            case 'm' -> strikethrough = true;
+            default -> obfuscated = true;
+        }
+    }
+
+    void font(String value) {
+        flush();
+        font = value;
+    }
+
+    /** Кликабельность на весь кусок до закрывающего тега. */
+    void link(String value) {
+        flush();
+        link = value;
     }
 
     private void clearStyles() {

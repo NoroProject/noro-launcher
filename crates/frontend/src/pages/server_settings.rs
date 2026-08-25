@@ -1,6 +1,6 @@
 //! Настройки клиента для конкретного сервера (JVM, консоль, флаги).
 use super::common::{panel, tabs, Cx};
-use crate::components::{checkbox_row, cta_button};
+use crate::components::checkbox_row;
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
@@ -429,7 +429,7 @@ fn fullscreen(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         )
         .into_any_element()
 }
-fn folder(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+fn folder(_ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     div()
         .flex()
         .items_center()

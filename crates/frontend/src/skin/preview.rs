@@ -38,9 +38,7 @@ pub fn render_view(
     let mut canvas = render_rgba(skin_png, cape_png, SUPERSAMPLE_W, SUPERSAMPLE_H, &view)?;
     // GPUI грузит текстуры как BGRA.
     for pixel in canvas.chunks_exact_mut(4) {
-        let r = pixel[0];
-        pixel[0] = pixel[2];
-        pixel[2] = r;
+        pixel.swap(0, 2);
     }
     Some(Arc::new(RenderImage::new(vec![Frame::new(canvas)])))
 }

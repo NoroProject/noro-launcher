@@ -15,7 +15,7 @@ const serverId = computed(() => String(route.params.id));
 const gameServerId = computed(() => String(route.params.gsid));
 
 const { data: servers } = await useAsyncData(`game-servers-${serverId.value}`, () =>
-    auth.request<GameServer[]>(`/api/admin/servers/${serverId.value}/game-servers`),
+    auth.requestList<GameServer>(`/api/admin/servers/${serverId.value}/game-servers`),
 );
 const server = computed(() => servers.value?.find((s) => s.id === gameServerId.value));
 /** Прочие бэкенды сборки: цели массового применения конфигов. */

@@ -2,7 +2,6 @@
 // Часть компонентов — библиотечные, ещё не везде задействованы.
 #![allow(unused_imports)]
 
-mod atom_art;
 mod badge;
 mod button;
 mod checkbox;
@@ -16,7 +15,6 @@ mod stage_row;
 mod version_badge;
 mod window_chrome;
 
-pub use atom_art::{atom_art, tiny_atom_logo};
 pub use badge::badge;
 pub use button::btn;
 pub use checkbox::checkbox_row;
