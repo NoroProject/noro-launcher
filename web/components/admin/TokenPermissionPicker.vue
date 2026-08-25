@@ -140,7 +140,7 @@ function toggleGroup(items: { name: string }[]) {
         class="text-xs text-[var(--noro-blue)] hover:underline"
         @click="customRawText = !customRawText"
       >
-        {{ customRawText ? 'Выбор галочками' : t('admin-tokens-custom-toggle') }}
+        {{ customRawText ? t('admin-tokens-checkbox-toggle') : t('admin-tokens-custom-toggle') }}
       </button>
     </div>
 

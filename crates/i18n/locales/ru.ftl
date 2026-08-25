@@ -686,6 +686,7 @@ admin-tokens-preset-senior-mod = ⚔️ Модератор
 admin-tokens-preset-junior-mod = 🤝 Хелпер
 admin-tokens-preset-custom = 🧹 Свой набор
 admin-tokens-custom-toggle = Ввести права вручную текстом
+admin-tokens-checkbox-toggle = Выбор галочками
 admin-tokens-select-all = Выбрать всё
 admin-tokens-deselect-all = Снять всё
 
@@ -959,6 +960,8 @@ admin-perm-suggestions-unavailable = Автодополнение недосту
 admin-perm-already-granted = Право уже выдано во всех выбранных контекстах.
 admin-perm-pick-build = Выберите хотя бы одну сборку или выдайте право для всех сборок.
 admin-perm-no-permissions = Персональные права ещё не выданы.
+admin-perm-show-nodes = Показать все узлы
+admin-perm-hide-nodes = Скрыть категории
 admin-diag-title = Диагностика
 admin-diag-collect = Запросить
 admin-diag-subtitle = Версии, железо и скорость соединения. Никаких личных данных.

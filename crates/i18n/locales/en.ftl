@@ -681,6 +681,7 @@ admin-tokens-preset-senior-mod = ⚔️ Senior Moderator
 admin-tokens-preset-junior-mod = 🤝 Junior Helper
 admin-tokens-preset-custom = 🧹 Custom Set
 admin-tokens-custom-toggle = Enter permissions manually as text
+admin-tokens-checkbox-toggle = Pick with checkboxes
 admin-tokens-select-all = Select all
 admin-tokens-deselect-all = Deselect all
 
@@ -954,6 +955,8 @@ admin-perm-suggestions-unavailable = Suggestions unavailable: { $error }. Permis
 admin-perm-already-granted = Already granted everywhere you picked.
 admin-perm-pick-build = Pick at least one build, or grant it on all of them.
 admin-perm-no-permissions = No permissions granted yet.
+admin-perm-show-nodes = Show all nodes
+admin-perm-hide-nodes = Hide categories
 admin-diag-title = Diagnostics
 admin-diag-collect = Collect
 admin-diag-subtitle = Versions, hardware and link speed — nothing personal.
