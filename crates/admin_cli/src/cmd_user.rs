@@ -11,6 +11,12 @@ use crate::util::urlencode;
 pub enum UserCmd {
     /// List all users.
     List,
+    /// Get user details by linked platform identity.
+    #[command(name = "by-identity", alias = "identity")]
+    ByIdentity {
+        provider: String,
+        provider_user_id: String,
+    },
     /// Get user details.
     Get { id: String },
     /// Ban a user.
@@ -73,6 +79,17 @@ pub async fn run(c: &Client, cmd: UserCmd) -> Result<()> {
         UserCmd::Get { id } => {
             let uid = resolve_user_id(c, &id).await?;
             c.get(&format!("/api/admin/users/{uid}")).await?
+        }
+        UserCmd::ByIdentity {
+            provider,
+            provider_user_id,
+        } => {
+            c.get(&format!(
+                "/api/admin/users/by-identity?provider={}&provider_user_id={}",
+                urlencode(&provider),
+                urlencode(&provider_user_id)
+            ))
+            .await?
         }
         UserCmd::Ban { id, reason } => {
             let uid = resolve_user_id(c, &id).await?;

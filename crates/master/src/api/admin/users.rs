@@ -83,6 +83,33 @@ pub async fn get(
 }
 
 #[derive(Deserialize)]
+pub struct LookupIdentityQuery {
+    pub provider: String,
+    pub provider_user_id: String,
+}
+
+/// `GET /api/admin/users/by-identity?provider=telegram&provider_user_id=730545443`
+///
+/// Найти профиль игрока по привязанной платформе и её ID.
+pub async fn get_by_identity(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Query(q): Query<LookupIdentityQuery>,
+) -> AppResult<Json<UserProfile>> {
+    admin.require(PERM_USERS_VIEW)?;
+    let user_id = crate::db::identities::find_user(&state.db, &q.provider, &q.provider_user_id)
+        .await?
+        .ok_or_else(|| {
+            AppError::NotFound(format!(
+                "user with identity {}/{} not found",
+                q.provider, q.provider_user_id
+            ))
+        })?;
+    let profile = crate::db::load_profile(&state.db, user_id).await?;
+    Ok(Json(profile))
+}
+
+#[derive(Deserialize)]
 pub struct BanReq {
     pub banned: bool,
     pub reason: Option<String>,

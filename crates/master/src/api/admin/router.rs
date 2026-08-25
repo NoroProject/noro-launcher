@@ -246,6 +246,7 @@ fn catalog_router() -> Router<AppState> {
 fn users_router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/users", get(users::list))
+        .route("/api/admin/users/by-identity", get(users::get_by_identity))
         .route("/api/admin/users/{id}", get(users::get))
         .route(
             "/api/admin/users/{id}/launcher",
