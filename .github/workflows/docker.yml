@@ -67,3 +67,21 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}-amd64
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-amd64
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Запускаем только если настроены секреты для деплоя
+    if: github.repository != '' # You can restrict to main repo or check secrets if needed
+    steps:
+      - name: Execute deployment commands via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USERNAME }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          # Выполняем пулл новых образов и перезапуск compose
+          script: |
+            cd /opt/noro-launcher # Замените на путь к вашему docker-compose.yml на сервере
+            docker compose pull
+            docker compose up -d
