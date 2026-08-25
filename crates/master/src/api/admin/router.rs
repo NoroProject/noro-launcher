@@ -101,7 +101,10 @@ pub fn router() -> Router<AppState> {
         )
         .route("/api/admin/settings/env", get(settings::export_env))
         .route("/api/admin/auth-methods", get(auth_methods::list))
-        .route("/api/admin/auth-methods/{method}", put(auth_methods::save))
+        .route(
+            "/api/admin/auth-methods/{method}",
+            put(auth_methods::save).post(auth_methods::save),
+        )
         .route(
             "/api/admin/settings/image/{key}",
             post(settings::upload_image),
@@ -272,7 +275,7 @@ fn users_router() -> Router<AppState> {
         )
         .route(
             "/api/admin/users/{id}/skin-presets",
-            get(users::list_skin_presets_for_user),
+            get(users::list_skin_presets_for_user).post(users::add_skin_preset_for_user),
         )
         .route(
             "/api/admin/users/{id}/skin-presets/select",

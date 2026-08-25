@@ -71,4 +71,28 @@ val collectAgents by tasks.registering(Copy::class) {
     // агентами, чтобы весь каталог копировался в {NORO_DATA_DIR}/agents одной
     // командой и админка видела его тем же списком.
     from(project(":wrapper").tasks.named("jar")) { rename { "wrapper.jar" } }
+
+    // Клиентские моды: ядро, плеер и стафф для всех доступных версий.
+    project(":client-core").subprojects.forEach { version ->
+        val taskName = if (version.tasks.findByName("remapJar") != null) "remapJar" else "jar"
+        from(version.tasks.named(taskName)) { rename { "client-core-${version.name}.jar" } }
+
+        if (project(":client-player").subprojects.isEmpty()) {
+            from(project(":client-player").tasks.named("jar")) { rename { "client-player-${version.name}.jar" } }
+        }
+        if (project(":client-staff").subprojects.isEmpty()) {
+            from(project(":client-staff").tasks.named("jar")) { rename { "client-staff-${version.name}.jar" } }
+        }
+    }
+
+    if (project(":client-player").subprojects.isNotEmpty()) {
+        project(":client-player").subprojects.forEach { version ->
+            from(version.tasks.named("jar")) { rename { "client-player-${version.name}.jar" } }
+        }
+    }
+    if (project(":client-staff").subprojects.isNotEmpty()) {
+        project(":client-staff").subprojects.forEach { version ->
+            from(version.tasks.named("jar")) { rename { "client-staff-${version.name}.jar" } }
+        }
+    }
 }

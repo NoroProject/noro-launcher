@@ -209,6 +209,10 @@ fn router(state: AppState) -> Router {
         // комплект без префикса убран: один и тот же хендлер по двум адресам
         // означал две ручки в поддержке и расхождение в том, какую зовёт кто.
         .route(
+            "/api/auth/telegram/login",
+            post(auth::telegram::telegram_login).options(|| async {}),
+        )
+        .route(
             "/api/auth/passkeys/login/options",
             post(auth::passkeys::login_options).options(|| async {}),
         )

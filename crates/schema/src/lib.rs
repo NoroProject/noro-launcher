@@ -65,6 +65,11 @@ pub fn mc_uuid_from_discord(discord_id: &str) -> uuid::Uuid {
     mc_uuid_from_identity("discord", discord_id)
 }
 
+/// Детерминированный offline-style MC UUID из Telegram ID.
+pub fn mc_uuid_from_telegram(telegram_id: &str) -> uuid::Uuid {
+    mc_uuid_from_identity("telegram", telegram_id)
+}
+
 /// DEV-ONLY seed для ed25519. В режиме разработки мастер выводит из него приватный
 /// ключ подписи манифестов, а лаунчер — публичный ключ для проверки. Так обе
 /// стороны согласованы из коробки. В production мастер задаёт реальный приватный

@@ -83,20 +83,33 @@ pub enum GameServerCmd {
 pub async fn run(c: &Client, cmd: ServerCmd) -> Result<()> {
     let v = match cmd {
         ServerCmd::List => c.get("/api/admin/servers").await?,
-        ServerCmd::Get { id } => c.get(&format!("/api/admin/servers/{id}")).await?,
+        ServerCmd::Get { id } => {
+            let sid = resolve_server_id(c, &id).await?;
+            c.get(&format!("/api/admin/servers/{sid}")).await?
+        }
         ServerCmd::Create { name, modloader, mc_version } => {
             c.post("/api/admin/servers", json!({ "name": name, "modloader": modloader, "mc_version": mc_version })).await?
         }
         ServerCmd::Edit { id, name, description, modloader, mc_version, active, limited, sort_order } => {
-            c.put(&format!("/api/admin/servers/{id}"), json!({
+            let sid = resolve_server_id(c, &id).await?;
+            c.put(&format!("/api/admin/servers/{sid}"), json!({
                 "name": name, "description": description, "modloader": modloader,
                 "mc_version": mc_version, "active": active, "limited": limited, "sort_order": sort_order
             })).await?
         }
-        ServerCmd::Delete { id } => c.delete(&format!("/api/admin/servers/{id}")).await?,
+        ServerCmd::Delete { id } => {
+            let sid = resolve_server_id(c, &id).await?;
+            c.delete(&format!("/api/admin/servers/{sid}")).await?
+        }
         ServerCmd::Reorder { ids } => c.put("/api/admin/servers/reorder", json!({ "order": ids })).await?,
-        ServerCmd::UploadIcon { id, file } => c.upload_image(&format!("/api/admin/servers/{id}/icon"), &file, "image").await?,
-        ServerCmd::UploadBg { id, file } => c.upload_image(&format!("/api/admin/servers/{id}/background"), &file, "image").await?,
+        ServerCmd::UploadIcon { id, file } => {
+            let sid = resolve_server_id(c, &id).await?;
+            c.upload_image(&format!("/api/admin/servers/{sid}/icon"), &file, "image").await?
+        }
+        ServerCmd::UploadBg { id, file } => {
+            let sid = resolve_server_id(c, &id).await?;
+            c.upload_image(&format!("/api/admin/servers/{sid}/background"), &file, "image").await?
+        }
         ServerCmd::GameServer { cmd } => return game_server(c, cmd).await,
     };
     print_json(&v);
@@ -105,20 +118,47 @@ pub async fn run(c: &Client, cmd: ServerCmd) -> Result<()> {
 
 async fn game_server(c: &Client, cmd: GameServerCmd) -> Result<()> {
     let v = match cmd {
-        GameServerCmd::List { server_id } => c.get(&format!("/api/admin/servers/{server_id}/game-servers")).await?,
+        GameServerCmd::List { server_id } => {
+            let sid = resolve_server_id(c, &server_id).await?;
+            c.get(&format!("/api/admin/servers/{sid}/game-servers")).await?
+        }
         GameServerCmd::Create { server_id, name, mc_host, mc_port, kind } => {
-            c.post(&format!("/api/admin/servers/{server_id}/game-servers"),
+            let sid = resolve_server_id(c, &server_id).await?;
+            c.post(&format!("/api/admin/servers/{sid}/game-servers"),
                 json!({ "name": name, "mc_host": mc_host, "mc_port": mc_port, "kind": kind })).await?
         }
         GameServerCmd::Update { server_id, id, name, mc_host, mc_port, sort_order, kind } => {
-            c.put(&format!("/api/admin/servers/{server_id}/game-servers/{id}"),
+            let sid = resolve_server_id(c, &server_id).await?;
+            c.put(&format!("/api/admin/servers/{sid}/game-servers/{id}"),
                 json!({ "name": name, "mc_host": mc_host, "mc_port": mc_port, "sort_order": sort_order, "kind": kind })).await?
         }
-        GameServerCmd::Delete { server_id, id } => c.delete(&format!("/api/admin/servers/{server_id}/game-servers/{id}")).await?,
+        GameServerCmd::Delete { server_id, id } => {
+            let sid = resolve_server_id(c, &server_id).await?;
+            c.delete(&format!("/api/admin/servers/{sid}/game-servers/{id}")).await?
+        }
         GameServerCmd::RotateToken { server_id, id } => {
-            c.post(&format!("/api/admin/servers/{server_id}/game-servers/{id}/token"), json!({})).await?
+            let sid = resolve_server_id(c, &server_id).await?;
+            c.post(&format!("/api/admin/servers/{sid}/game-servers/{id}/token"), json!({})).await?
         }
     };
     print_json(&v);
     Ok(())
+}
+
+async fn resolve_server_id(c: &Client, input: &str) -> Result<String> {
+    if uuid::Uuid::parse_str(input).is_ok() {
+        return Ok(input.to_string());
+    }
+    let v = c.get("/api/admin/servers").await?;
+    if let Some(arr) = v.as_array().or_else(|| v.get("items").and_then(|i| i.as_array())) {
+        for s in arr {
+            let name = s.get("name").and_then(|val| val.as_str()).unwrap_or("");
+            if name.eq_ignore_ascii_case(input) {
+                if let Some(id) = s.get("id").and_then(|val| val.as_str()) {
+                    return Ok(id.to_string());
+                }
+            }
+        }
+    }
+    Ok(input.to_string())
 }

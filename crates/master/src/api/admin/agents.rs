@@ -53,9 +53,23 @@ pub async fn list(
         // умеет докачку и кеширование.
         let stored = state.files.put_file(&entry.path()).await?;
         let stem = name.trim_end_matches(".jar");
-        let (platform, mc_version) = match stem.split_once('-') {
-            Some((platform, mc)) => (platform.to_string(), Some(mc.to_string())),
-            None => (stem.to_string(), None),
+        let (platform, mc_version) = if let Some(mc) = stem.strip_prefix("client-core-") {
+            ("client-core".to_string(), Some(mc.to_string()))
+        } else if let Some(mc) = stem.strip_prefix("client-player-") {
+            ("client-player".to_string(), Some(mc.to_string()))
+        } else if let Some(mc) = stem.strip_prefix("client-staff-") {
+            ("client-staff".to_string(), Some(mc.to_string()))
+        } else if let Some(mc) = stem.strip_prefix("chat-") {
+            ("chat".to_string(), Some(mc.to_string()))
+        } else if let Some(mc) = stem.strip_prefix("styledchat-") {
+            ("chat".to_string(), Some(mc.to_string()))
+        } else if let Some(mc) = stem.strip_prefix("tab-") {
+            ("tab".to_string(), Some(mc.to_string()))
+        } else {
+            match stem.split_once('-') {
+                Some((platform, mc)) => (platform.to_string(), Some(mc.to_string())),
+                None => (stem.to_string(), None),
+            }
         };
         // `?name=` — чтобы файл сохранился как `wrapper.jar`, а не как свой sha1:
         // ссылка ведёт на мастер, а админка живёт на другом origin, и атрибут

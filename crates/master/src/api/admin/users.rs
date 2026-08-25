@@ -339,7 +339,18 @@ pub async fn upload_skin_for_user(
                 .await
                 .map_err(AppError::Other)?;
             let url = state.config.file_url(&stored.sha1);
-            crate::db::set_skin(&state.db, id, Some(&url), false).await?;
+            let slim = crate::api::skin_model::detect_slim(&data);
+            crate::db::set_skin(&state.db, id, Some(&url), slim).await?;
+            let user_name = crate::db::load_profile(&state.db, id).await.map(|p| p.username).unwrap_or_else(|_| "Preset".into());
+            let _ = sqlx::query(
+                "INSERT INTO user_skin_presets (user_id, name, skin_url, skin_slim) VALUES ($1, $2, $3, $4)",
+            )
+            .bind(id)
+            .bind(user_name)
+            .bind(&url)
+            .bind(slim)
+            .execute(&state.db)
+            .await;
             return notify_user(&state, id).await;
         }
     }
@@ -347,6 +358,44 @@ pub async fn upload_skin_for_user(
         crate::error_codes::UPLOAD_FIELD_MISSING,
         "missing skin field",
     ))
+}
+
+#[derive(Deserialize)]
+pub struct AddSkinPresetReq {
+    pub name: Option<String>,
+    pub skin_url: Option<String>,
+    #[serde(default)]
+    pub slim: Option<bool>,
+}
+
+pub async fn add_skin_preset_for_user(
+    State(state): State<AppState>,
+    admin: AdminAuth,
+    Path(id): Path<Uuid>,
+    Json(req): Json<AddSkinPresetReq>,
+) -> AppResult<Json<SkinPresetItem>> {
+    admin.require(PERM_USERS_SKIN)?;
+    let profile = crate::db::load_profile(&state.db, id).await?;
+    let skin_url = match req.skin_url {
+        Some(u) => u,
+        None => profile.skin_url.ok_or_else(|| AppError::BadRequest("User has no current skin".into()))?,
+    };
+    let slim = req.slim.unwrap_or(profile.skin_slim);
+    let name = req.name.unwrap_or_else(|| profile.username);
+
+    let row = sqlx::query_as::<_, SkinPresetItem>(
+        "INSERT INTO user_skin_presets (user_id, name, skin_url, skin_slim)
+         VALUES ($1, $2, $3, $4) RETURNING id, name, skin_url",
+    )
+    .bind(id)
+    .bind(name)
+    .bind(skin_url)
+    .bind(slim)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|e| AppError::Other(e.into()))?;
+
+    Ok(Json(row))
 }
 
 pub async fn delete_skin_for_user(

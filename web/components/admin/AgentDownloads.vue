@@ -9,6 +9,23 @@ const ICONS: Record<string, string> = {
   fabric: 'i-lucide-scissors',
   neoforge: 'i-lucide-hammer',
   forge: 'i-lucide-anvil',
+  'client-core': 'i-lucide-cpu',
+  'client-player': 'i-lucide-user',
+  'client-staff': 'i-lucide-shield-check',
+  chat: 'i-lucide-message-square',
+  tab: 'i-lucide-table-properties',
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  paper: 'Paper',
+  fabric: 'Fabric',
+  neoforge: 'NeoForge',
+  forge: 'Forge',
+  'client-core': 'Client Core',
+  'client-player': 'Client Player',
+  'client-staff': 'Client Staff',
+  chat: 'Chat Mod (StyledChat)',
+  tab: 'TAB (Plugin / Mod)',
 }
 
 /** Группируем по платформе: версий под сотню, плоским списком их не читать. */
@@ -61,7 +78,7 @@ function sizeKb(bytes: number) {
     <div v-for="group in groups" :key="group.platform" class="mb-5 last:mb-0">
       <div class="mb-2 flex items-center gap-2">
         <UIcon :name="ICONS[group.platform] || 'i-lucide-box'" class="size-4 text-[var(--noro-muted)]" />
-        <h4 class="font-bold text-[var(--noro-text)] capitalize">{{ group.platform }}</h4>
+        <h4 class="font-bold text-[var(--noro-text)]">{{ PLATFORM_LABELS[group.platform] || group.platform }}</h4>
         <span class="text-xs text-[var(--noro-muted)]">{{ t('admin-agent-versions-count', { count: group.files.length }) }}</span>
       </div>
       <div class="flex flex-wrap gap-2">

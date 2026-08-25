@@ -105,6 +105,28 @@ impl Client {
         .await
     }
 
+    /// Multipart-загрузка с указанным именем поля файла и доп. полями.
+    pub async fn upload_named_file(
+        &self,
+        path: &str,
+        file: &str,
+        file_field: &str,
+        fields: Vec<(String, String)>,
+    ) -> Result<Value> {
+        let part = Self::read_part(file).await?;
+        let mut form = reqwest::multipart::Form::new().part(file_field.to_string(), part);
+        for (k, v) in fields {
+            form = form.text(k, v);
+        }
+        Self::handle(
+            self.req(reqwest::Method::POST, path)
+                .multipart(form)
+                .send()
+                .await?,
+        )
+        .await
+    }
+
     /// Multipart-загрузка с указанным именем поля (например, "image").
     pub async fn upload_image(&self, path: &str, file: &str, field_name: &str) -> Result<Value> {
         let part = Self::read_part(file).await?;
@@ -175,7 +197,7 @@ fn explain(body: &str) -> String {
         .unwrap_or_else(|| body.to_string())
 }
 
-/// Вывести JSON красиво.
+/// Вывести форматированный красивый ответ (таблица или карточка).
 pub fn print_json(v: &Value) {
-    println!("{}", serde_json::to_string_pretty(v).unwrap_or_default());
+    crate::format::print_response(v);
 }
