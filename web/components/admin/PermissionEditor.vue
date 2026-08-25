@@ -34,13 +34,6 @@ const contextSummary = computed(() => {
 const catalogFor = computed(() => (global.value ? '' : picked.value[0] || ''))
 const { suggestions, pending, error } = usePermissionNodes(catalogFor)
 
-const PRESETS = [
-  { key: 'admin-tokens-preset-superadmin', hint: '*', nodes: ['*'] },
-  { key: 'admin-tokens-preset-fulladmin', hint: 'noro.admin.*', nodes: ['noro.admin.*'] },
-  { key: 'admin-tokens-preset-senior-mod', hint: 'noro.mod.*', nodes: ['noro.mod.*', 'noro.admin.users.view', 'noro.admin.rules.view', 'noro.admin.audit'] },
-  { key: 'admin-tokens-preset-junior-mod', hint: '', nodes: ['noro.mod.punish.warn', 'noro.mod.punish.mute', 'noro.mod.cases.view', 'noro.mod.cases.claim', 'noro.mod.cases.resolve', 'noro.admin.users.view', 'noro.admin.rules.view'] },
-] as const
-
 const targets = computed<(string | null)[]>(() =>
   global.value ? [null] : picked.value.slice()
 )
@@ -82,14 +75,6 @@ function toggle(permission: string, serverId: string | null) {
   if (granted) emit('remove', [entry])
   else emit('add', [entry])
 }
-function applyPreset(nodesList: readonly string[]) {
-  const sids = global.value ? [null] : picked.value.slice()
-  const toAdd = nodesList.flatMap(p => 
-    sids.filter(sid => !props.entries.some(e => e.permission === p && e.server_id === sid))
-        .map(sid => ({ permission: p, server_id: sid }))
-  )
-  if (toAdd.length) emit('add', toAdd)
-}
 function removeAll(permission: string) {
   emit('remove', props.entries.filter(e => e.permission === permission))
 }
@@ -99,22 +84,6 @@ function removeAll(permission: string) {
   <section class="noro-panel p-5">
     <h2 class="text-xl font-black text-[var(--noro-text)]">{{ title }}</h2>
     <p class="mt-1 text-sm text-[var(--noro-muted)]">{{ subtitle }}</p>
-
-    <!-- Presets -->
-    <div class="mt-4 grid gap-1.5">
-      <span class="noro-label">{{ t('admin-tokens-preset-title') }}</span>
-      <div class="flex flex-wrap gap-1.5">
-        <button
-          v-for="p in PRESETS" :key="p.key"
-          type="button"
-          class="group flex items-center gap-1.5 rounded-md border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] px-2.5 py-1.5 text-xs font-semibold text-[var(--noro-muted)] transition hover:border-[var(--noro-cream)] hover:text-[var(--noro-text)] cursor-pointer"
-          @click="applyPreset(p.nodes)"
-        >
-          <span>{{ t(p.key) }}</span>
-          <span v-if="p.hint" class="font-mono text-[10px] text-[var(--noro-muted)] opacity-60 group-hover:opacity-100">{{ p.hint }}</span>
-        </button>
-      </div>
-    </div>
 
     <!-- Input -->
     <div class="mt-5">
