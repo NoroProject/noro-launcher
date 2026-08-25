@@ -137,14 +137,14 @@ fn builtin() -> Vec<Suggestion> {
         Suggestion {
             node: schema::PERM_SUPERADMIN.to_string(),
             source: "launcher",
-            label: Some("Everything, no limits".into()),
-            group: Some("Panel"),
+            label: Some("Суперадмин: Полный неограниченный доступ".into()),
+            group: Some("Панель"),
         },
         Suggestion {
             node: schema::PERM_ADMIN_ALL.to_string(),
             source: "launcher",
-            label: Some("Full admin panel".into()),
-            group: Some("Panel"),
+            label: Some("Админ панели: Все разделы администрирования".into()),
+            group: Some("Панель"),
         },
     ];
     // Ветку целиком («все права на игроков») выдают чаще, чем перечисляют узлы
@@ -159,8 +159,8 @@ fn builtin() -> Vec<Suggestion> {
         out.push(Suggestion {
             node: format!("{prefix}.*"),
             source: "launcher",
-            label: Some(format!("Everything under {prefix}")),
-            group: Some("Branches"),
+            label: Some(format!("Все права в ветке {prefix}")),
+            group: Some("Ветки"),
         });
     }
     out.extend(schema::ALL_NODES.iter().map(|node| Suggestion {
