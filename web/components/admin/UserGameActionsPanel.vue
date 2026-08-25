@@ -105,6 +105,8 @@ async function doTell() {
   }
 }
 
+const can = (perm: string) => auth.hasPermission(perm)
+
 onMounted(() => checkOnlineStatus())
 </script>
 
@@ -139,7 +141,7 @@ onMounted(() => checkOnlineStatus())
       :class="!isOnline ? 'opacity-50 pointer-events-none' : ''"
     >
       <!-- Kick Card -->
-      <div class="space-y-3 rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] p-4">
+      <div v-if="can('noro.admin.game.kick')" class="space-y-3 rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] p-4">
         <div>
           <div class="font-bold text-[var(--noro-text)] text-sm">
             {{ t('admin-game-actions-kick-title', { username }) }}
@@ -168,7 +170,7 @@ onMounted(() => checkOnlineStatus())
       </div>
 
       <!-- Tell / Direct Message Card -->
-      <div class="space-y-3 rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] p-4">
+      <div v-if="can('noro.admin.game.tell')" class="space-y-3 rounded border border-[var(--noro-border)] bg-[var(--noro-bg)] p-4">
         <div>
           <div class="font-bold text-[var(--noro-text)] text-sm">
             {{ t('admin-game-actions-tell-title') }}

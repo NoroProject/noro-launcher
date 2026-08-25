@@ -23,15 +23,25 @@ const siblings = computed(
     () => (servers.value ?? []).filter((s) => s.id !== gameServerId.value && s.kind !== "proxy"),
 );
 
+const can = (perm: string) => auth.hasPermission(perm)
+
 const wrapper = useWrapper(gameServerId.value);
-const tab = ref<"console" | "files" | "mods" | "backups" | "restarts">("console");
 const TABS = [
-    { id: "console", label: "Console", icon: "i-lucide-terminal" },
-    { id: "files", label: "Files", icon: "i-lucide-folder-tree" },
-    { id: "mods", label: "Mods", icon: "i-lucide-package" },
-    { id: "backups", label: "Backups", icon: "i-lucide-archive" },
-    { id: "restarts", label: "Restarts", icon: "i-lucide-timer-reset" },
+    { id: "console", label: "Console", icon: "i-lucide-terminal", perms: ['noro.admin.wrapper.console', 'noro.admin.wrapper.view'] },
+    { id: "files", label: "Files", icon: "i-lucide-folder-tree", perms: ['noro.admin.wrapper.files'] },
+    { id: "mods", label: "Mods", icon: "i-lucide-package", perms: ['noro.admin.mods.view', 'noro.admin.wrapper.files'] },
+    { id: "backups", label: "Backups", icon: "i-lucide-archive", perms: ['noro.admin.wrapper.backups'] },
+    { id: "restarts", label: "Restarts", icon: "i-lucide-timer-reset", perms: ['noro.admin.restarts.view'] },
 ] as const;
+
+const visibleTabs = computed(() => TABS.filter(item => auth.hasAny(...item.perms)));
+const tab = ref<"console" | "files" | "mods" | "backups" | "restarts">("console");
+
+watchEffect(() => {
+    if (visibleTabs.value.length && !visibleTabs.value.some(t => t.id === tab.value)) {
+        tab.value = visibleTabs.value[0]!.id
+    }
+})
 </script>
 
 <template>
@@ -47,6 +57,7 @@ const TABS = [
 
         <div class="flex flex-col gap-5 h-full min-h-0 flex-1">
             <GameserverStatusPanel
+                v-if="can('noro.admin.wrapper.power')"
                 class="shrink-0"
                 :state="wrapper.state.value"
                 :busy="wrapper.busy.value"
@@ -55,7 +66,7 @@ const TABS = [
 
             <nav class="flex shrink-0 flex-wrap gap-2">
                 <button
-                    v-for="item in TABS"
+                    v-for="item in visibleTabs"
                     :key="item.id"
                     type="button"
                     class="noro-chip flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider"
