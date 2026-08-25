@@ -142,4 +142,3 @@ fn admin_wildcard_covers_every_admin_node() {
         }
     }
 }
-
