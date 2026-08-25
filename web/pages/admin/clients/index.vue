@@ -188,8 +188,16 @@ async function createServer() {
                         </td>
                         <td class="px-5 py-4 text-right">
                             <AtomButton
+                              v-if="can('noro.admin.servers.edit')"
                               variant="dark"
                               icon="i-lucide-settings-2"
+                              :to="`/admin/clients/${server.id}`"
+                              class="!min-h-9 !min-w-9 !px-2"
+                            />
+                            <AtomButton
+                              v-else
+                              variant="dark"
+                              icon="i-lucide-eye"
                               :to="`/admin/clients/${server.id}`"
                               class="!min-h-9 !min-w-9 !px-2"
                             />
