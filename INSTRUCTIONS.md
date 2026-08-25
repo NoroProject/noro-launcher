@@ -1587,6 +1587,8 @@ Before marking any task complete, verify:
 
 - [ ] Solution is the **simplest** that works — no unnecessary abstractions.
 - [ ] **Strict i18n Localization:** All visible text, labels, titles, buttons, input placeholders, and hints are localized via Fluent FTL keys (`useT()` / `t(...)`) in both `ru.ftl` and `en.ftl`.
+- [ ] **Local Commits & Request-Only Push:** Local `git commit` is encouraged for atomic history tracking. NEVER perform `git push` or create/push release tags automatically — push ONLY when explicitly instructed by the user.
+- [ ] **No `master-v*` Tags:** Release tags MUST use standard `v*` format (e.g. `v1.7.12`). Creating or pushing `master-v*` tags is strictly forbidden.
 - [ ] No inline magic numbers or colors.
 - [ ] Loading, empty, and error states are handled.
 - [ ] If the fix touched auth or permissions — manually tested the auth flow.

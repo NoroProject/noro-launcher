@@ -35,10 +35,8 @@ pub async fn fetch_identity(
     let mut req = state.http().post(p.token_url());
     if p == Provider::Telegram {
         use base64::Engine;
-        let auth = base64::engine::general_purpose::STANDARD.encode(format!(
-            "{}:{}",
-            creds.client_id, creds.client_secret
-        ));
+        let auth = base64::engine::general_purpose::STANDARD
+            .encode(format!("{}:{}", creds.client_id, creds.client_secret));
         req = req.header("Authorization", format!("Basic {auth}"));
     }
 
@@ -81,17 +79,17 @@ pub async fn fetch_identity(
         })?;
 
         let u_url = p.userinfo_url().ok_or_else(|| {
-            AppError::Unauthorized(format!("{} does not support userinfo endpoint", p.display_name()))
+            AppError::Unauthorized(format!(
+                "{} does not support userinfo endpoint",
+                p.display_name()
+            ))
         })?;
         let mut u_req = state.http().get(u_url).bearer_auth(access);
         // Helix требует ещё и client_id: без заголовка ответ — 401 с пустым телом.
         if p == Provider::Twitch {
             u_req = u_req.header("Client-Id", creds.client_id.as_str());
         }
-        let u_res = u_req
-            .send()
-            .await
-            .map_err(|e| AppError::Other(e.into()))?;
+        let u_res = u_req.send().await.map_err(|e| AppError::Other(e.into()))?;
         let u_status = u_res.status();
         let u_text = u_res.text().await.map_err(|e| AppError::Other(e.into()))?;
         serde_json::from_str(&u_text).map_err(|_| {
