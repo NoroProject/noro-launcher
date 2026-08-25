@@ -17,36 +17,18 @@ const emit = defineEmits<{
 
 const { t } = useT()
 const node = ref('')
-const picked = ref<string[]>([])
-const global = ref(true)
-const showPicker = ref(false)
-
-const catalogFor = computed(() => (global.value ? '' : picked.value[0] || ''))
+const contextDropdown = ref('')
+const catalogFor = computed(() => contextDropdown.value)
 const { suggestions, pending, error } = usePermissionNodes(catalogFor)
 
 const PRESETS = [
-  { id: 'superadmin', key: 'admin-tokens-preset-superadmin', nodes: ['*'] },
-  { id: 'fulladmin', key: 'admin-tokens-preset-fulladmin', nodes: ['noro.admin.*'] },
-  { id: 'seniormod', key: 'admin-tokens-preset-senior-mod', nodes: ['noro.mod.*', 'noro.admin.users.view', 'noro.admin.rules.view', 'noro.admin.audit'] },
-  { id: 'juniormod', key: 'admin-tokens-preset-junior-mod', nodes: ['noro.mod.punish.warn', 'noro.mod.punish.mute', 'noro.mod.cases.view', 'noro.mod.cases.claim', 'noro.mod.cases.resolve', 'noro.admin.users.view', 'noro.admin.rules.view'] },
+  { key: 'admin-tokens-preset-superadmin', hint: '*', nodes: ['*'] },
+  { key: 'admin-tokens-preset-fulladmin', hint: 'noro.admin.*', nodes: ['noro.admin.*'] },
+  { key: 'admin-tokens-preset-senior-mod', hint: 'noro.mod.*', nodes: ['noro.mod.*', 'noro.admin.users.view', 'noro.admin.rules.view', 'noro.admin.audit'] },
+  { key: 'admin-tokens-preset-junior-mod', hint: '', nodes: ['noro.mod.punish.warn', 'noro.mod.punish.mute', 'noro.mod.cases.view', 'noro.mod.cases.claim', 'noro.mod.cases.resolve', 'noro.admin.users.view', 'noro.admin.rules.view'] },
 ] as const
 
-/** Leaf nodes only — wildcards and branches go to presets / manual input. */
-const groups = computed(() => {
-  const map = new Map<string, { name: string, title: string }[]>()
-  for (const s of suggestions.value) {
-    if (s.node === '*' || s.node.endsWith('.*')) continue
-    const grp = s.group || 'Система'
-    const list = map.get(grp) || []
-    list.push({ name: s.node, title: s.label || s.node })
-    map.set(grp, list)
-  }
-  return [...map.entries()].map(([title, items]) => ({ title, items }))
-})
-
-const targets = computed<(string | null)[]>(() =>
-  global.value ? [null] : picked.value.slice()
-)
+const targets = computed<(string | null)[]>(() => [contextDropdown.value === '' ? null : contextDropdown.value])
 const labels = computed(() => new Map(suggestions.value.map(s => [s.node, s.label])))
 const fresh = computed(() => targets.value.filter(server =>
   !props.entries.some(e => e.permission === node.value.trim() && e.server_id === server)
@@ -61,10 +43,6 @@ const rows = computed(() => {
     .sort((a, b) => a.permission.localeCompare(b.permission))
 })
 
-function isGranted(nodeName: string) {
-  const sid = global.value ? null : (picked.value[0] || null)
-  return props.entries.some(e => e.permission === nodeName && e.server_id === sid)
-}
 function add() {
   const p = node.value.trim()
   if (!p || !fresh.value.length) return
@@ -78,7 +56,7 @@ function toggle(permission: string, serverId: string | null) {
   else emit('add', [entry])
 }
 function applyPreset(nodesList: readonly string[]) {
-  const sid = global.value ? null : (picked.value[0] || null)
+  const sid = contextDropdown.value === '' ? null : contextDropdown.value
   const toAdd = nodesList
     .filter(p => !props.entries.some(e => e.permission === p && e.server_id === sid))
     .map(permission => ({ permission, server_id: sid }))
@@ -95,73 +73,44 @@ function removeAll(permission: string) {
     <p class="mt-1 text-sm text-[var(--noro-muted)]">{{ subtitle }}</p>
 
     <!-- Presets -->
-    <div class="mt-4 flex flex-wrap items-center gap-2">
-      <AtomButton
-        v-for="p in PRESETS" :key="p.id"
-        variant="ghost" size="sm"
-        @click="applyPreset(p.nodes)"
-      >
-        {{ t(p.key) }}
-      </AtomButton>
-
-      <button
-        type="button"
-        class="ml-auto flex items-center gap-1 text-xs font-semibold text-[var(--noro-cream)] hover:underline cursor-pointer"
-        @click="showPicker = !showPicker"
-      >
-        <UIcon :name="showPicker ? 'i-lucide-chevron-up' : 'i-lucide-list-checks'" class="size-3.5" />
-        {{ showPicker ? t('admin-perm-hide-nodes') : t('admin-perm-show-nodes') }}
-      </button>
-    </div>
-
-    <!-- Category Grid -->
-    <div
-      v-if="showPicker"
-      class="mt-3 max-h-80 overflow-y-auto noro-scroll rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] p-4 grid gap-5"
-    >
-      <div v-for="grp in groups" :key="grp.title">
-        <div class="mb-2 border-b border-[var(--noro-border)] pb-1">
-          <span class="text-[11px] font-black uppercase tracking-wider text-[var(--noro-cream)]">
-            {{ grp.title }}
-          </span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
-          <label
-            v-for="item in grp.items" :key="item.name"
-            class="flex items-start gap-2 rounded-md px-2 py-1.5 transition cursor-pointer hover:bg-[var(--noro-panel)]"
-          >
-            <input
-              type="checkbox"
-              class="mt-0.5 size-3.5 rounded border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-cream)]"
-              :checked="isGranted(item.name)"
-              @change="toggle(item.name, global ? null : (picked[0] || null))"
-            >
-            <div class="min-w-0 flex-1">
-              <div class="text-xs font-medium text-[var(--noro-text)] leading-snug">{{ item.title }}</div>
-              <div class="text-[10px] font-mono text-[var(--noro-muted)] truncate leading-tight">{{ item.name }}</div>
-            </div>
-          </label>
-        </div>
+    <div class="mt-4 grid gap-1.5">
+      <span class="noro-label">{{ t('admin-tokens-preset-title') }}</span>
+      <div class="flex flex-wrap gap-1.5">
+        <button
+          v-for="p in PRESETS" :key="p.key"
+          type="button"
+          class="group flex items-center gap-1.5 rounded-md border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] px-2.5 py-1.5 text-xs font-semibold text-[var(--noro-muted)] transition hover:border-[var(--noro-cream)] hover:text-[var(--noro-text)] cursor-pointer"
+          @click="applyPreset(p.nodes)"
+        >
+          <span>{{ t(p.key) }}</span>
+          <span v-if="p.hint" class="font-mono text-[10px] text-[var(--noro-muted)] opacity-60 group-hover:opacity-100">{{ p.hint }}</span>
+        </button>
       </div>
     </div>
 
-    <!-- Manual input -->
-    <div class="mt-4 grid gap-3">
-      <AdminPermissionContextPicker v-model:global="global" v-model:picked="picked" :servers="servers" />
-      <div>
-        <span class="noro-label">{{ t('admin-perm-permission') }}</span>
-        <div class="mt-1 flex items-start gap-2">
-          <div class="min-w-0 flex-1">
-            <AdminPermissionInput v-model="node" :suggestions="suggestions" :loading="pending" @submit="add" />
-          </div>
-          <AtomButton
-            variant="primary" icon="i-lucide-plus" class="shrink-0"
-            :loading="busy === 'perm'" :disabled="!node.trim() || !fresh.length || busy === 'perm'"
-            @click="add"
-          >
-            {{ t('admin-perm-add') }}
-          </AtomButton>
+    <!-- Input -->
+    <div class="mt-5">
+      <span class="noro-label">{{ t('admin-perm-permission') }}</span>
+      <div class="mt-1 flex items-start gap-2">
+        <select
+          v-model="contextDropdown"
+          class="noro-input w-36 shrink-0 bg-[var(--noro-input)] text-xs font-semibold text-[var(--noro-text)] cursor-pointer"
+        >
+          <option value="">{{ t('admin-perm-all-builds') }}</option>
+          <option v-for="server in servers" :key="server.id" :value="server.id">
+            {{ server.name }}
+          </option>
+        </select>
+        <div class="min-w-0 flex-1">
+          <AdminPermissionInput v-model="node" :suggestions="suggestions" :loading="pending" @submit="add" />
         </div>
+        <AtomButton
+          variant="primary" icon="i-lucide-plus" class="shrink-0"
+          :loading="busy === 'perm'" :disabled="!node.trim() || !fresh.length || busy === 'perm'"
+          @click="add"
+        >
+          {{ t('admin-perm-add') }}
+        </AtomButton>
       </div>
     </div>
 
@@ -170,9 +119,6 @@ function removeAll(permission: string) {
     </p>
     <p v-else-if="node.trim() && !fresh.length" class="mt-3 text-xs text-[var(--noro-amber)]">
       {{ t('admin-perm-already-granted') }}
-    </p>
-    <p v-else-if="!global && !picked.length" class="mt-3 text-xs text-[var(--noro-muted)]">
-      {{ t('admin-perm-pick-build') }}
     </p>
 
     <!-- Granted list -->

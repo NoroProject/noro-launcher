@@ -20,26 +20,6 @@ pub fn permission_matches(pattern: &str, target: &str) -> bool {
             return true;
         }
     }
-    // Умный неявный доступ на просмотр: если у пользователя есть право на действие в подсистеме
-    // (например, `noro.admin.users.edit` или `noro.mod.punish.ban`), он автоматически имеет право
-    // видеть список в этой подсистеме (`.view`), но НЕ дочерние детали вроде `.roles` или `.permissions`.
-    if target.ends_with(".view") {
-        let base = target.strip_suffix(".view").unwrap();
-        if pattern.starts_with(&format!("{base}.")) {
-            return true;
-        }
-        if target == "noro.admin.users.view"
-            && (pattern.starts_with("noro.mod.punish.") || pattern.starts_with("noro.admin.users."))
-        {
-            return true;
-        }
-        if target == "noro.admin.servers.view" && pattern.starts_with("noro.admin.builds.") {
-            return true;
-        }
-        if target == "noro.mod.cases.view" && pattern.starts_with("noro.mod.cases.") {
-            return true;
-        }
-    }
     false
 }
 
