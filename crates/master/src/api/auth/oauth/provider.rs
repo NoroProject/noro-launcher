@@ -114,23 +114,28 @@ impl Provider {
                     .to_string(),
                 avatar: body["picture"].as_str().map(str::to_string),
             }),
-            Provider::Telegram => Some(RemoteIdentity {
-                id: body["sub"]
+            Provider::Telegram => {
+                let id = body["sub"]
                     .as_str()
-                    .or_else(|| body["id"].as_str())?
-                    .to_string(),
-                username: body["preferred_username"]
-                    .as_str()
-                    .or_else(|| body["username"].as_str())
-                    .or_else(|| body["name"].as_str())
-                    .or_else(|| body["first_name"].as_str())
-                    .unwrap_or_else(|| body["sub"].as_str().unwrap_or("TelegramUser"))
-                    .to_string(),
-                avatar: body["picture"]
-                    .as_str()
-                    .or_else(|| body["photo_url"].as_str())
-                    .map(str::to_string),
-            }),
+                    .map(String::from)
+                    .or_else(|| body["sub"].as_i64().map(|n| n.to_string()))
+                    .or_else(|| body["id"].as_str().map(String::from))
+                    .or_else(|| body["id"].as_i64().map(|n| n.to_string()))?;
+                Some(RemoteIdentity {
+                    id,
+                    username: body["preferred_username"]
+                        .as_str()
+                        .or_else(|| body["username"].as_str())
+                        .or_else(|| body["name"].as_str())
+                        .or_else(|| body["first_name"].as_str())
+                        .unwrap_or("TelegramUser")
+                        .to_string(),
+                    avatar: body["picture"]
+                        .as_str()
+                        .or_else(|| body["photo_url"].as_str())
+                        .map(str::to_string),
+                })
+            }
         }
     }
 }
