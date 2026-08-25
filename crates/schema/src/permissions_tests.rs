@@ -142,3 +142,27 @@ fn admin_wildcard_covers_every_admin_node() {
         }
     }
 }
+
+#[test]
+fn implied_view_permissions() {
+    assert!(permission_matches(
+        "noro.mod.punish.ban",
+        "noro.admin.users.view"
+    ));
+    assert!(permission_matches(
+        "noro.admin.users.edit",
+        "noro.admin.users.view"
+    ));
+    assert!(!permission_matches(
+        "noro.mod.punish.ban",
+        "noro.admin.users.roles"
+    ));
+    assert!(!permission_matches(
+        "noro.mod.punish.ban",
+        "noro.admin.users.permissions"
+    ));
+    assert!(permission_matches(
+        "noro.admin.builds.edit",
+        "noro.admin.servers.view"
+    ));
+}

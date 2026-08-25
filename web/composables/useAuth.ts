@@ -55,7 +55,9 @@ export function useAuth() {
    * закрытой дверью, и это выглядело бы как поломка, а не как настройка.
    */
   const canAdmin = computed(() =>
-    permissions.value.some(perm => perm === '*' || perm.startsWith('noro.admin.')),
+    permissions.value.some(
+      perm => perm === '*' || perm.startsWith('noro.admin.') || perm.startsWith('noro.mod.'),
+    ),
   )
 
   return {
@@ -77,7 +79,23 @@ export function permissionMatches(pattern: string, target: string) {
   if (pattern === '*' || pattern === target) return true
   if (pattern.endsWith('.*')) {
     const prefix = pattern.slice(0, -2)
-    return target === prefix || target.startsWith(`${prefix}.`)
+    if (target === prefix || target.startsWith(`${prefix}.`)) return true
+  }
+  if (target.endsWith('.view')) {
+    const base = target.slice(0, -5)
+    if (pattern.startsWith(`${base}.`)) return true
+    if (
+      target === 'noro.admin.users.view' &&
+      (pattern.startsWith('noro.mod.punish.') || pattern.startsWith('noro.admin.users.'))
+    ) {
+      return true
+    }
+    if (target === 'noro.admin.servers.view' && pattern.startsWith('noro.admin.builds.')) {
+      return true
+    }
+    if (target === 'noro.mod.cases.view' && pattern.startsWith('noro.mod.cases.')) {
+      return true
+    }
   }
   return false
 }
