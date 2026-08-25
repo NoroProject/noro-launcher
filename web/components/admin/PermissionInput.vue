@@ -20,11 +20,11 @@ const { style: popupStyle } = useAnchoredPopup(anchor, open)
 
 const filtered = computed(() => {
   const needle = props.modelValue.trim().toLowerCase()
-  if (!needle) return props.suggestions.slice(0, 40)
+  if (!needle) return props.suggestions.slice(0, 200)
   return props.suggestions
     .filter(item => item.node.toLowerCase().includes(needle)
       || (item.label || '').toLowerCase().includes(needle))
-    .slice(0, 40)
+    .slice(0, 200)
 })
 
 watch(filtered, () => {

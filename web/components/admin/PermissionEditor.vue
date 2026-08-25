@@ -94,7 +94,7 @@ function removeAll(permission: string) {
       <div class="mt-1 flex items-start gap-2">
         <select
           v-model="contextDropdown"
-          class="noro-input w-36 shrink-0 bg-[var(--noro-input)] text-xs font-semibold text-[var(--noro-text)] cursor-pointer"
+          class="noro-input noro-select !w-44 shrink-0 bg-[var(--noro-input)] text-xs font-semibold text-[var(--noro-text)] cursor-pointer"
         >
           <option value="">{{ t('admin-perm-all-builds') }}</option>
           <option v-for="server in servers" :key="server.id" :value="server.id">
