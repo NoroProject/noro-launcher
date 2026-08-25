@@ -32,7 +32,7 @@ pub async fn fetch_identity(
     code: &str,
     redirect_uri: &str,
 ) -> AppResult<RemoteIdentity> {
-    let token_resp: Value = state
+    let res = state
         .http()
         .post(p.token_url())
         .form(&[
@@ -44,10 +44,16 @@ pub async fn fetch_identity(
         ])
         .send()
         .await
-        .map_err(|e| AppError::Other(e.into()))?
-        .json()
-        .await
         .map_err(|e| AppError::Other(e.into()))?;
+
+    let status = res.status();
+    let text = res.text().await.map_err(|e| AppError::Other(e.into()))?;
+    let token_resp: Value = serde_json::from_str(&text).map_err(|_| {
+        AppError::Unauthorized(format!(
+            "{} token endpoint returned non-JSON response ({status}): {text}",
+            p.display_name()
+        ))
+    })?;
 
     let access = token_resp["access_token"].as_str().ok_or_else(|| {
         AppError::Unauthorized(format!(
@@ -61,13 +67,18 @@ pub async fn fetch_identity(
     if p == Provider::Twitch {
         req = req.header("Client-Id", creds.client_id.as_str());
     }
-    let body: Value = req
+    let u_res = req
         .send()
         .await
-        .map_err(|e| AppError::Other(e.into()))?
-        .json()
-        .await
         .map_err(|e| AppError::Other(e.into()))?;
+    let u_status = u_res.status();
+    let u_text = u_res.text().await.map_err(|e| AppError::Other(e.into()))?;
+    let body: Value = serde_json::from_str(&u_text).map_err(|_| {
+        AppError::Unauthorized(format!(
+            "{} userinfo endpoint returned non-JSON response ({u_status}): {u_text}",
+            p.display_name()
+        ))
+    })?;
 
     p.parse_identity(&body).ok_or_else(|| {
         AppError::Unauthorized(format!("{} returned no usable profile", p.display_name()))

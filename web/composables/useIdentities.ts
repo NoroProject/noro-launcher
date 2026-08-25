@@ -29,6 +29,7 @@ export const PROVIDER_META: Record<string, ProviderMeta> = {
   discord: { label: 'Discord', icon: 'i-brand-discord', color: '#5865F2', mono: true },
   twitch: { label: 'Twitch', icon: 'i-brand-twitch', color: '#9146FF', mono: true },
   google: { label: 'Google', icon: 'i-brand-google', color: '', mono: false },
+  telegram: { label: 'Telegram', icon: 'i-brand-telegram', color: '#24A1DE', mono: true },
 }
 
 export function providerMeta(provider: string): ProviderMeta {
