@@ -17,8 +17,18 @@ const emit = defineEmits<{
 
 const { t } = useT()
 const node = ref('')
-const contextDropdown = ref('')
-const catalogFor = computed(() => contextDropdown.value)
+const contextDropdownOpen = ref(false)
+const global = ref(true)
+const picked = ref<string[]>([])
+
+const contextSummary = computed(() => {
+  if (global.value) return t('admin-perm-all-builds') || 'Все сборки'
+  if (picked.value.length === 0) return 'Выберите...'
+  if (picked.value.length === 1) return props.servers.find(s => s.id === picked.value[0])?.name || picked.value[0]
+  return `Выбрано: ${picked.value.length}`
+})
+
+const catalogFor = computed(() => (global.value ? '' : picked.value[0] || ''))
 const { suggestions, pending, error } = usePermissionNodes(catalogFor)
 
 const PRESETS = [
@@ -28,7 +38,9 @@ const PRESETS = [
   { key: 'admin-tokens-preset-junior-mod', hint: '', nodes: ['noro.mod.punish.warn', 'noro.mod.punish.mute', 'noro.mod.cases.view', 'noro.mod.cases.claim', 'noro.mod.cases.resolve', 'noro.admin.users.view', 'noro.admin.rules.view'] },
 ] as const
 
-const targets = computed<(string | null)[]>(() => [contextDropdown.value === '' ? null : contextDropdown.value])
+const targets = computed<(string | null)[]>(() =>
+  global.value ? [null] : picked.value.slice()
+)
 const labels = computed(() => new Map(suggestions.value.map(s => [s.node, s.label])))
 const fresh = computed(() => targets.value.filter(server =>
   !props.entries.some(e => e.permission === node.value.trim() && e.server_id === server)
@@ -56,10 +68,11 @@ function toggle(permission: string, serverId: string | null) {
   else emit('add', [entry])
 }
 function applyPreset(nodesList: readonly string[]) {
-  const sid = contextDropdown.value === '' ? null : contextDropdown.value
-  const toAdd = nodesList
-    .filter(p => !props.entries.some(e => e.permission === p && e.server_id === sid))
-    .map(permission => ({ permission, server_id: sid }))
+  const sids = global.value ? [null] : picked.value.slice()
+  const toAdd = nodesList.flatMap(p => 
+    sids.filter(sid => !props.entries.some(e => e.permission === p && e.server_id === sid))
+        .map(sid => ({ permission: p, server_id: sid }))
+  )
   if (toAdd.length) emit('add', toAdd)
 }
 function removeAll(permission: string) {
@@ -92,15 +105,54 @@ function removeAll(permission: string) {
     <div class="mt-5">
       <span class="noro-label">{{ t('admin-perm-permission') }}</span>
       <div class="mt-1 flex items-start gap-2">
-        <select
-          v-model="contextDropdown"
-          class="noro-input noro-select !w-44 shrink-0 bg-[var(--noro-input)] text-xs font-semibold text-[var(--noro-text)] cursor-pointer"
-        >
-          <option value="">{{ t('admin-perm-all-builds') }}</option>
-          <option v-for="server in servers" :key="server.id" :value="server.id">
-            {{ server.name }}
-          </option>
-        </select>
+        <div class="relative w-44 shrink-0">
+          <button
+            type="button"
+            class="noro-input w-full bg-[var(--noro-input)] text-xs font-semibold text-[var(--noro-text)] cursor-pointer flex items-center justify-between"
+            @click="contextDropdownOpen = !contextDropdownOpen"
+          >
+            <span class="truncate block">{{ contextSummary }}</span>
+            <UIcon name="i-lucide-chevron-down" class="shrink-0 ml-2" />
+          </button>
+
+          <Teleport to="body">
+            <div
+              v-if="contextDropdownOpen"
+              class="fixed inset-0 z-40"
+              @click="contextDropdownOpen = false"
+            ></div>
+          </Teleport>
+          
+          <div
+            v-if="contextDropdownOpen"
+            class="absolute top-full left-0 mt-1.5 w-56 rounded-lg border border-[var(--noro-border)] bg-[var(--noro-panel-2)] p-1.5 shadow-xl z-50 flex flex-col gap-1 max-h-60 overflow-y-auto noro-scroll"
+          >
+            <label class="flex items-center gap-2.5 rounded px-2 py-1.5 cursor-pointer hover:bg-[var(--noro-input)] transition">
+              <input
+                type="checkbox"
+                class="mt-0.5 size-3.5 rounded border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-cream)]"
+                v-model="global"
+              >
+              <span class="text-xs font-semibold text-[var(--noro-text)]">{{ t('admin-perm-all-builds') }}</span>
+            </label>
+            <div class="h-px bg-[var(--noro-border)] mx-1"></div>
+            <label
+              v-for="server in servers"
+              :key="server.id"
+              class="flex items-center gap-2.5 rounded px-2 py-1.5 cursor-pointer hover:bg-[var(--noro-input)] transition"
+              :class="global ? 'opacity-50 pointer-events-none' : ''"
+            >
+              <input
+                type="checkbox"
+                class="mt-0.5 size-3.5 rounded border-[var(--noro-border)] bg-[var(--noro-input)] text-[var(--noro-cream)]"
+                :value="server.id"
+                v-model="picked"
+                :disabled="global"
+              >
+              <span class="text-xs font-semibold text-[var(--noro-text)] truncate">{{ server.name }}</span>
+            </label>
+          </div>
+        </div>
         <div class="min-w-0 flex-1">
           <AdminPermissionInput v-model="node" :suggestions="suggestions" :loading="pending" @submit="add" />
         </div>
