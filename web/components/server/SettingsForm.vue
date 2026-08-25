@@ -9,6 +9,7 @@ defineProps<{
     loadingMinecraft: boolean;
     saving: boolean;
     deleting: boolean;
+    canEdit?: boolean;
 }>();
 
 defineEmits<{
@@ -49,22 +50,22 @@ const copy = computed(() => ({
             </div>
         </div>
 
-        <div class="p-5">
+        <div class="p-5" :class="{ 'opacity-70 pointer-events-none': !canEdit }">
             <div v-show="activeTab === 'server'" class="grid gap-5 md:grid-cols-2">
                 <label>
                     <span class="noro-label">{{ t('admin-roles-name') }}</span>
-                    <input v-model="form.name" class="noro-input" required>
+                    <input v-model="form.name" class="noro-input" required :disabled="!canEdit">
                 </label>
                 <label>
                     <span class="noro-label">{{ t('admin-roles-order') }}</span>
-                    <input v-model.number="form.sort_order" class="noro-input" type="number">
+                    <input v-model.number="form.sort_order" class="noro-input" type="number" :disabled="!canEdit">
                 </label>
                 <label class="md:col-span-2">
                     <span class="noro-label">{{ t('admin-blocklist-reason') }}</span>
-                    <input v-model="form.description" class="noro-input">
+                    <input v-model="form.description" class="noro-input" :disabled="!canEdit">
                 </label>
                 <label class="noro-toggle-row">
-                    <UCheckbox v-model="form.active" />
+                    <UCheckbox v-model="form.active" :disabled="!canEdit" />
                     <span>
                         <span class="block font-bold text-white">{{ t('admin-set-active') }}</span>
                         <span class="text-sm text-[var(--noro-muted)]">
@@ -73,7 +74,7 @@ const copy = computed(() => ({
                     </span>
                 </label>
                 <label class="noro-toggle-row">
-                    <UCheckbox v-model="form.limited" />
+                    <UCheckbox v-model="form.limited" :disabled="!canEdit" />
                     <span>
                         <span class="block font-bold text-white">{{ t('admin-set-limited') }}</span>
                         <span class="text-sm text-[var(--noro-muted)]">
@@ -88,12 +89,14 @@ const copy = computed(() => ({
                     v-model="form.modloader"
                     label="Modloader"
                     :options="modloaders"
+                    :disabled="!canEdit"
                 />
                 <AtomSelect
                     v-model="form.mc_version"
                     label="Minecraft"
                     :options="minecraft"
                     :loading="loadingMinecraft"
+                    :disabled="!canEdit"
                 />
                 <div class="noro-info md:col-span-2">
                     <UIcon name="i-lucide-package-check" class="size-5" />
@@ -104,7 +107,7 @@ const copy = computed(() => ({
             </div>
         </div>
 
-        <div class="flex flex-wrap gap-3 border-t border-[var(--noro-border)] p-5">
+        <div v-if="canEdit" class="flex flex-wrap gap-3 border-t border-[var(--noro-border)] p-5">
             <AtomButton :loading="saving" type="submit" icon="i-lucide-save" variant="primary">
                 {{ t('cabinet-save') }}
             </AtomButton>

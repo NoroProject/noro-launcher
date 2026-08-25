@@ -140,15 +140,18 @@ const buildEditor = useAdminBuildEditor(
                         :loading-minecraft="loading"
                         :saving="saving"
                         :deleting="deleting"
+                        :can-edit="auth.hasPermission('noro.admin.servers.edit')"
                         @save="save"
                         @remove="remove"
                     />
-                    <ServerMediaPanel
-                        :server-id="id"
-                        :icon-url="server.icon_url"
-                        :background-url="server.background_url"
-                        @uploaded="applyAsset"
-                    />
+                    <div :class="{ 'opacity-70 pointer-events-none': !auth.hasPermission('noro.admin.servers.edit') }">
+                        <ServerMediaPanel
+                            :server-id="id"
+                            :icon-url="server.icon_url"
+                            :background-url="server.background_url"
+                            @uploaded="applyAsset"
+                        />
+                    </div>
                 </div>
 
                 <ServerRolesPanel
@@ -203,24 +206,28 @@ const buildEditor = useAdminBuildEditor(
 
                     <div class="grid gap-5 xl:grid-cols-[1fr_390px] items-start">
                         <div class="grid gap-4 content-start">
-                            <BuildPublishPanel
-                                :build="buildEditor.build.value"
-                                :busy="buildEditor.busy.value"
-                                :build-pending="buildEditor.buildPayload.pending.value"
-                                @publish="buildEditor.publish"
-                                @rebuild="buildEditor.rebuild"
-                                @rebuild-clean="buildEditor.rebuildClean"
-                                @unpublish="buildEditor.unpublish"
-                                @delete="buildEditor.deleteBuild"
-                            />
-                            <BuildFilesSummary
-                                :files="buildEditor.filesData.data.value"
-                                :build-id="selectedBuildId"
-                                @open-manager="buildEditor.showFileManager.value = true"
-                            />
+                            <div :class="{ 'opacity-70 pointer-events-none': !auth.hasPermission('noro.admin.builds.edit') }">
+                                <BuildPublishPanel
+                                    :build="buildEditor.build.value"
+                                    :busy="buildEditor.busy.value"
+                                    :build-pending="buildEditor.buildPayload.pending.value"
+                                    @publish="buildEditor.publish"
+                                    @rebuild="buildEditor.rebuild"
+                                    @rebuild-clean="buildEditor.rebuildClean"
+                                    @unpublish="buildEditor.unpublish"
+                                    @delete="buildEditor.deleteBuild"
+                                />
+                            </div>
+                            <div :class="{ 'opacity-70 pointer-events-none': !auth.hasPermission('noro.admin.builds.edit') }">
+                                <BuildFilesSummary
+                                    :files="buildEditor.filesData.data.value"
+                                    :build-id="selectedBuildId"
+                                    @open-manager="buildEditor.showFileManager.value = true"
+                                />
+                            </div>
                         </div>
 
-                        <aside class="grid gap-5 content-start">
+                        <aside class="grid gap-5 content-start" :class="{ 'opacity-70 pointer-events-none': !auth.hasPermission('noro.admin.builds.edit') }">
                             <BuildImportPanel
                                 v-model:import-file="buildEditor.importFile.value"
                                 v-model:import-kind="buildEditor.importKind.value"
@@ -261,22 +268,25 @@ const buildEditor = useAdminBuildEditor(
                             :loading-minecraft="loading"
                             :saving="saving"
                             :deleting="deleting"
+                            :can-edit="auth.hasPermission('noro.admin.servers.edit')"
                             @save="save"
                             @remove="remove"
                         />
 
-                        <BuildOptionalModsPanel
-                            v-if="selectedBuildId"
-                            :optional-mods="buildEditor.optionalData.data.value"
-                            :allow-suggestions="buildEditor.build.value?.allow_optional_mod_suggestions ?? true"
-                            :busy="buildEditor.busy.value"
-                            @save="buildEditor.saveOptional"
-                            @delete="buildEditor.deleteOptional"
-                            @update:allow-suggestions="buildEditor.toggleAllowSuggestions"
-                        />
+                        <div :class="{ 'opacity-70 pointer-events-none': !auth.hasPermission('noro.admin.builds.edit') }">
+                            <BuildOptionalModsPanel
+                                v-if="selectedBuildId"
+                                :optional-mods="buildEditor.optionalData.data.value"
+                                :allow-suggestions="buildEditor.build.value?.allow_optional_mod_suggestions ?? true"
+                                :busy="buildEditor.busy.value"
+                                @save="buildEditor.saveOptional"
+                                @delete="buildEditor.deleteOptional"
+                                @update:allow-suggestions="buildEditor.toggleAllowSuggestions"
+                            />
+                        </div>
                     </div>
 
-                    <div v-if="selectedBuildId" class="grid gap-4 content-start">
+                    <div v-if="selectedBuildId" class="grid gap-4 content-start" :class="{ 'opacity-70 pointer-events-none': !auth.hasPermission('noro.admin.builds.edit') }">
                         <BuildRecommendedSettingsPanel
                             :form="buildEditor.recommendedForm"
                             :busy="buildEditor.busy.value"
