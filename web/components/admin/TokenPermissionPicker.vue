@@ -156,7 +156,7 @@ function toggleGroup(items: { name: string }[]) {
     <div v-else class="max-h-72 overflow-y-auto noro-scroll rounded-lg border border-[var(--noro-border)] bg-[var(--noro-bg-deep)] p-3 grid gap-4">
       <div v-for="grp in groups" :key="grp.title" class="grid gap-2">
         <div class="flex items-center justify-between border-b border-[var(--noro-border)] pb-1">
-          <span class="text-xs font-black uppercase text-[var(--noro-cream)]">{{ grp.title }}</span>
+          <span class="text-xs font-black uppercase text-[var(--noro-cream)]">{{ t(grp.title) }}</span>
           <button
             type="button"
             class="text-[11px] font-semibold text-[var(--noro-muted)] hover:text-[var(--noro-text)]"
@@ -178,7 +178,7 @@ function toggleGroup(items: { name: string }[]) {
               @change="toggleNode(item.name)"
             >
             <div class="min-w-0 flex-1">
-              <div class="text-xs font-semibold text-[var(--noro-text)] leading-snug">{{ item.title }}</div>
+              <div class="text-xs font-semibold text-[var(--noro-text)] leading-snug">{{ t(item.title) }}</div>
               <div class="text-[10px] font-mono text-[var(--noro-muted)] truncate">{{ item.name }}</div>
             </div>
           </label>

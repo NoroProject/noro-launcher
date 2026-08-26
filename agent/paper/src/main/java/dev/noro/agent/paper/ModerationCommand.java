@@ -74,10 +74,18 @@ final class ModerationCommand implements CommandExecutor, TabCompleter {
                 if (sender instanceof org.bukkit.entity.Player p) {
                     if (args.length > 0 && args[0].equalsIgnoreCase("list")) {
                         vanishManager.sendVanishList(p);
-                    } else if (p.hasPermission("noro.mod.vanish.use")) {
-                        vanishManager.toggleVanish(p, lang);
                     } else {
-                        p.sendMessage(dev.noro.agent.core.AgentStrings.get(lang, "no_perm_view"));
+                        boolean canVanish = p.hasPermission("noro.mod.vanish.use");
+                        boolean caseOnly = p.hasPermission("noro.mod.vanish.case_only");
+                        boolean hasActiveCase = moderation.cases() != null && moderation.cases().session(p.getUniqueId()).isPresent();
+
+                        if (canVanish || (caseOnly && hasActiveCase)) {
+                            vanishManager.toggleVanish(p, lang);
+                        } else if (caseOnly) {
+                            p.sendMessage(dev.noro.agent.core.AgentStrings.get(lang, "vanish_case_only"));
+                        } else {
+                            p.sendMessage(dev.noro.agent.core.AgentStrings.get(lang, "no_perm_view"));
+                        }
                     }
                 }
             }

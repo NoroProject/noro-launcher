@@ -41,7 +41,7 @@ services:
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      NORO_FILES_CDN_URL: https://noro-cdn.${DOMAIN}/files
+      NORO_FILES_CDN_URL: https://noro-cdn.dalynkaa.dev/files
       # Из браузера в API ходит только сайт. Без этой переменной CORS открыт
       # для любого origin (см. docs/env.md).
       NORO_ALLOWED_ORIGINS: https://${DOMAIN}
@@ -67,7 +67,7 @@ services:
       - traefik.http.routers.noro-master.entrypoints=websecure
       - traefik.http.routers.noro-master.tls.certresolver=le
       - traefik.http.services.noro-master.loadbalancer.server.port=8080
-      - traefik.http.routers.noro-cdn.rule=Host(`noro-cdn.${DOMAIN}`)
+      - traefik.http.routers.noro-cdn.rule=Host(`noro-cdn.dalynkaa.dev`)
       - traefik.http.routers.noro-cdn.entrypoints=web,websecure
       - traefik.http.routers.noro-cdn.tls=true
       - traefik.http.routers.noro-cdn.service=noro-master

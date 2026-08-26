@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { ServerRow } from '~/types/api'
 
+const { t } = useT()
+
 const props = defineProps<{
   permission: string
   /** Контексты, в которых право выдано. `null` — на всех сборках. */
@@ -29,7 +31,7 @@ function on(serverId: string | null) {
     <div class="flex items-center gap-3">
       <div class="min-w-0 flex-1">
         <code class="block truncate font-mono text-xs text-[var(--noro-blue)]">{{ permission }}</code>
-        <span v-if="label" class="block truncate text-xs text-[var(--noro-muted)]">{{ label }}</span>
+        <span v-if="label" class="block truncate text-xs text-[var(--noro-muted)]">{{ t(label) }}</span>
       </div>
       <AtomButton variant="danger" :loading="busy" icon="i-lucide-x" size="sm" @click="emit('remove')" />
     </div>

@@ -59,5 +59,6 @@
   "case_close_on_site": "<#8b8b8b>Close the case on the site: the verdict is written there.",
   "case_closed": "<#8b8b8b>Case closed.",
   "case_released": "<#8b8b8b>Case given back to the queue.",
-  "case_inventory_unsupported": "<#f87171>This server cannot open another player's inventory."
+  "case_inventory_unsupported": "<#f87171>This server cannot open another player's inventory.",
+  "vanish_case_only": "<#f87171>Vanish is only available during an active case."
 }

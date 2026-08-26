@@ -58,7 +58,7 @@ pub async fn list(
                 node: schema::perm_server_join(&server.id.to_string()),
                 source: "launcher",
                 label: Some(format!("Join build \u{201c}{}\u{201d}", server.name)),
-                group: Some("Access"),
+                group: Some("perm-group-access"),
             });
         }
     }
@@ -74,7 +74,7 @@ pub async fn list(
             node: format!("noro.build.{}.*", server.id),
             source: "launcher",
             label: Some(format!("All builds of \u{201c}{}\u{201d}", server.name)),
-            group: Some("Access"),
+            group: Some("perm-group-access"),
         });
         for b in builds {
             out.push(Suggestion {
@@ -86,7 +86,7 @@ pub async fn list(
                     b.version,
                     if b.published { "" } else { " (preview)" }
                 )),
-                group: Some("Access"),
+                group: Some("perm-group-access"),
             });
         }
     }
@@ -99,7 +99,7 @@ pub async fn list(
                 node,
                 source: "game",
                 label: None,
-                group: Some("Game"),
+                group: Some("perm-group-game"),
             });
         }
     }
@@ -123,7 +123,7 @@ async fn optional_mod_nodes(state: &AppState) -> AppResult<Vec<Suggestion>> {
                 node: schema::perm_optional_mod(&build.server_id.to_string(), &opt.name),
                 source: "launcher",
                 label: Some(format!("Optional mod \u{201c}{}\u{201d}", opt.name)),
-                group: Some("Access"),
+                group: Some("perm-group-access"),
             });
         }
     }
@@ -137,14 +137,14 @@ fn builtin() -> Vec<Suggestion> {
         Suggestion {
             node: schema::PERM_SUPERADMIN.to_string(),
             source: "launcher",
-            label: Some("Суперадмин: Полный неограниченный доступ".into()),
-            group: Some("Панель"),
+            label: Some("perm-superadmin-desc".into()),
+            group: Some("perm-group-panel"),
         },
         Suggestion {
             node: schema::PERM_ADMIN_ALL.to_string(),
             source: "launcher",
-            label: Some("Админ панели: Все разделы администрирования".into()),
-            group: Some("Панель"),
+            label: Some("perm-admin-all-desc".into()),
+            group: Some("perm-group-panel"),
         },
     ];
     // Ветку целиком («все права на игроков») выдают чаще, чем перечисляют узлы
@@ -160,7 +160,7 @@ fn builtin() -> Vec<Suggestion> {
             node: format!("{prefix}.*"),
             source: "launcher",
             label: Some(format!("Все права в ветке {prefix}")),
-            group: Some("Ветки"),
+            group: Some("perm-group-branches"),
         });
     }
     out.extend(schema::ALL_NODES.iter().map(|node| Suggestion {

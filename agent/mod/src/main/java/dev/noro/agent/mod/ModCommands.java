@@ -160,8 +160,14 @@ final class ModCommands {
                     CommandSourceStack source = context.getSource();
                     if (source.getEntity() instanceof net.minecraft.server.level.ServerPlayer player) {
                         ModSender sender = new ModSender(source);
-                        if (sender.has(ModVanishManager.PERM_USE)) {
+                        boolean canVanish = sender.has(ModVanishManager.PERM_USE);
+                        boolean caseOnly = sender.has("noro.mod.vanish.case_only");
+                        boolean hasActiveCase = ModModeration.getInstance().cases() != null && ModModeration.getInstance().cases().session(player.getUUID()).isPresent();
+
+                        if (canVanish || (caseOnly && hasActiveCase)) {
                             ModVanishManager.getInstance().toggleVanish(player, null);
+                        } else if (caseOnly) {
+                            ModText.send(player, dev.noro.agent.core.AgentStrings.get(null, "vanish_case_only"));
                         } else {
                             ModText.send(player, dev.noro.agent.core.AgentStrings.get(null, "no_perm_view"));
                         }

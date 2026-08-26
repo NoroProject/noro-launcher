@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PermissionSuggestion } from '~/types/permissions'
 
+const { t } = useT()
+
 const props = defineProps<{
   modelValue: string
   suggestions: PermissionSuggestion[]
@@ -100,7 +102,7 @@ function step(delta: number) {
         >
           <span class="min-w-0 flex-1">
             <span class="block truncate font-mono text-xs text-[var(--noro-cream)]">{{ item.node }}</span>
-            <span v-if="item.label" class="block truncate text-xs text-[var(--noro-muted)]">{{ item.label }}</span>
+            <span v-if="item.label" class="block truncate text-xs text-[var(--noro-muted)]">{{ t(item.label) }}</span>
           </span>
           <span
             class="shrink-0 rounded px-2 py-1 text-xs font-bold uppercase"
