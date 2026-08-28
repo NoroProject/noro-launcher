@@ -1,0 +1,42 @@
+//! Launcher pages facade.
+
+mod build_picker;
+mod common;
+mod game;
+mod game_bar;
+pub mod game_console;
+mod game_empty;
+mod game_status;
+mod game_sync;
+mod impersonate_dialog;
+mod log_request_dialog;
+mod markdown;
+mod mod_detail;
+mod mod_detail_body;
+mod mod_detail_parts;
+mod mod_icon;
+mod news;
+mod news_detail;
+mod profile;
+mod profile_cape;
+mod profile_skin;
+mod profile_skin_model;
+mod profile_skin_pick;
+mod profile_user;
+mod remote_action_dialog;
+mod server_mod_catalog;
+mod server_mods;
+mod server_settings;
+mod settings;
+mod settings_panel;
+mod settings_rows;
+mod shell;
+mod sidebar;
+mod sidebar_parts;
+mod sidebar_server;
+mod sidebar_user;
+mod skin_drag;
+mod toast;
+
+pub use shell::launcher_shell;
+pub use toast::toast_overlay;

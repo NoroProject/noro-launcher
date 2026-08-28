@@ -1,0 +1,67 @@
+[package]
+name = "backend"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+schema = { workspace = true }
+bridge = { workspace = true }
+mod_link = { workspace = true }
+mc_mod_utils = { workspace = true }
+
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+futures-util = { workspace = true }
+tokio-tungstenite = { workspace = true }
+reqwest = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+sentry = { workspace = true }
+sentry-tracing = { workspace = true }
+
+ed25519-dalek = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+base64 = { workspace = true }
+
+parking_lot = { workspace = true }
+once_cell = { workspace = true }
+dirs = { workspace = true }
+regex = { workspace = true }
+memchr = { workspace = true }
+open = { workspace = true }
+url = { workspace = true }
+urlencoding = { workspace = true }
+walkdir = { workspace = true }
+zip = { workspace = true }
+flate2 = { workspace = true }
+fastnbt = { workspace = true }
+discord-rich-presence = { workspace = true }
+futures = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
+# Каждой ОС — свой системный сейф. Общая строка с одним лишь apple-native
+# оставляла Windows и Linux на mock-хранилище: save отчитывался об успехе, а
+# после перезапуска сессии не было, и лаунчер снова просил вход.
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+# linux-native — keyutils ядра, без dbus: Secret Service утащил бы C-зависимости
+# в cross-сборку aarch64.
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["linux-native"] }

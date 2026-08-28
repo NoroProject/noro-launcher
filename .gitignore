@@ -1,0 +1,62 @@
+/target
+**/target
+.env
+.env.*
+!.env.example
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/
+
+# web
+web/node_modules
+web/.nuxt
+web/.output
+web/dist
+web/bun.lockb
+web/.cache
+web/.vercel
+web/.turbo
+web/coverage
+
+# java agents
+agent/**/.gradle/
+# Any depth: versioned builds sit in agent/mod/versions/<mc>-<loader>/build,
+# which plain agent/build and agent/*/build never reached.
+agent/**/build/
+agent/**/bin/
+*.class
+agent/**/run
+agent/**/.classpath
+agent/**/.project
+agent/**/.settings/
+
+# master data
+/data
+master_data/
+*.sqlite
+*.db
+*.sqlite-shm
+*.sqlite-wal
+
+# signing keys
+*.pem
+ed25519_private*
+secrets/
+*.p12
+*.jks
+*.keystore
+
+# scratch space: built agents, unpacked archives, one-off scripts
+/scratch/
+
+# Clones of third-party repos we bridge to NoroAgentApi (TAB, StyledChat). Each
+# tracks its own upstream, and together they run to ~915 MB with .git included.
+/vendor/
+
+# Working files of the OCI instance scripts — they hold tenancy OCIDs. The
+# scripts went away with the move to AWS, but the files are still on disk.
+/scripts/oci-*

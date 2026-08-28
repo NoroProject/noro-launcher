@@ -1,0 +1,63 @@
+# Проверка кода на каждый PR и push в master.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: rust fmt + clippy + test
+    runs-on: [self-hosted, Linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ci-rust
+
+      - name: fmt
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: |
+          cargo clippy --all-targets \
+            -p bridge -p mod_link -p backend \
+            -- -D warnings
+
+      - name: test
+        run: cargo test -p bridge -p mod_link -p backend
+
+  launcher:
+    name: launcher clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ci-launcher
+
+      - name: clippy
+        run: |
+          cargo clippy --all-targets \
+            -p frontend -p noro_launcher -p noro_core \
+            -- -D warnings
