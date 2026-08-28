@@ -215,6 +215,7 @@ jobs:
                 codesign --force --sign "$IDENTITY" --options runtime --timestamp "dist/noro-launcher-core-${{ matrix.target }}"
               fi
               bash .github/scripts/make-app.sh "$OUT/noro-launcher" NoroLauncher.app "${TAG#v}"
+              tar -czf "dist/noro-launcher-${{ matrix.target }}.app.tar.gz" NoroLauncher.app
               bash .github/scripts/make-dmg.sh NoroLauncher.app dist/noro-launcher-${{ matrix.target }}.dmg
               bash .github/scripts/notarize.sh dist/noro-launcher-${{ matrix.target }}.dmg
               ;;
