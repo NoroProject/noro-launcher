@@ -27,10 +27,6 @@ permissions:
   contents: write
 
 env:
-  # Оба обязательны: без них release-сборка bootstrapper'а не компилируется —
-  # см. crates/noro_launcher/src/verify.rs.
-  NORO_MASTER_URL: ${{ vars.NORO_MASTER_URL }}
-  NORO_SIGNING_PUBKEY: ${{ vars.NORO_SIGNING_PUBKEY }}
   # Необязателен. Пусто — лаунчер собирается без Sentry и ничего никуда не шлёт.
   # Именно `vars`, а не `secrets`: DSN всё равно уезжает внутрь бинарника на
   # машины игроков, и прятать его от логов сборки — самообман.
@@ -52,12 +48,9 @@ jobs:
     name: Check release vars
     runs-on: ubuntu-latest
     steps:
-      # Падать здесь, а не на пятой матрице через двадцать минут.
-      - name: Vars present
+      - name: Sentry notice
         run: |
           set -euo pipefail
-          [ -n "${NORO_MASTER_URL:-}" ] || echo "::notice::NORO_MASTER_URL не задан — бинарник собирается с универсальным плейсхолдером под stamping"
-          [ -n "${NORO_SIGNING_PUBKEY:-}" ] || echo "::notice::NORO_SIGNING_PUBKEY не задан — бинарник собирается с универсальным плейсхолдером под stamping"
           [ -n "${NORO_SENTRY_DSN:-}" ] || echo "::notice::NORO_SENTRY_DSN не задан — лаунчер соберётся без отчётов о падениях"
 
       # Лаунчер сверяет свою CARGO_PKG_VERSION с тегом, который отдаёт мастер.
