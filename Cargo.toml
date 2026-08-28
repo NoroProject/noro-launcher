@@ -169,8 +169,3 @@ strip = "debuginfo"
 inherits = "release"
 debug = "line-tables-only"
 strip = "none"
-
-[patch."https://github.com/NoroProject/noro-shared.git"]
-schema = { path = "../noro-shared/crates/schema" }
-i18n = { path = "../noro-shared/crates/i18n" }
-mc_mod_utils = { path = "../noro-shared/crates/mc_mod_utils" }
