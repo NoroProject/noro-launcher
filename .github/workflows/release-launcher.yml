@@ -123,9 +123,6 @@ jobs:
 
       - name: Build
         shell: bash
-        env:
-          NORO_MASTER_URL: https://api.noro.dalynkaa.dev
-          NORO_SIGNING_PUBKEY: ${{ secrets.NORO_SIGNING_PUBKEY }}
         run: |
           set -euo pipefail
           # release-symbols, not release: same optimised code plus the string
