@@ -1,5 +1,5 @@
-//! Проверяется то, ради чего появился режим: обновление доезжает, правки не
-//! затираются, а конфликт разрешается по политике.
+//! The three things `merged` has to get right: updates arrive, edits aren't
+//! overwritten, and a real conflict goes to the policy.
 
 use super::*;
 use schema::{ArtifactKind, FileSide, Modloader, PathRule, RecommendedClientSettings};
@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-/// Свой каталог на тест: план читает диск.
+/// A directory per test — `decide_file` reads the disk.
 struct Scratch(PathBuf);
 
 impl Scratch {
@@ -29,7 +29,7 @@ fn scratch(name: &str) -> Scratch {
     Scratch(dir)
 }
 
-/// Манифест с одним файлом `config/a.json` и одним правилом.
+/// One file, `config/a.json`, and one rule covering it.
 fn merged_manifest(pattern: &str, server_sha1: &str) -> BuildManifest {
     BuildManifest {
         build_id: Uuid::nil(),
@@ -73,7 +73,7 @@ fn merged_manifest(pattern: &str, server_sha1: &str) -> BuildManifest {
     }
 }
 
-/// Файл на диске + его настоящий sha1.
+/// Writes the file and returns its real sha1.
 async fn write(dir: &std::path::Path, rel: &str, body: &str) -> String {
     let path = dir.join(rel);
     tokio::fs::create_dir_all(path.parent().unwrap())
@@ -93,11 +93,11 @@ fn action_name(a: &Action) -> &'static str {
 
 #[tokio::test]
 async fn merged_updates_a_file_the_player_never_touched() {
-    // Ровно тот случай, ради которого режим и появился: user_managed оставлял
-    // игрока на старом конфиге навсегда.
+    // The case the mode exists for: `user_managed` would leave the player on
+    // the old config forever.
     let dir = scratch("merged-update");
-    let mine = write(dir.path(), "config/a.json", "старое").await;
-    let m = merged_manifest("config/**", "новыйsha1");
+    let mine = write(dir.path(), "config/a.json", "old contents").await;
+    let m = merged_manifest("config/**", "new-sha1");
     let mut base = BaseHashes::default();
     base.set("config/a.json", &mine);
 
@@ -108,11 +108,11 @@ async fn merged_updates_a_file_the_player_never_touched() {
 #[tokio::test]
 async fn merged_keeps_edits_the_server_did_not_touch() {
     let dir = scratch("merged-keep");
-    write(dir.path(), "config/a.json", "правки игрока").await;
-    let server_sha1 = "серверный";
+    write(dir.path(), "config/a.json", "player edits").await;
+    let server_sha1 = "server-sha1";
     let m = merged_manifest("config/**", server_sha1);
     let mut base = BaseHashes::default();
-    // База совпадает с серверным — значит сервер ничего не менял.
+    // Base matches the server's hash, so the server changed nothing.
     base.set("config/a.json", server_sha1);
 
     let a = decide_file(dir.path(), &m, &m.verified_files[0], &base, true).await;
@@ -122,10 +122,10 @@ async fn merged_keeps_edits_the_server_did_not_touch() {
 #[tokio::test]
 async fn merged_reports_a_conflict_when_both_sides_changed() {
     let dir = scratch("merged-conflict");
-    write(dir.path(), "config/a.json", "правки игрока").await;
-    let m = merged_manifest("config/**", "серверный");
+    write(dir.path(), "config/a.json", "player edits").await;
+    let m = merged_manifest("config/**", "server-sha1");
     let mut base = BaseHashes::default();
-    base.set("config/a.json", "исходный");
+    base.set("config/a.json", "original-sha1");
 
     let a = decide_file(dir.path(), &m, &m.verified_files[0], &base, true).await;
     assert_eq!(action_name(&a), "conflict");
@@ -134,7 +134,7 @@ async fn merged_reports_a_conflict_when_both_sides_changed() {
 #[tokio::test]
 async fn a_missing_file_is_installed_in_every_mode() {
     let dir = scratch("missing");
-    let m = merged_manifest("config/**", "серверный");
+    let m = merged_manifest("config/**", "server-sha1");
     let a = decide_file(
         dir.path(),
         &m,
@@ -149,8 +149,8 @@ async fn a_missing_file_is_installed_in_every_mode() {
 #[tokio::test]
 async fn user_managed_never_updates_an_existing_file() {
     let dir = scratch("user-managed");
-    write(dir.path(), "config/a.json", "правки игрока").await;
-    let mut m = merged_manifest("config/**", "серверный");
+    write(dir.path(), "config/a.json", "player edits").await;
+    let mut m = merged_manifest("config/**", "server-sha1");
     m.path_rules[0].mode = schema::PathMode::UserManaged;
 
     let a = decide_file(
@@ -167,7 +167,7 @@ async fn user_managed_never_updates_an_existing_file() {
 #[tokio::test]
 async fn unmanaged_is_never_touched() {
     let dir = scratch("unmanaged");
-    let mut m = merged_manifest("config/**", "серверный");
+    let mut m = merged_manifest("config/**", "server-sha1");
     m.path_rules[0].mode = schema::PathMode::Unmanaged;
 
     let a = decide_file(

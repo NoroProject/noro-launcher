@@ -1,11 +1,8 @@
-//! Инвентарь несинхронизируемых папок.
+//! An inventory of the directories sync never touches, so that new and changed
+//! files there still get flagged to the master.
 //!
-//! Unmanaged-пути не сканировались вообще: что бы туда ни положили, мастер об
-//! этом не узнавал. Здесь они обходятся, а новое и изменённое уезжает флагом.
-//!
-//! Ключевое ограничение — **не хешировать всё подряд**: `saves/` это гигабайты.
-//! Смотрим только на список наблюдаемых путей, а миры, логи, скриншоты и креши
-//! исключены жёстко.
+//! The constraint that shapes everything else: don't hash the whole instance.
+//! `saves/` alone is gigabytes. Only the watched list gets walked.
 
 use schema::{IntegrityFinding, IntegrityKind};
 use serde::{Deserialize, Serialize};
@@ -14,11 +11,8 @@ use std::path::Path;
 
 const INVENTORY_PATH: &str = ".noro/inventory.json";
 
-/// Где вообще имеет смысл смотреть.
-///
-/// Ровно те каталоги, куда игрок кладёт исполняемое или влияющее на игру.
-/// `saves/`, `logs/`, `screenshots/` и `crash-reports/` исключены жёстко: там
-/// либо гигабайты, либо ничего интересного.
+/// The directories a player drops something executable or game-affecting into.
+/// Everything else is either gigabytes or uninteresting.
 const WATCHED: [&str; 4] = ["mods", "config", "resourcepacks", "shaderpacks"];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -30,8 +24,8 @@ struct Entry {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Inventory {
     files: BTreeMap<String, Entry>,
-    /// Первый проход помечается, чтобы админку не завалило флагами при
-    /// раскатке: у всех игроков разом «появились» бы все их файлы.
+    /// The first pass only records. Without this, rolling the feature out would
+    /// flag every file of every player at once.
     #[serde(default)]
     initial_done: bool,
 }
@@ -55,9 +49,8 @@ impl Inventory {
     }
 }
 
-/// Пройти наблюдаемые пути и сравнить с прошлым разом.
-///
-/// Возвращает находки — новые и изменённые файлы, которых нет в манифесте.
+/// Walk the watched paths and diff against last time. Findings are new or
+/// changed files that aren't in the manifest.
 pub async fn scan(instance_dir: &Path, known: &[String]) -> (Vec<IntegrityFinding>, Inventory) {
     let inventory = Inventory::load(instance_dir).await;
     let mut fresh = Inventory {
@@ -67,7 +60,7 @@ pub async fn scan(instance_dir: &Path, known: &[String]) -> (Vec<IntegrityFindin
     let mut findings = Vec::new();
 
     for (rel, path) in candidates(instance_dir).await {
-        // Файлы сборки нас не интересуют: их целостность проверяется отдельно.
+        // Build files have their own integrity check; no point flagging twice.
         if known.iter().any(|k| k == &rel) {
             continue;
         }
@@ -82,12 +75,10 @@ pub async fn scan(instance_dir: &Path, known: &[String]) -> (Vec<IntegrityFindin
             sha1,
         };
 
-        // Первый проход только запоминает: иначе при раскатке админка получила
-        // бы флаг на каждый файл каждого игрока разом.
         if inventory.initial_done {
             match inventory.files.get(&rel) {
-                None => findings.push(finding(&rel, "новый файл")),
-                Some(old) if old != &entry => findings.push(finding(&rel, "изменён")),
+                None => findings.push(finding(&rel, "new file")),
+                Some(old) if old != &entry => findings.push(finding(&rel, "changed")),
                 Some(_) => {}
             }
         }
@@ -102,8 +93,8 @@ fn finding(rel: &str, detail: &str) -> IntegrityFinding {
         kind: IntegrityKind::ExtraFile,
         subject: rel.to_string(),
         detail: Some(detail.to_string()),
-        // Ничего не удаляем: это несинхронизируемые пути, файлы там принадлежат
-        // игроку. Флаг — повод посмотреть, а не действие.
+        // Nothing gets deleted here. These paths aren't synced and the files in
+        // them are the player's; a finding is something to look at, not an act.
         repaired: false,
     }
 }

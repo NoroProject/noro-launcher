@@ -1,8 +1,8 @@
-//! Поиск модов в каталоге мастера — со стороны лаунчера.
+//! Mod catalog search against the master, launcher side.
 //!
-//! Любой обрыв здесь возвращается сообщением `CatalogFailed`. Раньше запрос
-//! просто ничего не отправлял фронтенду, и экран каталога навсегда застывал на
-//! «Searching compatible mods...» — ошибку не видел ни игрок, ни лог.
+//! Every failure here has to reach the frontend as `CatalogFailed`. The catalog
+//! screen has no timeout of its own — a request that returns nothing leaves it
+//! spinning forever.
 
 use anyhow::{anyhow, Context, Result};
 use bridge::CatalogHitInfo;
@@ -43,15 +43,15 @@ pub async fn search(
         .get(&url)
         .send()
         .await
-        .context("каталог не отвечает")?
+        .context("catalog is not answering")?
         .error_for_status()
-        .context("каталог вернул ошибку")?;
-    let data: Value = res.json().await.context("ответ каталога не разобрать")?;
+        .context("catalog returned an error")?;
+    let data: Value = res.json().await.context("catalog response is not json")?;
 
     let hits = data
         .get("hits")
         .and_then(Value::as_array)
-        .ok_or_else(|| anyhow!("в ответе каталога нет списка модов"))?
+        .ok_or_else(|| anyhow!("catalog response has no hits"))?
         .iter()
         .filter_map(hit)
         .collect();
@@ -64,10 +64,8 @@ pub async fn search(
     })
 }
 
-/// Мод без провайдера или id пропускаем.
-///
-/// Провайдер раньше по умолчанию считался modrinth: мод с CurseForge получал
-/// чужую метку, и установка уходила в другой API — с ошибкой «не найдено».
+/// Drops hits with no provider or id rather than guessing a default: the
+/// provider decides which API the install goes to.
 fn hit(h: &Value) -> Option<CatalogHitInfo> {
     Some(CatalogHitInfo {
         provider: str_at(h, "provider")?,

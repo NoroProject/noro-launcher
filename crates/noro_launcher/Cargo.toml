@@ -20,9 +20,9 @@ ed25519-dalek = { workspace = true }
 base64 = { workspace = true }
 schema = { workspace = true }
 
-# Сплэш рисуется тем же GPUI, что и лаунчер: пока качается core, окно с
-# логотипом и полосой — единственное, что видит игрок. Ревизия та же, что у
-# frontend, иначе в сборке окажутся две несовместимые копии.
+# The splash is drawn with the same GPUI as the launcher: while core downloads,
+# that window is everything the player sees. Keep the revision identical to the
+# one frontend pins, or the build ends up with two incompatible copies.
 gpui = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1", features = ["font-kit", "runtime_shaders"] }
 rust-embed = "8"

@@ -1,15 +1,15 @@
-//! Отправка бандла мастеру по инициативе игрока.
+//! Uploading a bundle to the master.
 //!
-//! Ни запроса от админа, ни гранта, ни TTL: игрок сам нажал «Сообщить о
-//! проблеме». Это покрывает большую часть случаев, ради которых нужен был бы
-//! админский запрос, и ничего у игрока не спрашивает — он и есть инициатор.
+//! The player-initiated path needs no admin request, grant or TTL — they pressed
+//! the button, so there is nobody left to ask for consent.
 
 use anyhow::{bail, Result};
 use std::path::Path;
 use uuid::Uuid;
 
-/// То же, но по запросу админа: бандл привязывается к запросу и игрок его уже
-/// не удалит — иначе принудительный режим не имел бы смысла.
+/// The admin-requested path. Passing the `request_id` is what ties the bundle
+/// to the request on the master, and a tied bundle can't be deleted by the
+/// player.
 pub async fn send_for_request(
     http: &reqwest::Client,
     master_url: &str,
@@ -30,7 +30,7 @@ pub async fn send_for_request(
     .await
 }
 
-/// Собрать, упаковать и отправить. Возвращает id бандла на мастере.
+/// Returns the bundle's id on the master.
 pub async fn send(
     http: &reqwest::Client,
     master_url: &str,
@@ -63,7 +63,7 @@ async fn upload(
 ) -> Result<Uuid> {
     let bundle = super::collect(instance_dir, None, &[]).await;
     if bundle.files.is_empty() {
-        bail!("нечего отправлять: логов ещё нет");
+        bail!("nothing to send: no logs yet");
     }
     let archive = super::pack(&bundle)?;
 
@@ -90,7 +90,7 @@ async fn upload(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        bail!("мастер отказал ({status}): {body}");
+        bail!("master refused ({status}): {body}");
     }
 
     let value: serde_json::Value = resp.json().await?;
@@ -98,6 +98,6 @@ async fn upload(
         .get("id")
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok())
-        .ok_or_else(|| anyhow::anyhow!("мастер не вернул id бандла"))?;
+        .ok_or_else(|| anyhow::anyhow!("master returned no bundle id"))?;
     Ok(id)
 }

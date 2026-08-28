@@ -10,19 +10,17 @@ pub fn classpath_separator() -> &'static str {
     }
 }
 
-/// Собрать classpath из манифеста.
-///
-/// Для Forge/NeoForge ванильный client jar и patched loader client jar не
-/// добавляются в legacy classpath: FML сам собирает game layer через
-/// ProductionClientProvider.
+/// Under Forge and NeoForge neither the vanilla client jar nor the patched
+/// loader client jar goes on the legacy classpath — FML builds the game layer
+/// itself through `ProductionClientProvider`, and a duplicate there breaks it.
 pub fn build_classpath(instance_dir: &Path, manifest: &BuildManifest) -> String {
     let mut game_jar = None;
     let mut libs = Vec::new();
     let forge_like = is_forge_like(manifest);
 
     for f in &manifest.verified_files {
-        // Natives лежат в сборке под все платформы; чужие не скачивались, и
-        // ссылки на них в classpath указывали бы в пустоту.
+        // A manifest carries natives for every platform, but only ours were
+        // downloaded — the rest would be classpath entries pointing at nothing.
         if !f.side.needed_on_client() || !f.matches_platform() {
             continue;
         }

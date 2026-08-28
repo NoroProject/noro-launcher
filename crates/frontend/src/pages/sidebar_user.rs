@@ -5,8 +5,8 @@ use gpui::{div, img, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeig
 use i18n::t;
 
 pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    // Профиль не загружен — так и пишем. «Player» и «@discord» выглядели как
-    // настоящие имя и хэндл, и невошедший игрок не понимал, что он невошедший.
+    // With no profile loaded, say so outright: a stand-in like "Player" reads
+    // as a real name, and a signed-out player doesn't notice they are.
     let username = ui
         .user
         .as_ref()
@@ -35,7 +35,7 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .hover(|d| d.bg(rgba(0xffffff0a)))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.page = Page::Profile;
-            // Цикл анимации гаснет, когда профиль закрыт, — заводим заново.
+            // The animation loop stops while the profile is closed.
             this.start_skin_animation(cx);
             cx.notify();
         }))
@@ -104,8 +104,8 @@ fn avatar(ui: &LauncherUI) -> AnyElement {
 
 fn identity(username: String, handle: String) -> AnyElement {
     div()
-        // Без flex_1 блок сжимался до ширины содержимого и ник обрезался,
-        // хотя до иконок оставалось свободное место.
+        // Without `flex_1` this shrinks to its content and truncates the name
+        // even though there is room left before the icons.
         .flex_1()
         .min_w_0()
         .flex()

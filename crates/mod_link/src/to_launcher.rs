@@ -1,12 +1,12 @@
-//! Мод → лаунчер: намерения.
+//! Mod → launcher: intents.
 //!
-//! Ровно как `MessageToBackend`: мод говорит, чего хочет, и не знает, каким
-//! запросом это делается. URL админки в моде нет и не будет — иначе правка
-//! ручки ломала бы jar, который уже уехал к людям.
+//! The mod says what it wants and never learns which request carries it. No
+//! admin URL lives in the mod and none ever will — moving an endpoint would
+//! break a jar that already shipped.
 //!
-//! Действий в мире здесь нет намеренно: телепорт, заморозку и слежку мод шлёт
-//! теми же командами `/case …`, что и кнопки в чате. Серверный агент из-за
-//! панели не пересобирается.
+//! Nothing here acts on the world. Teleport, freeze and spectate go out as the
+//! same `/case …` commands the chat buttons send, so adding a panel doesn't mean
+//! rebuilding the server agent.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -15,39 +15,33 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum ToLauncher {
-    /// Первый кадр соединения: ключ из файла рукопожатия и версия договора.
-    /// Без него не принимается ничего.
+    /// First frame of the connection; nothing else is accepted before it.
     Hello {
         key: String,
         protocol: u32,
     },
-    /// Перечитать очередь с начала и без фильтра.
+    /// The whole queue from the top, unfiltered. Kept for mods that shipped with
+    /// older builds and know no other frame.
     ///
-    /// Осталась ради модов, уехавших со старыми сборками: у них есть только этот
-    /// кадр. Добавить сюда поля нельзя — `data` у кадра без полей отсутствует, и
-    /// `{"type": "RequestQueue"}` от старого мода перестал бы разбираться вовсе.
-    /// Новые моды шлют `RequestQueuePage`.
+    /// Fields must never be added to it: a frame without fields has no `data`,
+    /// so `{"type": "RequestQueue"}` from an old mod would stop parsing
+    /// entirely. Newer mods send `RequestQueuePage`.
     RequestQueue,
-    /// Страница очереди с поиском.
-    ///
-    /// Ищет и режет на страницы мастер: панель в игре показывает десяток дел за
-    /// раз, а очередь на большом сервере в него не помещается. Пока фильтр жил в
-    /// моде, он видел только загруженный кусок — и «дела нет» означало лишь «его
-    /// нет на первой странице».
+    /// The master searches and paginates. A filter that lived in the mod could
+    /// only see the page it had already loaded, so "no such case" really meant
+    /// "not on the first page".
     RequestQueuePage {
-        /// Ник, сервер, модератор или номер дела. Пусто — вся очередь.
+        /// Nickname, server, moderator or case number. Empty means everything.
         #[serde(default)]
         query: Option<String>,
-        /// Сколько дел пропустить от начала очереди.
         #[serde(default)]
         offset: i64,
     },
-    /// Открыть карточку. Лаунчер запомнит дело открытым и будет присылать его
-    /// заново на каждое `CaseUpdated` с мастера.
+    /// The launcher remembers the case as open and re-sends it on every
+    /// `CaseUpdated` from the master until `CloseCase`.
     OpenCase {
         case_id: Uuid,
     },
-    /// Закрыть карточку — перестать слать обновления по ней.
     CloseCase,
     Claim {
         case_id: Uuid,
@@ -57,7 +51,7 @@ pub enum ToLauncher {
     },
     Resolve {
         case_id: Uuid,
-        /// `confirmed`, `rejected` или `insufficient`.
+        /// `confirmed`, `rejected` or `insufficient`.
         verdict: String,
         #[serde(default)]
         resolution: String,
@@ -75,43 +69,42 @@ pub enum ToLauncher {
         reason: String,
         #[serde(default)]
         rule_code: Option<String>,
-        /// Пусто — бессрочно, как и в админке.
+        /// Empty means permanent, same as in the admin panel.
         #[serde(default)]
         duration_secs: Option<i64>,
     },
-    /// Попросить у сервера срез чата вокруг события. Ответ придёт не сюда, а
-    /// обновлённой карточкой: срез снимает агент, и это занимает время.
+    /// Ask the server for the chat around the incident. The answer doesn't come
+    /// back as a reply — the agent takes the slice, which takes time, and it
+    /// arrives as an updated card.
     RequestChat {
         case_id: Uuid,
     },
     RequestInventory {
         case_id: Uuid,
     },
-    /// Кадр экрана в дело. PNG едет base64: канал текстовый, а отдельный
-    /// бинарный кадр ради одного случая усложнил бы обе стороны.
+    /// A screenshot for the case. The PNG travels base64 — the channel is text,
+    /// and a binary frame for this one case would complicate both sides.
     Attach {
         case_id: Uuid,
         #[serde(default)]
         note: String,
         png_base64: String,
     },
-    /// Указание на сообщение в чате, а не само сообщение.
+    /// A pointer to a chat message, not the message itself.
     ///
-    /// Клиент не источник доказательств: в дело поедет строка из `ChatRing`
-    /// агента, найденная по отправителю и времени. Хеш — только чтобы понять,
-    /// что мод и сервер говорят про одну и ту же строку.
+    /// The client is not a source of evidence: what goes into the case is the
+    /// line from the agent's `ChatRing`, found by sender and time. The hash only
+    /// confirms both sides mean the same line.
     Quote {
         case_id: Uuid,
         sender: String,
         at: DateTime<Utc>,
         hash: String,
     },
-    /// Досье игрока под прицелом.
     Lookup {
         username: String,
     },
-    /// Свод правил. Публичный документ — прав на него не нужно.
+    /// A public document — no permission required.
     RequestRules,
-    /// Свои наказания: что действует и когда кончится.
     RequestOwnPunishments,
 }

@@ -1,6 +1,9 @@
-//! Координация корректного завершения. Главный поток создаёт [`QuitCoordinator`]
-//! с колбэком остановки; каждая подсистема получает [`QuitHandler`] через `fork()`.
-//! `quit()` запускает остановку и ждёт, пока все форки отметятся.
+//! Shutdown that waits for the subsystems.
+//!
+//! The main thread holds the [`QuitCoordinator`] and hands every subsystem a
+//! [`QuitHandler`] via `fork()`. Its `quit()` fires the stop callback and then
+//! blocks until each fork has checked in, so a fork that is never dropped hangs
+//! the exit.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -15,7 +18,7 @@ pub struct QuitCoordinator {
 impl QuitCoordinator {
     pub fn new(on_quit: Box<dyn Fn() + Send + Sync>) -> Self {
         Self {
-            forks: Arc::new(AtomicU32::new(1)), // 1 — за сам координатор
+            forks: Arc::new(AtomicU32::new(1)), // the coordinator itself counts as one
             notify: Arc::new(Notify::new()),
             on_quit,
         }
@@ -29,7 +32,6 @@ impl QuitCoordinator {
         }
     }
 
-    /// Запустить остановку и дождаться, пока все форки вызовут quit().
     pub async fn quit(self) {
         (self.on_quit)();
         if self.forks.fetch_sub(1, Ordering::SeqCst) == 1 {

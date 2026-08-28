@@ -1,4 +1,4 @@
-//! Мелкие части сайдбара: логотип, нижние иконки навигации, пустое состояние.
+//! Small sidebar pieces: logo, bottom nav icons, empty state.
 
 use super::common::Cx;
 use crate::components::{mascot, pixel_title, Mood};
@@ -42,8 +42,6 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
         .items_center()
         .gap(px(10.))
         .hover(|d| d.opacity(0.8))
-        // Иконка приложения рядом с названием: голая надпись в шапке смотрелась
-        // пустовато, а лаунчер уже имеет свой знак.
         .child(img("logo.png").size(px(26.)).flex_shrink_0())
         .child(pixel_title("NORO", 24., CTA))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
@@ -56,9 +54,9 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// Логотип в свёрнутом сайдбаре, он же кнопка раскрытия. Угловой бэйдж заменён
-/// на подмену по наведению: логотип гаснет, а иконка встаёт на его место в том
-/// же размере — на 40 px значок в углу всё равно нечитаем.
+/// The logo in a collapsed sidebar, doubling as the expand button. On hover the
+/// logo fades out and the icon takes its place at the same size — a corner badge
+/// is unreadable at 40 px.
 pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
     div()
         .id("collapsed-logo-toggle")
@@ -103,8 +101,8 @@ pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// Подсказка вместо списка серверов. Без рамки и заливки — обведённый пустой
-/// блок читался как сломавшаяся карточка сервера.
+/// Stands in for the server list. No border or fill: an outlined empty block
+/// reads as a server card that failed to load.
 pub fn empty_hint() -> AnyElement {
     div()
         .px(px(12.))

@@ -37,8 +37,8 @@ pub fn user_card(ui: &LauncherUI, user: &schema::UserProfile, cx: &mut Cx) -> An
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(14.))
                 .text_color(rgb(TEXT_MUTED))
-                // Локальный аккаунт заведён оператором и платформы не имеет —
-                // показываем игровой ник, а не пустое «@».
+                // A local account is created by an operator and has no platform
+                // handle; show the in-game name rather than a bare "@".
                 .child(match user.handle() {
                     Some(name) => format!("@{}", name.to_uppercase()),
                     None => user.username.to_uppercase(),

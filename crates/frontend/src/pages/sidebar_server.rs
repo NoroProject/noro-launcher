@@ -1,4 +1,4 @@
-//! Карточка сервера в сайдбаре: иконка (реальная или initial), статус-точка, версия.
+//! Server card in the sidebar: icon (real or initial), status dot, version.
 use super::common::Cx;
 use crate::icons::ic;
 use crate::state::LauncherUI;
@@ -77,7 +77,7 @@ fn icon_slot(ui: &LauncherUI, server: &ServerEntry) -> AnyElement {
             .child(img(img_data).size_full().object_fit(ObjectFit::Cover))
             .into_any_element()
     } else {
-        // Цветной initial-круг пока иконка грузится / не задана.
+        // A coloured initial, while the icon loads or if there is none.
         let initial: SharedString = server
             .name
             .chars()

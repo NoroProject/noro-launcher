@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# Упаковывает .app в образ для раздачи игрокам.
-#
-# .app — это директория, одним файлом в релиз она не кладётся. Из архивов
-# выбран .dmg: игрок открывает образ и перетаскивает приложение в Applications,
-# поэтому оно не остаётся навсегда лежать в Загрузках. Симлинк на /Applications
-# внутри образа и делает этот жест очевидным.
+# Packs the .app into a disk image. A .app is a directory and can't go into a
+# release as one file; a .dmg also gets the app out of Downloads, since the
+# player drags it across to the /Applications symlink inside the image.
 set -euo pipefail
 
 APP="$1"
@@ -17,23 +14,20 @@ trap 'rm -rf "$STAGE"' EXIT
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 
-# UDZO — сжатый образ только для чтения: меньше весит и не даёт случайно
-# изменить содержимое после подписи.
+# UDRO is an uncompressed read-only disk image: allows in-place binary stamping
+# of the embedded server address by the master server, and signs cleanly with rcodesign.
 hdiutil create \
   -volname "$VOLNAME" \
   -srcfolder "$STAGE" \
-  -ov -format UDZO \
+  -ov -format UDRO \
   -quiet \
   "$OUT"
 
 hdiutil verify -quiet "$OUT"
 
-# Подписать сам образ, а не только бандл внутри.
-#
-# Подписывается тем же Developer ID Application — для .dmg отдельный сертификат
-# не нужен, Developer ID Installer существует только для пакетов .pkg. Без этой
-# подписи штамп нотаризации пришивался бы к контейнеру, целостность которого
-# ничем не подтверждена.
+# Sign the image itself, not just the bundle inside it, or the notarisation
+# ticket ends up stapled to a container nothing vouches for. Same Developer ID
+# Application certificate — Developer ID Installer is only for .pkg.
 IDENTITY="${MACOS_SIGN_IDENTITY:--}"
 if [ "$IDENTITY" != "-" ]; then
   codesign --force --sign "$IDENTITY" --timestamp "$OUT"

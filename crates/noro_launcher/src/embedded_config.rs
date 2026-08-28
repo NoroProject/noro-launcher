@@ -1,8 +1,8 @@
-//! Вшитая в бинарник конфигурация (In-Place Binary Stamping).
+//! Config stamped into the binary after it has been built.
 //!
-//! При сборке релиза этот блок заполнен плейсхолдером. Мастер-сервер при
-//! скачивании релиза находит маркеры `NORO_CFG_START:` и `:NORO_CFG_END`
-//! и перезаписывает JSON реальным адресом и публичным ключом инстанса.
+//! A release is compiled with a placeholder in here. When the master hands out
+//! that release it looks for the `NORO_CFG_START:` and `:NORO_CFG_END` markers
+//! and rewrites the JSON between them with its own address and public key.
 
 pub const CFG_START: &[u8] = b"NORO_CFG_START:";
 pub const CFG_END: &[u8] = b":NORO_CFG_END";
@@ -27,7 +27,8 @@ const fn make_placeholder() -> [u8; EMBEDDED_CONFIG_LEN] {
     buf
 }
 
-// 512 байт в секции данных
+// Has to end up in the data section, at a fixed size, for the stamper to find
+// it and overwrite it in place.
 #[used]
 #[no_mangle]
 pub static mut NORO_EMBEDDED_CONFIG: [u8; EMBEDDED_CONFIG_LEN] = make_placeholder();
@@ -72,7 +73,7 @@ mod tests {
         let stamped = b"NORO_CFG_START:{\"master_url\":\"https://test.noro.dev\",\"pubkey\":\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\"}                :NORO_CFG_END\0";
         let mut buf = [b' '; EMBEDDED_CONFIG_LEN];
         buf[..stamped.len()].copy_from_slice(stamped);
-        let cfg = parse_embedded_config_slice(&buf).expect("должен распарсить");
+        let cfg = parse_embedded_config_slice(&buf).expect("should parse");
         assert_eq!(cfg.master_url, "https://test.noro.dev");
         assert_eq!(cfg.pubkey, "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
     }

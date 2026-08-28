@@ -1,15 +1,14 @@
-//! Что нужно обычному игроку: свод правил и свои наказания.
+//! What an ordinary player gets: the rules, and their own punishments.
 //!
-//! Ни то ни другое не требует прав модератора и не заводит новых ручек на
-//! мастере: свод публичен намеренно — на него ссылается каждый бан, и забаненный
-//! обязан прочитать, за что именно, — а свои наказания игрок и так видит в
-//! кабинете. Мод переносит это в игру, где вопрос и возникает.
+//! Neither needs moderator permissions or a new endpoint on the master. The
+//! rules are public on purpose — every ban cites one, and the banned player has
+//! to be able to read which — and their own punishments are already on their
+//! account page. The mod just puts both where the question comes up.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Пункт свода.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuleItem {
     pub id: Uuid,
@@ -23,20 +22,20 @@ pub struct RuleItem {
     pub sort_order: i32,
 }
 
-/// Раздел свода: пункты без раздела показываются в конце.
+/// A section of the rules. Items without a section are shown last.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuleCategory {
     pub id: Uuid,
-    /// У мастера это поле зовётся `name`. Псевдоним, а не переименование:
-    /// моду уезжает `title` — то же слово, что у пункта свода, чтобы у раздела
-    /// и пункта не было двух разных имён для одного и того же.
+    /// The master calls this `name`. It's an alias, not a rename: the mod
+    /// receives `title` here as well as on a rule item, so the two aren't
+    /// spelled differently for the same thing.
     #[serde(alias = "name", default)]
     pub title: String,
     #[serde(default)]
     pub sort_order: i32,
 }
 
-/// Вилка наказания по пункту: за что и насколько.
+/// The sanction range for a rule: what, and for how long.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuleSanction {
     pub rule_id: Uuid,
@@ -47,7 +46,7 @@ pub struct RuleSanction {
     pub max_minutes: Option<i64>,
 }
 
-/// Наказание игрока — своё, а не чужое.
+/// A punishment of the player asking, never of anyone else.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OwnPunishment {
     pub id: Uuid,
@@ -63,8 +62,8 @@ pub struct OwnPunishment {
 }
 
 impl OwnPunishment {
-    /// Действует ли прямо сейчас. Снятое и истёкшее остаётся в истории: снятый
-    /// бан — тоже факт, и он нужен при разборе следующего случая.
+    /// Revoked and expired punishments stay in the list, they just aren't
+    /// active: a lifted ban still happened, and it matters at the next case.
     pub fn active(&self, now: DateTime<Utc>) -> bool {
         self.revoked_at.is_none() && self.expires_at.is_none_or(|at| at > now)
     }

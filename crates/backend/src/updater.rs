@@ -1,6 +1,8 @@
-//! Самообновление лаунчера: скачивание, проверка sha256 + ed25519, установка в AppData/bin/.
-//! Bootstrapper (.exe, который скачал пользователь) никогда не меняется — это даёт
-//! накопление SmartScreen-репутации на Windows.
+//! Launcher self-update: download, check sha256 and the ed25519 signature,
+//! install into the data root.
+//!
+//! The bootstrapper — the .exe the user actually downloaded — is never
+//! replaced. That's what lets it build up SmartScreen reputation on Windows.
 
 use crate::directories::LauncherDirectories;
 use crate::sync::integrity::sha256_hex;
@@ -8,7 +10,6 @@ use anyhow::{bail, Context, Result};
 use schema::LauncherVersion;
 use std::path::PathBuf;
 
-/// Имя основного бинарника лаунчера в каталоге `bin/`.
 fn core_binary_name() -> &'static str {
     if cfg!(windows) {
         "noro-launcher-core.exe"
@@ -17,12 +18,12 @@ fn core_binary_name() -> &'static str {
     }
 }
 
-/// Путь к основному бинарнику лаунчера.
+/// The binary the bootstrapper launches, as opposed to the bootstrapper itself.
 pub fn core_binary_path(dirs: &LauncherDirectories) -> PathBuf {
     dirs.root().join(core_binary_name())
 }
 
-/// Скачать и установить обновление в `AppData/bin/`. Возвращает путь к бинарнику.
+/// Downloads and installs an update, returning the path to the new binary.
 pub async fn install_update(
     client: &reqwest::Client,
     dirs: &LauncherDirectories,
@@ -31,7 +32,6 @@ pub async fn install_update(
 ) -> Result<PathBuf> {
     tokio::fs::create_dir_all(dirs.root()).await.ok();
 
-    // Скачать.
     let resp = client.get(&version.url).send().await?.error_for_status()?;
     let total = resp.content_length().unwrap_or(0);
     let mut bytes = Vec::with_capacity(total as usize);
@@ -43,22 +43,21 @@ pub async fn install_update(
         on_progress(bytes.len() as u64, total);
     }
 
-    // Проверки целостности и подписи.
+    // Nothing touches disk until both checks pass.
     let actual = sha256_hex(&bytes);
     if !actual.eq_ignore_ascii_case(&version.sha256) {
         bail!(
-            "sha256 не совпал: ожидали {}, получили {actual}",
+            "sha256 mismatch: expected {}, got {actual}",
             version.sha256
         );
     }
     if !crate::signing::verify_bytes(&bytes, &version.signature) {
-        bail!("подпись бинарника недействительна");
+        bail!("binary signature is not valid");
     }
 
-    // Записать основной бинарник в bin/.
     let dest = core_binary_path(dirs);
 
-    // На Windows нельзя перезаписать запущенный exe — переименуем старый.
+    // A running exe can't be overwritten on Windows, so move the old one aside.
     #[cfg(windows)]
     if dest.exists() {
         let old = dest.with_extension("old");
@@ -76,20 +75,17 @@ pub async fn install_update(
         tokio::fs::set_permissions(&dest, perms).await?;
     }
 
-    // Сохранить текущую версию.
-    //
-    // Не «по возможности»: по этому файлу решается, надо ли обновляться. Если
-    // он не записался, лаунчер при каждом запуске считает себя устаревшим и
-    // качает одно и то же обновление заново — молча и бесконечно.
+    // This file is what decides whether an update is needed, so a failed write
+    // is fatal rather than best-effort: without it every launch believes it's
+    // out of date and fetches the same update again, silently and forever.
     let version_file = dirs.root().join("version");
     tokio::fs::write(&version_file, &version.version)
         .await
-        .with_context(|| format!("запись {}", version_file.display()))?;
+        .with_context(|| format!("writing {}", version_file.display()))?;
 
     Ok(dest)
 }
 
-/// Перезапустить лаунчер (запускает основной бинарник из bin/).
 pub fn restart(exe: &std::path::Path) -> ! {
     let _ = std::process::Command::new(exe).spawn();
     std::process::exit(0);

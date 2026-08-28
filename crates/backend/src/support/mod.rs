@@ -1,14 +1,14 @@
-//! Сборка support bundle: логи и окружение для разбора проблемы.
+//! Support bundles: logs and environment, for working out what went wrong.
 //!
-//! Состав — фиксированный allowlist в коде, а не «всё из папки»: игрок должен
-//! мочь заранее сказать, что именно уедет, и список не должен меняться сам
-//! собой при появлении нового файла в каталоге.
+//! The contents are a fixed allowlist in code rather than "whatever is in the
+//! folder", so the set can't grow on its own the day a new file appears in the
+//! directory.
 //!
-//! Не собирается никогда: `saves/`, `screenshots/`, `servers.dat`.
+//! Never collected: `saves/`, `screenshots/`, `servers.dat`.
 //!
-//! Всё содержимое проходит через [`crate::redact`] до упаковки — и тот же текст
-//! показывается игроку по кнопке «Посмотреть, что отправится». Без неё фича
-//! неотличима от слежки; с ней игрок видит `C:\Users\*****` вместо своего имени.
+//! Everything goes through [`crate::redact`] before packing, and the redacted
+//! text is exactly what the preview shows — the player sees `C:\Users\*****`
+//! rather than their own name.
 
 mod collect;
 mod environment;
@@ -21,25 +21,26 @@ pub use send::{send, send_for_request};
 
 use serde::{Deserialize, Serialize};
 
-/// Один файл бандла — уже очищенный.
+/// One file of the bundle, already redacted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BundleFile {
-    /// Имя внутри архива: `logs/latest.log`.
+    /// Name inside the archive, e.g. `logs/latest.log`.
     pub name: String,
     pub text: String,
-    /// Размер исходного файла на диске — чтобы показать игроку до отправки.
+    /// Size of the file on disk, shown to the player before sending. Not the
+    /// length of `text`, which is clamped.
     pub original_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bundle {
     pub files: Vec<BundleFile>,
-    /// ОС, версия лаунчера, сборка, набор модов — то, что не лежит в логах.
+    /// OS, launcher version, build, mod set — what the logs don't say.
     pub environment: String,
 }
 
 impl Bundle {
-    /// Ровно тот текст, который уедет: и в предпросмотре, и в архиве.
+    /// The same text the archive carries, so the preview can't understate it.
     pub fn preview(&self) -> String {
         let mut out = format!("=== environment ===\n{}\n", self.environment);
         for f in &self.files {

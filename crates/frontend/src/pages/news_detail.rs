@@ -1,4 +1,4 @@
-//! Новость целиком: картинка, полный текст, автор и дата.
+//! A single news item: image, full text, author and date.
 
 use super::common::{panel, Cx, CONTENT_W};
 use crate::icons::ic;
@@ -37,7 +37,7 @@ pub fn page(ui: &LauncherUI, id: Uuid, cx: &mut Cx) -> AnyElement {
                         .gap(px(16.))
                         .child(match item {
                             Some(item) => body(ui, item),
-                            // Новость могли удалить на мастере, пока её читали.
+                            // It can be removed on the master while it's open.
                             None => panel()
                                 .p(px(20.))
                                 .font_family(FONT_PIXEL_ALT)
@@ -51,8 +51,6 @@ pub fn page(ui: &LauncherUI, id: Uuid, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// Шапка чтения: стрелка возврата стоит рядом с заголовком, а не отдельной
-/// кнопкой над карточкой — там она висела в пустоте.
 fn header(cx: &mut Cx) -> AnyElement {
     div()
         .h(px(72.))
@@ -100,9 +98,9 @@ fn body(ui: &LauncherUI, item: &NewsItem) -> AnyElement {
 
     if let Some(image) = ui.news_images.get(&item.id) {
         root = root.child(
-            // Картинку держит контейнер с заданной высотой, а сама она внутри
-            // растягивается на него. Заданная высота у самого img в колонке не
-            // держалась: снимок расползался и наезжал на заголовок.
+            // The height lives on the wrapper, not on the image. A height set
+            // on `img` doesn't hold inside this flex column — the picture
+            // stretches and runs over the title.
             div()
                 .w_full()
                 .h(px(240.))
@@ -122,7 +120,6 @@ fn body(ui: &LauncherUI, item: &NewsItem) -> AnyElement {
             .child(item.title.clone()),
     )
     .child(meta(item))
-    // Тело новости — markdown: заголовки, списки, выделения и ссылки.
     .child(
         div()
             .flex()

@@ -1,9 +1,8 @@
-//! Окружение: то, чего нет в логах, но без чего они не читаются.
+//! What the logs don't say but can't be read without.
 
 use schema::BuildManifest;
 use std::path::Path;
 
-/// Описание одним текстом — его же видит игрок в предпросмотре.
 pub async fn describe(
     instance_dir: &Path,
     manifest: Option<&BuildManifest>,
@@ -28,7 +27,7 @@ pub async fn describe(
         out.push_str(&format!("build_id: {}\n", m.build_id));
         out.push_str(&format!("server_id: {}\n", m.server_id));
         out.push_str(&format!(
-            "memory: {}–{} МБ\n",
+            "memory: {}–{} MB\n",
             m.recommended_client_settings.memory_min_mb,
             m.recommended_client_settings.memory_max_mb
         ));
@@ -47,11 +46,11 @@ pub async fn describe(
     out
 }
 
-/// Что лежит в `mods/` на самом деле. Не то же, что список из манифеста:
-/// расхождение между ними и есть половина разбираемых случаев.
+/// What's actually in `mods/`, which is not the manifest's list. The gap
+/// between the two is half the cases worth investigating.
 async fn list_mods(instance_dir: &Path) -> String {
     let Ok(mut entries) = tokio::fs::read_dir(instance_dir.join("mods")).await else {
-        return "  (каталог mods не читается)\n".into();
+        return "  (mods directory unreadable)\n".into();
     };
     let mut names = Vec::new();
     while let Ok(Some(e)) = entries.next_entry().await {
@@ -63,7 +62,7 @@ async fn list_mods(instance_dir: &Path) -> String {
     }
     names.sort();
     if names.is_empty() {
-        return "  (пусто)\n".into();
+        return "  (empty)\n".into();
     }
     format!("{}\n", names.join("\n"))
 }

@@ -1,4 +1,4 @@
-//! Экран без серверов. Вынесен из `game.rs`, чтобы тот остался в лимите строк.
+//! The "no servers" screen.
 
 use super::common::{tabs, Cx};
 use crate::components::{mascot, Mood};
@@ -13,8 +13,6 @@ pub fn empty(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .relative()
         .bg(rgb(CONTENT_FALLBACK))
         .child(tabs(ui, cx))
-        // Пустой экран центрируется, а не висит полоской у верхнего края:
-        // так он читается как осмысленное состояние, а не как недогрузка.
         .child(
             div()
                 .absolute()
@@ -27,8 +25,6 @@ pub fn empty(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .items_center()
                 .justify_center()
                 .gap(px(16.))
-                // Маскот тут не украшение: он отличает «пусто, так и задумано»
-                // от «не загрузилось» — иконка-заглушка это не показывала.
                 .child(mascot(Mood::Thinking, 132.))
                 .child(
                     div()

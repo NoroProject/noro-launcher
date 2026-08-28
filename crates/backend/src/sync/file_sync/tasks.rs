@@ -1,4 +1,4 @@
-//! Что именно нужно скачать: решение по каждому файлу и разрешение конфликтов.
+//! The per-file decision, and what to do when both sides changed a file.
 
 use super::ProgressFn;
 use crate::directories::safe_join;
@@ -11,7 +11,7 @@ use schema::{ArtifactKind, BuildManifest, FileEntry};
 use std::path::Path;
 use std::sync::Arc;
 
-/// Собрать список загрузок и обновлённую базу хешей.
+/// The download list, plus the base hashes the next pass will compare against.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn collect(
     client: &reqwest::Client,
@@ -32,7 +32,7 @@ pub(super) async fn collect(
     let mut tasks: Vec<(ArtifactKind, DownloadTask)> = Vec::new();
     for (i, f) in effective.iter().enumerate() {
         if cancelled() {
-            bail!("отменено");
+            bail!("cancelled");
         }
         let Some(dest) = safe_join(instance_dir, &f.path) else {
             continue;
@@ -48,36 +48,34 @@ pub(super) async fn collect(
         let wanted = match plan::decide_file(instance_dir, manifest, f, &base, verify_hash).await {
             plan::Action::Download => true,
             plan::Action::Skip => false,
-            // Прежде чем звать человека — попробовать слить по ключам: правки
-            // разных строк одного конфига спорить не должны.
+            // Try a key merge before involving a human: edits to different
+            // lines of the same config aren't really in conflict.
             plan::Action::Conflict(_)
                 if crate::sync::keymerge::try_merge(client, instance_dir, &f.path, &f.url)
                     .await
                     .is_some() =>
             {
-                tracing::info!(path = %f.path, "конфликт разрешён слиянием по ключам");
+                tracing::info!(path = %f.path, "conflict resolved by key merge");
                 false
             }
             plan::Action::Conflict(policy) => match policy {
-                // Правки игрока важнее: молча затереть их — ровно то, от чего
-                // режим и защищает. Админ увидит это флагом.
                 schema::ConflictPolicy::KeepMine => {
-                    tracing::warn!(path = %f.path, "конфликт: оставлена версия игрока");
+                    tracing::warn!(path = %f.path, "conflict: kept the player's version");
                     false
                 }
-                // Берём серверную, но сначала откладываем версию игрока.
+                // Take the server's, but set the player's copy aside first.
                 schema::ConflictPolicy::TakeTheirs => {
                     if let Err(e) =
                         crate::sync::merge::backup_conflict(instance_dir, &f.path, stamp).await
                     {
-                        tracing::warn!(path = %f.path, error = %e, "не отложить версию игрока");
+                        tracing::warn!(path = %f.path, error = %e, "could not back up the player's version");
                     }
                     true
                 }
             },
         };
-        // Запоминаем то, что сервер отдаёт сейчас: следующий проход сравнит с
-        // этим и поймёт, кто именно менял файл.
+        // Record what the server is serving now; the next pass compares against
+        // it to work out which side changed the file.
         if wanted {
             base.set(&f.path, &f.sha1);
         }

@@ -1,8 +1,8 @@
-//! IPC-канал между frontend (GPUI, главный поток) и backend (tokio).
+//! The channel between the frontend (GPUI, main thread) and the backend (tokio).
 //!
-//! По образцу side-assist/"Пандоры": две пары mpsc-каналов, клонируемые отправители
-//! и отдельные приёмники. UI остаётся синхронным (GPUI требует главный поток),
-//! а вся сетевая/файловая работа живёт в tokio.
+//! GPUI owns the main thread and stays synchronous, so anything network- or
+//! disk-shaped runs on the tokio side and the two talk over a pair of mpsc
+//! channels.
 
 pub mod handle;
 pub mod message;

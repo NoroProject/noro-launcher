@@ -1,4 +1,4 @@
-//! Запуск игры: сборка classpath, подстановка аргументов, authlib-injector, JVM.
+//! Launching the game: classpath, argument substitution, authlib-injector, JVM.
 
 mod args;
 mod authlib;
@@ -17,25 +17,24 @@ use tokio::process::{Child, Command};
 pub use authlib::ensure_authlib_injector;
 pub use classpath::classpath_separator;
 
-/// `CREATE_NO_WINDOW` из winbase.h — запустить процесс без консольного окна.
+/// From winbase.h; spawns the process without a console window.
 #[cfg(windows)]
 pub(crate) const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-/// Данные для входа в игру.
 pub struct LoginInfo {
     pub username: String,
-    /// MC UUID без дефисов.
+    /// Minecraft UUID, no dashes.
     pub uuid: String,
     pub access_token: String,
 }
 
-/// Информация о подключаемом сервере (для автоподключения).
+/// Where to connect on startup, when the player launched into a server.
 pub struct ServerConnect {
     pub host: String,
     pub port: u16,
 }
 
-/// Запустить игру. Возвращает дочерний процесс с piped stdout/stderr.
+/// Returns the child process with stdout and stderr piped.
 #[allow(clippy::too_many_arguments)]
 pub async fn launch(
     client: &reqwest::Client,
@@ -51,7 +50,7 @@ pub async fn launch(
     tokio::fs::create_dir_all(&natives_dir).await.ok();
 
     let java = crate::sync::find_java(&instance_dir, manifest)
-        .ok_or_else(|| anyhow!("java не найдена в манифесте"))?;
+        .ok_or_else(|| anyhow!("no java in the manifest"))?;
     #[cfg(unix)]
     java::ensure_executable(&java).await?;
 
@@ -96,13 +95,13 @@ pub async fn launch(
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
     cmd.kill_on_drop(true);
-    // java.exe — консольное приложение, а лаунчер GUI-процесс без консоли, так
-    // что Windows заводит для него отдельное окно. Оно не просто пустое и
-    // лишнее: закрытие консоли шлёт CTRL_CLOSE_EVENT всей группе процессов, и
-    // игра умирает вместе с ней. Пайпы флаг не трогает — логи идут как шли.
+    // java.exe is a console application and the launcher is a GUI process with
+    // no console, so Windows opens a window for it. Closing that window sends
+    // CTRL_CLOSE_EVENT to the whole process group and takes the game with it.
+    // The flag doesn't affect the pipes; logs keep flowing.
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
-    cmd.spawn().context("не удалось запустить JVM")
+    cmd.spawn().context("could not start the JVM")
 }
 
 fn add_base_jvm_args(cmd: &mut Command, config: &LauncherConfig, natives_dir: &std::path::Path) {
@@ -125,11 +124,9 @@ fn add_modlauncher_args(cmd: &mut Command, primary_game_artifact: &str) {
     cmd.arg("-Dcpw.mods.modlauncher.add-exports=java.base/sun.net.www.protocol.http=ALL-UNNAMED,java.base/sun.net.www.protocol.https=ALL-UNNAMED");
 }
 
-/// Файл со списком classpath для forge-лаунча.
-///
-/// Отказ записи возвращается наверх, а не глотается: без этого файла игра
-/// стартует и падает внутри Java, где причина уже не видна — а здесь она ещё
-/// известна дословно.
+/// The classpath file a Forge launch reads. A failed write is propagated rather
+/// than swallowed: without the file the game starts and then dies inside Java,
+/// where the reason is no longer legible.
 async fn write_legacy_classpath(
     instance_dir: &std::path::Path,
     classpath: &str,
@@ -142,7 +139,7 @@ async fn write_legacy_classpath(
         .join("\n");
     tokio::fs::write(&legacy_cp_path, content)
         .await
-        .with_context(|| format!("запись {}", legacy_cp_path.display()))?;
+        .with_context(|| format!("writing {}", legacy_cp_path.display()))?;
     Ok(legacy_cp_path)
 }
 
@@ -153,9 +150,9 @@ async fn add_authlib(
     cmd: &mut Command,
 ) {
     if let Ok(authlib) = ensure_authlib_injector(client, dirs).await {
-        // authlib-injector ждёт корень Yggdrasil-API, а не корень мастера:
-        // по этому адресу он забирает ALI-метаданные и от него же строит
-        // пути authserver/sessionserver.
+        // authlib-injector wants the Yggdrasil API root, not the master's root:
+        // it fetches the ALI metadata from there and derives the authserver and
+        // sessionserver paths from it.
         let master_url = config.master_url.replace("localhost", "127.0.0.1");
         cmd.arg(format!(
             "-javaagent:{}={}/api/yggdrasil",

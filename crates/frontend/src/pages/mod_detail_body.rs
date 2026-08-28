@@ -1,4 +1,4 @@
-//! Тело описания мода: markdown Modrinth или HTML CurseForge.
+//! Mod description body: Modrinth markdown or CurseForge HTML.
 
 use super::mod_detail_parts::meta_row;
 use bridge::CatalogHitInfo;
@@ -7,10 +7,11 @@ use gpui::{div, prelude::*, px, AnyElement};
 pub fn description(hit: &CatalogHitInfo, project: Option<&bridge::ModProjectInfo>) -> AnyElement {
     let body = project.map(|p| p.body.clone()).unwrap_or_default();
     let blocks = if body.trim().is_empty() {
-        // Страница ещё не приехала — показываем строку из выдачи.
+        // Full page hasn't arrived yet; stand in with the search result line.
         vec![super::markdown::render(&hit.description)]
     } else if hit.provider == "curseforge" {
-        // CurseForge отдаёт готовый HTML, markdown-парсер его не разберёт.
+        // CurseForge serves rendered HTML; the markdown parser would let the
+        // tags through as text.
         vec![super::markdown::render(&html_to_text(&body))]
     } else {
         vec![super::markdown::render(&body)]
@@ -30,7 +31,7 @@ pub fn description(hit: &CatalogHitInfo, project: Option<&bridge::ModProjectInfo
         .into_any_element()
 }
 
-/// Грубое приведение HTML к тексту: теги выкидываются, блочные дают перенос.
+/// Crude HTML to text: tags are dropped, block-level ones become a newline.
 pub(super) fn html_to_text(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
     let mut in_tag = false;

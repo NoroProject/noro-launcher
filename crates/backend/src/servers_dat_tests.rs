@@ -23,7 +23,7 @@ fn build(nodes: Vec<GameServerEntry>) -> ServerEntry {
         description: String::new(),
         icon_url: None,
         background_url: None,
-        // Как у мастера: адреса нет, если игровых серверов нет.
+        // Matches the master: no address at all when there are no game servers.
         mc_host: nodes.first().map(|n| n.mc_host.clone()),
         mc_port: nodes.first().map(|n| n.mc_port),
         modloader: Modloader::NeoForge,
@@ -65,7 +65,7 @@ fn writes_game_servers_and_skips_unchanged() {
 
     assert!(sync(&dir, &server).unwrap());
     assert_eq!(names(&dir), vec![("Main".into(), "play.noro.dev".into())]);
-    // Второй проход без изменений на мастере файл не трогает.
+    // Nothing changed on the master, so the second pass leaves the file alone.
     assert!(!sync(&dir, &server).unwrap());
 }
 
@@ -80,7 +80,6 @@ fn proxy_hides_backends_behind_it() {
 
     sync(&dir, &server).unwrap();
 
-    // Внутренние бэкенды в списке игрока не место: прямой коннект обошёл бы прокси.
     assert_eq!(names(&dir), vec![("Proxy".into(), "play.noro.dev".into())]);
 }
 
@@ -111,10 +110,10 @@ fn keeps_player_entries_and_drops_removed_ones() {
     )
     .unwrap();
 
-    // Игрок дописал свой сервер.
+    // The player adds a server of their own.
     let mut dat: ServersDat =
         fastnbt::from_bytes(&std::fs::read(dir.join("servers.dat")).unwrap()).unwrap();
-    dat.servers.push(record("Друг", "friend.example"));
+    dat.servers.push(record("Friend", "friend.example"));
     std::fs::write(dir.join("servers.dat"), fastnbt::to_bytes(&dat).unwrap()).unwrap();
 
     sync(
@@ -126,63 +125,52 @@ fn keeps_player_entries_and_drops_removed_ones() {
     let got = names(&dir);
     assert!(got.contains(&("New".into(), "new.noro.dev:25566".into())));
     assert!(
-        got.contains(&("Друг".into(), "friend.example".into())),
+        got.contains(&("Friend".into(), "friend.example".into())),
         "{got:?}"
     );
     assert!(
         !got.iter().any(|(_, ip)| ip == "old.noro.dev"),
-        "снятый со сборки сервер должен уйти: {got:?}"
+        "a server dropped from the build should go: {got:?}"
     );
 }
 
-/// Пропавший файл при живом штампе.
-///
-/// Штамп отвечает на вопрос «менялся ли список у мастера», а не «лежит ли файл
-/// на диске». Пока их путали, удалённый servers.dat не возвращался никогда:
-/// отпечаток совпадал, и sync молча отчитывался, что делать нечего.
+/// The stamp answers "did the master's list change", not "is the file on disk".
 #[test]
 fn a_missing_file_is_rebuilt_even_when_the_stamp_matches() {
     let dir = tempdir();
     let server = build(vec![node("Main", "create.example.dev", 25565, false)]);
 
-    assert!(sync(&dir, &server).unwrap(), "первый запуск пишет файл");
+    assert!(sync(&dir, &server).unwrap(), "first run writes the file");
     assert!(dir.join("servers.dat").exists());
 
-    // Тот же список — второй раз писать незачем.
     assert!(
         !sync(&dir, &server).unwrap(),
-        "без изменений не переписываем"
+        "same list, nothing to rewrite"
     );
 
-    // Файл пропал, штамп остался.
     std::fs::remove_file(dir.join("servers.dat")).unwrap();
 
-    assert!(sync(&dir, &server).unwrap(), "пропавший файл нужно вернуть");
+    assert!(sync(&dir, &server).unwrap(), "missing file has to come back");
     assert!(
         names(&dir).contains(&("Main".into(), "create.example.dev".into())),
-        "сервер должен вернуться в список: {:?}",
+        "the server should be back in the list: {:?}",
         names(&dir)
     );
 }
 
-// --- Диагностика пропадающих точек Xaero (S0) ----------------------------------
+// --- Xaero waypoints ----------------------------------------------------------
 //
-// Жалоба «карта стирает все точки каждый перезапуск» проверяется здесь, потому
-// что servers.dat — единственное, что лаунчер трогает перед стартом игры.
-//
-// Xaero хранит waypoints в `XaeroWaypoints/Multiplayer_<идентификатор>/`, а
-// идентификатор берёт из записи списка серверов. Значит вопрос ровно один:
-// меняется ли запись между запусками.
+// Xaero keys its waypoints on `XaeroWaypoints/Multiplayer_<entry>/`, where the
+// entry comes from the server list. So "the map lost all my waypoints" reduces
+// to one question these tests answer: does our entry change between launches?
 
-/// Идентичность записи — то, по чему Xaero отличает «тот же сервер» от нового.
+/// What Xaero uses to tell "the same server" from a new one.
 fn identity(dir: &Path) -> Vec<(String, String)> {
     names(dir)
 }
 
 #[test]
 fn the_server_entry_is_identical_across_restarts() {
-    // Если бы запись менялась от запуска к запуску, Xaero каждый раз заводил бы
-    // новую папку — и точки «пропадали» бы, оставаясь на диске.
     let dir = tempdir();
     let server = build(vec![node("Main", "play.noro.dev", 25565, false)]);
 
@@ -190,7 +178,6 @@ fn the_server_entry_is_identical_across_restarts() {
     let first = identity(&dir);
 
     for _ in 0..5 {
-        // Файл вообще не переписывается: отпечаток не изменился.
         assert!(!sync(&dir, &server).unwrap());
     }
     assert_eq!(identity(&dir), first);
@@ -198,8 +185,8 @@ fn the_server_entry_is_identical_across_restarts() {
 
 #[test]
 fn reordered_nodes_from_the_database_do_not_rewrite_the_file() {
-    // Порядок выборки на мастере задан ORDER BY, но даже перестановка не должна
-    // трогать файл: отпечаток считается по отсортированному списку.
+    // The fingerprint is computed over a sorted list, so the order the master
+    // happens to return nodes in doesn't matter.
     let dir = tempdir();
     let a = node("A", "a.noro.dev", 25565, false);
     let b = node("B", "b.noro.dev", 25565, false);
@@ -210,9 +197,9 @@ fn reordered_nodes_from_the_database_do_not_rewrite_the_file() {
 
 #[test]
 fn renaming_the_server_does_change_the_entry() {
-    // Обратная сторона: переименование сервера в админке действительно меняет
-    // запись — и вот тогда Xaero заведёт новую папку. Это единственный
-    // сценарий, при котором точки «пропадают» из-за нас, и он не про синк.
+    // The other half of the answer: renaming a server in the admin panel really
+    // does change the entry, and Xaero will start a fresh waypoint directory.
+    // That's the one case where waypoints go missing because of us.
     let dir = tempdir();
     sync(
         &dir,
@@ -233,9 +220,9 @@ fn renaming_the_server_does_change_the_entry() {
 
 #[test]
 fn xaero_directories_are_protected_from_the_sync() {
-    // Вторая половина вопроса: даже переписав servers.dat, синк не должен
-    // трогать сами файлы карты. Маски приходят из сборки; проверяем, что
-    // реально используемые пути Xaero под них попадают.
+    // Rewriting servers.dat must not take the map's own files with it. The
+    // patterns come from the build; this checks the paths Xaero actually uses
+    // match them.
     let protected: Vec<String> = ["xaero*", "config/xaero*", "xaerominimap*", "xaeroworldmap*"]
         .iter()
         .map(|s| s.to_string())
@@ -249,7 +236,7 @@ fn xaero_directories_are_protected_from_the_sync() {
     ] {
         assert!(
             crate::sync::file_sync::is_protected(path, &protected),
-            "{path} должен быть защищён от удаления"
+            "{path} should be protected from deletion"
         );
     }
 }

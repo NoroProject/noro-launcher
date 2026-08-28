@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Собирает .app вокруг bootstrapper'а.
-#
-# Вынесено из workflow: раньше plist лежал в heredoc внутри YAML, и отступы YAML
-# заезжали внутрь XML — перед <?xml оказывались пробелы, которых стандарт не
-# допускает.
+# Builds the .app around the bootstrapper. Kept out of the workflow so the plist
+# heredoc doesn't pick up YAML indentation — XML won't take spaces before <?xml.
 set -euo pipefail
 
 BIN="$1"
@@ -44,24 +41,21 @@ if command -v plutil >/dev/null 2>&1; then
   plutil -lint "$APP/Contents/Info.plist"
 fi
 
-# Переподписать бандл целиком.
+# Re-sign the whole bundle. The linker ad-hoc signs the bare binary, and on
+# arm64 macOS won't run an unsigned one at all — but once that binary is wrapped
+# in a bundle with a plist and an icon, the signature no longer matches what is
+# there: it claims the bundle has no resources. macOS then treats it as damaged
+# and offers to move it to the trash.
 #
-# Линковщик подписывает голый бинарник ad-hoc, и на arm64 без подписи macOS
-# приложение вообще не запускает. Но как только бинарник оборачивается в бандл с
-# Info.plist и иконкой, та подпись перестаёт соответствовать содержимому: она
-# утверждает, что ресурсов нет. Система считает такой бандл повреждённым и
-# предлагает выбросить его в корзину.
-#
-# MACOS_SIGN_IDENTITY позволяет подставить настоящий Developer ID; по умолчанию
-# подпись ad-hoc — она не убирает предупреждение Gatekeeper о неизвестном
-# разработчике, но делает приложение запускаемым.
+# MACOS_SIGN_IDENTITY takes a real Developer ID. The ad-hoc default still leaves
+# the Gatekeeper warning about an unidentified developer, but the app launches.
 IDENTITY="${MACOS_SIGN_IDENTITY:--}"
 
 if [ "$IDENTITY" = "-" ]; then
   codesign --force --deep --sign - --timestamp=none "$APP"
 else
-  # Нотаризация принимает только сборки с hardened runtime и защищённой
-  # меткой времени; без --options runtime Apple отклонит пакет.
+  # Notarisation only takes hardened-runtime builds with a secure timestamp;
+  # without --options runtime Apple rejects the submission.
   codesign --force --deep --sign "$IDENTITY" --options runtime --timestamp "$APP"
 fi
 

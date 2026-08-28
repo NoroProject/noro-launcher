@@ -1,5 +1,5 @@
-//! Основной бинарник лаунчера (core): single-instance, мост frontend↔backend.
-//! Обновляется автоматически через bootstrapper / backend::check_launcher_update.
+//! The launcher itself: single-instance guard, then the frontend/backend pair.
+//! This binary is the one the bootstrapper replaces on update.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use bridge::{MessageToBackend, MessageToFrontend, QuitCoordinator};
@@ -13,17 +13,15 @@ fn main() {
         .join(schema::launcher_dir_name());
     let _ = std::fs::create_dir_all(&app_dir);
 
-    // Отчёты о падениях — до всего остального: хук паники должен стоять раньше,
-    // чем появится первый шанс упасть. Без вшитого DSN или при отказе игрока
-    // ничего не поднимается и никуда не уходит.
-    // Путь берём у backend, а не собираем свой: иначе настройка игрока и файл,
-    // который читает лаунчер, однажды разъедутся.
+    // The config path comes from backend rather than being rebuilt here, or the
+    // player's setting and the file the launcher reads eventually drift apart.
     let config = backend::persistent::Persistent::<backend::config::LauncherConfig>::load(
         backend::LauncherDirectories::new().config_file(),
     );
-    // Подписчик логов — первым: иначе всё, что телеметрия скажет о себе при
-    // старте, ушло бы в никуда. Слой `error!` → событие сам проверяет хаб, так
-    // что ставить его до `init` безопасно.
+    // Logging before telemetry, or everything telemetry says about its own
+    // startup goes nowhere. The `error!` → event layer checks the hub itself, so
+    // installing it before `init` is safe. Both go before anything that can
+    // panic — the hook has to be in place first.
     backend::telemetry::init_tracing(backend::telemetry::is_enabled(&config.get()));
     let _sentry = backend::telemetry::init(&config.get());
 
@@ -34,19 +32,18 @@ fn main() {
         .read(true)
         .write(true)
         .create(true)
-        // Явно: файл — это замок, его содержимое не наше и обнулять его нельзя.
+        // The file is the lock; its contents aren't ours to clear.
         .truncate(false)
         .open(&lockfile_path)
     {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("не удалось открыть app.lock: {e}");
+            eprintln!("could not open app.lock: {e}");
             return;
         }
     };
 
     if lockfile.try_lock_exclusive().is_err() {
-        // Уже запущен — попросить существующий процесс показать окно.
         focus_existing(&socket_path);
         return;
     }
@@ -54,7 +51,6 @@ fn main() {
     run_primary(&app_dir, &socket_path, &lockfile_path);
 }
 
-/// Основной процесс.
 fn run_primary(
     _app_dir: &std::path::Path,
     socket_path: &std::path::Path,
@@ -71,7 +67,6 @@ fn run_primary(
     let (backend_recv, backend_handle, frontend_recv, frontend_handle) = bridge::create_pair();
     let listen_cancel = tokio_util::sync::CancellationToken::new();
 
-    // Слушатель single-instance: на новое подключение — показать окно.
     spawn_focus_listener(
         &runtime,
         socket_path.to_path_buf(),
@@ -79,7 +74,6 @@ fn run_primary(
         listen_cancel.clone(),
     );
 
-    // Координатор завершения: отменяет слушатель и шлёт Quit в backend.
     let quit_coordinator = QuitCoordinator::new(Box::new({
         let backend_handle = backend_handle.clone();
         let listen_cancel = listen_cancel.clone();
@@ -96,13 +90,14 @@ fn run_primary(
         quit_coordinator.fork(),
     );
 
-    // Блокирует главный поток до выхода (GPUI требует main thread).
+    // Blocks the main thread until the window closes — GPUI insists on running
+    // there.
     frontend::start(backend_handle, frontend_recv);
 
-    tracing::info!("frontend завершён, останавливаем backend");
+    tracing::info!("frontend is gone, stopping the backend");
     runtime.block_on(quit_coordinator.quit());
     let _ = std::fs::remove_file(lockfile_path);
-    // `exit` не вызывает деструкторы, поэтому guard сам ничего не дошлёт.
+    // `exit` skips destructors, so the sentry guard never flushes on its own.
     backend::telemetry::flush();
     std::process::exit(0);
 }
@@ -119,7 +114,7 @@ fn spawn_focus_listener(
             let listener = match tokio::net::UnixListener::bind(&socket_path) {
                 Ok(l) => l,
                 Err(e) => {
-                    tracing::warn!("не удалось открыть сокет single-instance: {e}");
+                    tracing::warn!("single-instance socket did not open: {e}");
                     return;
                 }
             };
@@ -157,9 +152,9 @@ fn spawn_focus_listener(
     });
 }
 
-/// Вторичный процесс: достучаться до основного, чтобы показать окно.
+/// The second process: poke the first one and let it raise its window.
 fn focus_existing(socket_path: &std::path::Path) {
-    println!("noro-launcher уже запущен — показываю окно");
+    println!("noro-launcher is already running, focusing its window");
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -171,7 +166,7 @@ fn focus_existing(socket_path: &std::path::Path) {
         }
         #[cfg(windows)]
         {
-            let _ = socket_path; // имя пайпа фиксировано
+            let _ = socket_path; // the pipe name is fixed
             use tokio::net::windows::named_pipe::ClientOptions;
             let _ = ClientOptions::new().open(r"\\.\pipe\noro-launcher");
         }

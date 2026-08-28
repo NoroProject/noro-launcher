@@ -1,15 +1,14 @@
-//! Правила берутся из настоящих манифестов Mojang, а не выдуманные: смысл
-//! проверки в том, что реальная сборка запустится, а не в том, что код
-//! согласен сам с собой.
+//! The rules here are copied out of real Mojang manifests rather than invented,
+//! so what's being tested is that an actual build launches.
 
 use super::arg_values;
 use schema::ManifestArg;
 
 fn parse(json: &str) -> ManifestArg {
-    serde_json::from_str(json).expect("аргумент манифеста")
+    serde_json::from_str(json).expect("manifest argument")
 }
 
-/// Условные jvm-аргументы 1.21.1 — дословно.
+/// Conditional JVM arguments from 1.21.1, verbatim.
 const OSX_ONLY: &str =
     r#"{"rules":[{"action":"allow","os":{"name":"osx"}}],"value":["-XstartOnFirstThread"]}"#;
 const WINDOWS_ONLY: &str = r#"{"rules":[{"action":"allow","os":{"name":"windows"}}],"value":"-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump"}"#;
@@ -21,8 +20,8 @@ fn plain_string_passes_through() {
     assert_eq!(arg_values(&arg), ["-cp"]);
 }
 
-/// Тот самый аргумент, из-за которого всё и делалось: на macOS он обязателен,
-/// а на Linux и Windows JVM от него не стартует.
+/// The argument this whole module exists for: required on macOS, and the JVM
+/// refuses to start with it anywhere else.
 #[test]
 fn start_on_first_thread_only_on_macos() {
     let arg = parse(OSX_ONLY);
@@ -30,7 +29,7 @@ fn start_on_first_thread_only_on_macos() {
     if cfg!(target_os = "macos") {
         assert_eq!(got, ["-XstartOnFirstThread"]);
     } else {
-        assert!(got.is_empty(), "не macOS, а аргумент попал: {got:?}");
+        assert!(got.is_empty(), "not macOS, but the argument got through: {got:?}");
     }
 }
 
@@ -40,16 +39,16 @@ fn windows_heap_dump_only_on_windows() {
     assert_eq!(arg_values(&arg).is_empty(), !cfg!(target_os = "windows"));
 }
 
-/// `x86` у Mojang значит 32 бита. Ни одна платформа лаунчера такой не бывает,
-/// поэтому `-Xss1M` не должен появляться нигде.
+/// `x86` means 32-bit to Mojang, and no platform the launcher ships on is, so
+/// `-Xss1M` should never appear.
 #[test]
 fn xss_never_matches_64bit() {
     let arg = parse(X86_ONLY);
     assert!(arg_values(&arg).is_empty());
 }
 
-/// Feature-правила (demo, свой размер окна, quick play) не выполняются никогда:
-/// иначе игра получила бы `--width` без значения.
+/// Feature rules never match, or the game would be handed a `--width` with an
+/// unsubstituted placeholder after it.
 #[test]
 fn feature_args_are_dropped() {
     let demo =
@@ -60,8 +59,8 @@ fn feature_args_are_dropped() {
     assert!(arg_values(&resolution).is_empty());
 }
 
-/// Форма из манифестов Forge и старых версий: `allow` всем, `disallow` одной
-/// ОС. Решает последнее подошедшее правило, иначе вышло бы «запрещено всем».
+/// The shape Forge and older versions use: `allow` for everyone, `disallow` for
+/// one OS. Take the first match instead of the last and it reads as "nobody".
 #[test]
 fn last_matching_rule_wins() {
     let all_but_osx = r#"{"rules":[{"action":"allow"},{"action":"disallow","os":{"name":"osx"}}],"value":"-Dfoo"}"#;
@@ -69,8 +68,8 @@ fn last_matching_rule_wins() {
     assert_eq!(arg_values(&arg).is_empty(), cfg!(target_os = "macos"));
 }
 
-/// `version` есть в манифестах 1.16–1.19. На не-Windows правило отсекается уже
-/// по `os.name`, так что аргумент не проходит ни там, ни там при чужой версии.
+/// `version` shows up in the 1.16–1.19 manifests. Off Windows the rule is
+/// already ruled out by `os.name`, so the argument never survives either way.
 #[test]
 fn os_version_is_honoured() {
     let win10 = r#"{"rules":[{"action":"allow","os":{"name":"windows","version":"^10\\."}}],"value":["-Dos.name=Windows 10","-Dos.version=10.0"]}"#;
@@ -78,19 +77,19 @@ fn os_version_is_honoured() {
     if !cfg!(target_os = "windows") {
         assert!(arg_values(&arg).is_empty());
     }
-    // Битый regex не должен ронять запуск.
+    // A regex that won't compile must not take the launch down with it.
     let broken = r#"{"rules":[{"action":"allow","os":{"name":"windows","version":"^10\\.("}}],"value":"-Dbroken"}"#;
     let broken = parse(broken);
     assert!(arg_values(&broken).is_empty());
 }
 
-/// Поля, которых мы не понимаем, обязаны доживать до БД: мастер перекладывает
-/// правила через эти же структуры, и потеря `version` была бы необратимой.
+/// The master moves rules through these same structs on their way to the
+/// database, so a field we drop on deserialize is a field lost for good.
 #[test]
 fn unknown_shape_survives_round_trip() {
     let src = r#"{"rules":[{"action":"allow","os":{"name":"windows","version":"^10\\."}}],"value":["-Da","-Db"]}"#;
-    let arg: ManifestArg = serde_json::from_str(src).expect("аргумент");
-    let back = serde_json::to_string(&arg).expect("сериализация");
+    let arg: ManifestArg = serde_json::from_str(src).expect("argument");
+    let back = serde_json::to_string(&arg).expect("serialize");
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&back).unwrap(),
         serde_json::from_str::<serde_json::Value>(src).unwrap()

@@ -1,11 +1,8 @@
-//! Запросы к админ-API мастера от имени модератора.
+//! Admin-API calls to the master on the moderator's behalf.
 //!
-//! Токен сессии живёт здесь и только здесь: в JVM игры он не попадает никогда,
-//! потому что любой мод из модпака прочитал бы env, аргументы или файл и получил
-//! бы полный доступ к админке.
-//!
-//! Отказ различается по коду: 403 — это ответ мастера «не положено», и он
-//! единственный, которому стоит верить. Мод его показывает, но не проверяет.
+//! The session token lives here and nowhere else. It never reaches the game's
+//! JVM: any mod in the pack could read the environment, the arguments or a file
+//! and walk away with full admin access.
 
 use crate::backend::Ctx;
 use mod_link::{CaseBrief, CaseView, Dossier};
@@ -13,27 +10,26 @@ use schema::Page;
 use serde::Deserialize;
 use uuid::Uuid;
 
-/// Почему не получилось. Ключи перевода мода, а не текст: язык живёт в его
-/// `lang`-файлах.
+/// Why it didn't work. Carries the mod's translation keys rather than text —
+/// the wording lives in its `lang` files.
+///
+/// The split is finer than it looks like it needs to be, and each variant earns
+/// its place by what the moderator sees: 409 has to read as "another moderator
+/// already took this", and 400/422 as "the reason you typed is too short",
+/// neither of which should suggest trying again later.
 #[derive(Debug, Clone)]
 pub enum Denied {
-    /// Мастер ответил 401/403.
     Forbidden(u16),
     NotFound(u16),
-    /// 409: состояние разошлось — дело уже взято или уже закрыто. Отдельно от
-    /// `Offline`, иначе «дело уже у другого модератора» показывалось бы как
-    /// «лаунчер не достучался до мастера».
     Conflict(u16),
-    /// 400/422: мастер не принял то, что ввели в форме. Тоже отдельно от
-    /// `Offline`: короткая причина наказания — это ошибка модератора, а не
-    /// обрыв связи, и предлагать «попробуйте позже» здесь не за что.
     Invalid(u16),
-    /// До мастера не достучались или он ответил не тем.
+    /// The master couldn't be reached, or answered with something unexpected.
     Offline(String),
 }
 
 impl Denied {
-    /// Номер из реестра мастера. `0` — отказ наш собственный, номера у него нет.
+    /// Number from the master's error registry. `0` when the refusal is ours and
+    /// has no number.
     pub fn number(&self) -> u16 {
         match self {
             Denied::Forbidden(n)
@@ -64,7 +60,7 @@ pub struct Api {
 }
 
 impl Api {
-    /// `None` — лаунчер не залогинен: спрашивать мастера не о чем.
+    /// `None` when the launcher isn't logged in — nothing to ask the master.
     pub fn new(ctx: &Ctx) -> Option<Self> {
         let token = ctx.ws.token()?;
         Some(Self {
@@ -79,11 +75,11 @@ impl Api {
         })
     }
 
-    /// Страница очереди открытых дел для панели разбора в игре.
+    /// One page of open cases for the in-game panel.
     ///
-    /// Поиск уходит на мастер вместе с запросом: панель показывает десяток дел
-    /// за раз, и фильтровать загруженный десяток у себя значит не находить
-    /// ничего за его пределами.
+    /// The search goes to the master rather than filtering locally: the panel
+    /// holds ten cases at a time, and filtering those ten would never find
+    /// anything outside them.
     pub async fn queue(&self, query: Option<&str>, offset: i64) -> Answer<Page<CaseBrief>> {
         let mut path = format!(
             "/api/admin/cases?open_only=true&limit={}&offset={}",
@@ -110,17 +106,17 @@ impl Api {
         self.json(self.get(&path)).await
     }
 
-    /// Свод правил. Публичная ручка — токен ей не нужен, но и не мешает.
+    /// A public endpoint; the token isn't needed but doesn't hurt.
     pub async fn rules(&self) -> Answer<RulesResponse> {
         self.json(self.get("/api/rules")).await
     }
 
-    /// Свои наказания. Ручка кабинета: отдаёт того, чей токен, и никого больше.
+    /// Account endpoint: returns the punishments of whoever owns the token, and
+    /// nobody else's.
     pub async fn own_punishments(&self) -> Answer<Vec<mod_link::OwnPunishment>> {
         self.json(self.get("/api/me/punishments")).await
     }
 
-    /// Ручки без ответа по существу: важен только код.
     pub async fn post(&self, path: &str, body: serde_json::Value) -> Answer<()> {
         self.ok(self.req(reqwest::Method::POST, path).json(&body))
             .await
@@ -131,7 +127,7 @@ impl Api {
             .await
     }
 
-    /// Кадр экрана вложением. Форма та же, что у капы: одно поле с файлом.
+    /// A screenshot as an attachment. Same multipart shape the web panel uses.
     pub async fn attach(&self, case_id: Uuid, png: Vec<u8>, note: String) -> Answer<()> {
         let form = reqwest::multipart::Form::new().text("note", note).part(
             "file",
@@ -168,12 +164,11 @@ impl Api {
     }
 }
 
-/// Номер отказа из тела ответа мастера.
 async fn number_of(res: reqwest::Response) -> u16 {
     number_in(&res.text().await.unwrap_or_default())
 }
 
-/// `{"error": {"number": …}}` — `0`, если это не наш конверт.
+/// Expects `{"error": {"number": …}}`; anything else is `0`.
 fn number_in(body: &str) -> u16 {
     serde_json::from_str::<serde_json::Value>(body)
         .ok()
@@ -197,19 +192,18 @@ async fn check(req: reqwest::RequestBuilder) -> Answer<Vec<u8>> {
         404 => Err(Denied::NotFound(number_of(res).await)),
         409 => Err(Denied::Conflict(number_of(res).await)),
         400 | 422 => {
-            // Моду уходит ключ перевода — язык интерфейса живёт в его
-            // `lang`-файлах. Что именно не понравилось мастеру, видно в логе
-            // лаунчера: иначе разбирать такой отказ было бы нечем.
+            // The mod only gets a translation key, so what the master actually
+            // objected to has to land in the launcher's log or it's lost.
             let body = res.text().await.unwrap_or_default();
-            tracing::debug!(%status, %body, "mod_link: мастер не принял форму");
+            tracing::debug!(%status, %body, "mod_link: master rejected the form");
             Err(Denied::Invalid(number_in(&body)))
         }
         code => Err(Denied::Offline(format!("HTTP {code}"))),
     }
 }
 
-/// Ответ `/api/rules`. Разбирается здесь, а не в моде: форму ручки держит
-/// лаунчер, он же и обновляется вместе с мастером.
+/// Parsed here rather than in the mod: the launcher owns the endpoint's shape
+/// and is what gets updated alongside the master.
 #[derive(Deserialize)]
 pub struct RulesResponse {
     #[serde(default)]

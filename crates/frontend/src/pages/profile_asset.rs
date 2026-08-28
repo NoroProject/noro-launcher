@@ -7,8 +7,8 @@ use gpui::{div, prelude::*, px, rgb, AnyElement, FontWeight, SharedString};
 use i18n::t;
 use schema::NotifLevel;
 
-/// `id` намеренно отдельно от `title`: заголовок переводится, а идентификатор
-/// элемента должен оставаться одинаковым при любом языке.
+/// `id` is separate from `title` because the title is translated and the
+/// element id has to stay the same in every language.
 pub fn asset_panel(
     id: &'static str,
     title: impl Into<SharedString>,

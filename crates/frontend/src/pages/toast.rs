@@ -6,10 +6,7 @@ use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight};
 use i18n::t;
 use schema::NotifLevel;
 
-/// Иконка, цвет и заголовок по уровню.
-///
-/// Заголовок берётся из уровня, а не из сообщения: мастер шлёт один текст, и
-/// придумывать ему отдельный заголовок было бы выдумыванием содержания.
+/// The title comes from the level: the master sends body text and nothing else.
 fn style(level: NotifLevel) -> (&'static str, u32, &'static str) {
     match level {
         NotifLevel::Success => ("circle-check", SUCCESS, "toast-success"),
@@ -67,8 +64,7 @@ pub fn toast_overlay(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// Единственный способ убрать тост: таймера автоскрытия нет, и без кнопки
-/// сообщение висело поверх интерфейса до перезапуска лаунчера.
+/// There is no auto-dismiss timer, so this is the only way to clear a toast.
 fn close_button(cx: &mut Cx) -> AnyElement {
     div()
         .id("toast-close")

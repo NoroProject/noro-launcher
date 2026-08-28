@@ -1,11 +1,13 @@
-//! Удаление лишнего, защита путей от него и отбор активных опциональных модов.
+//! Removing files that don't belong, the paths that are exempt from it, and
+//! working out which optional mods are actually on.
 
 use anyhow::Result;
 use schema::{BuildManifest, FileEntry, UserProfile};
 use std::collections::HashSet;
 use std::path::Path;
 
-/// Пути файлов выключенных (или недоступных по правам) опциональных модов.
+/// Files belonging to optional mods that are off, or that the player has no
+/// permission for.
 pub fn excluded_optional_files(
     manifest: &BuildManifest,
     enabled: &[String],
@@ -18,7 +20,7 @@ pub fn excluded_optional_files(
         let active = if m.limited {
             user_enabled && allowed
         } else if enabled.is_empty() {
-            // нелимитный без выбора игрока: по умолчанию
+            // Unrestricted mod, player never chose: fall back to the default.
             m.enabled_by_default
         } else {
             user_enabled
@@ -32,18 +34,16 @@ pub fn excluded_optional_files(
     excluded
 }
 
-/// Удалить файлы, отсутствующие в effective и не попадающие под защищённые пути.
+/// Delete everything not in `effective`. Only managed paths are eligible.
 pub(super) async fn clean_extra(
     instance_dir: &Path,
     effective: &[&FileEntry],
     manifest: &BuildManifest,
 ) -> Result<()> {
     let keep: HashSet<String> = effective.iter().map(|f| f.path.clone()).collect();
-    // Всё, что не принадлежит сборке целиком, из удаления исключено: правила
-    // разрешают удалять только managed-пути.
     let rules = manifest.path_rules.clone();
-    // Служебные внутренние пути лаунчера. `.noro/` — база хешей и отложенные
-    // конфликты: снести их значит потерять и то, и другое.
+    // The launcher's own state. `.noro/` holds the base hashes and the saved
+    // conflicts — deleting it loses both.
     let protected: Vec<String> = vec![
         ".natives/".to_string(),
         ".noro/".to_string(),
@@ -86,7 +86,9 @@ pub(super) async fn clean_extra(
     Ok(())
 }
 
-/// Защищён ли относительный путь одним из префиксов из манифеста мастера (директория с '/', точный путь или маска '*').
+/// Patterns come from the master's manifest and take three forms: a directory
+/// ending in `/`, an exact path, or a prefix ending in `*`. Matching is
+/// case-insensitive.
 pub fn is_protected(rel: &str, protected: &[String]) -> bool {
     let rel_lower = rel.to_lowercase();
     protected

@@ -1,8 +1,8 @@
-//! Лаунчер → мод: состояние.
+//! Launcher → mod: state.
 //!
-//! Ровно как `MessageToFrontend`: мод рисует то, что прислали, и ничего не
-//! выводит сам. Отказ приходит ключом перевода, а не готовым текстом, —
-//! язык интерфейса живёт в `lang`-файлах мода.
+//! The mod draws what it is sent and works nothing out for itself. Refusals
+//! arrive as a translation key rather than finished text, because the interface
+//! language lives in the mod's `lang` files.
 
 use crate::case::{CaseBrief, CaseView, InventorySlot};
 use crate::dossier::Dossier;
@@ -14,22 +14,22 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum ToMod {
-    /// Рукопожатие принято. Права здесь — чтобы не рисовать кнопки, которых
-    /// всё равно не дадут нажать. Это удобство, а не защита: решает мастер.
+    /// Handshake accepted. The permissions are here so the mod doesn't draw
+    /// buttons that would be refused anyway — a convenience, not a check. The
+    /// master is the one that decides.
     Ready {
         protocol: u32,
         username: String,
-        /// Язык лаунчера, `ru` или `en`. Мод берёт свой, если игра на другом.
+        /// Launcher language, `ru` or `en`.
         locale: String,
         permissions: Vec<String>,
     },
-    /// Страница очереди. `total` — сколько дел подходит под фильтр целиком,
-    /// поэтому панель может нарисовать «11–20 из 348» и знает, есть ли ещё.
+    /// A page of the queue. `total` counts everything matching the filter, so
+    /// the panel can say "11-20 of 348" and knows whether more exists.
     ///
-    /// `query` и `offset` — эхо запроса: кадр говорит, какой странице он
-    /// соответствует. Без этого панель не отличает «пришла запрошенная
-    /// страница» от «прилетело обновление очереди» и, например, показывала бы
-    /// уведомление о новом деле на каждое перелистывание.
+    /// `query` and `offset` echo the request, so the panel can tell a page it
+    /// asked for from an unsolicited queue update. Without them it would
+    /// announce a new case every time someone turned a page.
     Queue {
         cases: Vec<CaseBrief>,
         total: i64,
@@ -37,58 +37,56 @@ pub enum ToMod {
         #[serde(default)]
         query: Option<String>,
     },
-    /// Наборы ресурсов обновились под работающей игрой.
-    ///
-    /// Лаунчер подменяет паки на ходу, но игра держит в памяти прежние: чтобы
-    /// новое стало видно, клиенту нужна перезагрузка ресурсов. Зовёт её мод, а
-    /// не лаунчер: снаружи процесса игры такой ручки нет.
+    /// Resource packs were swapped under the running game. The client still has
+    /// the old ones in memory, so it needs a resource reload — and only the mod
+    /// can ask for one, there is no such handle outside the game process.
     ReloadResources {
-        /// Что именно обновилось — мод показывает это в подсказке.
         packs: Vec<String>,
     },
-    /// Карточка целиком, включая срез чата: он часть карточки, как и на сайте.
+    /// The whole card, chat slice included; the slice is part of the card here
+    /// exactly as it is on the site.
     ///
-    /// В боксе: карточка на порядок больше любого другого кадра, и без него
-    /// каждое `Notice` из двух строк занимало бы в канале столько же. На JSON
-    /// это никак не сказывается — мод разницы не увидит.
+    /// Boxed because the card is an order of magnitude larger than any other
+    /// frame, and a two-line `Notice` would otherwise cost the same.
     Case {
         view: Box<CaseView>,
     },
     Dossier {
         dossier: Dossier,
     },
-    /// Снимок инвентаря отдельным кадром, хотя он же лежит событием в ленте:
-    /// в ленте это сырой JSON, и разбирать его в Java — работа на ровном месте.
+    /// The inventory snapshot gets its own frame even though the same data sits
+    /// in the timeline: there it's raw JSON, and parsing that in Java is work
+    /// for nothing.
     Inventory {
         case_id: Uuid,
         items: Vec<InventorySlot>,
     },
-    /// Мастер отказал. `intent` — имя кадра, на который отказ, чтобы мод понял,
-    /// какую кнопку гасить; `reason` — ключ перевода.
+    /// Refused. `intent` names the frame that was refused so the mod knows which
+    /// button to give up on; `reason` is a translation key.
     Rejected {
         intent: String,
         reason: String,
-        /// Номер из реестра мастера; `0` — отказ не от него (нет сети, свои
-        /// проверки). Панель показывает его рядом с текстом: причина переведена
-        /// в моде, а номер одинаков везде и его можно назвать.
+        /// Code from the master's registry. `0` means the refusal came from
+        /// somewhere else — no network, or a local check. The panel shows it
+        /// next to the text: the reason is translated locally, but the number is
+        /// the same everywhere and can be quoted.
         #[serde(default)]
         number: u16,
     },
-    /// Свод правил целиком: разделы, пункты и вилки наказаний.
-    ///
-    /// Одним кадром, а не тремя: свод открывают, чтобы прочитать пункт вместе с
-    /// тем, что за него бывает, и догружать вилки отдельно значит показать
-    /// правило без последствий.
+    /// Sections, rules and sanction ranges in one frame rather than three. The
+    /// rules get opened to read a clause together with what it costs, and
+    /// loading the ranges separately would show the rule without the
+    /// consequence.
     Rules {
         categories: Vec<RuleCategory>,
         rules: Vec<RuleItem>,
         sanctions: Vec<RuleSanction>,
     },
-    /// Свои наказания — вся история, включая снятые.
+    /// The player's whole history, revoked entries included.
     OwnPunishments {
         punishments: Vec<OwnPunishment>,
     },
-    /// Сказать словами. Ключом, как `Notification` у мастера.
+    /// Something to say in words, by key, like the master's `Notification`.
     Notice {
         key: String,
         #[serde(default)]

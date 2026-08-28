@@ -1,4 +1,4 @@
-//! Панель глобальных настроек и её элементы управления.
+//! The global settings panel and its controls.
 
 use super::common::{panel, Cx};
 use super::settings_rows::{mono_value, row, stepper};
@@ -39,8 +39,8 @@ pub fn settings_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             mono_value(&ui.config.jvm_flags, "not set"),
             ui.config.crash_reports_available,
         ))
-        // Строки нет, если в сборку не вшит DSN: переключать было бы нечего,
-        // а сама строка обещала бы игроку то, чего не происходит.
+        // Hidden when no DSN is baked into the build: the toggle would flip
+        // with nowhere to send.
         .when(ui.config.crash_reports_available, |d| {
             d.child(row(
                 "triangle-alert",
@@ -60,10 +60,7 @@ pub fn settings_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// Кнопка отправки логов.
-///
-/// Инициатива игрока покрывает большую часть случаев, ради которых иначе нужен
-/// был бы админский запрос с согласием, — и не требует ни того, ни другого.
+/// Player-initiated log upload: no admin request, no consent prompt.
 fn support_bundle_control(cx: &mut Cx) -> AnyElement {
     btn(
         "send-support-bundle",
@@ -141,7 +138,8 @@ fn fullscreen_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     .into_any_element()
 }
 
-/// Шаг памяти: минимум не выше максимума, максимум не ниже минимума.
+/// Keeps the max at or above the min by raising the max, never by lowering the
+/// min the player just set.
 fn adjust(ui: &mut LauncherUI, is_min: bool, delta: i32) {
     let mut min = ui.config.memory_min_mb as i32;
     let mut max = ui.config.memory_max_mb as i32;

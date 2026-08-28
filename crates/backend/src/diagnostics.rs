@@ -1,16 +1,13 @@
-//! Диагностический снапшот лаунчера.
+//! Diagnostic snapshot of the launcher.
 //!
-//! Личного здесь нет — версии, железо, скорость до мастера. Поэтому согласия не
-//! спрашиваем: это закрывает половину тикетов «не запускается» без единого
-//! файла логов, а спрашивать разрешение на «какая у вас версия» — только тратить
-//! внимание игрока.
+//! Versions, hardware, latency to the master. Nothing personal goes in here,
+//! which is why it is gathered without asking first.
 
 use crate::directories::LauncherDirectories;
 use schema::DiagnosticsReport;
 use std::path::Path;
 use std::time::Instant;
 
-/// Собрать снапшот.
 pub async fn collect(
     http: &reqwest::Client,
     dirs: &LauncherDirectories,
@@ -30,8 +27,8 @@ pub async fn collect(
     }
 }
 
-/// Java из любой установленной сборки: их рантаймы одинаковы, а важно то, что
-/// она вообще есть.
+/// Takes the runtime from whichever instance has one. They're interchangeable;
+/// the only question being answered is whether Java is there at all.
 fn find_java(dirs: &LauncherDirectories) -> Option<String> {
     let instances = dirs.instances();
     let entries = std::fs::read_dir(instances).ok()?;
@@ -46,10 +43,8 @@ fn find_java(dirs: &LauncherDirectories) -> Option<String> {
     None
 }
 
-/// Сколько свободно там, где лежат сборки.
-///
-/// «Не хватило места» — самая частая причина недокачки, и она не видна ни в
-/// одном логе игры.
+/// Free space on the volume holding the instances. A download that stopped
+/// because the disk filled up leaves no trace in any game log.
 fn free_space_mb(path: &Path) -> u64 {
     #[cfg(unix)]
     {
@@ -57,16 +52,15 @@ fn free_space_mb(path: &Path) -> u64 {
         let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
             return 0;
         };
-        // SAFETY: путь — валидная C-строка, структура заполняется целиком.
+        // SAFETY: valid C string in, statvfs fills the struct completely.
         unsafe {
             let mut stat: libc::statvfs = std::mem::zeroed();
             if libc::statvfs(c_path.as_ptr(), &mut stat) != 0 {
                 return 0;
             }
-            // Ширина полей `statvfs` у платформ разная: на macOS `f_bavail` —
-            // 32-битный, на Linux оба поля уже 64-битные. Приведение нужно там
-            // и лишнее здесь, поэтому lint глушится, а не «исправляется»:
-            // любая правка под одну платформу ломает сборку под другую.
+            // `f_bavail` is 32-bit on macOS and 64-bit on Linux, so the cast is
+            // required on one and redundant on the other. Silencing the lint is
+            // the only way to keep both platforms compiling.
             #[allow(clippy::unnecessary_cast)]
             let free = (stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64);
             free / 1_048_576
@@ -79,7 +73,6 @@ fn free_space_mb(path: &Path) -> u64 {
     }
 }
 
-/// Размер каталога лаунчера.
 async fn dir_size_mb(root: &Path) -> u64 {
     let root = root.to_path_buf();
     tokio::task::spawn_blocking(move || {
@@ -96,7 +89,6 @@ async fn dir_size_mb(root: &Path) -> u64 {
     .unwrap_or(0)
 }
 
-/// Время ответа мастера.
 async fn ping(http: &reqwest::Client, master_url: &str) -> Option<u64> {
     let url = format!("{}/health", master_url.trim_end_matches('/'));
     let started = Instant::now();
@@ -108,7 +100,7 @@ async fn ping(http: &reqwest::Client, master_url: &str) -> Option<u64> {
         .map(|_| started.elapsed().as_millis() as u64)
 }
 
-/// Установленные сборки: id инстанса и версия из служебного файла.
+/// Instance id paired with the build recorded in its `.noro-build`.
 async fn instances(dirs: &LauncherDirectories) -> Vec<(String, String)> {
     let Ok(entries) = std::fs::read_dir(dirs.instances()) else {
         return Vec::new();

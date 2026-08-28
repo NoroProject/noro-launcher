@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-# Отправляет образ на нотаризацию и пришивает результат.
-#
-# Без нотаризации macOS показывает предупреждение о неизвестном разработчике
-# даже у правильно подписанного приложения. Штамп пришивается к самому файлу,
-# поэтому проверка потом проходит и без интернета.
+# Submits the image for notarisation and staples the result. Without it macOS
+# warns about an unidentified developer even for a properly signed app. The
+# ticket is stapled to the file, so later checks work offline.
 set -euo pipefail
 
 DMG="$1"
 
 if [ -z "${NOTARY_KEY_ID:-}" ]; then
-  echo "нотаризация пропущена: секреты не заданы"
+  echo "notarisation skipped: secrets are not set"
   exit 0
 fi
 

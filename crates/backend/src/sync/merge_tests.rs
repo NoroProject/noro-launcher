@@ -1,5 +1,5 @@
-//! Таблица решений из плана §10.5, проверенная по клеткам. Ошибка здесь либо
-//! затирает правки игрока, либо навсегда оставляет его на старом конфиге.
+//! The decision table, cell by cell. Getting it wrong either overwrites the
+//! player's edits or leaves them on an old config forever.
 
 use super::*;
 
@@ -9,8 +9,8 @@ const THEIRS: &str = "ccc";
 
 #[test]
 fn untouched_by_the_player_gets_updated() {
-    // Совпадает с базой, сервер изменил → обновить. Ровно тот случай, ради
-    // которого режим и появился: user_managed оставлял игрока на старом навсегда.
+    // Matches the base and the server moved on. The case the mode exists for:
+    // `user_managed` would leave the player on the old file forever.
     assert_eq!(decide(Some(BASE), Some(BASE), THEIRS), Decision::Update);
 }
 
@@ -31,21 +31,20 @@ fn nothing_changed_means_nothing_to_do() {
 
 #[test]
 fn identical_edits_are_not_a_conflict() {
-    // Обе стороны пришли к одному и тому же содержимому — спорить не о чем.
+    // Both sides landed on the same contents; nothing to argue about.
     assert_eq!(decide(Some(THEIRS), Some(BASE), THEIRS), Decision::Nothing);
 }
 
 #[test]
 fn a_missing_file_is_always_installed() {
-    // Файла нет — ставим, кто бы что ни менял.
     assert_eq!(decide(None, Some(BASE), THEIRS), Decision::Update);
     assert_eq!(decide(None, None, THEIRS), Decision::Update);
 }
 
 #[test]
 fn without_a_base_a_difference_is_treated_as_a_conflict() {
-    // Первый проход на уже установленной сборке: базы нет, и затирать чужой
-    // файл только потому, что мы его не помним, нельзя.
+    // First pass over an already installed build: there is no base, and a file
+    // must not be overwritten just because we don't remember it.
     assert_eq!(decide(Some(MINE), None, THEIRS), Decision::Conflict);
     assert_eq!(decide(Some(THEIRS), None, THEIRS), Decision::Nothing);
 }
@@ -72,7 +71,7 @@ async fn a_conflict_backup_keeps_the_players_version() {
     let dir = std::env::temp_dir().join(format!("noro-conflict-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("config")).unwrap();
-    std::fs::write(dir.join("config/sodium.json"), "правки игрока").unwrap();
+    std::fs::write(dir.join("config/sodium.json"), "the player's edits").unwrap();
 
     backup_conflict(&dir, "config/sodium.json", "20260816-120000")
         .await
@@ -81,7 +80,7 @@ async fn a_conflict_backup_keeps_the_players_version() {
     let saved =
         std::fs::read_to_string(dir.join(".noro/conflicts/20260816-120000/config/sodium.json"))
             .unwrap();
-    assert_eq!(saved, "правки игрока");
+    assert_eq!(saved, "the player's edits");
 
     let _ = std::fs::remove_dir_all(&dir);
 }

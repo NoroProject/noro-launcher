@@ -1,4 +1,4 @@
-//! Экран полного каталога модов и детальной страницы мода в лаунчере.
+//! The full mod catalog screen and the mod detail page.
 use super::common::{tabs, Cx};
 use crate::components::btn;
 use crate::icons::ic;
@@ -16,9 +16,9 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let mc_ver = server.map(|s| s.mc_version.clone());
     let loader = server.map(|s| s.modloader.as_str().to_string());
 
-    // Автоматически запускаем базовый поиск при первом входе, если выдача пустая.
-    // После ошибки не повторяем: этот код выполняется на каждый кадр, и упавший
-    // каталог получил бы шквал запросов вместо одного.
+    // Kick off a default search on first entry. This runs on every frame, so
+    // the error guard matters: without it a catalog that is down would take a
+    // request per frame instead of one.
     if ui.mod_catalog_hits.is_empty() && ui.mod_catalog_error.is_none() {
         ui.backend.send(MessageToBackend::SearchCatalog {
             query: "".to_string(),
@@ -29,7 +29,6 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         });
     }
 
-    // Автоматически подгружаем иконки через безопасный reqwest loader
     let icon_urls: Vec<String> = ui
         .mod_catalog_hits
         .iter()
@@ -147,8 +146,8 @@ fn mod_catalog_grid(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyEle
                 .border_color(rgb(BORDER))
                 .p(px(16.))
                 .child(if hits.is_empty() {
-                    // Пустая выдача и упавший запрос выглядели одинаково —
-                    // вечным «Searching...». Теперь причина видна на экране.
+                    // No results and a failed request both end up here; without
+                    // the error text both read as a search that never finishes.
                     let (text, color) = match &ui.mod_catalog_error {
                         Some(e) => (format!("Catalog unavailable: {e}"), ERROR),
                         None => ("Searching compatible mods...".to_string(), TEXT_MUTED),
@@ -340,8 +339,9 @@ fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                             "space" => {
                                 this.mod_catalog_query.push(' ');
                             }
-                            // key_char уже учитывает shift и раскладку, а при cmd/ctrl он
-                            // пустой — так что горячие клавиши не сыплются в строку поиска.
+                            // `key_char` already accounts for shift and layout,
+                            // and is empty under cmd/ctrl, so shortcuts don't
+                            // end up typed into the query.
                             _ => {
                                 if let Some(ch) = keystroke.key_char.as_deref() {
                                     this.mod_catalog_query.push_str(ch);

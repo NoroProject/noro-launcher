@@ -1,4 +1,7 @@
-//! Монотонные счётчики для дедупликации/упорядочивания сообщений между сторонами.
+//! Monotonic counters meant to let one side see how far the other has got.
+//!
+//! Nothing hands one out yet: both `send` paths put `None` on the wire, so the
+//! receivers never advance their counter. Don't read ordering into it.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;

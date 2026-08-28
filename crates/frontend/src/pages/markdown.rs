@@ -1,9 +1,8 @@
-//! Markdown новости в элементы GPUI.
+//! Markdown news bodies into GPUI elements.
 //!
-//! Тело новости пишут в админке как markdown, а раньше оно попадало в лаунчер
-//! сырым текстом — со звёздочками и решётками. Inline-стили кладутся ранжами на
-//! `StyledText`, а не отдельными элементами: только так строка переносится по
-//! словам, а не рвётся на куски по каждому жирному слову.
+//! Inline styles go on as ranges over a single `StyledText` rather than as
+//! separate elements. Only that way does the paragraph wrap by words; split
+//! into elements it breaks at every bold run.
 
 use crate::theme::*;
 use gpui::{
@@ -21,7 +20,7 @@ enum Kind {
     Item(usize),
 }
 
-/// Разобрать markdown в блоки: по элементу на абзац, заголовок, пункт списка.
+/// One element per paragraph, heading and list item.
 pub fn render(source: &str) -> Vec<AnyElement> {
     let parser = Parser::new_ext(source, Options::ENABLE_STRIKETHROUGH);
     let mut out = Vec::new();
@@ -82,10 +81,6 @@ pub fn render(source: &str) -> Vec<AnyElement> {
     out
 }
 
-/// Короткий отрывок без разметки — для карточки в списке.
-///
-/// Раньше в карточку падало тело как есть, и читатель видел решётки, звёздочки
-/// и дефисы списков вместо текста.
 pub fn plain_excerpt(source: &str, limit: usize) -> String {
     let mut out = String::new();
     for event in Parser::new(source) {
@@ -124,8 +119,8 @@ fn style(weight: FontWeight, italic: Option<FontStyle>, color: Option<u32>) -> H
     }
 }
 
-/// Закрыть накопленный блок. Пустые пропускаем — иначе markdown с двойными
-/// переводами строки давал бы пустые полосы.
+/// Closes out the accumulated block. Empty ones are dropped, otherwise double
+/// line breaks would leave blank strips in the output.
 fn flush(
     out: &mut Vec<AnyElement>,
     buf: &mut String,

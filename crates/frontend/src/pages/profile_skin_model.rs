@@ -1,12 +1,8 @@
-//! Выбор модели скина: классическая (Стив) или тонкая (Алекс).
+//! Skin model: classic (Steve) or slim (Alex).
 //!
-//! Отдельным файлом, а не строчкой в `profile_skin`: там уже карточка превью,
-//! пресеты, перетаскивание и переименование — ещё один блок сделал бы её
-//! нечитаемой.
-//!
-//! Переключение не трогает картинку: меняется только ширина рук. Заставлять
-//! игрока перезаливать файл ради этого нельзя — скина у него на диске может и
-//! не быть, если тот приехал по нику.
+//! Switching doesn't touch the image, only the arm width. It can't require a
+//! re-upload either: a skin that arrived by nickname was never on the player's
+//! disk to begin with.
 
 use super::common::Cx;
 use crate::components::btn;
@@ -15,8 +11,7 @@ use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement};
 use i18n::t;
 
-/// Ряд из двух кнопок. Пусто, если скина нет: переключать нечего, а показывать
-/// выбор поверх общего Стива значит обещать то, чего игрок не загружал.
+/// `None` when the player has no skin — there is nothing to switch.
 pub fn model_row(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     ui.user.as_ref()?.skin_url.as_ref()?;
     let slim = ui.user.as_ref().is_some_and(|u| u.skin_slim);
@@ -51,8 +46,8 @@ fn choice(
     active: bool,
     label_key: &'static str,
 ) -> AnyElement {
-    // Выбранную кнопку не гасим: повторное нажатие безвредно, а серая кнопка
-    // рядом с активной читается как «недоступно», а не как «уже выбрано».
+    // While an upload is in flight the click is dropped rather than the
+    // button disabled.
     let busy = ui.skin_uploading;
     div()
         .flex_1()

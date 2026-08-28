@@ -1,6 +1,8 @@
-//! Проверка ed25519-подписи манифеста. Публичный ключ зашит в бинарник:
-//! в production — через env `NORO_SIGNING_PUBKEY` (hex) при компиляции,
-//! в dev — выводится из общего seed [`schema::DEV_SIGNING_SEED`].
+//! ed25519 signature checks on the build manifest.
+//!
+//! The public key is baked into the binary: `NORO_SIGNING_PUBKEY` (hex) at
+//! compile time for production, otherwise derived from the shared
+//! [`schema::DEV_SIGNING_SEED`].
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use once_cell::sync::Lazy;
@@ -29,21 +31,20 @@ fn resolve_signing_pubkey_hex() -> Option<String> {
 static VERIFYING_KEY: Lazy<VerifyingKey> = Lazy::new(|| {
     match resolve_signing_pubkey_hex() {
         Some(hex_str) => {
-            let bytes = hex::decode(hex_str).expect("NORO_SIGNING_PUBKEY: невалидный hex");
+            let bytes = hex::decode(hex_str).expect("NORO_SIGNING_PUBKEY: not valid hex");
             let arr: [u8; 32] = bytes
                 .try_into()
-                .expect("NORO_SIGNING_PUBKEY: нужно 32 байта");
-            VerifyingKey::from_bytes(&arr).expect("NORO_SIGNING_PUBKEY: невалидный ключ")
+                .expect("NORO_SIGNING_PUBKEY: must be 32 bytes");
+            VerifyingKey::from_bytes(&arr).expect("NORO_SIGNING_PUBKEY: not a valid key")
         }
         None => {
-            // DEV: вывести публичный ключ из того же seed, что использует мастер.
+            // Dev builds derive the key from the same seed the master uses.
             let sk = ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED);
             sk.verifying_key()
         }
     }
 });
 
-/// Проверить подпись манифеста сборки.
 pub fn verify_manifest(manifest: &schema::BuildManifest) -> bool {
     if manifest.signature.len() != 64 {
         return false;
@@ -57,7 +58,7 @@ pub fn verify_manifest(manifest: &schema::BuildManifest) -> bool {
     VERIFYING_KEY.verify(&msg, &signature).is_ok()
 }
 
-/// Проверить подпись произвольных байтов (для бинарника обновления лаунчера).
+/// Signature over raw bytes, used for the launcher's own update binary.
 pub fn verify_bytes(data: &[u8], signature_b64: &str) -> bool {
     use base64::Engine;
     let Ok(sig_raw) = base64::engine::general_purpose::STANDARD.decode(signature_b64) else {
@@ -76,8 +77,8 @@ mod tests {
     use ed25519_dalek::{Signer as _, SigningKey};
     use schema::{BuildManifest, FileEntry, FileSide, Modloader};
 
-    /// Тесты идут без `NORO_SIGNING_PUBKEY`, поэтому проверяющий ключ выводится
-    /// из общего dev-seed — тем же способом, что и на мастере.
+    /// Tests run without `NORO_SIGNING_PUBKEY`, so both sides fall back to the
+    /// dev seed and the signatures line up.
     fn dev_key() -> SigningKey {
         SigningKey::from_bytes(&schema::DEV_SIGNING_SEED)
     }
@@ -126,8 +127,8 @@ mod tests {
         assert!(verify_manifest(&signed()));
     }
 
-    /// Главное свойство: подменённый файл в сборке ломает подпись. Без этого
-    /// игроку можно подсунуть любой jar.
+    /// The property everything else rests on: swap a hash and the signature
+    /// stops matching. Otherwise any jar can be handed to a player.
     #[test]
     fn rejects_manifest_with_a_swapped_file_hash() {
         let mut m = signed();
@@ -147,17 +148,17 @@ mod tests {
     #[test]
     fn rejects_unsigned_and_malformed_signatures() {
         let mut m = manifest();
-        assert!(!verify_manifest(&m), "пустая подпись");
+        assert!(!verify_manifest(&m), "empty signature");
 
         m.signature = vec![0u8; 64];
-        assert!(!verify_manifest(&m), "нулевая подпись");
+        assert!(!verify_manifest(&m), "all-zero signature");
 
         m.signature = vec![1u8; 63];
-        assert!(!verify_manifest(&m), "подпись неверной длины");
+        assert!(!verify_manifest(&m), "wrong length");
     }
 
-    /// Подпись, снятая с другого ключа, не должна проходить: иначе любой,
-    /// кто поднял свой мастер, подписал бы сборку для чужого лаунчера.
+    /// Otherwise anyone running their own master could sign a build for someone
+    /// else's launcher.
     #[test]
     fn rejects_manifest_signed_by_a_foreign_key() {
         let foreign = SigningKey::from_bytes(&[7u8; 32]);

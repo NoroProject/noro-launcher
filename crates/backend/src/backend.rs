@@ -1,4 +1,4 @@
-//! Ядро backend: состояние, главный событийный цикл, запуск игры.
+//! Backend core: state, the main event loop, launching the game.
 
 use crate::auth::token_store;
 use crate::config::{LauncherConfig, OptionalModsSelection};
@@ -15,14 +15,14 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use uuid::Uuid;
 
-/// Запущенная игра.
 pub struct RunningGame {
     pub started: Instant,
-    /// Послать сюда → процесс будет убит.
+    /// Send here to kill the process.
     pub kill: UnboundedSender<()>,
 }
 
-/// Событие от фоновой задачи к главному циклу (нужно изменить состояние).
+/// A background task asking the main loop to change state — the loop owns it,
+/// the tasks only have a `Ctx`.
 pub enum InternalEvent {
     LoginCompleted {
         auth: token_store::StoredAuth,
@@ -31,20 +31,20 @@ pub enum InternalEvent {
     LoginFailed {
         kind: bridge::LoginErrorKind,
     },
-    /// Установлено обновление — перезапуститься из нового бинарника.
+    /// Update installed; restart from the new binary.
     RestartInto(std::path::PathBuf),
     /// Skin/cape/profile change from native upload or external — refresh UI.
     ProfileUpdated {
         user: UserProfile,
     },
-    /// Обмен гранта удался: пора переключить сессию на аккаунт игрока.
+    /// The grant was traded in; switch the session to that player's account.
     ImpersonationStarted {
         access_token: String,
         username: String,
     },
 }
 
-/// Клонируемый контекст, доступный фоновым задачам (sync/launch).
+/// What a background task gets: everything shared, nothing owned by the loop.
 #[derive(Clone)]
 pub struct Ctx {
     pub frontend: FrontendHandle,
@@ -56,11 +56,12 @@ pub struct Ctx {
     pub running: Arc<Mutex<HashMap<Uuid, RunningGame>>>,
     pub internal: UnboundedSender<InternalEvent>,
     pub rpc: crate::discord_rpc::DiscordRpc,
-    /// Канал с клиентским модом разбора. Живёт столько же, сколько лаунчер;
-    /// слушатель поднимается только на время игры.
+    /// Channel to the in-game case mod. Lives as long as the launcher, but the
+    /// listener is only up while a game is running.
     pub mod_link: crate::mod_link::ModLink,
-    /// Профиль вошедшего. Копия того, что лежит в главном цикле: панели дел он
-    /// нужен из фоновой задачи, а тянуть туда весь `BackendState` незачем.
+    /// A copy of what the main loop holds. The case panel needs the profile
+    /// from a background task, and dragging all of `BackendState` there isn't
+    /// worth it.
     pub(crate) profile: Arc<parking_lot::RwLock<Option<UserProfile>>>,
 }
 
@@ -78,35 +79,29 @@ impl Ctx {
     }
 }
 
-/// Полное состояние backend (живёт в главном цикле).
+/// Owned by the main loop and never shared.
 pub struct BackendState {
     pub ctx: Ctx,
-    /// Команды от frontend.
     pub rx_backend: BackendReceiver,
-    /// Координатор завершения.
     pub quit: QuitHandler,
-    /// Входящие сообщения от мастера.
     pub master_rx: UnboundedReceiver<ServerWsMsg>,
-    /// Состояние соединения.
     pub conn_rx: UnboundedReceiver<bool>,
-    /// События от фоновых задач.
     pub internal_rx: UnboundedReceiver<InternalEvent>,
 
-    // Кэши.
     pub user: Option<UserProfile>,
     pub access_token: Option<String>,
-    /// Свой токен, пока лаунчер работает от имени игрока. Выход из чужого
-    /// аккаунта — возврат к нему, а не повторный вход.
+    /// Our own token, parked here while impersonating someone. Leaving their
+    /// account restores this rather than asking for a fresh login.
     pub own_token: Option<String>,
     pub servers: Vec<ServerEntry>,
     pub manifests: HashMap<Uuid, BuildManifest>,
-    /// Сборки, ожидающие запуска после получения манифеста.
+    /// Launches waiting on a manifest to arrive.
     pub pending_launch: HashMap<Uuid, bridge::ModalAction>,
 }
 
 const STARTUP_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Запустить backend на заданном рантайме. Не блокирует — спавнит главный цикл.
+/// Spawns the main loop onto `runtime` and returns immediately.
 pub fn start(
     runtime: &tokio::runtime::Runtime,
     tx_frontend: FrontendHandle,
@@ -115,7 +110,7 @@ pub fn start(
 ) {
     runtime.spawn(async move {
         if let Err(e) = run(tx_frontend, rx_backend, quit).await {
-            tracing::error!("backend завершился с ошибкой: {e:#}");
+            tracing::error!("backend stopped with an error: {e:#}");
         }
     });
 }
@@ -131,7 +126,7 @@ async fn run(
     let config = Persistent::<LauncherConfig>::load(dirs.config_file());
     config.update(|c| {
         if c.fix_localhost() {
-            tracing::info!("автоматическая миграция: localhost -> 127.0.0.1 в конфиге");
+            tracing::info!("migrated config: localhost -> 127.0.0.1");
         }
     });
     let optional = Persistent::<OptionalModsSelection>::load(dirs.optional_mods_file());
@@ -139,16 +134,14 @@ async fn run(
         .user_agent(format!("noro-launcher/{}", env!("CARGO_PKG_VERSION")))
         .build()?;
 
-    // Восстановить сессию из keyring.
     let stored = token_store::load();
     if stored.is_some() {
-        tracing::info!("сессия загружена из keyring");
+        tracing::info!("session loaded from the keyring");
     } else {
-        tracing::info!("сессия не найдена в keyring");
+        tracing::info!("no session in the keyring");
     }
     let access_token = stored.as_ref().map(|s| s.access_token.clone());
 
-    // Каналы ws.
     let (master_tx, master_rx) = mpsc::unbounded_channel::<ServerWsMsg>();
     let (conn_tx, conn_rx) = mpsc::unbounded_channel::<bool>();
     let (internal_tx, internal_rx) = mpsc::unbounded_channel::<InternalEvent>();
@@ -159,7 +152,7 @@ async fn run(
         conn_tx,
     );
 
-    tracing::info!("используется мастер-сервер: {}", config.get().master_url);
+    tracing::info!("using master server: {}", config.get().master_url);
 
     let rpc = crate::discord_rpc::spawn_discord_rpc();
     rpc.update(crate::discord_rpc::DiscordRpcState::Launcher { server_name: None });
@@ -193,14 +186,13 @@ async fn run(
         pending_launch: HashMap::new(),
     };
 
-    // Если есть токен — подтянуть профиль через REST для мгновенного состояния входа.
+    // Over REST rather than waiting for the socket: the login screen would
+    // otherwise flash by on every start.
     if state.access_token.is_some() {
         state.restore_session().await;
     }
 
-    // Отдать конфиг и проверить обновление лаунчера при старте.
     state.send_config_state();
-    // Каталог языка — из кеша сразу, с мастера следом.
     crate::translations::refresh(&state.ctx, state.ctx.config.get().locale);
     state.check_launcher_update().await;
 
@@ -225,7 +217,7 @@ impl BackendState {
                 Some(online) = self.conn_rx.recv() => {
                     self.ctx.send(MessageToFrontend::ConnectionState { online });
                     if online {
-                        // При (пере)подключении обновим списки.
+                        // Both lists may have moved on while we were offline.
                         self.ctx.ws.send(ClientWsMsg::RequestServerList);
                         self.ctx.ws.send(ClientWsMsg::RequestNews);
                     }
@@ -236,19 +228,17 @@ impl BackendState {
                 else => break,
             }
         }
-        tracing::info!("backend: главный цикл завершён");
-        // Отметиться в координаторе завершения.
+        tracing::info!("backend: main loop finished");
         self.quit.clone().quit();
     }
 
-    /// Обработать событие фоновой задачи.
     fn handle_internal(&mut self, event: InternalEvent) {
         match event {
             InternalEvent::LoginCompleted { auth, user } => {
                 if let Err(e) = token_store::save(&auth) {
-                    tracing::error!("не удалось сохранить сессию в keyring: {e}");
+                    tracing::error!("could not save the session to the keyring: {e}");
                 } else {
-                    tracing::info!("сессия сохранена в keyring");
+                    tracing::info!("session saved to the keyring");
                 }
                 self.access_token = Some(auth.access_token.clone());
                 self.user = Some(user.clone());
@@ -273,8 +263,8 @@ impl BackendState {
                 access_token,
                 username,
             } => {
-                // В keyring не сохраняем: чужая сессия живёт полчаса и не
-                // должна пережить перезапуск лаунчера.
+                // Deliberately not saved to the keyring: someone else's session
+                // lasts half an hour and must not survive a restart.
                 self.access_token = Some(access_token.clone());
                 self.ctx.ws.set_token(Some(access_token));
                 self.ctx.send(MessageToFrontend::ImpersonationChanged {
@@ -284,7 +274,8 @@ impl BackendState {
         }
     }
 
-    /// Login-инфо для запуска игры.
+    /// `None` until both the profile and the token are in hand — the game can't
+    /// be started with half a session.
     pub fn login_info(&self) -> Option<LoginInfo> {
         let user = self.user.as_ref()?;
         let token = self.access_token.clone()?;
@@ -295,9 +286,8 @@ impl BackendState {
         })
     }
 
-    /// Подключение к серверу для автоконнекта.
+    /// No address means no auto-connect — the game just opens on the main menu.
     pub fn server_connect(&self, server_id: &Uuid) -> Option<ServerConnect> {
-        // Нет адреса — нет автоконнекта: игра просто откроется в главном меню.
         self.servers
             .iter()
             .find(|s| &s.id == server_id)
@@ -305,17 +295,16 @@ impl BackendState {
             .map(|(host, port)| ServerConnect { host, port })
     }
 
-    /// Восстановить профиль по сохранённому токену (REST /api/me).
     async fn restore_session(&mut self) {
         let url = format!(
             "{}/api/me",
             self.ctx.config.get().master_url.trim_end_matches('/')
         );
         let Some(token) = &self.access_token else {
-            tracing::info!("restore_session: токен отсутствует");
+            tracing::info!("restore_session: no token");
             return;
         };
-        tracing::info!("restore_session: попытка восстановить сессию через {url}");
+        tracing::info!("restore_session: trying {url}");
         let resp = self
             .ctx
             .http
@@ -327,44 +316,38 @@ impl BackendState {
         match resp {
             Ok(r) if r.status().is_success() => {
                 if let Ok(profile) = r.json::<UserProfile>().await {
-                    tracing::info!(
-                        "restore_session: сессия успешно восстановлена для {}",
-                        profile.username
-                    );
+                    tracing::info!("restore_session: restored for {}", profile.username);
                     self.user = Some(profile.clone());
                     self.ctx
                         .send(MessageToFrontend::LoginSuccess { user: profile });
                 } else {
-                    tracing::warn!("restore_session: не удалось распарсить UserProfile");
+                    tracing::warn!("restore_session: UserProfile did not parse");
                 }
             }
             Ok(r) if r.status().as_u16() == 401 || r.status().as_u16() == 403 => {
-                tracing::info!(
-                    "restore_session: токен истёк ({}), пробуем refresh",
-                    r.status()
-                );
+                tracing::info!("restore_session: token expired ({}), refreshing", r.status());
                 self.try_refresh().await;
             }
             Ok(r) => {
-                tracing::warn!("restore_session: сервер вернул статус {}", r.status());
+                tracing::warn!("restore_session: master returned {}", r.status());
             }
+            // Unreachable is not the same as rejected: keep the session and
+            // wait for the network rather than logging the player out.
             Err(e) if e.is_connect() || e.is_timeout() => {
-                tracing::error!("restore_session: сервер недоступен: {e}. Сессия сохранена.");
-                // Не сбрасываем сессию, просто ждем восстановления связи.
+                tracing::error!("restore_session: master unreachable: {e}, session kept");
             }
             Err(e) => {
-                tracing::error!("restore_session: критическая ошибка запроса: {e}");
+                tracing::error!("restore_session: request failed: {e}");
             }
         }
     }
 
-    /// Обновить access-токен по refresh-токену.
     async fn try_refresh(&mut self) {
         let Some(stored) = token_store::load() else {
-            tracing::info!("try_refresh: refresh_token не найден в keyring");
+            tracing::info!("try_refresh: no refresh_token in the keyring");
             return;
         };
-        tracing::info!("try_refresh: попытка обновления токена");
+        tracing::info!("try_refresh: refreshing the token");
         let url = format!(
             "{}/auth/refresh",
             self.ctx.config.get().master_url.trim_end_matches('/')
@@ -383,7 +366,7 @@ impl BackendState {
                     if let (Some(at), Some(rt)) =
                         (v["access_token"].as_str(), v["refresh_token"].as_str())
                     {
-                        tracing::info!("try_refresh: токен успешно обновлен");
+                        tracing::info!("try_refresh: token refreshed");
                         let _ = token_store::save(&token_store::StoredAuth {
                             access_token: at.to_string(),
                             refresh_token: rt.to_string(),
@@ -394,12 +377,12 @@ impl BackendState {
                         return;
                     }
                 }
-                tracing::warn!("try_refresh: не удалось получить токены из ответа");
+                tracing::warn!("try_refresh: response had no tokens in it");
             } else {
-                tracing::warn!("try_refresh: сервер вернул ошибку {}", r.status());
+                tracing::warn!("try_refresh: master returned {}", r.status());
             }
         } else if let Err(e) = resp {
-            tracing::error!("try_refresh: ошибка запроса: {e}");
+            tracing::error!("try_refresh: request failed: {e}");
         }
     }
 
@@ -427,7 +410,6 @@ impl BackendState {
         }
     }
 
-    /// Проверить доступное обновление лаунчера (REST).
     async fn check_launcher_update(&self) {
         let url = format!(
             "{}/api/launcher/version?platform={}",
@@ -438,9 +420,10 @@ impl BackendState {
             if let Ok(v) = r.json::<serde_json::Value>().await {
                 if !v.is_null() {
                     if let Some(version) = v["version"].as_str() {
-                        // Мастер отдаёт git-тег («launcher-v1.2.0»), а у нас на
-                        // руках версия крейта («1.2.0»): без снятия префикса они
-                        // не совпадали никогда, и плашка обновления висела всегда.
+                        // The master reports a git tag, "launcher-v1.2.0", and
+                        // what we have is the crate version, "1.2.0". Without
+                        // stripping the prefix they never match and the update
+                        // banner is always up.
                         if version.trim_start_matches("launcher-v") != env!("CARGO_PKG_VERSION") {
                             if let Ok(lv) = serde_json::from_value::<schema::LauncherVersion>(
                                 build_launcher_version(&v),
@@ -457,7 +440,8 @@ impl BackendState {
     }
 }
 
-/// Достроить объект LauncherVersion из ответа /api/launcher/version.
+/// `/api/launcher/version` answers with a subset of `LauncherVersion`; the rest
+/// is filled in here so it can be deserialized as one.
 fn build_launcher_version(v: &serde_json::Value) -> serde_json::Value {
     serde_json::json!({
         "id": Uuid::nil(),
@@ -470,11 +454,7 @@ fn build_launcher_version(v: &serde_json::Value) -> serde_json::Value {
     })
 }
 
-/// Всё, что нужно, чтобы синхронизировать сборку и запустить игру.
-///
-/// Девять позиционных аргументов складывались в вызов, где `user` и `login`
-/// стояли рядом и различались только типом: перепутать их местами компилятор бы
-/// не дал, а вот `connect` и `server` — вполне.
+/// Everything needed to sync a build and start the game.
 pub struct Launch {
     pub ctx: Ctx,
     pub server_id: Uuid,

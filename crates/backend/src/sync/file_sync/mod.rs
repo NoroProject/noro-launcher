@@ -1,5 +1,5 @@
-//! Синхронизация файлов сервера: проверка подписи, докачка изменённого,
-//! удаление лишнего (verified-set защита), обработка опциональных модов.
+//! The pre-launch sync: verify the manifest signature, download what differs,
+//! remove what doesn't belong, and honour the optional-mod selection.
 
 use super::downloader::{download_all, DownloadTask};
 use anyhow::{bail, Result};
@@ -8,7 +8,7 @@ use schema::{BuildManifest, FileEntry, UserProfile};
 use std::path::Path;
 use std::sync::Arc;
 
-/// Колбэк прогресса: (стадия, готово, всего, текущий файл).
+/// Progress callback: (stage, done, total, current file).
 pub type ProgressFn = Arc<dyn Fn(SyncStage, u64, u64, String) + Send + Sync>;
 mod clean;
 mod stages;
@@ -30,35 +30,30 @@ pub async fn sync_server(
     progress: ProgressFn,
     cancelled: Arc<dyn Fn() -> bool + Send + Sync>,
 ) -> Result<()> {
-    // 1. Проверка подписи манифеста.
     if !crate::signing::verify_manifest(manifest) {
-        bail!("подпись манифеста недействительна — синхронизация прервана");
+        bail!("manifest signature is invalid, sync aborted");
     }
 
     tokio::fs::create_dir_all(instance_dir).await?;
 
-    // 2. Вычислить эффективный набор файлов (исключив выключенные опц. моды).
     let excluded = excluded_optional_files(manifest, enabled_optional, user);
-    // Ignored раньше значил только «не удаляй»: файл из манифеста всё равно
-    // скачивался и затирал правки игрока. Папка в ignored не спасала ничего,
-    // что лежит внутри и пришло с сервера.
+    // Unmanaged paths are dropped here, not merely spared from cleanup: a file
+    // still in the download set would land on top of the player's edits.
     let effective: Vec<&FileEntry> = manifest
         .verified_files
         .iter()
         .filter(|f| f.side.needed_on_client())
         .filter(|f| !excluded.contains(&f.path))
         .filter(|f| schema::mode_for(&f.path, &manifest.path_rules) != schema::PathMode::Unmanaged)
-        // Java-рантайм и natives лежат в сборке под все платформы сразу; чужие
-        // не только бесполезны, но и весят как пять лишних JRE.
+        // The build carries the Java runtime and natives for every platform at
+        // once. The other platforms' copies are useless and cost several JREs
+        // worth of download.
         .filter(|f| f.matches_platform())
         .collect();
 
-    // База хешей: то, что мы установили в прошлый раз. Без неё режим `merged`
-    // не отличает правки игрока от обновления сервера.
     let base = super::merge::BaseHashes::load(instance_dir).await;
     let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
 
-    // 3. Проверка файлов — что нужно скачать.
     let (tasks, base) = tasks::collect(
         client,
         instance_dir,
@@ -70,9 +65,8 @@ pub async fn sync_server(
         &cancelled,
     )
     .await?;
-    // 4. Скачать все стадии разом. Они трогают непересекающиеся файлы, поэтому
-    //    ждать очереди незачем: раньше тысяча мелких ассетов простаивала, пока
-    //    докачается JDK, хотя канал в это время занят одним потоком.
+    // All stages run at once. They touch disjoint files, and a single big JDK
+    // download would otherwise hold up a thousand small assets behind it.
     let jobs = STAGE_GROUPS.iter().filter_map(|g| {
         let group: Vec<DownloadTask> = tasks
             .iter()
@@ -83,8 +77,8 @@ pub async fn sync_server(
             return None;
         }
         let total: u64 = group.iter().map(|t| t.size).sum();
-        // Полосу стадии нужно показать до старта, иначе она появится в UI
-        // только с первым отчётом — то есть уже наполовину заполненной.
+        // The stage's bar has to be published before the work starts, or it
+        // first appears in the UI already half full.
         progress(g.stage, 0, total, String::new());
 
         let prog = progress.clone();
@@ -102,31 +96,27 @@ pub async fn sync_server(
                 move || cancelled(),
             )
             .await?;
-            // Последний порог прогресса мог не сработать — досылаем точный итог,
-            // чтобы полоса не замерла на 99%.
+            // The last progress threshold may not have fired; send the exact
+            // total so the bar doesn't freeze at 99%.
             prog(g.stage, total, total, String::new());
             Ok::<_, anyhow::Error>(())
         })
     });
     futures::future::try_join_all(jobs).await?;
 
-    // Копии конфигов для слияния по ключам: делаются после загрузки, когда на
-    // диске уже лежит серверная версия.
+    // Both of these have to happen after the downloads: before them the
+    // server's version isn't on disk yet, and recording its hash would lie to
+    // the next pass.
     for f in &effective {
         crate::sync::keymerge::remember_base(instance_dir, &f.path).await;
     }
-
-    // База пишется после загрузки: до неё файлов ещё нет, и запомнить их хеш
-    // значило бы соврать следующему проходу.
     base.save(instance_dir).await;
 
-    // 5. Удалить лишние файлы (всё, что не в effective и не защищено).
     progress(SyncStage::Cleaning, 0, 0, String::new());
     clean_extra(instance_dir, &effective, manifest).await?;
 
-    // Отметка о том, что именно установлено. Без неё «поставить» и «обновить»
-    // не отличить от «запустить»: набор файлов на диске сам по себе не говорит,
-    // какой версии сборки он соответствует.
+    // Which build is installed. The files on disk don't say by themselves, so
+    // without this there's no telling "install" and "update" from "launch".
     let _ = tokio::fs::write(version_marker(instance_dir), &manifest.version).await;
 
     progress(SyncStage::Done, 1, 1, String::new());

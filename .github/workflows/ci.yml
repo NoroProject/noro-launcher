@@ -1,4 +1,4 @@
-# Проверка кода на каждый PR и push в master.
+# Checks on every PR and every push to master.
 name: CI
 
 on:

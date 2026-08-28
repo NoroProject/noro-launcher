@@ -1,12 +1,13 @@
-//! Вычисление `rules` из version.json — на стороне клиента, а не мастера.
+//! Evaluating `rules` from version.json, client-side.
 //!
-//! Мастер раздаёт один манифест на все платформы и не знает, куда он уедет,
-//! поэтому условные аргументы доходят до нас нетронутыми: `-XstartOnFirstThread`
-//! нужен только macOS, а на Linux и Windows JVM от него просто не стартует.
-//! Раньше мастер сворачивал правила под свою собственную ОС — и сборка,
-//! собранная на Linux-сервере, ломала клиентов на macOS, и наоборот.
+//! One manifest serves every platform, so conditional arguments reach us
+//! untouched and are resolved here. They have to be: `-XstartOnFirstThread` is
+//! required on macOS and stops the JVM from starting anywhere else, so a
+//! manifest resolved on the machine that built it would be wrong for everyone
+//! running a different OS.
 
-/// Значения аргумента, годные для этой машины. Пусто — аргумент не наш.
+/// The values this argument contributes on this machine — empty if its rules
+/// don't match.
 pub fn arg_values(arg: &schema::ManifestArg) -> &[String] {
     match arg {
         schema::ManifestArg::String(s) => std::slice::from_ref(s),
@@ -20,20 +21,18 @@ pub fn arg_values(arg: &schema::ManifestArg) -> &[String] {
     }
 }
 
-/// Разрешают ли правила то, к чему они прицеплены.
-///
-/// Правила читаются по порядку, и последнее подошедшее решает: так у Mojang
-/// `allow` для всех и `disallow` для одной ОС даёт «всем, кроме неё».
-/// Без правил разрешено, с правилами по умолчанию запрещено.
+/// Rules are read in order and the last matching one wins — that's how Mojang
+/// expresses "everyone except macOS" as `allow` for all plus `disallow` for one.
+/// No rules means allowed; any rules means denied unless one matches.
 fn allow(rules: &[schema::ManifestRule]) -> bool {
     if rules.is_empty() {
         return true;
     }
     let mut allowed = false;
     for rule in rules {
-        // Feature-правила — про demo-режим, свой размер окна и quick play.
-        // Ничего этого мы не включаем, поэтому такие правила не подходят
-        // никогда: и `--demo`, и `--width` остаются за бортом.
+        // Feature rules cover demo mode, custom window size and quick play. We
+        // enable none of those, so a feature rule never matches and `--demo`,
+        // `--width` and friends stay out of the command line.
         if rule.features.is_some() {
             continue;
         }
@@ -62,11 +61,8 @@ fn os_name() -> &'static str {
     }
 }
 
-/// Архитектура в обозначениях Mojang.
-///
-/// На практике в манифестах 1.8–1.21 встречается единственное значение —
-/// `x86`, то есть 32 бита, и только у `-Xss1M`. Ни `arm64`, ни `x86_64` там
-/// не попадаются, так что ветка ниже почти всегда просто «не x86».
+/// Architecture in Mojang's spelling. In practice manifests only ever name
+/// `x86`, so the last arm is really "not 32-bit".
 fn arch() -> &'static str {
     match std::env::consts::ARCH {
         "aarch64" => "arm64",
@@ -75,10 +71,9 @@ fn arch() -> &'static str {
     }
 }
 
-/// Сходится ли версия ОС с regex из правила (`^10\.` у Windows 10).
-///
-/// Правило с непонятным regex считаем не подошедшим: пропустить лишний
-/// `-Dos.name=Windows 10` безопаснее, чем уронить запуск на разборе.
+/// Matches the OS version against the rule's regex (`^10\.` for Windows 10). A
+/// pattern that won't compile counts as no match — skipping one `-Dos.name`
+/// argument beats failing a launch over a regex.
 fn version_matches(pattern: &str) -> bool {
     let Ok(re) = regex::Regex::new(pattern) else {
         return false;
@@ -88,11 +83,11 @@ fn version_matches(pattern: &str) -> bool {
 
 #[cfg(target_os = "windows")]
 fn os_version() -> String {
-    // `cmd /c ver` отдаёт "Microsoft Windows [Version 10.0.19045.5011]".
+    // `cmd /c ver` prints "Microsoft Windows [Version 10.0.19045.5011]".
     use std::os::windows::process::CommandExt;
     std::process::Command::new("cmd")
         .args(["/c", "ver"])
-        // Без флага на секунду мигает консольное окно — прямо при запуске игры.
+        // Without this a console window flashes up mid-launch.
         .creation_flags(super::CREATE_NO_WINDOW)
         .output()
         .ok()
@@ -104,8 +99,8 @@ fn os_version() -> String {
         .unwrap_or_default()
 }
 
-/// Правила с `version` в манифестах есть только у Windows-аргументов, так что
-/// на остальных системах спрашивать нечего — они и по `os.name` не подойдут.
+/// Only Windows arguments carry a `version` rule, and those fail on `os.name`
+/// here anyway, so there is nothing to look up.
 #[cfg(not(target_os = "windows"))]
 fn os_version() -> String {
     String::new()

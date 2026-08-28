@@ -1,12 +1,11 @@
-//! Вход в лаунчере — через сайт.
+//! Signing in through the website.
 //!
-//! Лаунчер поднимает локальный HTTP-сервер на случайном порту, открывает
-//! браузер на мастере, тот уводит на страницу согласия сайта, и обратно
-//! приезжает одноразовый код. Токены лаунчер получает сам, запросом к мастеру.
+//! The launcher opens a local HTTP server on a random port, sends the browser
+//! to the master, which hands off to the site's consent page, and a one-time
+//! code comes back to that port. The launcher then fetches the tokens itself.
 //!
-//! Своих кнопок «войти через платформу» здесь нет намеренно: способов входа
-//! стало много, поддерживать их в двух интерфейсах — двойная работа, а сайт
-//! умеет все и обновляется без переустановки лаунчера.
+//! There are deliberately no "sign in with X" buttons here. The site already
+//! has all of them and can add more without anyone reinstalling the launcher.
 
 use super::token_store::StoredAuth;
 use anyhow::{anyhow, bail, Context, Result};
@@ -24,12 +23,10 @@ fn random_state() -> String {
     uuid::Uuid::new_v4().simple().to_string()
 }
 
-/// PKCE (RFC 7636): секрет, который лаунчер держит у себя до самого обмена.
-///
-/// Секрета приложения у лаунчера нет и быть не может — он стоит на машине
-/// игрока. Поэтому код, прилетевший на локальный порт, сам по себе ничего не
-/// стоит: обменять его получится только у того, кто знает `verifier`. Без этого
-/// код мог перехватить любой другой процесс, слушающий петлю.
+/// PKCE (RFC 7636). The launcher can't hold a client secret — it runs on the
+/// player's machine — so the code arriving on the local port is worthless on its
+/// own: only whoever knows the verifier can trade it in. Otherwise any other
+/// process listening on loopback could race for it.
 fn pkce_pair() -> (String, String) {
     use base64::Engine;
     use sha2::{Digest, Sha256};
@@ -44,7 +41,8 @@ fn pkce_pair() -> (String, String) {
     (verifier, challenge)
 }
 
-/// Выполнить полный флоу входа. `cancelled` позволяет прервать ожидание.
+/// The whole flow. `cancelled` is polled while waiting, so the player can back
+/// out without waiting for the five-minute timeout.
 pub async fn login(master_url: &str, cancelled: impl Fn() -> bool) -> Result<LoginResult> {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -53,10 +51,10 @@ pub async fn login(master_url: &str, cancelled: impl Fn() -> bool) -> Result<Log
 
     let csrf = random_state();
     let redirect_uri = format!("http://127.0.0.1:{port}/callback");
-    // Открываем мастер, а не сайт: `/oauth2/authorize` у мастера редиректит на
-    // свой NORO_WEB_URL. Лаунчеру больше не нужно знать адрес сайта — раньше он
-    // угадывал его по подстроке "localhost" и на любом чужом стенде уводил
-    // игрока на наш домен.
+    // Point the browser at the master, not the site: `/oauth2/authorize`
+    // redirects to whatever `NORO_WEB_URL` the master is configured with, so
+    // the launcher never needs to know the site's address and a third-party
+    // deployment keeps its own players.
     let (verifier, challenge) = pkce_pair();
     let url = format!(
         "{}/oauth2/authorize?client_id=noro_launcher&redirect_uri={}&response_type=code\
@@ -93,8 +91,8 @@ pub async fn login(master_url: &str, cancelled: impl Fn() -> bool) -> Result<Log
     }
 }
 
-/// Обменять код на токены. Идёт к мастеру напрямую, поэтому по HTTPS, и токены
-/// не оказываются ни в адресной строке, ни в истории браузера.
+/// Goes to the master directly, over HTTPS, so the tokens never touch the
+/// address bar or the browser's history.
 async fn exchange(master_url: &str, code: &str, verifier: &str) -> Result<LoginResult> {
     #[derive(serde::Deserialize)]
     struct TokenResp {
@@ -114,12 +112,12 @@ async fn exchange(master_url: &str, code: &str, verifier: &str) -> Result<LoginR
         }))
         .send()
         .await
-        .context("запрос обмена кода OAuth2")?
+        .context("OAuth2 code exchange request")?
         .error_for_status()
-        .context("мастер отверг код OAuth2")?
+        .context("master rejected the OAuth2 code")?
         .json()
         .await
-        .context("разбор ответа на обмен кода OAuth2")?;
+        .context("parsing the OAuth2 token response")?;
 
     Ok(LoginResult {
         auth: StoredAuth {
@@ -130,12 +128,14 @@ async fn exchange(master_url: &str, code: &str, verifier: &str) -> Result<LoginR
     })
 }
 
-/// Обработать одно входящее соединение. Возвращает Some с одноразовым кодом.
+/// `Some` when this connection carried the one-time code. Anything else on the
+/// port gets a 404 and the loop keeps waiting.
 async fn handle_connection(mut stream: tokio::net::TcpStream) -> Result<Option<String>> {
     let mut buf = Vec::new();
     let mut tmp = [0u8; 2048];
 
-    // Нужна только строка запроса: код приезжает в query, тела у GET нет.
+    // Only the request line matters — the code is in the query and a GET has no
+    // body — so stop at the end of the headers or at 8 KiB, whichever is first.
     loop {
         let n = stream.read(&mut tmp).await?;
         if n == 0 {
@@ -156,7 +156,7 @@ async fn handle_connection(mut stream: tokio::net::TcpStream) -> Result<Option<S
     if let Some(query) = query_opt {
         if query.contains("error=") {
             respond(&mut stream, 200, "text/html; charset=utf-8", CANCELLED_HTML).await?;
-            bail!("Авторизация отменена пользователем");
+            bail!("authorization denied by the user");
         }
 
         if let Some(code) = query.split('&').find_map(|kv| kv.strip_prefix("code=")) {

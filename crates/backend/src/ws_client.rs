@@ -1,4 +1,4 @@
-//! WebSocket-клиент к мастеру с автопереподключением и backoff.
+//! WebSocket client for the master, with reconnect and backoff.
 
 use futures_util::{SinkExt, StreamExt};
 use parking_lot::RwLock;
@@ -8,7 +8,6 @@ use std::time::Duration;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
 
-/// Хендл на ws-клиент: отправка сообщений мастеру и общий токен.
 #[derive(Clone)]
 pub struct WsClient {
     pub out: UnboundedSender<ClientWsMsg>,
@@ -20,25 +19,25 @@ impl WsClient {
         let _ = self.out.send(msg);
     }
 
-    /// Токен сессии, если лаунчер вошёл. Держится здесь один раз на всех: у
-    /// панели дел та же сессия, что у сокета, и второй копии токена быть не
-    /// должно — в JVM игры не уходит ни та, ни другая.
+    /// The session token, held in one place for every consumer. The case panel
+    /// shares this session with the socket; a second copy would be one more
+    /// thing to keep out of the game's JVM.
     pub fn token(&self) -> Option<String> {
         self.token.read().clone()
     }
 
-    /// Обновить токен (логин/логаут). При следующем коннекте уйдёт Authenticate.
+    /// Login and logout both come through here. The next connection sends
+    /// `Authenticate` on its own; this covers the connection already open.
     pub fn set_token(&self, token: Option<String>) {
         *self.token.write() = token.clone();
-        // Если есть активное соединение — сразу аутентифицируемся.
         if let Some(t) = token {
             let _ = self.out.send(authenticate(t));
         }
     }
 }
 
-/// Запустить ws-клиент. `inbound` получает сообщения от мастера,
-/// `conn_state` — true/false при изменении соединения.
+/// `inbound` receives messages from the master; `conn_state` gets a bool every
+/// time the connection comes up or goes down.
 pub fn spawn(
     ws_url: String,
     initial_token: Option<String>,
@@ -74,8 +73,8 @@ async fn connection_loop(
                 let _ = conn_state.send(true);
                 let (mut sink, mut stream) = ws_stream.split();
 
-                // Аутентификация при подключении (клонируем значение и сразу
-                // освобождаем guard, чтобы не держать его через await).
+                // Clone out of the lock first — the guard isn't Send and must
+                // not be held across the await below.
                 let auth_token = token.read().clone();
                 if let Some(t) = auth_token {
                     let _ = sink.send(Message::Text(authenticate(t).to_json())).await;
@@ -90,7 +89,7 @@ async fn connection_loop(
                                         break;
                                     }
                                 }
-                                None => return, // канал закрыт — backend завершается
+                                None => return, // channel closed: the backend is shutting down
                             }
                         }
                         incoming = stream.next() => {
@@ -110,7 +109,7 @@ async fn connection_loop(
                 let _ = conn_state.send(false);
             }
             Err(e) => {
-                tracing::debug!("не удалось подключиться к мастеру: {e}");
+                tracing::debug!("could not connect to the master: {e}");
                 let _ = conn_state.send(false);
             }
         }
@@ -120,10 +119,8 @@ async fn connection_loop(
     }
 }
 
-/// Сообщение авторизации с описанием клиента.
-///
-/// Версия берётся из самого бинарника, платформа — из target-триплета сборки:
-/// так админка видит, кто остался на старом лаунчере, без отдельного запроса.
+/// Version and platform ride along with the auth message so the admin panel can
+/// see who is still on an old launcher without asking separately.
 fn authenticate(access_token: String) -> ClientWsMsg {
     ClientWsMsg::Authenticate {
         access_token,

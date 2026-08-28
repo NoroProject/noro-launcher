@@ -10,19 +10,17 @@ members = [
 ]
 
 [workspace.package]
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 license = "AGPL-3.0-only"
 authors = ["noro"]
 
 [workspace.dependencies]
-fluent-bundle = "0.16"
-unic-langid = "0.9"
-# Shared protocol and utilities from noro-shared
+# Protocol and utilities shared with the master server.
 schema = { git = "https://github.com/NoroProject/noro-shared.git", package = "schema", branch = "master" }
 i18n = { git = "https://github.com/NoroProject/noro-shared.git", package = "i18n", branch = "master" }
 mc_mod_utils = { git = "https://github.com/NoroProject/noro-shared.git", package = "mc_mod_utils", branch = "master" }
-# Локальные крейты
+
 bridge = { path = "crates/bridge" }
 mod_link = { path = "crates/mod_link" }
 backend = { path = "crates/backend" }
@@ -32,120 +30,76 @@ tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["io"] }
 futures = "0.3"
 futures-util = "0.3"
-async-trait = "0.1"
 
-# Сериализация
+# Serialisation
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_with = "3"
 
-# Типы
+# Types
 uuid = { version = "1", features = ["v4", "v5", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
-# Ошибки/логи
+# Errors and logging
 anyhow = "1"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-# Отчёты об ошибках мастера. rustls, чтобы не тянуть системный OpenSSL в образ.
 sentry = { version = "0.34", default-features = false, features = [
     "backtrace",
     "contexts",
-    # Список загруженных образов с их id сборки. Без него Sentry не может
-    # символизировать трейс у себя — остаются голые адреса.
+    # Loaded images and their build ids. Without this Sentry can't symbolicate
+    # a trace and you get bare addresses.
     "debug-images",
     "panic",
     "reqwest",
+    # rustls so the image doesn't need system OpenSSL.
     "rustls",
 ] }
 sentry-tracing = "0.34"
 
-# HTTP сервер (master)
-axum = { version = "0.8", features = ["ws", "multipart", "macros"] }
-axum-extra = { version = "0.10", features = ["typed-header"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
-
-# БД
-sqlx = { version = "0.8", features = [
-    "runtime-tokio",
-    "tls-rustls",
-    "postgres",
-    "uuid",
-    "chrono",
-    "json",
-    "migrate",
-] }
-
-# WS клиент (backend ↔ master)
+# WebSocket client to the master
 tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 
-# HTTP клиент
+# HTTP client
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "stream",
     "rustls-tls",
     "multipart",
-    # Без неё крейт h2 вообще не попадает в сборку, и лаунчер качает тысячи
-    # ассетов по HTTP/1.1 — по одному запросу на соединение.
+    # Without it the h2 crate never makes it into the build and the launcher
+    # fetches thousands of assets over HTTP/1.1, one request per connection.
     "http2",
 ] }
 
-# Крипто/хеши
+# Crypto and hashes
 ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8", "pem"] }
-# RSA — только для подписи профилей Yggdrasil: клиент проверяет её ключом из
-# signaturePublicKey, а там исторически RSA. Манифесты сборок подписываются
-# ed25519 выше и к этому отношения не имеют.
-rsa = { version = "0.9", features = ["sha1", "sha2"] }
-rand = "0.8"
 sha1 = "0.10"
 sha2 = "0.10"
-hmac = "0.12"
 hex = "0.4"
 base64 = "0.22"
-argon2 = "0.5"
-# WebAuthn. `danger-allow-state-serialisation` включён намеренно: мастер
-# держит состояние регистрации/входа в БД между двумя HTTP-запросами, а не в
-# памяти процесса, иначе рестарт или второй инстанс ломают вход.
-# `conditional-ui` даёт вход без ввода имени — экран входа спрашивает только
-# отпечаток, поля «кто вы» там нет и не было.
-webauthn-rs = { version = "0.5", features = [
-    "danger-allow-state-serialisation",
-    "conditional-ui",
-] }
 
-# CLI
-clap = { version = "4", features = ["derive", "env"] }
-
-# Утилиты
+# Utilities
 parking_lot = "0.12"
-dashmap = "6"
 once_cell = "1"
-bytes = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
 zip = "2"
-# Разжать logs/*.log.gz, чтобы санитизировать содержимое: отправить сжатый лог
-# как есть значит отправить токен, которого мы в нём не видели.
+# Decompress logs/*.log.gz so the contents can be sanitised before upload —
+# sending the archive as-is would send tokens we never looked at.
 flate2 = "1"
-# Полный архив мастера. tar, а не zip: записи пишутся и читаются потоком, так
-# что архив в гигабайты не приходится держать на диске целиком.
-tar = "0.4"
-# NBT: servers.dat игрового клиента
+# NBT, for the game client's servers.dat
 fastnbt = "2"
 walkdir = "2"
-# Свободное место на диске: «не хватило места» — самая частая причина
-# недокачки, и она не видна ни в одном логе игры. libc и так в дереве.
+# Free disk space. Running out is the most common cause of a failed download
+# and shows up in no game log; libc is in the tree anyway.
 libc = "0.2"
 dirs = "5"
-# Платформенный бэкенд включается в crates/backend по target: без него keyring 3
-# молча берёт mock-хранилище в памяти.
+# The platform backend is selected per target in crates/backend. Without one,
+# keyring 3 quietly falls back to an in-memory mock.
 keyring = { version = "3", default-features = false }
 url = "2"
 urlencoding = "2"
 open = "5"
 discord-rich-presence = "0.2.4"
-indexmap = { version = "2", features = ["serde"] }
 memchr = "2"
 regex = "1"
 
@@ -153,18 +107,17 @@ regex = "1"
 opt-level = 3
 lto = "thin"
 codegen-units = 1
-# `true` (= "symbols") срезал и таблицу символов, из-за чего трейс упавшего у
-# игрока лаунчера состоял из голых адресов. "debuginfo" оставляет имена функций.
+# `true` (= "symbols") also strips the symbol table, which left crash traces
+# from players as bare addresses. "debuginfo" keeps function names.
 strip = "debuginfo"
 
-# Релизная сборка лаунчера: тот же оптимизированный код плюс таблицы строк, без
-# которых Sentry не покажет ни номера строк, ни исходники.
+# Release launcher build: the same optimised code plus the string tables Sentry
+# needs for line numbers and sources. A separate profile so the master image
+# doesn't grow for nothing.
 #
-# Отдельным профилем, а не правкой `release`, — иначе образ мастера вырос бы ни
-# за чем. Игроку лишнее не достаётся: на macOS отладочная информация и так живёт
-# в .dSYM рядом (замерено: бинарник 20 МБ, из них на strip уходит 1 МБ), на
-# Windows — в .pdb, а на Linux она внутри ELF, и CI срезает её после загрузки
-# символов в Sentry.
+# Players don't carry the extra weight: on macOS debug info lives in a .dSYM
+# alongside, on Windows in a .pdb, and on Linux it sits inside the ELF until CI
+# strips it after uploading symbols.
 [profile.release-symbols]
 inherits = "release"
 debug = "line-tables-only"

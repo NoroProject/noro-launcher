@@ -2,8 +2,8 @@
 
 use anyhow::{anyhow, Result};
 
-// Внешний процесс зовут только macOS и Windows: на Linux импорт оставался
-// неиспользованным и валил сборку с `-D warnings`.
+// Only macOS and Windows shell out; on Linux this import is unused and `-D
+// warnings` turns that into a build failure.
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::process::Command;
 
@@ -58,13 +58,13 @@ if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &e
     }
 }
 
-/// Сборка PowerShell-скрипта вынесена из `cfg(windows)` намеренно: под Windows
-/// этот крейт с macOS/Linux не собирается (у зависимостей C-код под MSVC), и
-/// единственная ошибкоопасная часть — экранирование — иначе осталась бы вообще
-/// без проверки. Здесь её покрывает тест на любой платформе.
+/// Built outside `cfg(windows)` on purpose. The crate can't be cross-compiled
+/// for Windows from macOS or Linux, so the one part that's easy to get wrong —
+/// the quoting — would never be exercised. Compiled under `test` everywhere, it
+/// is.
 #[cfg(any(target_os = "windows", test))]
 fn windows_hello_script(reason: &str) -> String {
-    // Кавычки удваиваются — так PowerShell экранирует их внутри строки.
+    // PowerShell escapes a quote inside a string by doubling it.
     format!(
         r#"[Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType=WindowsRuntime]
 $asyncOp = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("{}")
@@ -77,8 +77,6 @@ if ($task.Result -eq [Windows.Security.Credentials.UI.UserConsentVerificationRes
 
 #[cfg(target_os = "windows")]
 fn authenticate_windows_hello(reason: &str) -> Result<bool> {
-    // Текст запроса берётся из аргумента, как и на macOS: раньше здесь была
-    // зашита русская строка, хотя интерфейс лаунчера англоязычный.
     let script = windows_hello_script(reason);
 
     let output = Command::new("powershell")
@@ -97,14 +95,15 @@ mod tests {
     fn windows_prompt_escapes_quotes_and_keeps_braces() {
         let script = windows_hello_script(r#"Sign in to "Noro""#);
 
-        // Кавычки в тексте удвоены, а не оборвали строку PowerShell.
+        // Quotes in the reason are doubled, not left to terminate the string.
         assert!(script.contains(r#"RequestVerificationAsync("Sign in to ""Noro""")"#));
-        // Блоки скрипта остались блоками: `{{`/`}}` в format! дают одну скобку.
+        // `{{` and `}}` in the format string have to come out as single braces,
+        // or PowerShell gets a script with no blocks in it.
         assert!(script.contains("Run({ $asyncOp.GetResults() })"));
         assert!(script.contains("{ exit 0 } else { exit 1 }"));
         assert!(
             !script.contains("{{"),
-            "двойные скобки не должны утечь в скрипт"
+            "doubled braces should not reach the script"
         );
     }
 }

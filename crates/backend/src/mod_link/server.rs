@@ -1,7 +1,8 @@
-//! Слушатель на loopback: рукопожатие и цикл кадров.
+//! The loopback listener: handshake, then the frame loop.
 //!
-//! Соединение одно на игру. Первым кадром обязан прийти `Hello` с ключом из
-//! файла рукопожатия — до него не принимается ничего, включая запрос очереди.
+//! One connection per game. The first frame must be `Hello` carrying the key
+//! from the handshake file; nothing else is accepted before it, not even a
+//! queue request.
 
 use super::{intents, push, ModLink};
 use crate::backend::Ctx;
@@ -16,15 +17,15 @@ pub async fn serve(ctx: Ctx, link: ModLink, listener: TcpListener) {
         let Ok((stream, addr)) = listener.accept().await else {
             continue;
         };
-        // Слушаем только 127.0.0.1, но проверка дешевле рассуждений о том,
-        // что там на самом деле сделал bind.
+        // The bind is already 127.0.0.1, but checking is cheaper than reasoning
+        // about what it actually did.
         if !addr.ip().is_loopback() {
             continue;
         }
         let (ctx, link) = (ctx.clone(), link.clone());
         tokio::spawn(async move {
             if let Err(e) = session(ctx, link, stream).await {
-                tracing::debug!("mod_link: соединение закрыто: {e}");
+                tracing::debug!("mod_link: connection closed: {e}");
             }
         });
     }
@@ -34,11 +35,11 @@ async fn session(ctx: Ctx, link: ModLink, stream: TcpStream) -> anyhow::Result<(
     let ws = tokio_tungstenite::accept_async(stream).await?;
     let (mut sink, mut incoming) = ws.split();
 
-    // Ключ знает только тот, кто прочитал файл в каталоге игры. Чужая
-    // веб-страница открыть сокет может, прочитать файл — нет.
+    // Only something that read the file in the game directory knows the key. A
+    // web page can open the socket; it can't read the file.
     let hello = incoming.next().await.transpose()?;
     let Some(Message::Text(text)) = hello else {
-        anyhow::bail!("первый кадр не текстовый");
+        anyhow::bail!("first frame was not text");
     };
     match serde_json::from_str::<ToLauncher>(&text) {
         Ok(ToLauncher::Hello { key, protocol }) if key == link.key() && !key.is_empty() => {
@@ -46,17 +47,18 @@ async fn session(ctx: Ctx, link: ModLink, stream: TcpStream) -> anyhow::Result<(
                 tracing::info!(
                     mod_protocol = protocol,
                     ours = PROTOCOL,
-                    "mod_link: версии договора разошлись"
+                    "mod_link: protocol versions differ"
                 );
             }
         }
-        _ => anyhow::bail!("рукопожатие не принято"),
+        _ => anyhow::bail!("handshake rejected"),
     }
 
     let (tx, mut outgoing) = mpsc::unbounded_channel::<ToMod>();
     link.attach(tx);
     link.send(push::ready(&ctx));
-    // Очередь нужна сразу: панель открывают, чтобы взять следующее дело.
+    // The queue goes out immediately: the panel gets opened to pick up the next
+    // case.
     push::refresh_queue(&ctx, &link, None, 0).await;
 
     let result = pump(&ctx, &link, &mut sink, &mut outgoing, &mut incoming).await;
@@ -83,11 +85,12 @@ async fn pump(
             msg = incoming.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        // Незнакомый кадр не рвёт соединение: мод уезжает со
-                        // сборкой и живёт у людей дольше, чем эта версия.
+                        // An unknown frame doesn't drop the connection. The mod
+                        // ships with the build and outlives this launcher
+                        // version on people's machines.
                         match serde_json::from_str::<ToLauncher>(&text) {
                             Ok(frame) => intents::handle(ctx, link, frame).await,
-                            Err(e) => tracing::debug!("mod_link: кадр не разобран: {e}"),
+                            Err(e) => tracing::debug!("mod_link: could not parse frame: {e}"),
                         }
                     }
                     Some(Ok(Message::Ping(_) | Message::Pong(_))) => {}

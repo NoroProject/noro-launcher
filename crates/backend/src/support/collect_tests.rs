@@ -1,5 +1,5 @@
-//! Проверяется и то, что нужное собирается, и то, что лишнее не собирается —
-//! второе важнее: бандл уезжает наружу.
+//! Both that the right files are collected and that the wrong ones aren't. The
+//! second half matters more — the bundle leaves the machine.
 
 use super::*;
 
@@ -57,13 +57,13 @@ async fn the_allowlist_picks_up_logs_and_options() {
 
 #[tokio::test]
 async fn private_directories_are_never_collected() {
-    // Прямое требование: миры, скриншоты и список серверов не собираются
-    // никогда, даже с согласия игрока.
+    // Worlds, screenshots and the server list are never collected, consent or
+    // no consent.
     let dir = Scratch::new("private");
     dir.write("logs/latest.log", "ok");
-    dir.write("saves/Мир/level.dat", "мир игрока");
-    dir.write("screenshots/2026-08-16.png", "картинка");
-    dir.write("servers.dat", "чужие серверы");
+    dir.write("saves/World/level.dat", "the player's world");
+    dir.write("screenshots/2026-08-16.png", "a picture");
+    dir.write("servers.dat", "someone else's servers");
 
     let bundle = collect(dir.path(), None, &[]).await;
 
@@ -82,8 +82,7 @@ async fn a_token_in_the_log_never_reaches_the_bundle() {
     let bundle = collect(dir.path(), None, &[]).await;
 
     assert!(!bundle.files[0].text.contains(token));
-    // Предпросмотр показывает ровно то же, что уедет: иначе кнопка «посмотреть,
-    // что отправится» врёт.
+    // The preview has to show exactly what leaves, or it's lying.
     assert!(!bundle.preview().contains(token));
 }
 
@@ -102,18 +101,18 @@ async fn only_the_newest_crash_reports_are_taken() {
 #[tokio::test]
 async fn an_enormous_log_is_cut_from_the_middle() {
     let dir = Scratch::new("huge");
-    let body = format!("НАЧАЛО{}КОНЕЦ", "ф".repeat(600 * 1024));
+    let body = format!("HEAD{}TAIL", "x".repeat(600 * 1024));
     dir.write("logs/latest.log", &body);
 
     let bundle = collect(dir.path(), None, &[]).await;
 
     let text = &bundle.files[0].text;
     assert!(text.len() < body.len());
-    // Причина обычно в первых строках, симптом — в последних; вырезается
-    // середина.
-    assert!(text.starts_with("НАЧАЛО"), "{}", &text[..40]);
-    assert!(text.ends_with("КОНЕЦ"));
-    assert!(text.contains("вырезано"));
+    // The cause is in the first lines and the symptom in the last, so the
+    // middle is what goes.
+    assert!(text.starts_with("HEAD"), "{}", &text[..40]);
+    assert!(text.ends_with("TAIL"));
+    assert!(text.contains("bytes cut"));
 }
 
 #[tokio::test]
@@ -135,8 +134,8 @@ async fn a_rotated_gzip_log_is_decompressed_and_cleaned() {
 
     let bundle = collect(dir.path(), None, &[]).await;
 
-    // Отправить .gz как есть значит отправить токен, которого мы в нём не
-    // видели: сжатый файл обязан быть разжат и очищен.
+    // Sending the .gz as-is would send a token we never saw. It has to be
+    // decompressed and redacted.
     assert_eq!(names(&bundle), ["logs/2026-08-15-1.log.gz"]);
     assert!(!bundle.files[0].text.contains(token));
 }
@@ -144,12 +143,12 @@ async fn a_rotated_gzip_log_is_decompressed_and_cleaned() {
 #[tokio::test]
 async fn the_archive_carries_the_same_text_as_the_preview() {
     let dir = Scratch::new("pack");
-    dir.write("logs/latest.log", "строка лога");
+    dir.write("logs/latest.log", "a log line");
 
     let bundle = collect(dir.path(), None, &[]).await;
     let bytes = super::super::pack(&bundle).unwrap();
 
     assert!(!bytes.is_empty());
-    // Zip начинается с PK: архив, а не сырой текст.
+    // A zip starts with PK, so this is an archive and not raw text.
     assert_eq!(&bytes[..2], b"PK");
 }

@@ -1,8 +1,8 @@
-//! Канал с клиентским модом разбора: слушатель на loopback.
+//! The loopback channel to the in-game moderation mod.
 //!
-//! Мод не получает ни токена, ни URL админки — он шлёт намерение, лаунчер
-//! ходит к мастеру сам. Слушатель поднимается на запуск игры и гаснет вместе с
-//! ней: чем короче окно, тем меньше смысла в нём для чужой локальной страницы.
+//! The mod gets neither a token nor the admin URL: it sends an intent and the
+//! launcher talks to the master itself. The listener comes up with the game and
+//! dies with it, so the window a hostile local page could use stays short.
 
 mod handshake;
 mod intents;
@@ -27,11 +27,11 @@ use uuid::Uuid;
 
 #[derive(Default)]
 struct Inner {
-    /// Ключ из файла рукопожатия. Пуст, пока слушателя нет.
+    /// The key from the handshake file. Empty while no listener is up.
     key: String,
     instance_dir: Option<PathBuf>,
-    /// Куда слать кадры, пока мод подключён. Соединение одно: панель у
-    /// модератора тоже одна.
+    /// Where frames go while the mod is connected. One connection only — the
+    /// moderator has one panel.
     tx: Option<UnboundedSender<ToMod>>,
     accept: Option<JoinHandle<()>>,
 }
@@ -47,23 +47,25 @@ impl ModLink {
         self.store.clone()
     }
 
-    /// Поднять слушатель и положить файл рукопожатия в каталог инстанса.
+    /// Bring up the listener and drop the handshake file in the instance
+    /// directory.
     ///
-    /// Ошибка здесь не повод не пустить игрока: без канала мод просто не
-    /// найдёт лаунчер и останется без панели, а игра запустится как раньше.
+    /// Every failure here is warn-and-continue: without the channel the mod
+    /// won't find the launcher and goes without its panel, but the game still
+    /// starts.
     pub async fn start(&self, ctx: &Ctx, instance_dir: PathBuf) {
         self.stop().await;
         let listener = match TcpListener::bind("127.0.0.1:0").await {
             Ok(l) => l,
-            Err(e) => return tracing::warn!("mod_link: порт не открылся: {e}"),
+            Err(e) => return tracing::warn!("mod_link: could not open a port: {e}"),
         };
         let port = match listener.local_addr() {
             Ok(a) => a.port(),
-            Err(e) => return tracing::warn!("mod_link: адрес не прочитался: {e}"),
+            Err(e) => return tracing::warn!("mod_link: could not read the address: {e}"),
         };
         let key = handshake::new_key();
         if let Err(e) = handshake::write(&instance_dir, port, &key).await {
-            return tracing::warn!("mod_link: рукопожатие не записано: {e}");
+            return tracing::warn!("mod_link: handshake file not written: {e}");
         }
 
         let accept = tokio::spawn(server::serve(ctx.clone(), self.clone(), listener));
@@ -71,10 +73,10 @@ impl ModLink {
         guard.key = key;
         guard.instance_dir = Some(instance_dir);
         guard.accept = Some(accept);
-        tracing::info!(port, "mod_link: канал открыт");
+        tracing::info!(port, "mod_link: channel open");
     }
 
-    /// Игра закрылась: гасим слушатель и убираем ключ.
+    /// The game closed: shut the listener down and drop the key.
     pub async fn stop(&self) {
         let (accept, dir) = {
             let mut guard = self.inner.lock();
@@ -91,13 +93,13 @@ impl ModLink {
         self.store.close();
     }
 
-    /// Мастер сказал, что дело изменилось. Перечитываем то, что на экране.
+    /// The master says a case changed. Re-read whatever is on screen.
     pub fn case_updated(&self, ctx: &Ctx, case_id: Uuid) {
         let open = self.store.is_open(case_id);
         let (ctx, link) = (ctx.clone(), self.clone());
         tokio::spawn(async move {
-            // Дело не на экране — обновится, когда его откроют. Очередь всё
-            // равно перечитываем: там могла смениться строка.
+            // A case that isn't on screen refreshes when it's opened. The queue
+            // is re-read either way — its row for this case may have changed.
             if open {
                 push::refresh_case(&ctx, &link, case_id).await;
             }

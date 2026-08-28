@@ -1,12 +1,8 @@
-//! Парные ручки канала между frontend (GPUI, главный поток) и backend (tokio).
+//! Both ends of the channel: commands travel frontend → backend, updates come
+//! back the other way. The handles clone freely, the receivers do not.
 //!
-//! По образцу "Пандоры"/side-assist: четыре сущности.
-//! - [`BackendHandle`] — клонируемый отправитель команд (frontend/main → backend).
-//! - [`BackendReceiver`] — приёмник команд (у backend).
-//! - [`FrontendHandle`] — клонируемый отправитель обновлений (backend → frontend).
-//! - [`FrontendReceiver`] — приёмник обновлений (у frontend).
-//!
-//! В debug каналы ограничены (ловит переполнение раньше), в release — unbounded.
+//! Debug builds cap both channels at 256 messages so a backlog is visible during
+//! development; release builds are unbounded.
 
 #[cfg(debug_assertions)]
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -108,7 +104,8 @@ pub struct BackendHandle {
 }
 
 impl BackendHandle {
-    /// Отправить команду backend. Вызывается из синхронного GPUI-потока.
+    /// Called from the GPUI thread, so it must not be an async send. In debug a
+    /// full channel blocks that thread, which means a frozen window.
     pub fn send(&self, message: MessageToBackend) {
         #[cfg(debug_assertions)]
         let _ = self.sender.blocking_send((message, None));
@@ -130,7 +127,8 @@ pub struct FrontendHandle {
 }
 
 impl FrontendHandle {
-    /// Отправить обновление во frontend. Вызывается из async backend.
+    /// Never blocks the runtime: in debug an update sent while the frontend is
+    /// 256 messages behind is dropped, not queued.
     pub fn send(&self, message: MessageToFrontend) {
         #[cfg(debug_assertions)]
         let _ = self.sender.try_send((message, None));

@@ -1,5 +1,5 @@
-//! Смысл слияния — в том, что правки разных ключей уживаются. Ошибка здесь
-//! либо теряет настройку игрока, либо молча склеивает несклеиваемое.
+//! The whole point is that edits to different keys coexist. Getting it wrong
+//! either loses a player's setting or silently merges what shouldn't be merged.
 
 use super::*;
 
@@ -9,8 +9,8 @@ fn lines(text: &str) -> Vec<&str> {
 
 #[test]
 fn edits_to_different_keys_live_together() {
-    // Ровно тот случай, ради которого key-level и нужен: файловый three-way
-    // назвал бы это конфликтом.
+    // The case key-level merging exists for: a whole-file three-way would call
+    // this a conflict.
     let base = "fov=70\nrender=12\nsound=1.0";
     let mine = "fov=90\nrender=12\nsound=1.0";
     let theirs = "fov=70\nrender=16\nsound=1.0";
@@ -46,7 +46,7 @@ fn a_key_added_by_the_player_survives() {
 
 #[test]
 fn a_key_the_player_deleted_stays_deleted() {
-    // Удаление — тоже правка, и затирать её обновлением нельзя.
+    // A deletion is an edit; an update must not undo it.
     let out = merge_properties("render=12", "fov=70\nrender=12", "fov=70\nrender=12").unwrap();
     assert_eq!(lines(&out), ["render=12"]);
 }
@@ -59,15 +59,15 @@ fn a_key_the_server_removed_goes_away() {
 
 #[test]
 fn colon_separated_lines_are_understood() {
-    // options.txt Minecraft использует двоеточие.
+    // Minecraft's options.txt uses a colon.
     let out = merge_properties("fov:90", "fov:70", "fov:70").unwrap();
     assert_eq!(lines(&out), ["fov=90"]);
 }
 
 #[test]
 fn comments_and_blank_lines_do_not_break_parsing() {
-    let base = "# комментарий\n\nfov=70";
-    let out = merge_properties("# другой\nfov=90", base, base).unwrap();
+    let base = "# a comment\n\nfov=70";
+    let out = merge_properties("# a different one\nfov=90", base, base).unwrap();
     assert_eq!(lines(&out), ["fov=90"]);
 }
 
@@ -75,8 +75,8 @@ fn comments_and_blank_lines_do_not_break_parsing() {
 fn only_known_formats_are_offered_for_merging() {
     assert!(is_mergeable("config/mod.properties"));
     assert!(is_mergeable("options.txt"));
-    // JSON и TOML намеренно не поддерживаются: там значение бывает деревом, и
-    // «слияние по ключам» перестаёт быть однозначным.
+    // JSON and TOML are left out on purpose: a value there can be a tree, and
+    // merging by key stops being well-defined.
     assert!(!is_mergeable("config/sodium.json"));
     assert!(!is_mergeable("config/server.toml"));
     assert!(!is_mergeable("mods/core.jar"));

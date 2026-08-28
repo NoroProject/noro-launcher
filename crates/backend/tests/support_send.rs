@@ -1,8 +1,8 @@
-//! Тот же путь, что дёргает кнопка «Сообщить о проблеме»: собрать → упаковать →
-//! отправить мастеру. Запускается вручную против поднятого стенда.
+//! The path the report button takes: collect, pack, upload. Run by hand against
+//! a running master.
 
 #[tokio::test]
-#[ignore = "нужен поднятый мастер и живая сессия"]
+#[ignore = "needs a running master and a live session"]
 async fn the_report_button_path_reaches_the_master() {
     let master = std::env::var("NORO_TEST_MASTER").unwrap();
     let token = std::env::var("NORO_TEST_TOKEN").unwrap();
@@ -22,11 +22,11 @@ async fn the_report_button_path_reaches_the_master() {
         &token,
         &dir,
         None,
-        "проверка кнопки",
+        "button check",
     )
     .await
-    .expect("бандл должен уехать");
+    .expect("the bundle should upload");
 
-    println!("бандл принят: {id}");
+    println!("bundle accepted: {id}");
     let _ = std::fs::remove_dir_all(&dir);
 }

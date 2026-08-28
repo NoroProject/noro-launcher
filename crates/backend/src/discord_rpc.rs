@@ -1,4 +1,7 @@
-//! Discord Rich Presence модуль для NORO Launcher.
+//! Discord Rich Presence.
+//!
+//! Discord may not be running, so every connection failure is non-fatal and the
+//! loop keeps retrying on a timer.
 
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

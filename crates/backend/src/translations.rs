@@ -1,15 +1,15 @@
-//! Каталоги перевода с мастера, с кешем на диске.
+//! Translation catalogs from the master, cached on disk.
 //!
-//! Кеш нужен не для экономии трафика (каталоги — единицы КБ), а чтобы язык
-//! поднимался при старте без сети: иначе до первого ответа мастера интерфейс
-//! моргал бы английским.
+//! The cache isn't about bandwidth — catalogs are a few KB. It's so the right
+//! language is up before the network is: without it the UI shows English until
+//! the master answers.
 
 use crate::backend::Ctx;
 use bridge::MessageToFrontend;
 use std::path::PathBuf;
 
-/// Отдать фронтенду каталог: сперва из кеша (мгновенно), затем свежий с
-/// мастера, если он отличается.
+/// Sends the cached catalog straight away, then a fresh one from the master if
+/// it differs. The frontend can receive `LocaleCatalog` twice for one call.
 pub fn refresh(ctx: &Ctx, code: String) {
     let cached = read_cache(&cache_path(ctx, &code));
     if let Some(ftl) = &cached {
@@ -23,7 +23,6 @@ pub fn refresh(ctx: &Ctx, code: String) {
     tokio::spawn(async move {
         match fetch(&ctx, &code).await {
             Ok(Some(ftl)) => {
-                // Тот же текст — фронтенд уже его показывает.
                 if cached.as_deref() == Some(ftl.as_str()) {
                     return;
                 }
@@ -31,10 +30,10 @@ pub fn refresh(ctx: &Ctx, code: String) {
                 ctx.send(MessageToFrontend::LocaleCatalog { code, ftl });
             }
             Ok(None) => {
-                tracing::debug!(locale = %code, "на мастере нет каталога, остаёмся на встроенном");
+                tracing::debug!(locale = %code, "master has no catalog, keeping the built-in one");
             }
             Err(e) => {
-                tracing::warn!(locale = %code, error = %e, "не удалось получить каталог перевода");
+                tracing::warn!(locale = %code, error = %e, "could not fetch translation catalog");
             }
         }
     });
@@ -66,6 +65,6 @@ fn write_cache(path: &PathBuf, ftl: &str) {
         let _ = std::fs::create_dir_all(parent);
     }
     if let Err(e) = std::fs::write(path, ftl) {
-        tracing::warn!(error = %e, "не удалось записать кеш каталога");
+        tracing::warn!(error = %e, "could not write catalog cache");
     }
 }

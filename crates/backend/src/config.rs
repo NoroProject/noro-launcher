@@ -1,4 +1,4 @@
-//! Конфигурация лаунчера (сохраняется на диск).
+//! Launcher configuration, persisted to disk.
 
 use schema::RecommendedClientSettings;
 use serde::{Deserialize, Serialize};
@@ -7,30 +7,23 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {
-    /// URL мастер-сервера.
     pub master_url: String,
-    /// Код языка интерфейса.
     #[serde(default = "default_locale")]
     pub locale: String,
-    /// Минимум памяти JVM (МБ).
     pub memory_min_mb: u32,
-    /// Максимум памяти JVM (МБ).
     pub memory_max_mb: u32,
-    /// Доп. JVM-флаги (через пробел).
+    /// Space-separated, passed to the JVM as-is.
     pub jvm_flags: String,
-    /// Открывать ли окно консоли при запуске игры.
     pub show_console_on_launch: bool,
-    /// Запускать ли игры в полноэкранном режиме.
     #[serde(default)]
     pub fullscreen: bool,
-    /// Отправлять ли отчёты о падениях. Игрок может отказаться — см. telemetry.
     #[serde(default = "default_crash_reports")]
     pub crash_reports: bool,
-    /// Персональные настройки клиента для конкретных серверов.
+    /// Per-server overrides for the fields above.
     #[serde(default)]
     pub server_settings: BTreeMap<Uuid, ServerClientSettings>,
-    /// Выбранная версия сборки по серверам. Нет записи — берётся текущая
-    /// опубликованная, то есть поведение по умолчанию не меняется.
+    /// Build pinned per server. No entry means whatever the master currently
+    /// publishes, which is the default.
     #[serde(default)]
     pub selected_build: BTreeMap<Uuid, Uuid>,
 }
@@ -62,13 +55,14 @@ impl Default for LauncherConfig {
     }
 }
 
-/// По умолчанию включено: иначе о падениях мы не узнаём вовсе.
+/// Opt-out rather than opt-in — without it we hear about crashes only when
+/// someone writes in.
 fn default_crash_reports() -> bool {
     true
 }
 
 fn default_locale() -> String {
-    // Системный язык, если мы его поддерживаем, иначе английский.
+    // ru and en are the only two we ship, so everything else lands on en.
     std::env::var("LANG")
         .ok()
         .and_then(|l| l.split('.').next().map(str::to_string))
@@ -77,9 +71,10 @@ fn default_locale() -> String {
         .unwrap_or_else(|| "en".to_string())
 }
 
-/// Адрес мастера вшивается на сборке. В release он обязателен — за этим следит
-/// `noro_launcher::verify`. Здесь остаётся только dev-адрес: подставлять сюда
-/// боевой домен значило бы, что отладочная сборка молча ходит в прод.
+/// The master address is baked in at build time and is mandatory for release
+/// builds — `noro_launcher::verify` enforces that. The literal fallback below
+/// stays a dev address on purpose, so a build without one can't quietly talk to
+/// production.
 fn default_master_url() -> String {
     if let Ok(val) = std::env::var("NORO_MASTER_URL") {
         let trimmed = val.trim();
@@ -179,17 +174,19 @@ impl LauncherConfig {
         self.server_settings.remove(server_id);
     }
 
-    /// WebSocket URL мастера.
     pub fn ws_url(&self) -> String {
         let base = self.master_url.trim_end_matches('/');
         let ws = base
             .replacen("https://", "wss://", 1)
             .replacen("http://", "ws://", 1)
+            // macOS resolves localhost to ::1 first and the connection hangs
+            // there while a v4-only master sits waiting.
             .replace("localhost", "127.0.0.1");
         format!("{ws}/ws/launcher")
     }
 
-    /// Миграция: заменить localhost на 127.0.0.1 для избежания проблем с IPv6 на macOS.
+    /// Same substitution as [`Self::ws_url`], applied to configs written before
+    /// it existed. Returns whether anything changed.
     pub fn fix_localhost(&mut self) -> bool {
         if self.master_url.contains("://localhost") {
             self.master_url = self.master_url.replace("://localhost", "://127.0.0.1");
@@ -224,10 +221,10 @@ impl From<&ServerClientSettings> for bridge::ClientSettingsState {
     }
 }
 
-/// Выбор опциональных модов по серверам (отдельный persistent-файл).
+/// Kept in its own file, not in [`LauncherConfig`].
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct OptionalModsSelection {
-    /// server_id → список включённых имён модов.
+    /// server id → enabled mod names.
     pub enabled: BTreeMap<Uuid, Vec<String>>,
 }
 

@@ -1,7 +1,8 @@
-//! Расширенное чтение и парсинг логов Minecraft (на основе PandoraLauncher).
+//! Reading and classifying Minecraft's log output (based on PandoraLauncher).
 //!
-//! Поддерживает log4j XML формат и классификацию уровней. Санитизация — в
-//! [`crate::redact`]: те же правила нужны и файлам, а не только живому потоку.
+//! Handles the log4j XML format as well as plain lines. Redaction lives in
+//! [`schema::redact`], not here — log files need the same rules as the live
+//! stream.
 
 use bridge::{GameLogLevel, MessageToFrontend};
 use schema::redact;
@@ -10,7 +11,8 @@ use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
 use uuid::Uuid;
 
-/// Данные для обновления Discord Rich Presence по строкам игрового лога.
+/// The game never reports what screen it's on, so Rich Presence is driven off
+/// whatever the log happens to say.
 pub struct RpcLogContext {
     pub rpc: crate::discord_rpc::DiscordRpc,
     pub server_name: String,
@@ -19,7 +21,6 @@ pub struct RpcLogContext {
     pub online_max: Option<u32>,
 }
 
-/// Запустить чтение логов из stdout/stderr процесса.
 pub async fn spawn_log_reader<R>(
     mut reader: R,
     server_id: Uuid,
@@ -83,7 +84,8 @@ pub async fn spawn_log_reader<R>(
 }
 
 fn classify_log(line: &str, is_stderr: bool) -> (GameLogLevel, Cow<'_, str>) {
-    // Если лог в формате log4j XML (упрощенный поиск)
+    // Substring matching rather than parsing: a line can be a fragment of the
+    // XML, and a half-parsed event is worse than a guessed level.
     if line.contains("<log4j:Event") {
         if line.contains("level=\"FATAL\"") || line.contains("level=\"ERROR\"") {
             return (GameLogLevel::Error, Cow::Borrowed(line));
@@ -94,7 +96,6 @@ fn classify_log(line: &str, is_stderr: bool) -> (GameLogLevel, Cow<'_, str>) {
         return (GameLogLevel::Info, Cow::Borrowed(line));
     }
 
-    // Обычные текстовые логи (проверка маркеров)
     let upper = line.to_uppercase();
     if upper.contains("[ERROR]")
         || upper.contains("[FATAL]")
@@ -110,15 +111,15 @@ fn classify_log(line: &str, is_stderr: bool) -> (GameLogLevel, Cow<'_, str>) {
         return (GameLogLevel::Info, Cow::Borrowed(line));
     }
 
-    // Если нет четких маркеров, ориентируемся на поток
+    // No marker at all — fall back to which stream it came from.
     if is_stderr {
         if upper.contains("ERROR") {
             (GameLogLevel::Error, Cow::Borrowed(line))
         } else if upper.contains("WARN") {
             (GameLogLevel::Warn, Cow::Borrowed(line))
         } else {
-            // Многие инструменты (в т.ч. authlib-injector) пишут инфо в stderr.
-            // Если нет слова ERROR/WARN, считаем это Info.
+            // authlib-injector and friends write ordinary progress to stderr,
+            // so stderr on its own doesn't mean anything went wrong.
             (GameLogLevel::Info, Cow::Borrowed(line))
         }
     } else {

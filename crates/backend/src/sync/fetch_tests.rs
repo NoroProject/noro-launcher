@@ -1,6 +1,6 @@
-//! Докачка — место, где ошибка не падает, а тихо портит файл: хеш должен
-//! непрерывно продолжаться через границу склейки, а ответ без Range обязан
-//! перезаписать остаток, а не дописаться к нему.
+//! Resume doesn't fail loudly when it's wrong, it quietly corrupts the file.
+//! The hash has to carry across the join, and a response that ignores Range has
+//! to overwrite the partial rather than append to it.
 
 use super::*;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -16,8 +16,8 @@ fn sha1_of(data: &[u8]) -> String {
     hex::encode(Sha1::digest(data))
 }
 
-/// Одноразовый HTTP-сервер. `honor_range = false` изображает origin, который
-/// заголовок Range игнорирует.
+/// Single-shot HTTP server. `honor_range = false` plays an origin that ignores
+/// the Range header.
 async fn serve_once(body: Vec<u8>, honor_range: bool) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -74,7 +74,7 @@ async fn resume_continues_the_hash_across_the_join() {
     let dir = tempdir();
     let dest = dir.join("artifact.jar");
     let part = part_path(&dest);
-    // Половина уже на диске от прошлой, оборванной попытки.
+    // Half of it is already on disk from an earlier, interrupted attempt.
     tokio::fs::write(&part, &data[..15_000]).await.unwrap();
 
     let url = serve_once(data.clone(), true).await;
@@ -90,11 +90,11 @@ async fn resume_continues_the_hash_across_the_join() {
         &on_bytes,
     )
     .await
-    .expect("докачка должна пройти");
+    .expect("resume should succeed");
 
     assert_eq!(tokio::fs::read(&dest).await.unwrap(), data);
-    assert!(!part.exists(), ".part должен быть переименован");
-    // Досчитан только хвост, а не весь файл заново.
+    assert!(!part.exists(), ".part should have been renamed");
+    // Only the tail was counted, not the whole file over again.
     assert_eq!(seen.load(Ordering::Relaxed), (PAYLOAD_LEN - 15_000) as i64);
 }
 
@@ -106,7 +106,7 @@ async fn a_200_response_replaces_the_partial_instead_of_appending() {
     let part = part_path(&dest);
     tokio::fs::write(&part, &data[..15_000]).await.unwrap();
 
-    // Origin без поддержки Range: пришлёт файл целиком.
+    // Origin with no Range support: sends the whole file.
     let url = serve_once(data.clone(), false).await;
     let seen = AtomicI64::new(0);
     let on_bytes = |d: i64| {
@@ -120,11 +120,11 @@ async fn a_200_response_replaces_the_partial_instead_of_appending() {
         &on_bytes,
     )
     .await
-    .expect("должен переписать остаток и сойтись по хешу");
+    .expect("should overwrite the partial and match the hash");
 
-    // Дописались бы — вышло бы 55000 байт и битый sha1.
+    // Appending would give 55000 bytes and a broken sha1.
     assert_eq!(tokio::fs::read(&dest).await.unwrap(), data);
-    // Откат прогресса на отброшенный остаток плюс полная загрузка.
+    // The discarded partial rolled back, plus the full download.
     assert_eq!(seen.load(Ordering::Relaxed), PAYLOAD_LEN as i64 - 15_000);
 }
 
@@ -144,18 +144,18 @@ async fn a_wrong_hash_removes_the_partial_so_a_retry_starts_clean() {
         &on_bytes,
     )
     .await
-    .expect_err("несовпадение хеша должно быть ошибкой");
+    .expect_err("a hash mismatch should be an error");
 
     assert!(err.to_string().contains("SHA1 mismatch"), "{err}");
-    assert!(!dest.exists(), "битый файл не должен доехать до dest");
+    assert!(!dest.exists(), "a corrupt file must not reach dest");
     assert!(
         !part_path(&dest).exists(),
-        "остаток надо снести, иначе повтор зациклится на мусоре"
+        "the partial has to go, or the retry loops on the same garbage"
     );
 }
 
-/// Соседи по имени качаются параллельно; общий `.part` означал бы, что они
-/// пишут друг поверх друга, а в dest уедет смесь с «сошедшимся» хешем.
+/// Neighbours download in parallel; a shared `.part` would have them writing
+/// over each other, and dest would get the mixture.
 #[tokio::test]
 async fn neighbours_with_different_extensions_do_not_share_a_partial() {
     let dir = tempdir();

@@ -1,8 +1,8 @@
-//! Намерение мода → запрос к мастеру.
+//! Turning an intent from the mod into a request to the master.
 //!
-//! Мод не знает ни одного URL: здесь и только здесь намерение превращается в
-//! ручку. Отказ мастера уходит обратно `Rejected` с ключом перевода — решает
-//! мастер, и его 403 единственная проверка, которой стоит верить.
+//! The mod knows no URLs; this is the only place an intent becomes an endpoint.
+//! A refusal comes back as `Rejected` with a translation key. The master's 403
+//! is the only permission check worth trusting — nothing is decided here.
 
 use super::master::{Api, Denied};
 use super::push;
@@ -26,10 +26,11 @@ pub async fn handle(ctx: &Ctx, link: &ModLink, frame: ToLauncher) {
     let case_id = match dispatch(ctx, link, &api, frame).await {
         Ok(case_id) => case_id,
         Err(e) => {
-            // Моду уходит ключ, в лог — причина: «мастер недоступен» и «мастер
-            // ответил 500» для модератора одно и то же, а для разбора нет.
+            // The mod gets a key, the log gets the reason. "master unreachable"
+            // and "master answered 500" look the same to a moderator, but not
+            // to whoever debugs it later.
             if let Denied::Offline(why) = &e {
-                tracing::debug!(intent = name, "mod_link: мастер не ответил: {why}");
+                tracing::debug!(intent = name, "mod_link: master did not answer: {why}");
             }
             return link.send(ToMod::Rejected {
                 intent: name.into(),
@@ -38,14 +39,15 @@ pub async fn handle(ctx: &Ctx, link: &ModLink, frame: ToLauncher) {
             });
         }
     };
-    // Всё, что меняет дело, меняет и очередь: замок и статус видны в обеих.
+    // Anything that changes a case changes the queue too: the claim and the
+    // status show in both.
     if let Some(case_id) = case_id {
         push::refresh_case(ctx, link, case_id).await;
         push::refresh_queue_in_place(ctx, link).await;
     }
 }
 
-/// `Ok(Some(case_id))` — дело изменилось и его надо перечитать.
+/// `Ok(Some(case_id))` means the case changed and needs re-reading.
 async fn dispatch(
     ctx: &Ctx,
     link: &ModLink,
@@ -53,7 +55,7 @@ async fn dispatch(
     frame: ToLauncher,
 ) -> Result<Option<Uuid>, Denied> {
     match frame {
-        // Рукопожатие приняли раньше, повторное ничего не значит.
+        // The handshake was already accepted; a repeat means nothing.
         ToLauncher::Hello { .. } => Ok(None),
         ToLauncher::RequestQueue => {
             push::refresh_queue(ctx, link, None, 0).await;
@@ -108,7 +110,8 @@ async fn dispatch(
             rule_code,
             duration_secs,
         } => {
-            // Наказывают игрока, а не дело: id цели берём из карточки.
+            // Punishments land on a player, not a case, so the target id has to
+            // come out of the card.
             let target = api.card(case_id).await?.brief.target_id;
             let body = json!({
                 "kind": kind,
@@ -127,7 +130,8 @@ async fn dispatch(
                 json!({}),
             )
             .await?;
-            // Срез снимает агент — карточка догонит следующим `CaseUpdated`.
+            // The agent takes the snapshot; the card catches up on the next
+            // `CaseUpdated`.
             Ok(None)
         }
         ToLauncher::RequestInventory { case_id } => {
@@ -182,7 +186,7 @@ async fn dispatch(
     }
 }
 
-/// Имя кадра для `Rejected`: моду нужно понять, какую кнопку гасить.
+/// Frame name for `Rejected` — the mod needs it to know which button to undim.
 fn intent_name(frame: &ToLauncher) -> &'static str {
     match frame {
         ToLauncher::Hello { .. } => "Hello",

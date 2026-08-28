@@ -1,8 +1,8 @@
-//! Диалог подтверждения входа в чужой аккаунт и баннер о том, что вход активен.
+//! Confirming a sign-in as another player.
 //!
-//! Диалог здесь работает вторым фактором: он закрывает случай «злоумышленник
-//! получил веб-сессию админа, но не доступ к его машине». Поэтому подтверждение
-//! спрашивается именно тут, а не в браузере.
+//! The prompt is a second factor: it covers the case where someone has an
+//! admin's web session but not their machine. That's why it is asked here and
+//! not in the browser.
 
 use super::common::Cx;
 use crate::components::btn;
@@ -12,7 +12,7 @@ use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
 use i18n::t;
 
-/// Модальный запрос. `None`, если ничего не ждём.
+/// `None` when nothing is pending.
 pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     let prompt = ui.impersonate_prompt.as_ref()?;
 
@@ -96,5 +96,5 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     )
 }
 
-// Отметка «вы в чужом аккаунте» — в рамке окна: она относится к окну целиком,
-// а не к странице. См. `components::window_chrome`.
+// The "you are signed in as someone else" marker lives in the window frame, not
+// on the page — see `components::window_chrome`.

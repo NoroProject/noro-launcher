@@ -1,15 +1,13 @@
-# Версия тулчейна закреплена намеренно.
+# The toolchain version is pinned deliberately.
 #
-# CI гоняет clippy с `-D warnings`. На плавающем stable это значит, что выход
-# новой версии Rust красит сборку без единого изменения в коде: каждый релиз
-# приносит новые линты. Так уже случилось дважды за один день — на машине
-# разработчика был 1.94, на раннере 1.97, и они расходились в наборе проверок.
+# CI runs clippy with `-D warnings`. On a floating stable that means a new Rust
+# release turns the build red without a single change to the code, since every
+# release brings new lints.
 #
-# Обновлять версию здесь отдельным коммитом, вместе с правкой того, что найдёт
-# новый clippy.
+# Bump this in its own commit, together with whatever the newer clippy finds.
 #
-# Локально это работает только через rustup: если `rustc` подхватывается из
-# Homebrew, файл игнорируется и расхождение с CI останется.
+# Locally it only takes effect through rustup — if `rustc` comes from Homebrew
+# the file is ignored and you keep drifting from CI.
 [toolchain]
 channel = "1.97.1"
 components = ["clippy", "rustfmt"]

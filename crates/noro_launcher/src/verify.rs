@@ -1,86 +1,99 @@
-//! Проверка подписи core-бинарника.
-//!
-//! Ключ зашивается на компиляции и в bootstrapper'е это **настоящий якорь
-//! доверия**: этот бинарь по замыслу никогда не обновляется, значит подменить
-//! ключ негде. Отсюда и правило ниже — sha256 из ответа мастера подтверждает
-//! только целостность закачки: кто подменит канал, подставит и файл, и его хеш.
-//! Отличает подделку от подлинника единственно подпись.
+//! Signature check for the core binary. The key is compiled in or stamped.
+//! The signature separates a forgery from the real binary.
 
 use anyhow::{anyhow, Result};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use std::path::Path;
 
-/// Имя файла с подписью рядом с core-бинарником.
 pub const SIG_SUFFIX: &str = ".sig";
 
 use crate::embedded_config;
 
-/// Возвращает hex публичного ключа из вшитого конфига или env.
+/// Hex from the stamped config, falling back to env var, bootstrap.json, or build-time.
 pub fn raw_signing_pubkey() -> String {
     if let Some(cfg) = embedded_config::get_embedded_config() {
         if !cfg.pubkey.is_empty() && !cfg.pubkey.contains("__NORO_PUBKEY_PLACEHOLDER__") {
             return cfg.pubkey;
         }
     }
-    option_env!("NORO_SIGNING_PUBKEY").unwrap_or_default().to_string()
+    if let Ok(val) = std::env::var("NORO_SIGNING_PUBKEY") {
+        if !val.trim().is_empty() {
+            return val.trim().to_string();
+        }
+    }
+    from_bootstrap("signing_pubkey").unwrap_or_else(|| {
+        option_env!("NORO_SIGNING_PUBKEY").unwrap_or_default().to_string()
+    })
+}
+
+fn from_bootstrap(key: &str) -> Option<String> {
+    let path = dirs::data_dir()?.join(schema::launcher_dir_name()).join("bootstrap.json");
+    let content = std::fs::read_to_string(path).ok()?;
+    let val: serde_json::Value = serde_json::from_str(&content).ok()?;
+    val.get(key)?.as_str().filter(|s| !s.trim().is_empty()).map(|s| s.trim().to_string())
 }
 
 fn verifying_key() -> Result<VerifyingKey> {
     let hex_str = raw_signing_pubkey();
     if hex_str.is_empty() {
-        // В dev ключ выводится из общего seed — того же, что у мастера.
         let sk = ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED);
         return Ok(sk.verifying_key());
     }
-    let bytes = hex::decode(&hex_str).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: невалидный hex"))?;
-    let arr: [u8; 32] = bytes
-        .try_into()
-        .map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: нужно 32 байта"))?;
-    VerifyingKey::from_bytes(&arr).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: невалидный ключ"))
+    let bytes = hex::decode(&hex_str).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: not valid hex"))?;
+    let arr: [u8; 32] = bytes.try_into().map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: expected 32 bytes"))?;
+    VerifyingKey::from_bytes(&arr).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: not a valid key"))
 }
 
-/// Адрес мастера. Читается из впечатанного конфига, либо из env / localhost.
+/// Stamped config first, then env var, then bootstrap.json, then build-time env var.
 pub fn master_url() -> String {
     if let Some(cfg) = embedded_config::get_embedded_config() {
         if !cfg.master_url.is_empty() {
             return cfg.master_url;
         }
     }
-    option_env!("NORO_MASTER_URL")
-        .unwrap_or("http://localhost:8080")
-        .to_string()
+    if let Ok(val) = std::env::var("NORO_MASTER_URL") {
+        if !val.trim().is_empty() {
+            return val.trim().to_string();
+        }
+    }
+    from_bootstrap("master_url").unwrap_or_else(|| {
+        option_env!("NORO_MASTER_URL").unwrap_or("http://localhost:8080").to_string()
+    })
 }
 
-/// Проверяет ed25519-подпись байтов. `signature_b64` — как отдаёт мастер.
+/// `signature_b64` in the form the master hands it over.
 pub fn verify_bytes(data: &[u8], signature_b64: &str) -> Result<()> {
     use base64::Engine;
     let raw = base64::engine::general_purpose::STANDARD
         .decode(signature_b64.trim())
-        .map_err(|_| anyhow!("подпись не base64"))?;
-    let sig: [u8; 64] = raw.try_into().map_err(|_| anyhow!("подпись не 64 байта"))?;
+        .map_err(|_| anyhow!("signature is not base64"))?;
+    let sig: [u8; 64] = raw
+        .try_into()
+        .map_err(|_| anyhow!("signature is not 64 bytes"))?;
     verifying_key()?
         .verify(data, &Signature::from_bytes(&sig))
-        .map_err(|_| anyhow!("подпись не совпала с зашитым ключом"))
+        .map_err(|_| anyhow!("signature does not match the built-in key"))
 }
 
-/// Кладёт подпись рядом с бинарником, чтобы проверять её и без сети.
+/// Kept next to the binary so it can be checked again with no network.
 pub fn store(core_path: &Path, signature_b64: &str) -> Result<()> {
     let path = sig_path(core_path);
     std::fs::write(&path, signature_b64.trim().as_bytes())
-        .map_err(|e| anyhow!("не записать {}: {e}", path.display()))
+        .map_err(|e| anyhow!("could not write {}: {e}", path.display()))
 }
 
-/// Перепроверяет уже установленный core на каждом запуске.
+/// Runs on every launch, not just after a download.
 pub fn verify_installed(core_path: &Path) -> Result<()> {
     let sig_file = sig_path(core_path);
     let signature = std::fs::read_to_string(&sig_file)
-        .map_err(|_| anyhow!("нет подписи рядом с {}", core_path.display()))?;
+        .map_err(|_| anyhow!("no signature next to {}", core_path.display()))?;
     let bytes = std::fs::read(core_path)
-        .map_err(|e| anyhow!("не прочитать {}: {e}", core_path.display()))?;
+        .map_err(|e| anyhow!("could not read {}: {e}", core_path.display()))?;
     verify_bytes(&bytes, &signature)
 }
 
-/// Убирает битый core вместе с подписью, чтобы следующий запуск скачал заново.
+/// Drop a core that failed the check, signature included, so the next launch
+/// downloads it again.
 pub fn discard(core_path: &Path) {
     let _ = std::fs::remove_file(core_path);
     let _ = std::fs::remove_file(sig_path(core_path));
@@ -96,9 +109,7 @@ fn sig_path(core_path: &Path) -> std::path::PathBuf {
 mod tests {
     use super::*;
 
-    /// Контракт с мастером: тот подписывает байты тем же ключом и кодирует
-    /// подпись в base64 (`launcher_builder::run_build`). Тест ловит расхождение
-    /// на сборке, а не на машине игрока.
+    /// The master signs the bytes with this key and base64s the result.
     #[test]
     fn accepts_signature_made_like_master() {
         use base64::Engine;
@@ -108,7 +119,7 @@ mod tests {
         let payload = b"noro-launcher-core payload";
         let sig = base64::engine::general_purpose::STANDARD.encode(sk.sign(payload).to_bytes());
 
-        verify_bytes(payload, &sig).expect("подпись мастера должна проходить");
+        verify_bytes(payload, &sig).expect("a signature from the master must verify");
         verify_bytes(b"tampered", &sig).unwrap_err();
     }
 
@@ -126,9 +137,9 @@ mod tests {
         let sk = ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED);
         let sig = base64::engine::general_purpose::STANDARD.encode(sk.sign(body).to_bytes());
         store(&core, &sig).unwrap();
-        verify_installed(&core).expect("свежеустановленный core проходит проверку");
+        verify_installed(&core).expect("a freshly installed core verifies");
 
-        // Подменённый на диске бинарник обязан быть отвергнут.
+        // A binary swapped on disk has to be rejected.
         std::fs::write(&core, b"evil").unwrap();
         verify_installed(&core).unwrap_err();
 

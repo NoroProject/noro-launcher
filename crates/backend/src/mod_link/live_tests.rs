@@ -1,7 +1,8 @@
-//! Живая проверка канала: поднять слушатель, прикинуться модом, получить дело.
+//! End-to-end check of the channel: bring the listener up, pretend to be the
+//! mod, get a case back.
 //!
-//! Помечен `#[ignore]`: нужен работающий мастер и токен сессии, а CI ни того ни
-//! другого не имеет. Запускается руками, когда правится канал:
+//! `#[ignore]`d because it needs a running master and a session token, neither
+//! of which CI has. Run by hand when the channel changes:
 //!
 //! ```text
 //! NORO_TEST_MASTER=http://127.0.0.1:8080 NORO_TEST_TOKEN=<uuid> \
@@ -15,44 +16,44 @@ use mod_link::{Handshake, ToLauncher, ToMod, HANDSHAKE_FILE, PROTOCOL};
 use tokio_tungstenite::tungstenite::Message;
 
 #[tokio::test]
-#[ignore = "нужен живой мастер: NORO_TEST_MASTER + NORO_TEST_TOKEN"]
+#[ignore = "needs a live master: NORO_TEST_MASTER + NORO_TEST_TOKEN"]
 async fn mod_gets_ready_and_queue() {
     let (Ok(master), Ok(token)) = (
         std::env::var("NORO_TEST_MASTER"),
         std::env::var("NORO_TEST_TOKEN"),
     ) else {
-        panic!("задайте NORO_TEST_MASTER и NORO_TEST_TOKEN");
+        panic!("set NORO_TEST_MASTER and NORO_TEST_TOKEN");
     };
 
     let dir = std::env::temp_dir().join(format!("noro-mod-link-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&dir).expect("каталог инстанса");
+    std::fs::create_dir_all(&dir).expect("instance directory");
 
     let ctx = ctx_for(&master, &token);
     ctx.mod_link.start(&ctx, dir.clone()).await;
 
-    // Мод читает файл рукопожатия — ровно так же, как это сделает Java.
-    let raw = std::fs::read(dir.join(HANDSHAKE_FILE)).expect("файл рукопожатия");
-    let hs: Handshake = serde_json::from_slice(&raw).expect("разбор рукопожатия");
+    // Read the handshake file exactly the way the Java side will.
+    let raw = std::fs::read(dir.join(HANDSHAKE_FILE)).expect("handshake file");
+    let hs: Handshake = serde_json::from_slice(&raw).expect("parse handshake");
     assert_eq!(hs.protocol, PROTOCOL);
 
     let url = format!("ws://127.0.0.1:{}", hs.port);
     let (mut ws, _) = tokio_tungstenite::connect_async(&url)
         .await
-        .expect("соединение с лаунчером");
+        .expect("connect to the launcher");
     let hello = ToLauncher::Hello {
         key: hs.key.clone(),
         protocol: PROTOCOL,
     };
     ws.send(Message::Text(serde_json::to_string(&hello).unwrap()))
         .await
-        .expect("рукопожатие ушло");
+        .expect("handshake sent");
 
     let mut saw_ready = false;
     let mut first_case = None;
     for _ in 0..4 {
         match next_frame(&mut ws).await {
             Some(ToMod::Ready { permissions, .. }) => {
-                println!("Ready, прав: {}", permissions.len());
+                println!("Ready, {} permissions", permissions.len());
                 saw_ready = true;
             }
             Some(ToMod::Queue {
@@ -61,30 +62,30 @@ async fn mod_gets_ready_and_queue() {
                 offset,
                 ..
             }) => {
-                println!("Queue, дел: {} из {total} (сдвиг {offset})", cases.len());
+                println!("Queue, {} of {total} cases (offset {offset})", cases.len());
                 first_case = cases.first().map(|c| c.id);
             }
-            Some(other) => println!("кадр: {other:?}"),
+            Some(other) => println!("frame: {other:?}"),
             None => break,
         }
         if saw_ready && first_case.is_some() {
             break;
         }
     }
-    assert!(saw_ready, "не пришёл Ready");
-    let case_id = first_case.expect("в очереди нет ни одного дела — нечего открывать");
+    assert!(saw_ready, "no Ready frame arrived");
+    let case_id = first_case.expect("the queue is empty, nothing to open");
 
-    // Намерение → запрос к мастеру → карточка обратно. Это и есть весь канал.
+    // Intent, request to the master, card back. That's the whole channel.
     let open = ToLauncher::OpenCase { case_id };
     ws.send(Message::Text(serde_json::to_string(&open).unwrap()))
         .await
-        .expect("намерение ушло");
+        .expect("intent sent");
     let mut saw_card = false;
     for _ in 0..4 {
         match next_frame(&mut ws).await {
             Some(ToMod::Case { view }) => {
                 println!(
-                    "Case N-{}, событий: {}, чат разрешён: {}",
+                    "Case N-{}, {} events, chat allowed: {}",
                     view.brief.number,
                     view.events.len(),
                     view.chat_allowed
@@ -93,43 +94,45 @@ async fn mod_gets_ready_and_queue() {
                 saw_card = true;
                 break;
             }
-            Some(other) => println!("кадр: {other:?}"),
+            Some(other) => println!("frame: {other:?}"),
             None => break,
         }
     }
 
     ctx.mod_link.stop().await;
-    assert!(saw_card, "карточка не приехала");
+    assert!(saw_card, "no card arrived");
     assert!(
         !dir.join(HANDSHAKE_FILE).exists(),
-        "ключ остался лежать после остановки"
+        "the key was left lying around after stop"
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Ключ обязателен: чужая страница может открыть сокет, но не прочитать файл.
+/// The key is what makes this safe: any page can open the socket, but it can't
+/// read the file.
 #[tokio::test]
 async fn wrong_key_is_refused() {
     let dir = std::env::temp_dir().join(format!("noro-mod-link-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&dir).expect("каталог инстанса");
+    std::fs::create_dir_all(&dir).expect("instance directory");
 
     let ctx = ctx_for("http://127.0.0.1:1", "no-token");
     ctx.mod_link.start(&ctx, dir.clone()).await;
-    let raw = std::fs::read(dir.join(HANDSHAKE_FILE)).expect("файл рукопожатия");
-    let hs: Handshake = serde_json::from_slice(&raw).expect("разбор рукопожатия");
+    let raw = std::fs::read(dir.join(HANDSHAKE_FILE)).expect("handshake file");
+    let hs: Handshake = serde_json::from_slice(&raw).expect("parse handshake");
 
     let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{}", hs.port))
         .await
-        .expect("соединение");
+        .expect("connect");
     let hello = ToLauncher::Hello {
-        key: "подобранный".into(),
+        key: "guessed".into(),
         protocol: PROTOCOL,
     };
     ws.send(Message::Text(serde_json::to_string(&hello).unwrap()))
         .await
         .ok();
 
-    // Лаунчер обязан закрыть соединение, не прислав ни одного кадра состояния.
+    // The launcher has to close the connection without sending a single state
+    // frame.
     let next = tokio::time::timeout(std::time::Duration::from_secs(5), ws.next()).await;
     let refused = matches!(
         next,
@@ -137,7 +140,7 @@ async fn wrong_key_is_refused() {
     );
     ctx.mod_link.stop().await;
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(refused, "соединение с чужим ключом не закрылось: {next:?}");
+    assert!(refused, "a connection with a bad key stayed open: {next:?}");
 }
 
 type ModSocket =
@@ -149,7 +152,7 @@ async fn next_frame(ws: &mut ModSocket) -> Option<ToMod> {
     else {
         return None;
     };
-    Some(serde_json::from_str::<ToMod>(&text).expect("кадр разобран"))
+    Some(serde_json::from_str::<ToMod>(&text).expect("frame parsed"))
 }
 
 fn ctx_for(master: &str, token: &str) -> Ctx {
@@ -162,7 +165,7 @@ fn ctx_for(master: &str, token: &str) -> Ctx {
         inbound,
         conn,
     );
-    // Каталог свой, временный: настоящий конфиг лаунчера тест портить не должен.
+    // A throwaway directory: the test must not touch the real launcher config.
     let dirs = crate::directories::LauncherDirectories {
         root: std::env::temp_dir().join(format!("noro-mod-link-home-{}", uuid::Uuid::new_v4())),
     };

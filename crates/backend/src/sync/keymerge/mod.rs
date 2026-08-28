@@ -1,15 +1,16 @@
-//! Слияние конфигов по ключам вместо файла целиком.
+//! Merging configs key by key rather than whole-file.
 //!
-//! Файловый three-way (`merge.rs`) отвечает «кто менял файл». Здесь вопрос
-//! мельче: игрок поправил одну строку, сервер — другую, и обе правки должны
-//! ужиться. Без этого такой случай остаётся конфликтом, хотя спорить не о чем.
+//! `merge.rs` answers "who changed this file". The question here is smaller: the
+//! player edited one line and the server edited another, and both edits should
+//! survive. Whole-file compare calls that a conflict when there's nothing to
+//! argue about.
 //!
-//! Требует реальную копию исходного файла, а не только его хеш — поэтому
-//! `.noro/base/` появляется только для тех путей, где режим включён.
+//! Unlike `merge.rs` this needs the original file itself, not just its hash, so
+//! `.noro/base/` only exists for the paths where the mode is on.
 //!
-//! Форматы: `.properties` и построчные `.txt` вроде `options.txt`. JSON и TOML
-//! сюда не входят намеренно: там значение может быть деревом, и «слияние по
-//! ключам» перестаёт быть однозначным ровно там, где начинает быть нужным.
+//! `.properties` and line-oriented `.txt` like `options.txt` only. JSON and TOML
+//! are left out on purpose: a value there can be a tree, and "merge by key"
+//! stops being well-defined exactly where you'd want it.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -18,10 +19,8 @@ mod base;
 
 pub use base::{base_copy_path, remember_base};
 
-/// Слить три версии по ключам.
-///
-/// Возвращает `None`, если разрешить нельзя: один и тот же ключ изменили обе
-/// стороны по-разному. Такой файл остаётся обычным конфликтом.
+/// `None` when both sides changed the same key to different values — that file
+/// stays an ordinary conflict.
 pub fn merge_properties(mine: &str, base: &str, theirs: &str) -> Option<String> {
     let mine_map = parse(mine);
     let base_map = parse(base);
@@ -43,32 +42,33 @@ pub fn merge_properties(mine: &str, base: &str, theirs: &str) -> Option<String> 
         let t = theirs_map.get(key);
 
         match (m, b, t) {
-            // Ключ удалён обеими сторонами либо не было и нет.
+            // Gone on both sides, or never there.
             (None, _, None) => {}
-            // Игрок удалил, сервер не менял — уважаем удаление.
+            // The player deleted it and the server left it alone. A deletion is
+            // an edit too.
             (None, Some(b), Some(t)) if b == t => {}
-            // Сервер удалил, игрок не менял.
+            // The server deleted it and the player left it alone.
             (Some(m), Some(b), None) if m == b => {}
-            // Обе стороны согласны.
+            // Both sides agree.
             (Some(m), _, Some(t)) if m == t => {
                 out.insert(key, (*m).to_string());
             }
-            // Менял только игрок.
+            // Only the player changed it.
             (Some(m), b, t) if b == t => {
                 out.insert(key, (*m).to_string());
             }
-            // Менял только сервер.
+            // Only the server changed it.
             (m, b, Some(t)) if m == b => {
                 out.insert(key, (*t).to_string());
             }
-            // Ключ появился только у одной стороны.
+            // Added by one side, unknown to the other.
             (Some(m), None, None) => {
                 out.insert(key, (*m).to_string());
             }
             (None, None, Some(t)) => {
                 out.insert(key, (*t).to_string());
             }
-            // Оба изменили один ключ по-разному — здесь автоматика кончается.
+            // Both changed it, differently. This is where the automation ends.
             _ => return None,
         }
     }
@@ -81,8 +81,8 @@ pub fn merge_properties(mine: &str, base: &str, theirs: &str) -> Option<String> 
     )
 }
 
-/// `key=value` построчно. Комментарии и пустые строки пропускаются: сохранять
-/// их порядок при слиянии всё равно нечем.
+/// `key=value` per line. Comments and blank lines are dropped — a merge has no
+/// way to keep their placement anyway, so they don't survive the round trip.
 fn parse(text: &str) -> BTreeMap<&str, &str> {
     text.lines()
         .map(str::trim)
@@ -92,20 +92,19 @@ fn parse(text: &str) -> BTreeMap<&str, &str> {
         .collect()
 }
 
-/// Поддерживается ли формат.
 pub fn is_mergeable(rel_path: &str) -> bool {
     let lower = rel_path.to_lowercase();
     lower.ends_with(".properties") || lower.ends_with("options.txt")
 }
 
-/// Попробовать разрешить конфликт слиянием по ключам.
+/// Try to resolve a conflict by merging keys.
 ///
-/// Серверную версию приходится скачать до решения — иначе сливать не с чем.
-/// Это дёшево ровно потому, что режим включается только для конфигов: они
-/// весят килобайты, и лишний GET случается только при настоящем конфликте.
+/// The server's version has to be downloaded before the decision — there's
+/// nothing to merge against otherwise. Affordable only because this runs on
+/// configs, which are kilobytes, and only on a real conflict.
 ///
-/// `None` — не смогли: формат не тот, копии базы нет либо один ключ изменили
-/// обе стороны по-разному. Тогда решает политика конфликта.
+/// `None` means the conflict policy decides instead: wrong format, no base
+/// copy, or one key changed differently on both sides.
 pub async fn try_merge(
     client: &reqwest::Client,
     instance_dir: &Path,
@@ -127,7 +126,8 @@ pub async fn try_merge(
     tokio::fs::write(instance_dir.join(rel), &merged)
         .await
         .ok()?;
-    // Новая база — то, что сейчас у сервера: следующий раз сравниваем с ним.
+    // The new base is the server's text, not the merged result: next time we
+    // want to know what changed relative to what they sent.
     let base_path = base_copy_path(instance_dir, rel);
     if let Some(parent) = base_path.parent() {
         let _ = tokio::fs::create_dir_all(parent).await;

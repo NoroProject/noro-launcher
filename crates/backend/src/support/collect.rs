@@ -1,4 +1,4 @@
-//! Чтение файлов по allowlist и их очистка.
+//! Reading the allowlisted files and redacting them.
 
 use super::{Bundle, BundleFile};
 use flate2::read::GzDecoder;
@@ -7,16 +7,15 @@ use schema::BuildManifest;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// Потолок на файл. Лог с зациклившимся исключением растёт до гигабайтов, и
-/// смысла в его хвосте нет — берём начало и конец.
+/// Per-file ceiling. A log with a looping exception runs to gigabytes of the
+/// same lines.
 const MAX_FILE_BYTES: usize = 512 * 1024;
 
-/// Сколько ротированных логов и крешей брать. Больше — это уже архив за месяц,
-/// а не разбор конкретной проблемы.
+/// Any more rotated logs and crash reports than this and it's a month's archive
+/// rather than one problem.
 const MAX_ROTATED: usize = 3;
 const MAX_CRASHES: usize = 3;
 
-/// Собрать бандл для инстанса.
 pub async fn collect(
     instance_dir: &Path,
     manifest: Option<&BuildManifest>,
@@ -34,7 +33,8 @@ pub async fn collect(
     for rel in newest(instance_dir, "crash-reports", ".txt", MAX_CRASHES).await {
         push(&mut files, instance_dir, &rel).await;
     }
-    // hs_err JVM кладёт в рабочий каталог процесса — то есть в корень инстанса.
+    // The JVM drops hs_err files in the process's working directory, which is
+    // the instance root.
     for rel in newest(instance_dir, "", ".log", MAX_ROTATED).await {
         if rel.starts_with("hs_err_pid") {
             push(&mut files, instance_dir, &rel).await;
@@ -47,7 +47,8 @@ pub async fn collect(
     }
 }
 
-/// Прочитать, обрезать, очистить и добавить — если файл есть.
+/// A missing file is silently skipped: the allowlist covers everything that
+/// might be there, not everything that is.
 async fn push(out: &mut Vec<BundleFile>, root: &Path, rel: &str) {
     let path = root.join(rel);
     let Ok(meta) = tokio::fs::metadata(&path).await else {
@@ -63,7 +64,8 @@ async fn push(out: &mut Vec<BundleFile>, root: &Path, rel: &str) {
     });
 }
 
-/// Текст файла; `.gz` разжимается — иначе очистить его содержимое нельзя.
+/// `.gz` has to be decompressed here: redaction can't reach inside a compressed
+/// file, and sending one as-is would send whatever it contains.
 async fn read_text(path: &Path) -> Option<String> {
     let bytes = tokio::fs::read(path).await.ok()?;
     if path.extension().is_some_and(|e| e == "gz") {
@@ -74,8 +76,8 @@ async fn read_text(path: &Path) -> Option<String> {
     Some(String::from_utf8_lossy(&bytes).into_owned())
 }
 
-/// Начало и конец: причина обычно в первых строках (что за сборка, что
-/// загрузилось), а симптом — в последних.
+/// Keeps the head and the tail. The cause is usually in the first lines — which
+/// build, what loaded — and the symptom in the last.
 fn clamp(text: &str) -> String {
     if text.len() <= MAX_FILE_BYTES {
         return text.to_string();
@@ -84,7 +86,7 @@ fn clamp(text: &str) -> String {
     let head = floor_char_boundary(text, half);
     let tail = ceil_char_boundary(text, text.len() - half);
     format!(
-        "{}\n\n[… вырезано {} байт …]\n\n{}",
+        "{}\n\n[… {} bytes cut …]\n\n{}",
         &text[..head],
         text.len() - MAX_FILE_BYTES,
         &text[tail..]
@@ -105,7 +107,7 @@ fn ceil_char_boundary(s: &str, mut i: usize) -> usize {
     i
 }
 
-/// Самые свежие файлы с нужным расширением, новые первыми.
+/// The newest files with the given suffix, newest first.
 async fn newest(root: &Path, subdir: &str, suffix: &str, limit: usize) -> Vec<String> {
     let dir = if subdir.is_empty() {
         root.to_path_buf()

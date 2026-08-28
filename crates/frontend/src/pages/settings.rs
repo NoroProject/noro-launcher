@@ -1,4 +1,4 @@
-//! Глобальные настройки лаунчера (без вкладок сервера).
+//! Global launcher settings, as opposed to the per-server tabs.
 
 use super::common::{panel, Cx};
 use super::settings_panel::settings_panel;

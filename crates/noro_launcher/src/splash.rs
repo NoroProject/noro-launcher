@@ -1,8 +1,7 @@
-//! Окно загрузки: логотип, маскот и полоса прогресса, пока качается core.
+//! The loading window: logo, mascot and a progress bar while core downloads.
 //!
-//! Раньше на этом месте не было ничего — игрок жал ярлык и минуту смотрел в
-//! пустой рабочий стол. Рисуем тем же GPUI, что и лаунчер, чтобы экран
-//! совпадал с остальным интерфейсом, а не выглядел чужой заплаткой.
+//! Drawn with the same GPUI as the launcher, so the first thing a player sees
+//! looks like the rest of the interface rather than a patch bolted on.
 
 use gpui::{
     div, img, prelude::*, px, rgb, App, Context, IntoElement, SharedString, Window, WindowOptions,
@@ -24,7 +23,6 @@ const WINDOW: (f32, f32) = (420., 320.);
 #[folder = "assets/"]
 struct SplashAssets;
 
-/// Что показывать в окне. Присылается из потока закачки.
 #[derive(Default, Clone)]
 pub struct Progress {
     pub label: String,
@@ -32,7 +30,6 @@ pub struct Progress {
     pub total: u64,
 }
 
-/// Куда закачка шлёт свои отчёты.
 pub type Reporter = UnboundedSender<Progress>;
 
 struct Splash {
@@ -41,8 +38,8 @@ struct Splash {
 
 impl Splash {
     fn new(mut rx: UnboundedReceiver<Progress>, cx: &mut Context<Self>) -> Self {
-        // Перерисовываем по событию, а не по таймеру: задача спит на recv, пока
-        // закачка не пришлёт новую цифру, и лишних кадров не возникает.
+        // Redrawn on events rather than a timer: this sleeps on `recv` until
+        // the download has a new number, so there are no idle frames.
         cx.spawn(async move |this, cx| {
             while let Some(next) = rx.recv().await {
                 if this
@@ -138,17 +135,17 @@ impl gpui::AssetSource for SplashAssetSource {
     }
 }
 
-/// Что позвать, когда работа закончилась, но окно ещё живо.
+/// Called once the work is finished and the window is still up.
 pub type OnDone<T> = Box<dyn FnOnce(&T) + Send + 'static>;
 
-/// Показать окно и держать его, пока `work` не закончит. Возвращает результат
-/// работы: сама закачка идёт в фоне, GPUI требует главный поток себе.
+/// Opens the window and holds it until `work` returns. `work` runs on a
+/// background thread because GPUI wants the main one.
 ///
-/// `on_done` получает результат сразу, как только `work` его вернул, — до
-/// `cx.quit()`. Это единственная точка, которая срабатывает на всех платформах:
-/// `run` не возвращает управление ни на macOS (`quit` упирается в
-/// `[NSApp terminate:]`), ни на Windows (GPUI зовёт `ExitProcess`). Всё, что
-/// должно случиться после закачки, вешается сюда, а не на код после `run_with`.
+/// `on_done` fires as soon as `work` returns, before `cx.quit()`, and it is the
+/// only point that runs on every platform: `run` never comes back on macOS
+/// (`quit` goes into `[NSApp terminate:]`) or on Windows (GPUI calls
+/// `ExitProcess`). Anything that has to happen after the download belongs in
+/// there, not after the call to `run_with`.
 pub fn run_with<T, F>(
     rx: UnboundedReceiver<Progress>,
     work: F,
@@ -184,7 +181,7 @@ where
                 |_window, cx| cx.new(|cx| Splash::new(rx, cx)),
             );
 
-            // Работа идёт в отдельном потоке: главный занят отрисовкой.
+            // Off the main thread, which is busy drawing.
             let quit = cx.background_executor().spawn(async move {
                 let value = work();
                 if let Some(cb) = on_done {

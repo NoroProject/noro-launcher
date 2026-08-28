@@ -1,8 +1,8 @@
-//! Модалка «админ просит логи».
+//! "An admin is asking for your logs" modal.
 //!
-//! Кнопка «Посмотреть, что отправится» показывает ровно тот текст, который
-//! уйдёт, — уже очищенный. Без неё фича неотличима от слежки; с ней игрок
-//! видит `C:\Users\*****` вместо своего имени.
+//! The preview shows exactly what would be sent, already scrubbed: the player
+//! sees `C:\Users\*****` rather than their own name. Without it there is no way
+//! to tell this feature apart from snooping.
 
 use super::common::Cx;
 use crate::components::btn;
@@ -75,7 +75,6 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                             .text_color(rgb(TEXT_MUTED))
                             .child(t("logreq-not-collected")),
                     )
-                    // Раскрывающийся компонент предпросмотра
                     .child(
                         div()
                             .flex()
@@ -121,7 +120,6 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     )
 }
 
-/// Ровно тот текст, который уедет.
 fn preview(text: &str, files_summary: &str) -> AnyElement {
     let content = if text.trim().is_empty() {
         files_summary.to_string()

@@ -1,18 +1,17 @@
-//! Сторона лаунчера: подтверждение входа и обмен гранта на сессию.
+//! Impersonation, launcher side: trading a confirmed grant for a session.
 //!
-//! Токен приходит по HTTPS в ответ на запрос самого лаунчера — не через
-//! браузер, не через URL и не аргументом процесса, который видно в `ps`.
+//! The token comes back over HTTPS in reply to the launcher's own request. Not
+//! through the browser, not in a URL, and not as a process argument that shows
+//! up in `ps`.
 
 use anyhow::{bail, Result};
 use uuid::Uuid;
 
-/// Что вернул мастер в обмен на грант.
 pub struct Claimed {
     pub access_token: String,
     pub username: String,
 }
 
-/// Обменять подтверждённый грант на сессию игрока.
 pub async fn claim(
     http: &reqwest::Client,
     master_url: &str,
@@ -33,7 +32,7 @@ pub async fn claim(
     if !resp.status().is_success() {
         let status = resp.status();
         bail!(
-            "мастер отказал ({status}): {}",
+            "master refused the grant ({status}): {}",
             resp.text().await.unwrap_or_default()
         );
     }
@@ -42,7 +41,7 @@ pub async fn claim(
     let token = value
         .get("access_token")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("мастер не вернул токен"))?;
+        .ok_or_else(|| anyhow::anyhow!("master returned no access token"))?;
     let username = value
         .get("user")
         .and_then(|u| u.get("username"))

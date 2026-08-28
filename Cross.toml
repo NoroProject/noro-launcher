@@ -1,6 +1,6 @@
-# cross собирает внутри Docker-контейнера и пробрасывает туда только свой
-# список переменных. Без этого NORO_MASTER_URL и NORO_SIGNING_PUBKEY не доходят
-# до rustc, и release-сборка лаунчера падает на проверке в verify.rs — что она
-# и сделала на aarch64-unknown-linux-gnu, единственном таргете через cross.
+# cross builds inside a Docker container and only forwards the variables it is
+# told about. Without this NORO_MASTER_URL and NORO_SIGNING_PUBKEY never reach
+# rustc, and the release build fails the check in verify.rs — which is what
+# happened on aarch64-unknown-linux-gnu, the one target that goes through cross.
 [build.env]
 passthrough = ["NORO_MASTER_URL", "NORO_SIGNING_PUBKEY"]

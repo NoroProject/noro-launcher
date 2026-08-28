@@ -1,4 +1,4 @@
-//! Сообщения, пересекающие границу frontend ↔ backend.
+//! Everything that crosses the frontend ↔ backend boundary.
 
 use crate::modal_action::ModalAction;
 use schema::{LauncherVersion, NewsItem, NotifLevel, ServerEntry, UserProfile};
@@ -27,13 +27,14 @@ pub struct CatalogHitInfo {
     pub downloads: u64,
 }
 
-/// Страница мода целиком. Приходит отдельным запросом: в выдаче поиска нет ни
-/// описания, ни скриншотов, а тянуть их для каждой карточки списка незачем.
+/// The full mod page, fetched on demand: search results carry neither the
+/// description nor the screenshots, and pulling them for every card in a list
+/// would be pointless.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ModProjectInfo {
     pub provider: String,
     pub project_id: String,
-    /// Markdown у Modrinth, HTML у CurseForge.
+    /// Markdown from Modrinth, HTML from CurseForge.
     #[serde(default)]
     pub body: String,
     #[serde(default)]
@@ -54,8 +55,8 @@ pub struct ModProjectInfo {
 /// Frontend → Backend.
 #[derive(Debug)]
 pub enum MessageToBackend {
-    // --- Авторизация (вход через сайт / ключ доступа) ---
-    /// Вход через сайт: способов входа много, и живут они там.
+    // --- Auth ---
+    /// The site owns the login methods, so this hands off to a browser.
     StartWebLogin {
         modal_action: ModalAction,
     },
@@ -68,10 +69,10 @@ pub enum MessageToBackend {
     },
     Logout,
 
-    // --- Серверы / контент ---
+    // --- Servers and content ---
     RequestServerList,
     RequestNews,
-    /// Открыть карточку сервера — backend подтянет манифест и пришлёт опц. моды.
+    /// The backend pulls the manifest and answers with `OptionalMods`.
     OpenServer {
         server_id: Uuid,
     },
@@ -86,7 +87,7 @@ pub enum MessageToBackend {
         server_id: Uuid,
         enabled: Vec<String>,
     },
-    /// Выбрать версию сборки для сервера. `None` — вернуться к текущей.
+    /// `None` goes back to whatever the server currently ships.
     SelectBuild {
         server_id: uuid::Uuid,
         build_id: Option<uuid::Uuid>,
@@ -112,7 +113,7 @@ pub enum MessageToBackend {
         project_id: String,
     },
 
-    // --- Настройки ---
+    // --- Settings ---
     SetMemory {
         min_mb: u32,
         max_mb: u32,
@@ -126,7 +127,6 @@ pub enum MessageToBackend {
     SetFullscreen {
         enabled: bool,
     },
-    /// Игрок разрешил или запретил отправку отчётов о падениях.
     SetCrashReports {
         enabled: bool,
     },
@@ -153,54 +153,48 @@ pub enum MessageToBackend {
     OpenServerClientFolder {
         server_id: Uuid,
     },
-    /// Сменить язык интерфейса: backend сохранит выбор и подтянет каталог.
+    /// The backend stores the choice and fetches the catalog for it.
     SetLocale {
         code: String,
     },
 
-    /// Ответ на предложенное действие.
     RemoteActionAnswer {
         action: schema::RemoteAction,
         server_id: Option<Uuid>,
         accepted: bool,
     },
 
-    /// Ответ на запрос логов.
     LogRequestAnswer {
         request_id: Uuid,
         accepted: bool,
     },
 
-    /// Ответ на диалог impersonation.
     ImpersonateAnswer {
         grant_id: Uuid,
         accepted: bool,
     },
-    /// Выйти из чужого аккаунта обратно в свой.
     ImpersonateExit,
 
-    /// «Сообщить о проблеме»: собрать логи и отправить мастеру.
-    ///
-    /// Инициатива игрока, а не запрос админа — ни согласия, ни гранта здесь не
-    /// нужно, он сам нажал кнопку.
+    /// Collect logs and send them to the master. Player-initiated, so unlike
+    /// `LogRequestPrompt` there is no grant to check — they pressed the button.
     SendSupportBundle {
         server_id: Option<Uuid>,
     },
 
-    // --- Обновление лаунчера ---
+    // --- Launcher updates ---
     InstallUpdate {
         version: LauncherVersion,
         modal_action: ModalAction,
     },
 
-    /// Нативная загрузка скина из лаунчера (без браузера).
     UploadSkin {
         bytes: Vec<u8>,
     },
 
-    /// Сменить модель уже загруженного скина: тонкая (Алекс) или классическая
-    /// (Стив). Отдельно от загрузки — картинка при этом не меняется, а
-    /// требовать от игрока исходник ради ширины рук не за что.
+    /// Slim (Alex) or classic (Steve) arms for the skin already uploaded.
+    /// Separate from `UploadSkin` because the image itself doesn't change, and
+    /// asking the player for the original file again just to widen the arms
+    /// would be rude.
     SetSkinModel {
         slim: bool,
     },
@@ -211,16 +205,15 @@ pub enum MessageToBackend {
         cape_id: Option<Uuid>,
     },
 
-    /// Второй процесс попросил показать окно (single-instance).
+    /// A second launcher process started and handed the request over to this one.
     FocusWindow,
 
     Quit,
 }
 
-/// Стадии синхронизации — пользователь видит детальный прогресс.
-///
-/// Порядок вариантов — это и порядок полос в UI: стадии загрузки идут
-/// параллельно, и `Ord` держит их список стабильным, а не в порядке прихода.
+/// Variant order is also the order of the bars in the UI: download stages run in
+/// parallel, and `Ord` keeps the list stable instead of letting it shuffle as
+/// progress arrives. Reordering these reorders the screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SyncStage {
     CheckingFiles,
@@ -235,7 +228,6 @@ pub enum SyncStage {
 }
 
 impl SyncStage {
-    /// Человекочитаемое описание для UI.
     pub fn label(&self) -> &'static str {
         match self {
             SyncStage::CheckingFiles => "Checking files...",
@@ -250,7 +242,7 @@ impl SyncStage {
         }
     }
 
-    /// Короткая метка для строки стадии — рядом с полосой места мало.
+    /// There is very little room next to the bar.
     pub fn short_label(&self) -> &'static str {
         match self {
             SyncStage::CheckingFiles => "Checking",
@@ -265,8 +257,8 @@ impl SyncStage {
         }
     }
 
-    /// Качает ли стадия файлы. У таких прогресс в байтах и своя полоса; у
-    /// остальных счётчик в штуках, и сложить их в общий итог нельзя.
+    /// Download stages count bytes, the rest count files — the two can't be
+    /// added up into a single total.
     pub fn is_download(&self) -> bool {
         matches!(
             self,
@@ -286,7 +278,8 @@ pub enum GameLogLevel {
     Error,
 }
 
-/// UI-представление опционального мода (с учётом прав пользователя).
+/// An optional mod as the UI sees it, with the player's permissions already
+/// resolved.
 #[derive(Debug, Clone)]
 pub struct OptionalModInfo {
     pub name: String,
@@ -294,37 +287,32 @@ pub struct OptionalModInfo {
     pub category: String,
     pub icon_url: Option<String>,
     pub author: Option<String>,
-    /// Требует права.
+    /// Gated behind a permission.
     pub limited: bool,
-    /// Доступен ли пользователю (есть право, если limited).
+    /// This player has that permission.
     pub allowed: bool,
-    /// Включён ли сейчас.
     pub enabled: bool,
-    /// Моды, с которыми этот несовместим: включить оба нельзя.
+    /// Can't be enabled together with this one.
     pub conflicts: Vec<String>,
-    /// Моды, без которых этот не имеет смысла.
+    /// This one does nothing without them.
     pub dependencies: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoginErrorKind {
-    /// Пользователь закрыл окно браузера / истёк таймаут.
+    /// Browser window closed, or the wait ran out.
     Cancelled,
-    /// Discord/мастер отверг.
+    /// Turned down by Discord or by the master.
     Rejected(String),
-    /// Сетевая ошибка.
     Network(String),
 }
 
-/// Что лаунчер может сделать со сборкой прямо сейчас.
+/// What the launcher can do with the local copy of a build right now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BuildState {
-    /// Файлов нет — сборку нужно поставить.
     #[default]
     Missing,
-    /// Установлена другая версия — нужно обновить.
     Outdated,
-    /// Всё на месте, можно играть.
     Ready,
 }
 
@@ -353,13 +341,11 @@ pub enum MessageToFrontend {
         items: Vec<NewsItem>,
     },
 
-    /// Состояние локальной копии сборки — от него зависит подпись главной кнопки.
     BuildStateChanged {
         server_id: Uuid,
         state: BuildState,
     },
 
-    /// Текущая конфигурация лаунчера (для экрана настроек).
     ConfigState {
         memory_min_mb: u32,
         memory_max_mb: u32,
@@ -367,18 +353,18 @@ pub enum MessageToFrontend {
         show_console_on_launch: bool,
         fullscreen: bool,
         crash_reports: bool,
-        /// Вшит ли DSN в эту сборку. Без него переключатель показывать незачем.
+        /// Whether a DSN was baked into this build; without one the toggle has
+        /// nowhere to send and isn't worth showing.
         crash_reports_available: bool,
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,
     },
-    /// Каталог перевода с мастера (или из локального кеша).
+    /// Translation catalog, from the master or from the local cache.
     LocaleCatalog {
         code: String,
         ftl: String,
     },
-    /// Опциональные моды сервера (после получения манифеста).
     OptionalMods {
         server_id: Uuid,
         mods: Vec<OptionalModInfo>,
@@ -395,17 +381,15 @@ pub enum MessageToFrontend {
         offset: u32,
         limit: u32,
     },
-    /// Каталог не ответил. Раньше в этом случае не приходило ничего, и экран
-    /// навсегда оставался в состоянии «ищем моды».
+    /// The catalog didn't answer. The search screen needs something to end its
+    /// spinner on, otherwise it sits on "searching" forever.
     CatalogFailed {
         message: String,
     },
-    /// Полная страница мода — ответ на `RequestModProject`.
     ModProjectLoaded {
         project: ModProjectInfo,
     },
 
-    /// Прогресс синхронизации (файлы, java, assets — всё через один канал).
     SyncProgress {
         server_id: Uuid,
         stage: SyncStage,
@@ -416,13 +400,10 @@ pub enum MessageToFrontend {
     SyncComplete {
         server_id: Uuid,
     },
-    /// Паки и шейдеры обновились, пока игра запущена.
-    ///
-    /// Отдельно от `SyncComplete`: та говорит «сборка готова к запуску», а эта —
-    /// «в запущенной игре появилось новое, применить можно перезагрузкой
-    /// ресурсов». Файлы, которые игра держала открытыми, встанут при следующем
-    /// запуске, и о них тоже надо сказать — иначе человек будет ждать того,
-    /// чего не произошло.
+    /// Packs and shaders that changed while the game was running; a resource
+    /// reload picks them up. Anything the game held open is in `locked` and only
+    /// lands on the next launch — the player has to be told, or they'll wait for
+    /// something that already didn't happen.
     LiveSynced {
         server_id: Uuid,
         updated: Vec<String>,
@@ -451,14 +432,13 @@ pub enum MessageToFrontend {
         version: LauncherVersion,
     },
 
-    /// Уведомление ключом перевода. Текст собирается во фронтенде, где живёт
-    /// каталог, — так сообщения от мастера следуют выбранному языку.
+    /// A translation key, not text. The catalog lives in the frontend, so
+    /// notifications from the master follow whatever language is selected.
     AddNotification {
         key: String,
         args: BTreeMap<String, String>,
         level: NotifLevel,
     },
-    /// Аплоад скина не удался — снять индикатор загрузки в профиле.
     SkinUploadFailed,
     PermissionsUpdated {
         user: UserProfile,
@@ -470,46 +450,41 @@ pub enum MessageToFrontend {
         presets: Vec<ServerSkinPresetItem>,
     },
 
-    /// Соединение с мастером установлено/потеряно — для индикатора в UI.
     ConnectionState {
         online: bool,
     },
 
-    /// Админ нажал «Login as» в вебе — спросить подтверждение здесь.
-    ///
-    /// Нативный диалог это второй фактор: он закрывает случай «злоумышленник
-    /// получил веб-сессию админа, но не доступ к его машине».
+    /// An admin pressed "Login as" on the site. The native dialog is a second
+    /// factor: a stolen web session alone shouldn't be enough, the attacker
+    /// would also need the admin's machine.
     ImpersonatePrompt {
         grant_id: Uuid,
         actor_username: String,
         target_username: String,
         reason: String,
-        /// Сколько секунд осталось на решение.
         expires_in_secs: i64,
     },
-    /// Админ просит выполнить действие. Игрок решает.
     RemoteActionPrompt {
         action: schema::RemoteAction,
         server_id: Option<Uuid>,
         actor_username: String,
     },
 
-    /// Админ просит логи. Игрок решает, отправлять ли.
+    /// An admin is asking for logs; the player decides whether they go.
     LogRequestPrompt {
         request_id: Uuid,
         actor_username: String,
         reason: String,
-        /// Собран без спроса: логи уже уехали, модалка только сообщает.
+        /// Taken without asking — the logs are already gone, the dialog is only
+        /// telling them.
         forced: bool,
-        /// Что именно уйдёт — уже очищенный текст.
+        /// Exactly what was or will be sent, already scrubbed.
         preview: String,
-        /// Имена файлов и их размер на диске.
         files: Vec<(String, u64)>,
     },
 
-    /// Сессия impersonation началась или закончилась — для баннера в лаунчере.
     ImpersonationChanged {
-        /// `None` — вернулись в свой аккаунт.
+        /// `None` once they're back in their own account.
         as_username: Option<String>,
     },
 

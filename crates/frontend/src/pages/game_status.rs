@@ -1,11 +1,10 @@
-//! Информационный блок сервера: название, описание, бейджи, онлайн.
+//! Server info block: name, description, badges, online count.
 use crate::components::badge;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
 use i18n::t;
 use schema::{Modloader, ServerEntry};
 
-/// Инфо-блок внизу игровой страницы (над bottom bar).
 pub fn info_block(server: &ServerEntry) -> AnyElement {
     div()
         .absolute()
@@ -20,13 +19,11 @@ pub fn info_block(server: &ServerEntry) -> AnyElement {
             d.child(description_line(server))
         })
         .child(tag_row(server))
-        // Разбивка нужна только когда серверов правда несколько: при одном она
-        // повторяет цифру из строки статуса.
+        // With one node the breakdown just repeats the status line.
         .when(server.game_servers.len() > 1, |d| d.child(node_row(server)))
         .into_any_element()
 }
 
-/// Онлайн по каждому серверу сборки: суммы мало, когда выбирать есть из чего.
 fn node_row(server: &ServerEntry) -> AnyElement {
     let mut row = div().flex().items_center().flex_wrap().gap(px(8.));
     for node in &server.game_servers {
@@ -78,13 +75,11 @@ fn name_row(server: &ServerEntry) -> AnyElement {
                 .py(px(4.))
                 .mb(px(4.))
                 .rounded(px(R_SM))
-                // Подложка обязательна: за шапкой стоит произвольная картинка
-                // сборки, и на светлых её участках строка онлайна пропадала.
+                // The banner behind this is an arbitrary image; without a
+                // backdrop the online line disappears over its light areas.
                 .bg(rgba((OVERLAY << 8) | 0xcc))
                 .child(div().size(px(8.)).rounded_full().bg(rgb(dot_color)))
                 .child(
-                    // Цвет статуса, а не приглушённый: он и так несёт смысл
-                    // (живой / offline / неизвестно), а заодно читается.
                     div()
                         .font_family(FONT_PIXEL_ALT)
                         .text_size(px(11.))
@@ -104,8 +99,8 @@ fn status(server: &ServerEntry) -> (String, u32) {
                 .unwrap_or_default();
             (format!("{online}{max} online"), SUCCESS)
         }
-        // Ни один агент не на связи. Если серверов вообще не заводили, онлайн
-        // не «ноль», а неизвестен — врать про offline в этом случае нельзя.
+        // No agent reported in. With no game servers configured at all the
+        // count is unknown rather than zero, so don't claim offline.
         None if server.game_servers.is_empty() => (t("game-online-unknown"), TEXT_MUTED),
         None => (t("game-node-offline"), ERROR),
     }

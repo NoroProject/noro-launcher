@@ -1,4 +1,4 @@
-//! Вкладка MODS — список опциональных модов сервера в полностраничном режиме.
+//! MODS tab: the server's optional mods as a full page.
 use super::common::{tabs, Cx};
 use super::mod_icon::{category_color, mod_icon, mod_text};
 use crate::components::{badge, mod_toggle};
@@ -136,9 +136,7 @@ fn mod_row(ui: &LauncherUI, server_id: Uuid, m: &OptionalModInfo, cx: &mut Cx) -
         .child(mod_icon(ui, m, color))
         .child(mod_text(m, None, 60))
         .child(div().flex_1())
-        // Мод с ограничением: его ставит не каждый, а тот, кому выдали право.
-        // Раньше метка называлась «VIP» — от старой затеи с донатом; к правам
-        // это отношения не имеет и путало.
+        // Restricted: only players granted the right can turn it on.
         .when(m.limited, |d| d.child(badge(t("mods-limited"), WARNING)))
         .child(badge(m.category.clone(), color))
         .child(mod_toggle(

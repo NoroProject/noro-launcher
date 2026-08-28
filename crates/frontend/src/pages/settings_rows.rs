@@ -1,8 +1,4 @@
-//! Строительные блоки экрана настроек: строка-настройка и её элементы.
-//!
-//! Настройки выложены строками в одной панели, а не отдельными карточками с
-//! заголовком над содержимым: так взгляд идёт по одной колонке подписей, а
-//! высота экрана перестаёт зависеть от числа секций.
+//! Building blocks for the settings screen: the setting row and its controls.
 
 use super::common::Cx;
 use crate::components::stepper_btn;
@@ -11,7 +7,6 @@ use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight, SharedString};
 
-/// Одна строка настройки: иконка, подпись с пояснением, управляющий элемент.
 pub fn row(
     icon: &'static str,
     title: impl Into<SharedString>,
@@ -64,7 +59,7 @@ pub fn row(
         .into_any_element()
 }
 
-/// Числовое поле со стрелками: `[−] 2048 MB [+]`, высота 32.
+/// A number with arrows on either side: `[−] 2048 MB [+]`.
 pub fn stepper(
     id: &'static str,
     label: impl Into<SharedString>,
@@ -113,7 +108,7 @@ pub fn stepper(
         .into_any_element()
 }
 
-/// Моноширинное значение — путь, флаги. Пустое показывается приглушённо.
+/// A path or a set of flags. Empty falls back to the placeholder, dimmed.
 pub fn mono_value(value: &str, placeholder: &'static str) -> AnyElement {
     let empty = value.trim().is_empty();
     div()

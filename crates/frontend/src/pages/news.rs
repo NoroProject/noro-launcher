@@ -50,8 +50,8 @@ fn cards(items: &[NewsItem], cx: &mut Cx) -> Vec<AnyElement> {
 fn card(item: &NewsItem, cx: &mut Cx) -> AnyElement {
     let id = item.id;
     panel()
-        // Идентификатор обязан быть уникальным на кадр, иначе GPUI склеит
-        // обработчики разных карточек.
+        // The id has to be unique within the frame, or GPUI merges the click
+        // handlers of different cards.
         .id(gpui::ElementId::Name(id.to_string().into()))
         .p(px(20.))
         .cursor_pointer()

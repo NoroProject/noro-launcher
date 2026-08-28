@@ -1,4 +1,4 @@
-//! Настройки клиента для конкретного сервера (JVM, консоль, флаги).
+//! Per-server client settings: JVM, console, flags.
 use super::common::{panel, tabs, Cx};
 use crate::components::checkbox_row;
 use crate::icons::ic;
@@ -38,8 +38,8 @@ pub fn page(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// Ключ перевода источника настроек. Именно ключ, а не текст: по нему
-/// сравнивают состояние, и перевод не должен на это влиять.
+/// Returns the translation key rather than the text: callers compare on it, and
+/// the current language must not change the outcome.
 fn settings_source(ui: &LauncherUI, server_id: Uuid) -> &'static str {
     if ui.has_server_client_override(server_id) {
         "settings-source-override"
@@ -296,7 +296,7 @@ fn memory(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// `id` не переводится, иначе идентификаторы кнопок менялись бы вместе с языком.
+/// `id` stays untranslated, or the button ids would shift with the language.
 fn mem_group(
     id: &'static str,
     label: impl Into<gpui::SharedString>,

@@ -1,11 +1,4 @@
-//! Выбор файла скина через нативный диалог платформы.
-//!
-//! Раньше здесь запускался `osascript` с `choose file`, и это ломалось трижды:
-//! на Windows и Linux такого бинарника нет вовсе; на macOS панель принадлежала
-//! стороннему процессу и всплывала позади окна лаунчера; а `Command::output()`
-//! держал поток отрисовки GPUI до закрытия диалога. Все три случая выглядели
-//! одинаково — «кнопка не работает», — потому что любой из них сводился к
-//! одному и тому же тосту «No valid skin selected».
+//! Picking a skin file through the platform's native dialog.
 
 use crate::state::{LauncherUI, SavedSkinPreset, Toast};
 use gpui::{AppContext, ClickEvent, Context, PathPromptOptions, Window};
@@ -13,7 +6,7 @@ use i18n::t;
 use schema::NotifLevel;
 use std::path::Path;
 
-/// Тот же потолок, что и у мастера: скин крупнее он не примет.
+/// Same ceiling as the master, which rejects anything larger.
 const MAX_SKIN_BYTES: usize = 256 * 1024;
 const PNG_MAGIC: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
 
@@ -34,10 +27,10 @@ pub fn on_upload_click(
         let path = match picked.await {
             Ok(Ok(Some(paths))) => match paths.into_iter().next() {
                 Some(path) => path,
-                // Диалог отдал пустой список — выбирать нечего, и это не сбой.
+                // An empty list from the dialog: nothing was picked.
                 None => return,
             },
-            // Игрок закрыл диалог. Это решение игрока, а не ошибка: молчим.
+            // Cancelled by the player, or the prompt was dropped. Say nothing.
             Ok(Ok(None)) | Err(_) => return,
             Ok(Err(e)) => {
                 report(
@@ -49,7 +42,7 @@ pub fn on_upload_click(
             }
         };
 
-        // Чтение уводим с потока отрисовки: файл может лежать на сетевом диске.
+        // Off the render thread: the file may sit on a network drive.
         let loaded = cx.background_spawn(async move { read_skin(&path) }).await;
 
         match loaded {
@@ -77,10 +70,7 @@ struct Skin {
     bytes: Vec<u8>,
 }
 
-/// Каждый отказ называет свою причину.
-///
-/// Один общий «No valid skin selected» на все случаи не давал игроку понять,
-/// что делать: не тот файл, слишком большой или мы вовсе не смогли его открыть.
+/// Each rejection names its own reason: unreadable, not a PNG, or too large.
 fn read_skin(path: &Path) -> Result<Skin, String> {
     let bytes =
         std::fs::read(path).map_err(|e| format!("{}: {e}", t("profile-skin-unreadable")))?;
@@ -115,7 +105,7 @@ fn report(this: &gpui::WeakEntity<LauncherUI>, cx: &mut gpui::AsyncApp, text: St
     });
 }
 
-/// Расширение подсказывает, но не решает: содержимое проверяется по сигнатуре.
+/// The extension is a hint; the content is what gets checked, by signature.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,17 +117,17 @@ mod tests {
         let path = dir.join("not-a-skin.png");
         std::fs::write(&path, b"just text, but the extension lies").unwrap();
 
-        let err = read_skin(&path).expect_err("не PNG");
+        let err = read_skin(&path).expect_err("not a PNG");
         assert_eq!(err, t("profile-skin-not-png"));
         std::fs::remove_file(&path).ok();
     }
 
     #[test]
     fn a_missing_file_reports_reading_and_not_format() {
-        let err = read_skin(Path::new("/nope/definitely/missing.png")).expect_err("нет файла");
+        let err = read_skin(Path::new("/nope/definitely/missing.png")).expect_err("no such file");
         assert!(
             err.starts_with(&t("profile-skin-unreadable")),
-            "причина должна быть про чтение: {err}"
+            "the reason should be about reading: {err}"
         );
     }
 
@@ -151,7 +141,7 @@ mod tests {
         std::fs::write(&path, &bytes).unwrap();
 
         assert_eq!(
-            read_skin(&path).expect_err("слишком большой"),
+            read_skin(&path).expect_err("too large"),
             t("profile-skin-too-large")
         );
         std::fs::remove_file(&path).ok();

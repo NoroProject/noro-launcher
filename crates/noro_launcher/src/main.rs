@@ -1,9 +1,9 @@
-//! Bootstrapper лаунчера: проверка обновлений, скачивание core-бинарника, запуск.
+//! Bootstrapper: check for a newer build, fetch the core binary, hand over.
 //!
-//! Этот файл НИКОГДА не обновляется после первой установки — это даёт
-//! накопление SmartScreen-репутации на Windows.
-//! Вся логика лаунчера живёт в core-бинарнике (`noro-launcher-core`),
-//! который обновляется автоматически в `AppData/noro-launcher/`.
+//! This binary is never updated after the first install, which is what lets it
+//! accumulate SmartScreen reputation on Windows. Everything that looks like a
+//! launcher lives in `noro-launcher-core`, which does update itself, under
+//! `AppData/noro-launcher/`.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod embedded_config;
@@ -15,9 +15,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    // Посмотреть на окно загрузки, не дожидаясь настоящей закачки: править вид
-    // иначе можно только вслепую, стирая скачанный core перед каждым запуском.
-    // Только в отладочной сборке — в релизе такого крючка нет.
+    // Look at the loading window without waiting for a real download. The only
+    // other way to work on it is deleting the installed core before every run.
     #[cfg(debug_assertions)]
     if std::env::var_os("NORO_SPLASH_PREVIEW").is_some() {
         return splash_preview();
@@ -35,33 +34,33 @@ fn main() -> ExitCode {
         .build()
         .expect("tokio runtime");
 
-    // Проверяем подпись на КАЖДОМ запуске, а не только при скачивании: иначе
-    // всё, что сумеет записать в AppData, исполнялось бы вечно.
+    // The signature is checked on every launch, not only after a download:
+    // otherwise anything that can write to AppData gets executed forever.
     if core_path.exists() {
         match verify::verify_installed(&core_path) {
             Ok(()) if !rt.block_on(update_pending(&app_dir)) => return run_core(&core_path, &app_dir),
-            Ok(()) => eprintln!("на мастере лежит другая версия — обновляемся"),
+            Ok(()) => eprintln!("master has a different version, updating"),
             Err(e) => {
-                eprintln!("установленный лаунчер не прошёл проверку подписи: {e:#}");
-                eprintln!("он будет скачан заново");
+                eprintln!("the installed launcher failed its signature check: {e:#}");
+                eprintln!("downloading it again");
                 verify::discard(&core_path);
             }
         }
     }
 
-    // Сюда попадаем на первом запуске, при забракованном core и при обновлении.
-    // Дальше — минуты закачки, поэтому показываем окно: GPUI забирает главный
-    // поток себе, а скачивание уходит в фон и рапортует прогресс в общий слот.
+    // First run, a rejected core, or an update. What follows can take minutes,
+    // so the window goes up: GPUI takes the main thread, the download runs
+    // behind it and reports progress through the channel.
     let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
     let work_dir = app_dir.clone();
     let work_core = core_path.clone();
     let launch_path = core_path.clone();
     let splash_app_dir = app_dir.clone();
 
-    // Запуск core висит на колбэке `run_with`, а не на коде после него: оттуда
-    // до нас доходит только Linux. На macOS и Windows GPUI убивает процесс
-    // внутри `run_with`, и раньше обновление на этом и заканчивалось — окно
-    // закрывалось, а лаунчер не стартовал.
+    // Core is started from the `run_with` callback rather than after it,
+    // because only Linux ever reaches the code after it: on macOS and Windows
+    // GPUI takes the process down from inside `run_with`. Move this out and the
+    // update ends with the window closing and nothing starting.
     let outcome = splash::run_with(
         rx,
         move || {
@@ -80,27 +79,27 @@ fn main() -> ExitCode {
             {
                 use std::os::unix::process::CommandExt;
                 let err = cmd.exec();
-                eprintln!("не удалось запустить {}: {err}", launch_path.display());
+                eprintln!("could not start {}: {err}", launch_path.display());
             }
             #[cfg(not(unix))]
             if let Err(e) = cmd.spawn() {
-                eprintln!("не удалось запустить {}: {e}", launch_path.display());
+                eprintln!("could not start {}: {e}", launch_path.display());
             }
         })),
     );
 
-    // Сюда приходит только Linux, и core здесь уже запущен колбэком.
+    // Linux only, and by now the callback has already started core.
     match outcome {
         Some(Ok(())) => ExitCode::SUCCESS,
         Some(Err(e)) => {
-            eprintln!("ошибка скачивания: {e:#}");
+            eprintln!("download failed: {e:#}");
             ExitCode::FAILURE
         }
         None => ExitCode::FAILURE,
     }
 }
 
-/// Крутит полосу по кругу, пока окно не закроют.
+/// Runs the bar around in circles until the window is closed.
 #[cfg(debug_assertions)]
 fn splash_preview() -> ExitCode {
     let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
@@ -166,7 +165,7 @@ fn run_core(path: &std::path::Path, app_dir: &std::path::Path) -> ExitCode {
     {
         use std::os::unix::process::CommandExt;
         let err = cmd.exec();
-        eprintln!("не удалось запустить {}: {err}", path.display());
+        eprintln!("could not start {}: {err}", path.display());
         ExitCode::FAILURE
     }
 
@@ -181,21 +180,21 @@ fn run_core(path: &std::path::Path, app_dir: &std::path::Path) -> ExitCode {
                 }
             }
             Err(e) => {
-                eprintln!("не удалось запустить {}: {e}", path.display());
+                eprintln!("could not start {}: {e}", path.display());
                 ExitCode::FAILURE
             }
         }
     }
 }
 
-/// Мастер раздаёт версию, отличную от установленной?
+/// Is the master serving a different version than the one installed?
 ///
-/// Обновлять core обязан именно bootstrapper. Сам core этого не сделает: он
-/// показывает кнопку обновления в настройках, а те лежат за экраном входа — и
-/// когда обновление нужно как раз для входа, круг не разрывается.
+/// Updating core is the bootstrapper's job. Core can't do it itself: its update
+/// button lives in settings, settings live behind the login screen, and when the
+/// update is what login needs, that circle never opens.
 ///
-/// Сеть недоступна или мастер молчит — запускаем что есть: игру важнее открыть,
-/// чем упереться в обновление.
+/// No network, or a silent master, means launching what we have. Getting into
+/// the game matters more than being current.
 async fn update_pending(app_dir: &Path) -> bool {
     let installed = std::fs::read_to_string(app_dir.join("version")).unwrap_or_default();
     let installed = installed.trim();
@@ -243,38 +242,40 @@ async fn download_core(
     let info: serde_json::Value = resp.json().await?;
 
     if info.is_null() {
-        anyhow::bail!("нет доступной версии лаунчера для {platform}");
+        anyhow::bail!("no launcher build for {platform}");
     }
 
     let download_url = info["url"]
         .as_str()
-        .ok_or_else(|| anyhow::anyhow!("нет url в ответе"))?;
-    // Подпись обязательна: sha256 из этого же ответа ловит битую закачку, но не
-    // подмену — кто подменит канал, подставит и файл, и его хеш. Пустой sha
-    // раньше просто отключал проверку ниже, и об этом никто не узнавал.
+        .ok_or_else(|| anyhow::anyhow!("no url in the response"))?;
+    // Both of these are required rather than optional. The sha256 catches a
+    // corrupted download but not a substituted one — whoever can swap the file
+    // can swap the hash beside it — so it's the signature that decides, and an
+    // absent one must fail here rather than quietly skip the check below.
     let expected_sha = info["sha256"]
         .as_str()
         .filter(|s| !s.trim().is_empty())
-        .ok_or_else(|| anyhow::anyhow!("мастер не отдал sha256 лаунчера"))?;
+        .ok_or_else(|| anyhow::anyhow!("master sent no sha256"))?;
     let signature = info["signature"]
         .as_str()
         .filter(|s| !s.trim().is_empty())
-        .ok_or_else(|| anyhow::anyhow!("мастер не отдал подпись лаунчера"))?;
-    // Версию запишем в файл рядом с бинарником: «unknown» там означало бы, что
-    // следующая проверка обновления сравнивает не пойми что.
+        .ok_or_else(|| anyhow::anyhow!("master sent no signature"))?;
+    // This ends up in the version file next to the binary, so a placeholder
+    // would leave the next update check comparing against nonsense.
     let version = info["version"]
         .as_str()
         .filter(|s| !s.trim().is_empty())
-        .ok_or_else(|| anyhow::anyhow!("мастер не отдал версию лаунчера"))?;
+        .ok_or_else(|| anyhow::anyhow!("master sent no version"))?;
 
     say(&format!("Загрузка {version}"), 0, 0);
     let mut resp = client.get(download_url).send().await?.error_for_status()?;
 
-    // Читаем по кускам ради прогресса: reqwest отдаёт их сам, без futures.
+    // Chunk by chunk for the progress bar; reqwest hands them over without
+    // dragging in futures.
     let total = resp.content_length().unwrap_or(0);
     let mut bytes: Vec<u8> = Vec::with_capacity(total as usize);
-    // Отчитываемся раз в процент: кадр всё равно один, а сообщений было бы
-    // столько же, сколько кусков в ответе.
+    // One report per percent. The window redraws once either way, and reporting
+    // per chunk would be a message for every packet.
     let mut reported = 0u64;
     while let Some(chunk) = resp.chunk().await? {
         bytes.extend_from_slice(&chunk);
@@ -285,17 +286,15 @@ async fn download_core(
         }
     }
 
-    // Проверка SHA256.
     use sha2::Digest;
     let hash = hex::encode(sha2::Sha256::digest(&bytes));
     if !hash.eq_ignore_ascii_case(expected_sha) {
-        anyhow::bail!("sha256 не совпал: ожидали {expected_sha}, получили {hash}");
+        anyhow::bail!("sha256 mismatch: expected {expected_sha}, got {hash}");
     }
 
     verify::verify_bytes(&bytes, signature)
-        .map_err(|e| anyhow::anyhow!("проверка подписи лаунчера не прошла: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("launcher signature check failed: {e}"))?;
 
-    // Записать файл.
     std::fs::write(dest, &bytes)?;
     verify::store(dest, signature)?;
 
@@ -307,10 +306,10 @@ async fn download_core(
         std::fs::set_permissions(dest, perms)?;
     }
 
-    // Сохранить версию. Не записав её, лаунчер скачивал бы себя при каждом старте.
+    // Without this the launcher downloads itself again on every start.
     let version_file = app_dir.join("version");
     std::fs::write(&version_file, version)
-        .with_context(|| format!("не записать {}", version_file.display()))?;
+        .with_context(|| format!("could not write {}", version_file.display()))?;
 
     say("Готово", 1, 1);
     Ok(())

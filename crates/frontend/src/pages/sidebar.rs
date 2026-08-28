@@ -1,4 +1,4 @@
-//! Боковая панель: логотип, список серверов, кнопки внизу.
+//! Sidebar: logo, server list, buttons along the bottom.
 use super::common::Cx;
 use super::sidebar_parts::{collapsed_logo_toggle, empty_hint, logo, nav_icon};
 use super::sidebar_server::server_item;
@@ -25,7 +25,6 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .bg(rgb(SIDEBAR))
         .border_r_1()
         .border_color(rgb(BORDER))
-        // Логотип + Кнопка сворачивания
         .child(
             div()
                 .h(px(72.))
@@ -51,7 +50,6 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     d.justify_center().child(collapsed_logo_toggle(cx))
                 }),
         )
-        // Список серверов (скроллируемый контейнер в центре)
         .child(
             div()
                 .flex_1()
@@ -67,7 +65,6 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     d.child(empty_hint())
                 }),
         )
-        // Нижняя панель
         .child(
             div()
                 .h(px(64.))

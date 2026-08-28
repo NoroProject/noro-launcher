@@ -175,11 +175,11 @@ These rules override cleverness. When in doubt, choose the simpler path.
 - Abstract only when it genuinely pays off (3+ call sites, meaningful reuse).
 - Three similar lines of code are better than a premature abstraction.
 
-### 4.2 No Hacks (No костыли)
+### 4.2 No Hacks
 
 - Never ship hacky quick fixes that are hard to support later.
 - If a proper fix needs a larger scope, **explain the tradeoff and ask** instead of shipping a fragile patch.
-- Hacks compound. One костыль today means three костыли next week.
+- Hacks compound. One workaround today means three next week.
 
 ### 4.3 Durable Solutions
 
@@ -1322,7 +1322,7 @@ read together. A file without that reason is a file nobody decided on.
 **The existing backlog** is short and named, so it can be closed rather than
 quietly tolerated — sixteen files exceed 400, and these are the worst:
 
-| Файл | Строк |
+| File | Lines |
 |---|---|
 | `crates/master/src/db/queries.rs` | 1638 |
 | `crates/frontend/src/state.rs` | 1469 |

@@ -1,8 +1,8 @@
-//! Страница мода: описание в markdown, скриншоты, метаданные.
+//! Mod page: markdown description, screenshots, metadata.
 //!
-//! Выдача поиска несёт только заголовок и одну строку описания, поэтому полная
-//! страница тянется отдельным запросом и приезжает в `ui.mod_project`. Пока она
-//! в пути, показываем короткое описание из выдачи — экран не должен быть пустым.
+//! Search results carry only a title and one line of description, so the full
+//! page is a separate request that lands in `ui.mod_project`. Until it arrives
+//! the short description stands in for it.
 
 use super::common::Cx;
 use super::mod_detail_body::description;

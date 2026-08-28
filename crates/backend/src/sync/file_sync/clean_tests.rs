@@ -1,8 +1,5 @@
-//! Защита путей от удаления — ошибка здесь стирает данные игрока и заметна
-//! только после того, как мир, скриншоты или настройки уже пропали.
-//!
-//! Маски `xaero*` и `config/xaero*` появились не на пустом месте: карта Xaero
-//! хранит данные вне `saves/`, и синхронизация сносила их при каждом запуске.
+//! A mistake in path protection deletes the player's data, and only shows up
+//! once the world, the screenshots or the settings are already gone.
 
 use super::*;
 
@@ -27,7 +24,7 @@ fn directory_pattern_covers_everything_below_it() {
     let p = protected_defaults();
     assert!(is_protected("saves/world/level.dat", &p));
     assert!(is_protected("saves/world/region/r.0.0.mca", &p));
-    assert!(is_protected("saves", &p), "сама директория тоже защищена");
+    assert!(is_protected("saves", &p), "the directory itself counts too");
     assert!(is_protected("logs/latest.log", &p));
 }
 
@@ -37,13 +34,13 @@ fn exact_pattern_matches_only_that_file() {
     assert!(is_protected("options.txt", &p));
     assert!(
         !is_protected("options.txt.bak", &p),
-        "точный шаблон не должен цеплять соседние имена"
+        "an exact pattern must not catch neighbouring names"
     );
     assert!(!is_protected("config/options.txt", &p));
 }
 
-/// Ровно тот случай, ради которого заводили маски: данные Xaero лежат в корне
-/// инстанса и в `config/`, а не в `saves/`.
+/// The case the wildcards exist for: Xaero's map keeps its data at the instance
+/// root and in `config/`, not under `saves/`.
 #[test]
 fn wildcard_protects_xaero_data() {
     let p = protected_defaults();
@@ -53,8 +50,8 @@ fn wildcard_protects_xaero_data() {
     assert!(is_protected("config/xaerominimap.txt", &p));
 }
 
-/// Маска у корня не должна распространяться на вложенные каталоги сама по
-/// себе — поэтому `config/xaero*` и заведён отдельной строкой.
+/// A root wildcard doesn't reach into subdirectories on its own, which is why
+/// `config/xaero*` needs its own entry.
 #[test]
 fn root_wildcard_does_not_reach_into_subdirectories() {
     let only_root = vec!["xaero*".to_string()];
@@ -70,7 +67,8 @@ fn managed_files_stay_deletable() {
     assert!(!is_protected("versions/1.21.1/client.jar", &p));
 }
 
-/// Windows отдаёт пути в другом регистре, а манифест пишет админ руками.
+/// Windows hands back paths in a different case, and the manifest is written by
+/// hand.
 #[test]
 fn matching_ignores_case() {
     let p = protected_defaults();

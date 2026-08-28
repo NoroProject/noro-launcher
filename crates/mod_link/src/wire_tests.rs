@@ -1,53 +1,52 @@
-//! Формат кадров на проводе. Его реализует чужой код на Java, который уезжает
-//! со сборкой и живёт у людей дольше этой версии лаунчера, — поэтому форма
-//! закреплена тестом, а не «как сериализуется, так и хорошо».
+//! The frame format on the wire. The other end is Java code that ships with a
+//! build and stays on people's machines longer than this launcher version, so
+//! the shape is pinned by tests instead of being whatever serde emits today.
 
 use crate::{ToLauncher, ToMod, PROTOCOL};
 use serde_json::json;
 
-/// Кадр без полей — это `{"type": …}` без `data`. Разбор на той стороне обязан
-/// это пережить: половина намерений мода именно такие.
+/// A frame with no fields is `{"type": …}` and no `data` at all. Half the mod's
+/// intents look like this, so the Java side has to cope with it.
 #[test]
 fn unit_frame_has_no_data() {
     let text = serde_json::to_value(ToLauncher::CloseCase).unwrap();
     assert_eq!(text, json!({ "type": "CloseCase" }));
 }
 
-/// Мод уезжает со сборкой и обновляется отдельно от лаунчера, поэтому старый
-/// `{"type": "RequestQueue"}` без `data` обязан и дальше означать «первая
-/// страница, без фильтра».
+/// The mod updates on its own schedule, so `{"type": "RequestQueue"}` with no
+/// `data` has to keep meaning "first page, no filter".
 ///
-/// Именно поэтому поля поиска уехали в отдельный кадр, а не в этот: у кадра без
-/// полей нет `data`, и serde на его отсутствии останавливается — панель разбора
-/// у всех, кто не обновил сборку, молча перестала бы получать очередь.
+/// This is why the search fields went into a separate frame: adding them here
+/// would give the frame a `data`, serde would refuse the version without one,
+/// and every panel on an older build would quietly stop getting the queue.
 #[test]
-fn старый_запрос_очереди_без_data_разбирается() {
+fn old_queue_request_without_data_parses() {
     let frame: ToLauncher = serde_json::from_value(json!({ "type": "RequestQueue" })).unwrap();
     assert!(matches!(frame, ToLauncher::RequestQueue));
 }
 
 #[test]
-fn страница_очереди_несёт_фильтр_и_сдвиг() {
+fn queue_page_carries_query_and_offset() {
     let frame: ToLauncher = serde_json::from_value(json!({
         "type": "RequestQueuePage",
         "data": { "query": "Steve", "offset": 20 }
     }))
     .unwrap();
     let ToLauncher::RequestQueuePage { query, offset } = frame else {
-        panic!("не RequestQueuePage");
+        panic!("not a RequestQueuePage");
     };
     assert_eq!(query.as_deref(), Some("Steve"));
     assert_eq!(offset, 20);
 }
 
-/// Новый мод против старого лаунчера тоже бывает: сборку обновили, лаунчер ещё
-/// нет. Незнакомый кадр там логируется и пропускается, а не роняет канал.
+/// The other direction happens too: the build is newer than the launcher. An
+/// empty `data` has to read as "first page, no filter" rather than fail.
 #[test]
-fn страница_очереди_без_data_тоже_разбирается() {
+fn queue_page_with_empty_data_parses() {
     let frame: ToLauncher =
         serde_json::from_value(json!({ "type": "RequestQueuePage", "data": {} })).unwrap();
     let ToLauncher::RequestQueuePage { query, offset } = frame else {
-        panic!("не RequestQueuePage");
+        panic!("not a RequestQueuePage");
     };
     assert_eq!(query, None);
     assert_eq!(offset, 0);
@@ -65,8 +64,7 @@ fn hello_carries_key_and_protocol() {
     );
 }
 
-/// Новое поле не должно ронять разбор кадра, пришедшего от старого мода:
-/// ровно тем же приёмом держится `ClientWsMsg` при выпуске новых полей.
+/// A field added on our side must not break a frame sent by an older mod.
 #[test]
 fn missing_optional_fields_are_defaulted() {
     let text = json!({
@@ -80,21 +78,21 @@ fn missing_optional_fields_are_defaulted() {
         ..
     } = frame
     else {
-        panic!("разобралось не в тот кадр");
+        panic!("parsed into the wrong frame");
     };
     assert_eq!(resolution, "");
     assert_eq!(rule_code, None);
 }
 
-/// Незнакомый кадр — ошибка разбора, а не паника: соединение из-за него не
-/// рвётся, кадр логируется и пропускается.
+/// An unknown frame is a parse error, not a panic — the caller logs it and
+/// keeps the connection.
 #[test]
 fn unknown_frame_is_an_error_not_a_panic() {
     let text = json!({ "type": "SomethingFromTheFuture", "data": {} });
     assert!(serde_json::from_value::<ToLauncher>(text).is_err());
 }
 
-/// Бокс вокруг карточки — деталь Rust: на проводе его быть не должно.
+/// The box around the card is a Rust detail; it must not show up on the wire.
 #[test]
 fn boxed_case_is_transparent_on_the_wire() {
     let view = crate::CaseView {
@@ -114,8 +112,8 @@ fn boxed_case_is_transparent_on_the_wire() {
     assert_eq!(text["data"]["view"]["case"]["number"], 7);
 }
 
-/// Карточка приходит с мастера под ключом `case`, а не `brief`: разбирает её
-/// лаунчер, и переименование поля на мастере обязано ломаться здесь.
+/// The master sends the card under `case`, not `brief`. The launcher is what
+/// parses it, so a rename on the master has to break here.
 #[test]
 fn card_is_read_from_the_master_shape() {
     let text = json!({
@@ -148,26 +146,25 @@ fn brief() -> crate::CaseBrief {
     }
 }
 
-/// Свод правил приходит с мастера, и его форма — не наша.
-///
-/// Раздел там зовётся `name`, пункт — `title`. Без псевдонима разбор всего
-/// ответа падал целиком, а мод показывал «лаунчер не достучался до мастера»:
-/// ошибка была в форме, а выглядела как обрыв связи.
+/// The rules come from the master in the master's shape: a section is `name`
+/// there, a rule is `title`. Without the alias the whole response fails to
+/// parse and the mod reports that the launcher can't reach the master — a shape
+/// problem that looks like a dropped connection.
 #[test]
 fn rule_category_reads_masters_name() {
-    let text = json!({ "id": uuid::Uuid::nil(), "name": "Чат", "sort_order": 1 });
+    let text = json!({ "id": uuid::Uuid::nil(), "name": "Chat", "sort_order": 1 });
     let category: crate::RuleCategory = serde_json::from_value(text).unwrap();
-    assert_eq!(category.title, "Чат");
+    assert_eq!(category.title, "Chat");
 }
 
-/// Лишние поля мастера не должны мешать: их там втрое больше, чем нужно моду.
+/// The master sends about three times the fields the mod needs.
 #[test]
 fn extra_master_fields_are_ignored() {
     let text = json!({
         "id": uuid::Uuid::nil(),
         "rule_id": uuid::Uuid::nil(),
         "kind": "mute",
-        "label": "за флуд",
+        "label": "spam",
         "min_minutes": 15,
         "max_minutes": 120,
         "sort_order": 0,

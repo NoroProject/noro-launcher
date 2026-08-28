@@ -1,6 +1,6 @@
-//! Backend лаунчера: вся сетевая/файловая/игровая логика на tokio.
+//! Launcher backend: all network, filesystem and game logic, on tokio.
 //!
-//! Связан с frontend через [`bridge`]. Точка входа — [`backend::start`].
+//! Talks to the frontend through [`bridge`]. Entry point is [`backend::start`].
 
 pub mod auth;
 pub mod backend;

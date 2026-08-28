@@ -20,8 +20,6 @@ pub fn sync_overlay(server_id: Uuid, sync: &SyncUiState, cx: &mut Cx) -> AnyElem
         .flex()
         .items_start()
         .gap(px(16.))
-        // Маскот рядом с полосой: пока идёт долгая закачка, он показывает, что
-        // лаунчер занят делом, а не завис. При ошибке он не к месту.
         .when(sync.failed.is_none(), |d| {
             d.child(mascot(Mood::Loading, 56.))
         })
@@ -64,8 +62,7 @@ pub fn sync_overlay(server_id: Uuid, sync: &SyncUiState, cx: &mut Cx) -> AnyElem
                         ),
                 )
                 .child(progress_bar(sync.fraction()))
-                // Полосы стадий под общей: видно, что качается прямо сейчас, и
-                // что осталось. Пока стадий нет (идёт проверка файлов) — пусто.
+                // No stages yet while the files are still being verified.
                 .when(!sync.stages.is_empty() && sync.failed.is_none(), |d| {
                     d.child(
                         div().flex().flex_col().gap(px(4.)).children(

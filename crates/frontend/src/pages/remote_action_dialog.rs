@@ -1,4 +1,4 @@
-//! Модалка «админ просит выполнить действие» (перезапуск, сброс кэша и т.д.).
+//! "An admin is asking you to do something" modal: restart, cache reset, and so on.
 
 use super::common::Cx;
 use crate::components::btn;

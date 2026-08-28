@@ -1,4 +1,4 @@
-//! Profile page — skin model preview on left + sub-tabbed right column (ОСНОВНАЯ / ПРЕСЕТЫ).
+//! Profile page: skin model preview on the left, sub-tabbed column on the right.
 
 use super::common::{page_title, panel, tabs, Cx};
 use super::profile_cape::cape_panel;

@@ -1,4 +1,4 @@
-//! Persistent<T> — значение, синхронизируемое с JSON-файлом на диске.
+//! A value kept in sync with a JSON file on disk.
 
 use parking_lot::RwLock;
 use serde::{de::DeserializeOwned, Serialize};
@@ -12,7 +12,8 @@ pub struct Persistent<T> {
 }
 
 impl<T: Serialize + DeserializeOwned + Default + Clone> Persistent<T> {
-    /// Загрузить из файла или создать значение по умолчанию.
+    /// A missing or unreadable file gives the default — nothing is reported,
+    /// and the first `save` overwrites whatever was there.
     pub fn load(path: PathBuf) -> Self {
         let value = std::fs::read_to_string(&path)
             .ok()
@@ -28,7 +29,7 @@ impl<T: Serialize + DeserializeOwned + Default + Clone> Persistent<T> {
         self.value.read().clone()
     }
 
-    /// Изменить значение и немедленно сохранить.
+    /// Writes through to disk before returning.
     pub fn update(&self, f: impl FnOnce(&mut T)) {
         {
             let mut guard = self.value.write();

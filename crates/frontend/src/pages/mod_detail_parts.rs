@@ -1,4 +1,4 @@
-//! Части страницы мода: вкладки, галерея скриншотов, строка метаданных.
+//! Parts of the mod page: tabs, screenshot gallery, metadata row.
 
 use crate::icons::ic;
 use crate::state::LauncherUI;
@@ -36,8 +36,8 @@ pub fn tab_button(
         .into_any_element()
 }
 
-/// Скриншоты в две колонки. Картинки те же, что и иконки, — грузятся общим
-/// загрузчиком в `optional_mod_icons`, поэтому здесь только берём готовое.
+/// Screenshots in two columns. They go through the same loader as the icons and
+/// land in `optional_mod_icons`, so this only picks up what is already there.
 pub fn gallery(ui: &LauncherUI, shots: &[String]) -> AnyElement {
     let mut rows: Vec<AnyElement> = Vec::new();
     for pair in shots.chunks(2) {
@@ -77,12 +77,11 @@ fn shot(ui: &LauncherUI, url: &str) -> AnyElement {
         Some(image) => frame
             .child(img(image).size_full().object_fit(ObjectFit::Contain))
             .into_any_element(),
-        // Пока грузится — рамка с иконкой, чтобы сетка не прыгала.
+        // Keep the frame while it loads, or the grid jumps when it arrives.
         None => frame.child(ic("image", 24., TEXT_MUTED)).into_any_element(),
     }
 }
 
-/// Категории, лоадеры и версии игры одной строкой чипов.
 pub fn meta_row(project: &bridge::ModProjectInfo) -> AnyElement {
     let mut chips: Vec<AnyElement> = Vec::new();
     for c in project.categories.iter().take(4) {
@@ -91,7 +90,7 @@ pub fn meta_row(project: &bridge::ModProjectInfo) -> AnyElement {
     for l in project.loaders.iter().take(3) {
         chips.push(chip(l, BLUE));
     }
-    // Версий бывает под сотню — показываем свежие, иначе строка не помещается.
+    // A project can list close to a hundred versions; only the newest few fit.
     for v in project.game_versions.iter().rev().take(3) {
         chips.push(chip(v, TEXT_MUTED));
     }

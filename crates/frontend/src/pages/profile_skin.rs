@@ -486,11 +486,10 @@ fn placeholder(text: impl Into<gpui::SharedString>) -> AnyElement {
         .into_any_element()
 }
 
-/// Имя пресета: подпись, а при переименовании — поле ввода прямо в карточке.
+/// The preset name, or a text field in its place while renaming.
 ///
-/// Системного диалога для ввода текста нет ни в GPUI, ни в трёх наших
-/// платформах, а прежний `osascript display dialog` работал только на macOS и
-/// вставал поперёк потока отрисовки.
+/// The field is inline because GPUI gives us no text-input dialog on any of the
+/// three platforms.
 fn name_row(
     ui: &LauncherUI,
     preset: &crate::state::SavedSkinPreset,
@@ -534,7 +533,8 @@ fn name_row(
         .text_size(px(10.))
         .text_color(rgb(TEXT_PRIMARY))
         .cursor_text()
-        // Клик по полю не должен «надевать» скин — карточка целиком кликабельна.
+        // The whole card is clickable, so a click into the field would
+        // otherwise put the skin on.
         .on_click(|_, _, cx| cx.stop_propagation())
         .on_key_down(cx.listener(rename_key))
         .child(if draft.is_empty() {
@@ -545,8 +545,7 @@ fn name_row(
         .into_any_element()
 }
 
-/// Enter сохраняет, Escape отменяет. Пустое имя не сохраняем: карточка без
-/// подписи неотличима от соседней.
+/// Enter saves, Escape cancels. An empty name is discarded rather than stored.
 fn rename_key(
     this: &mut LauncherUI,
     event: &gpui::KeyDownEvent,
@@ -572,8 +571,8 @@ fn rename_key(
             }
             this.renaming_preset = None;
         }
-        // key_char уже учитывает раскладку и shift, а при cmd/ctrl он пустой —
-        // горячие клавиши не сыплются в имя.
+        // `key_char` already accounts for layout and shift, and is empty under
+        // cmd/ctrl, so shortcuts don't end up typed into the name.
         _ => {
             if let Some(ch) = event.keystroke.key_char.as_deref() {
                 draft.push_str(ch);

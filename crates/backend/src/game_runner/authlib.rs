@@ -2,7 +2,8 @@ use crate::directories::LauncherDirectories;
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 
-/// Скачать authlib-injector, если его ещё нет.
+/// Fetched from upstream, not from the master, and only once — the jar is
+/// version-independent and every instance uses the same copy.
 pub async fn ensure_authlib_injector(
     client: &reqwest::Client,
     dirs: &LauncherDirectories,
@@ -12,7 +13,7 @@ pub async fn ensure_authlib_injector(
         return Ok(path);
     }
 
-    tracing::info!("скачивание authlib-injector");
+    tracing::info!("downloading authlib-injector");
     let meta: serde_json::Value = client
         .get("https://authlib-injector.yushi.moe/artifact/latest.json")
         .send()
@@ -21,7 +22,7 @@ pub async fn ensure_authlib_injector(
         .await?;
     let url = meta["download_url"]
         .as_str()
-        .ok_or_else(|| anyhow!("нет download_url для authlib-injector"))?;
+        .ok_or_else(|| anyhow!("authlib-injector metadata has no download_url"))?;
     let bytes = client
         .get(url)
         .send()

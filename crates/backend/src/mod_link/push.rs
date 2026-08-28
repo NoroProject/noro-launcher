@@ -1,8 +1,8 @@
-//! Что лаунчер шлёт моду сам: очередь, карточка, готовность.
+//! Frames the launcher sends on its own: the queue, a case card, readiness.
 //!
-//! Мод не «запрашивает и ждёт ответ» — он подписан. Сходить за карточкой и
-//! разослать её решает эта сторона, поэтому и в протоколе нет ни request-id,
-//! ни корреляции ответов.
+//! The mod subscribes rather than requesting and waiting. This side decides when
+//! to fetch a card and push it out, which is why the protocol has no request ids
+//! and no response correlation.
 
 use super::master::Api;
 use super::ModLink;
@@ -10,8 +10,8 @@ use crate::backend::Ctx;
 use mod_link::{CaseView, ToMod, PROTOCOL};
 use uuid::Uuid;
 
-/// Первый кадр после рукопожатия. Права — чтобы мод не рисовал кнопки, которых
-/// всё равно не дадут нажать; это удобство, а не защита.
+/// First frame after the handshake. The permissions are there so the mod can
+/// avoid drawing buttons that would only be refused — convenience, not a check.
 pub fn ready(ctx: &Ctx) -> ToMod {
     let profile = ctx.profile();
     ToMod::Ready {
@@ -21,8 +21,8 @@ pub fn ready(ctx: &Ctx) -> ToMod {
             .map(|u| u.username.clone())
             .unwrap_or_default(),
         locale: ctx.config.get().locale,
-        // Права с ролями вместе: прямых у модератора обычно нет вовсе, они
-        // приходят ролью, и кнопки рисовались бы по пустому списку.
+        // Role permissions included. A moderator usually has no direct grants
+        // at all, so the direct list alone would be empty.
         permissions: profile
             .as_ref()
             .map(|u| u.all_permissions().map(str::to_string).collect())
@@ -30,7 +30,6 @@ pub fn ready(ctx: &Ctx) -> ToMod {
     }
 }
 
-/// Прочитать страницу очереди и разослать её.
 pub async fn refresh_queue(ctx: &Ctx, link: &ModLink, query: Option<String>, offset: i64) {
     let Some(api) = Api::new(ctx) else { return };
     match api.queue(query.as_deref(), offset).await {
@@ -44,21 +43,20 @@ pub async fn refresh_queue(ctx: &Ctx, link: &ModLink, query: Option<String>, off
                 query,
             });
         }
-        Err(e) => tracing::debug!("mod_link: очередь не прочиталась: {e:?}"),
+        Err(e) => tracing::debug!("mod_link: could not read the queue: {e:?}"),
     }
 }
 
-/// Перечитать ту же страницу, что модератор смотрит сейчас.
-///
-/// Зовётся на `CaseUpdated` с мастера. Именно ту же, а не первую: иначе любое
-/// чужое действие над любым делом выбрасывало бы его в начало очереди.
+/// Re-read the page the moderator is actually looking at, not the first one:
+/// otherwise anyone else's action on any case would throw them back to the top
+/// of the queue.
 pub async fn refresh_queue_in_place(ctx: &Ctx, link: &ModLink) {
     let (query, offset) = link.store().queue_spot();
     refresh_queue(ctx, link, query, offset).await;
 }
 
-/// Перечитать карточку и разослать её. Дело становится открытым: дальше оно
-/// обновляется само на каждое `CaseUpdated` с мастера.
+/// Fetch the card and push it. This also marks the case open, after which it
+/// refreshes itself on every `CaseUpdated` from the master.
 pub async fn refresh_case(ctx: &Ctx, link: &ModLink, case_id: Uuid) {
     let Some(api) = Api::new(ctx) else { return };
     match api.card(case_id).await {
@@ -81,16 +79,16 @@ pub async fn refresh_case(ctx: &Ctx, link: &ModLink, case_id: Uuid) {
     }
 }
 
-/// Снимок инвентаря отдельным кадром: в ленте он лежит сырым JSON, и разбирать
-/// его в Java — работа на ровном месте.
+/// The inventory snapshot goes out as its own frame. In the event feed it's raw
+/// JSON, and parsing that on the Java side is work for nothing.
 fn inventory(view: &CaseView) -> Option<ToMod> {
     let event = view
         .events
         .iter()
         .rev()
         .find(|e| e.kind == "inventory_snapshot")?;
-    // Слоты приезжают от агента как есть. Битую запись пропускаем, а не роняем
-    // весь снимок: один странный предмет не повод не показать остальные.
+    // Slots arrive from the agent as-is. A bad entry is skipped rather than
+    // failing the whole snapshot — one odd item shouldn't hide the rest.
     let items = event
         .payload
         .get("items")?

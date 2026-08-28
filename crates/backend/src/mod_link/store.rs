@@ -1,12 +1,11 @@
-//! Состояние дел в лаунчере: очередь и открытая карточка.
+//! Case state: the queue page and the open card.
 //!
-//! Живёт в беке, а не в моде, ради того, ради чего вообще делался канал:
-//! UI над этим store потом будет два. Вкладка «Дела» в самом лаунчере
-//! получается почти бесплатно, и модератору не нужен браузер, даже когда игра
-//! закрыта.
+//! It lives in the backend rather than the mod because a second UI will sit on
+//! top of it — a Cases tab in the launcher itself comes almost for free, and
+//! then a moderator doesn't need a browser with the game closed.
 //!
-//! Игра не запущена — кадр просто некуда класть, и это нормально: store
-//! переживёт до следующего подключения.
+//! With no game running there's nowhere to send a frame, and that's fine: the
+//! store keeps its contents until the next connection.
 
 use mod_link::{CaseBrief, CaseView};
 use parking_lot::Mutex;
@@ -16,15 +15,14 @@ use uuid::Uuid;
 #[derive(Default)]
 struct Inner {
     queue: Vec<CaseBrief>,
-    /// Что за страницу мы держим: сколько дел подходит под фильтр целиком, с
-    /// какого сдвига взята страница и по какому запросу. Нужно, чтобы обновить
-    /// её на месте по `CaseUpdated` — иначе модератора выбрасывало бы на первую
-    /// страницу каждый раз, когда кто-то тронул любое дело.
+    /// Which page this is: matches in total, the offset it came from, and the
+    /// query behind it. Needed to refresh it in place on `CaseUpdated` — without
+    /// it the moderator lands back on page one whenever anyone touches any case.
     total: i64,
     offset: i64,
     query: Option<String>,
-    /// Дело, которое мод сейчас держит открытым. По нему и только по нему
-    /// перечитывается карточка на `CaseUpdated`.
+    /// The case the mod currently has open. Only this one gets its card re-read
+    /// on `CaseUpdated`.
     open: Option<CaseView>,
 }
 
@@ -46,7 +44,7 @@ impl CaseStore {
         self.inner.lock().queue.clone()
     }
 
-    /// Чем была получена текущая страница: запрос и сдвиг.
+    /// The query and offset the current page was fetched with.
     pub fn queue_spot(&self) -> (Option<String>, i64) {
         let inner = self.inner.lock();
         (inner.query.clone(), inner.offset)
@@ -68,8 +66,8 @@ impl CaseStore {
         self.inner.lock().open.clone()
     }
 
-    /// Открыто ли сейчас именно это дело. `CaseUpdated` приходит на любое дело
-    /// за модератором, а перечитывать имеет смысл только то, что на экране.
+    /// `CaseUpdated` arrives for every case the moderator follows, but only
+    /// what's on screen is worth re-reading.
     pub fn is_open(&self, case_id: Uuid) -> bool {
         self.inner
             .lock()

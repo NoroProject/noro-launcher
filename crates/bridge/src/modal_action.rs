@@ -1,7 +1,8 @@
-//! ModalAction — разделяемый прогресс для долгих задач (синхронизация, обновление).
+//! Shared progress for the long jobs: syncing, updating the launcher.
 //!
-//! Frontend создаёт `ModalAction`, кладёт его в сообщение к backend, и затем
-//! читает прогресс прямо из `Arc` (для отрисовки модалки), пока backend его обновляет.
+//! The frontend builds a `ModalAction`, puts it in the command it sends, and
+//! then reads the same `Arc` while the backend writes to it. Progress doesn't go
+//! through the channel at all — the modal redraws from whatever is in there.
 
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,18 +10,14 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, Default)]
 pub struct ModalProgress {
-    /// Заголовок модалки ("Синхронизация HiTech").
     pub title: String,
-    /// Текущая стадия ("Скачивание ресурсов...").
     pub stage: String,
-    /// Деталь (имя файла или "487 / 1203").
+    /// A file name, or something like "487 / 1203".
     pub detail: String,
-    /// Сделано / всего в байтах (или штуках — зависит от стадии).
+    /// Bytes or item counts, depending on the stage.
     pub done: u64,
     pub total: u64,
-    /// Завершено успешно.
     pub finished: bool,
-    /// Ошибка, если задача упала.
     pub error: Option<String>,
 }
 
@@ -34,7 +31,7 @@ impl ModalProgress {
     }
 }
 
-/// Разделяемая ручка прогресса. Клонируется в обе стороны bridge.
+/// Cloned onto both sides of the bridge; every clone shares one progress state.
 #[derive(Clone, Default)]
 pub struct ModalAction {
     inner: Arc<Mutex<ModalProgress>>,
@@ -52,7 +49,6 @@ impl ModalAction {
         }
     }
 
-    /// Снимок прогресса для отрисовки.
     pub fn snapshot(&self) -> ModalProgress {
         self.inner.lock().clone()
     }
@@ -85,7 +81,7 @@ impl ModalAction {
         self.inner.lock().error = Some(error.into());
     }
 
-    /// Запросить отмену задачи (нажатие "Отмена" в модалке).
+    /// Only a request: the task decides where it is safe to stop.
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
     }
