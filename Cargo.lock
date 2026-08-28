@@ -457,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "bridge"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "parking_lot",
  "schema",
@@ -2051,7 +2051,7 @@ dependencies = [
 
 [[package]]
 name = "frontend"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "base64",
  "bridge",
@@ -2972,7 +2972,7 @@ dependencies = [
 
 [[package]]
 name = "i18n"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "fluent-bundle",
  "parking_lot",
@@ -2992,7 +2992,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.57.0",
 ]
 
 [[package]]
@@ -3652,7 +3652,7 @@ dependencies = [
 
 [[package]]
 name = "mc_mod_utils"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "base64",
  "serde",
@@ -3769,7 +3769,7 @@ dependencies = [
 
 [[package]]
 name = "mod_link"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "chrono",
  "serde",
@@ -3896,7 +3896,7 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
 name = "noro_core"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "backend",
@@ -3914,7 +3914,7 @@ dependencies = [
 
 [[package]]
 name = "noro_launcher"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -5516,7 +5516,7 @@ dependencies = [
 
 [[package]]
 name = "schema"
-version = "1.7.13"
+version = "2.0.0"
 dependencies = [
  "chrono",
  "once_cell",

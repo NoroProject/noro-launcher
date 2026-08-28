@@ -10,6 +10,7 @@ on:
   # Запасной путь: без GITHUB_TOKEN у мастера собрать лаунчер больше нечем.
   push:
     tags:
+      - 'v*'
       - 'launcher-v*'
   workflow_dispatch:
     inputs:
@@ -64,11 +65,10 @@ jobs:
         run: |
           set -euo pipefail
           MANIFEST=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
-          EXPECTED="launcher-v$MANIFEST"
-          [ "$TAG" = "$EXPECTED" ] || {
-            echo "::error::тег $TAG не совпадает с версией в Cargo.toml ($MANIFEST). Ожидался $EXPECTED"
+          if [ "$TAG" != "v$MANIFEST" ] && [ "$TAG" != "launcher-v$MANIFEST" ]; then
+            echo "::error::тег $TAG не совпадает с версией в Cargo.toml ($MANIFEST). Ожидался v$MANIFEST или launcher-v$MANIFEST"
             exit 1
-          }
+          fi
           echo "тег и манифест сходятся: $TAG"
 
   build:
