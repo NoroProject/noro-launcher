@@ -1,4 +1,4 @@
-/** Свод правил: разделы, правила и допустимые за них наказания. */
+/** The rulebook: categories, rules, and the sanctions allowed for each. */
 
 import type { InjectionKey } from 'vue'
 
@@ -7,9 +7,9 @@ export type PunishmentKind = 'warn' | 'mute' | 'ban' | 'server_ban'
 export interface RuleCategory {
   id: string;
   parent_id: string | null;
-  /** `null` — раздел общего свода, иначе дополнение конкретного сервера. */
+  /** `null` for the shared rulebook, otherwise an addition for one server. */
   server_id: string | null;
-  /** Номер раздела: «1», «2.3». Из него выводятся коды правил. */
+  /** Category number: "1", "2.3". Rule codes are derived from it. */
   code: string;
   name: string;
   description: string;
@@ -20,29 +20,29 @@ export interface Rule {
   id: string;
   category_id: string | null;
   server_id: string | null;
-  /** Короткий код: им ссылаются в чате, банах и тикетах. */
+  /** Short code, quoted in chat, bans and tickets. */
   code: string;
   title: string;
   description: string;
-  /** Что игрок увидит как причину, когда его наказали по этому пункту. */
+  /** The reason a player sees when punished under this rule. */
   punish_reason: string;
   sort_order: number;
 }
 
 /**
- * Допустимое наказание за правило: вид и рамки срока. Вилка, а не одно число —
- * модератор выбирает внутри неё, а выйти за неё может только тот, кому выдан
- * `noro.mod.punish.bypass`.
+ * A sanction allowed for a rule: kind plus duration bounds. It's a range, not
+ * a single number — a moderator picks inside it, and only
+ * `noro.mod.punish.bypass` gets out of it.
  */
 export interface RuleSanction {
   id: string;
   rule_id: string;
   kind: PunishmentKind;
-  /** Пояснение к варианту: «первое нарушение», «повторное». */
+  /** Which case this variant covers: first offence, repeat, and so on. */
   label: string;
-  /** `null` — без нижней границы. */
+  /** `null` means no lower bound. */
   min_minutes: number | null;
-  /** `null` — допустимо вплоть до «навсегда». */
+  /** `null` means anything up to permanent. */
   max_minutes: number | null;
   sort_order: number;
 }
@@ -55,36 +55,34 @@ export interface RulesResponse {
 }
 
 /**
- * Заголовок и текст записи на одном языке. Запись базового языка — это сами
- * поля правила или раздела, остальные уходят в `translations`.
+ * Title and body in one language. The base-language entry is the rule's or
+ * category's own fields; the rest live in `translations`.
  */
 export interface LocalizedText {
   locale: string;
   title: string;
   description: string;
-  /** Формулировка наказания по пункту. Есть только у правил, не у разделов. */
+  /** Punishment wording. Rules have it, categories don't. */
   punish_reason?: string;
 }
 
-/** Сервер, у которого свод отличается от общего. */
+/** A server whose rulebook differs from the shared one. */
 export interface RuleScope {
   id: string;
   name: string;
 }
 
-/** Раздел вместе со своими правилами и подразделами — то, что рисует страница. */
 export interface RuleNode {
   category: RuleCategory;
   rules: Rule[];
   children: RuleNode[];
-  /** Правил в этом разделе и во всех вложенных: пустые ветки не рисуются. */
+  /** Rules here and in every nested category. Empty branches aren't drawn. */
   total: number;
 }
 
 /**
- * Действия админского дерева. Дерево рекурсивное, и прокидывать восемь
- * обработчиков через каждый уровень означало бы повторять их на каждом —
- * вместо этого страница выдаёт их через `provide`.
+ * Actions for the admin tree. The tree is recursive, so the page hands these
+ * down through `provide` rather than threading eight handlers per level.
  */
 export interface RuleActions {
   editRule: (rule: Rule) => void;
@@ -96,7 +94,7 @@ export interface RuleActions {
   move: (kind: 'rules' | 'categories', id: string, delta: number) => void;
   serverName: (id: string | null) => string;
   sanctionsOf: (ruleId: string) => RuleSanction[];
-  /** Права на свод: без них дерево остаётся читаемым, но кнопки не рисуются. */
+  /** Without these the tree still reads fine, it just loses its buttons. */
   canEdit: boolean;
   canDelete: boolean;
 }

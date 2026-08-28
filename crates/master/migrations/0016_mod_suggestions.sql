@@ -1,4 +1,4 @@
--- Таблица заявок игроков на добавление опциональных модов
+-- Player requests to add an optional mod to a build.
 CREATE TABLE IF NOT EXISTS mod_suggestions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     server_id UUID NOT NULL REFERENCES servers(id) ON DELETE CASCADE,

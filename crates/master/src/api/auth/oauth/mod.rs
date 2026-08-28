@@ -1,8 +1,7 @@
-//! Вход через внешние платформы: Discord, Twitch, Google.
+//! Sign-in through external platforms: Discord, Twitch, Google.
 //!
-//! Раньше здесь был один Discord, вшитый в колонки `users`. Теперь платформа —
-//! это привязка в `user_identities`, их у аккаунта может быть несколько, и
-//! войти можно любой.
+//! A platform link is a row in `user_identities`. An account can hold several
+//! of them and sign in with any one.
 
 pub mod config;
 pub mod flow;

@@ -1,4 +1,4 @@
-//! Пул параллельных загрузок: ретраи с backoff, прогресс по байтам.
+//! Parallel download pool: retries with backoff, byte-level progress.
 
 use super::fetch::fetch_to_file;
 use super::integrity::sha1_file;
@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Одно задание скачивания.
 #[derive(Clone)]
 pub struct DownloadTask {
     pub url: String,
@@ -19,15 +18,14 @@ pub struct DownloadTask {
     pub executable: bool,
 }
 
-/// Сетевые сбои под нагрузкой — норма, а не повод ронять всю синхронизацию:
-/// раньше один 502 обрывал стадию целиком.
+/// Network hiccups under load are normal; one 502 must not take the whole
+/// stage down with it.
 const MAX_ATTEMPTS: u32 = 4;
 const BASE_BACKOFF_MS: u64 = 300;
-/// Порог оповещения о прогрессе — чтобы не будить UI на каждый чанк.
+/// Don't wake the UI on every chunk.
 const PROGRESS_STEP: i64 = 512 * 1024;
 
-/// Скачать все задания с ограничением параллелизма.
-/// `on_progress(done_bytes)` вызывается при прогрессе; `cancelled()` прерывает.
+/// `on_progress` gets the running byte total; `cancelled` aborts the pool.
 pub async fn download_all(
     client: &reqwest::Client,
     tasks: Vec<DownloadTask>,
@@ -48,7 +46,7 @@ pub async fn download_all(
         let cancelled = cancelled.clone();
         async move {
             if cancelled() {
-                bail!("отменено");
+                bail!("cancelled");
             }
             let bytes = {
                 let done = done.clone();
@@ -64,7 +62,8 @@ pub async fn download_all(
                 }
             };
             download_with_retry(&client, &task, &bytes, cancelled.as_ref()).await?;
-            // Файл дошёл целиком — отдать точную цифру, не дожидаясь порога.
+            // File finished: report the exact total instead of waiting for
+            // the next progress step.
             on_progress(done.load(Ordering::Relaxed).max(0) as u64);
             Ok::<_, anyhow::Error>(())
         }
@@ -91,13 +90,13 @@ async fn download_with_retry(
         match result {
             Ok(()) => break,
             Err(e) if attempt >= MAX_ATTEMPTS || cancelled() => {
-                return Err(e.context(format!("скачивание {} не удалось", task.url)));
+                return Err(e.context(format!("download of {} failed", task.url)));
             }
             Err(e) => {
                 let delay = BASE_BACKOFF_MS * 2u64.pow(attempt - 1) + jitter_ms(BASE_BACKOFF_MS);
                 tracing::warn!(
                     url = %task.url, attempt, error = %e,
-                    "повтор загрузки через {delay} мс"
+                    "retrying download in {delay}ms"
                 );
                 tokio::time::sleep(Duration::from_millis(delay)).await;
                 attempt += 1;
@@ -105,7 +104,7 @@ async fn download_with_retry(
         }
     }
 
-    // Бит исполняемости для java/natives на unix.
+    // The java binary and natives need the exec bit on unix.
     #[cfg(unix)]
     if task.executable {
         use std::os::unix::fs::PermissionsExt;
@@ -116,7 +115,7 @@ async fn download_with_retry(
     Ok(())
 }
 
-/// Разброс повторов, чтобы сотня лаунчеров не пришла обратно одной волной.
+/// Spreads retries out so a hundred launchers don't come back in one wave.
 fn jitter_ms(max: u64) -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -125,7 +124,6 @@ fn jitter_ms(max: u64) -> u64 {
         .unwrap_or(0)
 }
 
-/// Быстрая проверка: нужно ли скачивать файл (по существованию/размеру/опц. SHA1).
 pub async fn needs_download(
     dest: &PathBuf,
     expected_size: u64,
@@ -133,7 +131,7 @@ pub async fn needs_download(
     verify_hash: bool,
 ) -> bool {
     let Ok(meta) = tokio::fs::metadata(dest).await else {
-        return true; // нет файла
+        return true;
     };
     if meta.len() != expected_size {
         return true;
@@ -144,6 +142,7 @@ pub async fn needs_download(
             Err(_) => true,
         }
     } else {
-        false // размер совпал — для иммутабельных артефактов доверяем
+        // Size matched. Artifacts are immutable, so that is good enough.
+        false
     }
 }

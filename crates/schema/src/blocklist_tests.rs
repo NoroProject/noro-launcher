@@ -1,5 +1,5 @@
-//! Ложное срабатывание здесь удаляет файл игрока, пропуск — оставляет xray.
-//! Проверяются обе стороны.
+//! A false positive here deletes a player's file; a miss leaves xray in place.
+//! Both directions are covered.
 
 use super::*;
 
@@ -7,7 +7,7 @@ fn by_name(pattern: &str) -> BlockedFile {
     BlockedFile {
         pattern: Some(pattern.into()),
         sha1: None,
-        reason: "тест".into(),
+        reason: "test".into(),
         action: BlockAction::Delete,
     }
 }
@@ -16,7 +16,7 @@ fn by_hash(sha1: &str) -> BlockedFile {
     BlockedFile {
         pattern: None,
         sha1: Some(sha1.into()),
-        reason: "тест".into(),
+        reason: "test".into(),
         action: BlockAction::Delete,
     }
 }
@@ -33,10 +33,10 @@ fn a_name_mask_catches_the_obvious() {
 
 #[test]
 fn a_hash_rule_ignores_the_name() {
-    // Переименование — самый дешёвый обход маски, и хеш его переживает.
+    // Renaming is the cheapest way past a mask, and a hash survives it.
     let r = by_hash(SHA);
-    assert!(r.matches("resourcepacks/безобидное-имя.zip", SHA));
-    assert!(!r.matches("resourcepacks/безобидное-имя.zip", "0".repeat(40).as_str()));
+    assert!(r.matches("resourcepacks/harmless-name.zip", SHA));
+    assert!(!r.matches("resourcepacks/harmless-name.zip", "0".repeat(40).as_str()));
 }
 
 #[test]
@@ -46,12 +46,10 @@ fn a_hash_comparison_ignores_case() {
 
 #[test]
 fn both_conditions_must_hold_when_both_are_set() {
-    // «Этот хеш под этим именем» строже каждого по отдельности и даёт меньше
-    // ложных срабатываний.
     let r = BlockedFile {
         pattern: Some("mods/*.jar".into()),
         sha1: Some(SHA.into()),
-        reason: "тест".into(),
+        reason: "test".into(),
         action: BlockAction::Delete,
     };
 
@@ -62,11 +60,11 @@ fn both_conditions_must_hold_when_both_are_set() {
 
 #[test]
 fn an_empty_rule_matches_nothing() {
-    // Иначе пустая строка в админке удалила бы игроку весь каталог.
+    // Otherwise a blank row in the admin panel wipes a player's whole directory.
     let r = BlockedFile {
         pattern: None,
         sha1: None,
-        reason: "пусто".into(),
+        reason: "empty".into(),
         action: BlockAction::Delete,
     };
     assert!(!r.matches("mods/anything.jar", SHA));
@@ -89,12 +87,12 @@ fn a_mask_without_stars_is_an_exact_path() {
 
 #[test]
 fn the_first_matching_rule_decides() {
-    // Порядок задаёт админ, и более узкое правило ставится выше.
+    // Admins set the order and put the narrower rule on top.
     let rules = vec![
         BlockedFile {
             pattern: Some("*xray*".into()),
             sha1: None,
-            reason: "известная сборка".into(),
+            reason: "known build".into(),
             action: BlockAction::BlockLaunch,
         },
         by_name("*"),
@@ -102,7 +100,7 @@ fn the_first_matching_rule_decides() {
 
     let hit = first_match(&rules, "mods/xray.jar", SHA).unwrap();
     assert_eq!(hit.action, BlockAction::BlockLaunch);
-    assert_eq!(hit.reason, "известная сборка");
+    assert_eq!(hit.reason, "known build");
 }
 
 #[test]

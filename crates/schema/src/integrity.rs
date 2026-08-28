@@ -1,9 +1,7 @@
-//! Отчёт о целостности игрового каталога.
+//! Integrity report for the instance directory.
 //!
-//! Клиентский сигнал, а не доказательство: лаунчер открыт, свой билд отправит
-//! что угодно. Поэтому находки — повод для ручного разбора, никогда не автобан.
-//! Против мотивированного нарушителя работает серверная проверка через агента;
-//! это второй, дешёвый слой, который ловит остальное.
+//! A signal, not proof: the launcher is open source and a custom build can send
+//! whatever it likes. Findings are grounds for a manual look, never an autoban.
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -11,13 +9,13 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IntegrityKind {
-    /// Файл в managed-пути, которого нет в манифесте.
+    /// File under a managed path that the manifest doesn't list.
     ExtraFile,
-    /// Хеш не совпал с манифестом.
+    /// Hash doesn't match the manifest.
     ModifiedFile,
-    /// Файл из манифеста отсутствует.
+    /// Listed in the manifest, not on disk.
     MissingFile,
-    /// Включён limited-мод, права на который нет.
+    /// A limited mod is on without the permission for it.
     ForbiddenOptionalMod,
 }
 
@@ -35,12 +33,12 @@ impl IntegrityKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IntegrityFinding {
     pub kind: IntegrityKind,
-    /// Относительный путь внутри инстанса либо имя мода.
+    /// Path relative to the instance, or a mod name.
     pub subject: String,
-    /// Что именно разошлось: ожидаемый и фактический хеш, размер.
+    /// What diverged: expected and actual hash, size.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
-    /// Лаунчер убрал находку сам (удалил лишний файл).
+    /// The launcher already dealt with it, e.g. deleted the extra file.
     #[serde(default)]
     pub repaired: bool,
 }
@@ -51,68 +49,58 @@ pub struct IntegrityReport {
     pub build_id: Uuid,
     pub build_version: String,
     pub launcher_version: String,
-    /// Опциональные моды, включённые на момент запуска.
+    /// Optional mods that were on at launch.
     #[serde(default)]
     pub enabled_optional: Vec<String>,
     pub findings: Vec<IntegrityFinding>,
-    /// Сколько файлов сверено — чтобы отличать «всё чисто» от «проверка не шла».
+    /// Separates "nothing found" from "the check never ran".
     pub checked_files: u32,
-    /// Нашёлся файл, из-за которого игру запускать нельзя.
+    /// Something turned up that the game must not be launched with.
     #[serde(default)]
     pub block_launch: bool,
 }
 
-/// Диагностический снапшот лаунчера.
-///
-/// Личного здесь нет — версии, железо и скорость до мастера, — поэтому согласие
-/// не спрашивается. Закрывает половину тикетов «не запускается» без единого
-/// файла логов.
+/// Sent without asking the player, because none of it is personal — versions,
+/// hardware, and how fast the master answers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiagnosticsReport {
     pub launcher_version: String,
     pub os: String,
     pub arch: String,
-    /// Java, которой запускается игра, если она уже установлена.
+    /// The Java the game runs on, once it's installed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub java_path: Option<String>,
-    /// Свободно на диске под каталогом лаунчера, в мегабайтах.
+    /// Megabytes free on the volume holding the launcher directory.
     #[serde(default)]
     pub disk_free_mb: u64,
-    /// Сколько занимает каталог лаунчера, в мегабайтах.
+    /// Megabytes the launcher directory takes up.
     #[serde(default)]
     pub data_size_mb: u64,
-    /// Миллисекунды до мастера. `None` — не ответил.
+    /// `None` means the master didn't answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub master_ping_ms: Option<u64>,
-    /// Последняя ошибка синхронизации, если была.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_sync_error: Option<String>,
-    /// Установленные сборки: сервер и версия.
+    /// Installed builds, as (server, version).
     #[serde(default)]
     pub instances: Vec<(String, String)>,
 }
 
-/// Что мастер просит сделать лаунчер.
+/// What the master can ask the launcher to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RemoteAction {
-    /// Пересверить каталог с манифестом.
     VerifyIntegrity,
-    /// Снести кэш ассетов: он восстановим и чаще всего именно он и битый.
+    /// Assets are re-downloadable and usually the thing that's corrupt.
     ClearAssetCache,
-    /// Переустановить сборку с нуля.
     ReinstallBuild,
-    /// Перезапустить лаунчер.
     RestartLauncher,
-    /// Закрыть запущенный процесс игры.
     KillGame,
 }
 
 impl RemoteAction {
-    /// Требует ли подтверждения у игрока.
-    ///
-    /// Всё, что стирает файлы или прерывает работу, — да. Сверка целостности
-    /// ничего не портит и идёт молча.
+    /// Anything that deletes files or interrupts the player needs a prompt.
+    /// Verification changes nothing, so it runs silently.
     pub fn needs_confirmation(self) -> bool {
         !matches!(self, RemoteAction::VerifyIntegrity)
     }

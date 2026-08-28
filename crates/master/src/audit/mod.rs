@@ -1,9 +1,9 @@
-//! Журнал админских действий.
+//! Admin action log.
 //!
-//! Пишется смысл события — «выдал роль», «выкатил версию» — вместе с тем, что
-//! именно изменилось. Логировать каждый HTTP-запрос здесь незачем: из метода и
-//! пути не восстановить, что стало с объектом, а разбирать спорную ситуацию
-//! придётся именно по этому.
+//! What gets written is the meaning of the event — "granted a role", "deployed
+//! a version" — together with what actually changed. Logging every HTTP request
+//! would not help: a method and a path don't say what became of the object, and
+//! that's what a dispute is settled on.
 
 pub mod actions;
 pub mod impersonation;

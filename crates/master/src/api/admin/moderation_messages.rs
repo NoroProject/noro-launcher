@@ -1,4 +1,4 @@
-//! Админ: тексты, которые игрок видит при бане, муте и варне.
+//! The text a player sees on a ban, mute or warn.
 
 use crate::api::auth::AdminAuth;
 use crate::api::moderation_messages::{ModerationMessages, SETTINGS_KEY};
@@ -9,8 +9,8 @@ use axum::extract::State;
 use axum::Json;
 use serde_json::json;
 
-/// Править тексты — это править то, что видит игрок при отказе, поэтому право
-/// то же, что и на остальные настройки инстанса.
+/// Guarded by the instance settings permissions rather than a moderation one:
+/// this edits instance-wide copy, not any individual punishment.
 use schema::{PERM_SETTINGS_EDIT, PERM_SETTINGS_VIEW};
 
 pub async fn get(

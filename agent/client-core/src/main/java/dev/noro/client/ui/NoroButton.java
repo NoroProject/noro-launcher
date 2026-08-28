@@ -7,28 +7,23 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 
 /**
- * Кнопка лаунчера: прямоугольник без ванильной текстуры.
- *
- * <p>Варианты те же, что у {@code AtomButton} на сайте, и значат то же самое.
- * Главное действие на экране одно и оно кремовое — как «Играть» в лаунчере;
- * остальные приглушены. Это не украшение: когда все кнопки выглядят одинаково,
- * нужную ищут глазами каждый раз заново.
+ * Launcher-styled button: a plain rectangle, no vanilla texture. Variants match
+ * {@code AtomButton} on the site and mean the same thing — at most one PRIMARY
+ * per screen.
  */
 public final class NoroButton extends AbstractButton {
 
-    /** Высота: пять шагов сетки — минимум, в который влезает текст с воздухом. */
     public static final int HEIGHT = 5 * Theme.GRID;
 
     public enum Variant {
-        /** Единственное на экране действие, ради которого его открыли. */
+        /** The one action the screen was opened for. */
         PRIMARY,
-        /** Обычное действие: их на экране может быть сколько угодно. */
         SECONDARY,
-        /** Без заливки — для мест, где рамка уже есть у соседа. */
+        /** No fill, for places where a neighbour already draws the border. */
         GHOST,
-        /** Действие, которое трудно отменить. */
+        /** Hard to undo. */
         DANGER,
-        /** Действие с последствиями, но обратимое. */
+        /** Has consequences, but reversible. */
         WARNING
     }
 
@@ -42,7 +37,6 @@ public final class NoroButton extends AbstractButton {
         this.onPress = onPress;
     }
 
-    /** Отступ от текста до края кнопки с каждой стороны. */
     private static final int PAD = 3 * Theme.GRID;
 
     public static NoroButton of(
@@ -50,13 +44,7 @@ public final class NoroButton extends AbstractButton {
         return new NoroButton(x, y, w, label, variant, onPress);
     }
 
-    /**
-     * Ширина по подписи, а не наугад.
-     *
-     * <p>Кнопка с заданной шириной и длинным текстом — самый заметный способ
-     * сломать экран: подпись вылезает за края и накрывает соседей. Здесь ширину
-     * задаёт текст, а сетку держит округление вверх до её шага.
-     */
+    /** Width from the label, rounded up to the grid step. */
     public static int widthFor(Component label) {
         int text = Minecraft.getInstance().font.width(label) + 2 * PAD;
         return (text + Theme.GRID - 1) / Theme.GRID * Theme.GRID;
@@ -83,11 +71,9 @@ public final class NoroButton extends AbstractButton {
     }
 
     /**
-     * Погасить кнопку, если права нет.
-     *
-     * <p>Это удобство, а не защита: решает мастер, и его отказ — единственная
-     * проверка, которой стоит верить. Но прятать кнопку значило бы врать про
-     * то, чего у человека нет: он не узнает, что действие вообще существует.
+     * Grey the button out when the permission is missing. Convenience, not
+     * enforcement — the master's 403 is the only check that counts. Greyed rather
+     * than hidden, so people can see the action exists.
      */
     public NoroButton needs(boolean permitted) {
         this.allowed = permitted;
@@ -108,21 +94,19 @@ public final class NoroButton extends AbstractButton {
         int fill = fill(hovered);
         int text = text();
         g.fill(getX(), getY(), getX() + width, getY() + height, fill);
-        // Блик сверху и тень снизу: одна заливка выглядит нарисованной на стене,
-        // а не лежащей на ней. Полпикселя разницы хватает — кнопка сама по себе
-        // маленькая, и большего объёма ей не нужно.
+        // Highlight on top, shadow underneath — a flat fill reads as painted on
+        // the wall rather than lying on it.
         g.fill(getX(), getY(), getX() + width, getY() + 1, Theme.lift(fill, 0x18));
         g.fill(getX(), getY() + height - 1, getX() + width, getY() + height, Theme.SHADOW);
         if (variant != Variant.PRIMARY) {
             border(g, hovered);
         }
-        // Подпись обрезается по ширине кнопки: даже если её задали вручную и
-        // текст не влез, он не должен вылезать на соседние виджеты.
+        // Clip the label: width can be set by hand, and an overlong caption must
+        // not spill onto neighbouring widgets.
         var font = Minecraft.getInstance().font;
         String label = font.plainSubstrByWidth(getMessage().getString(), width - 2 * PAD);
-        // Без тени: на кремовой заливке тёмная тень под тёмным текстом делает
-        // из подписи грязь. Ванильный drawCenteredString рисует её всегда,
-        // поэтому центрируем сами.
+        // Centred by hand because drawCenteredString always draws a text shadow,
+        // and a dark shadow under dark text on the cream fill turns to mud.
         g.drawString(
                 font,
                 label,

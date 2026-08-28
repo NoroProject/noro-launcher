@@ -1,10 +1,12 @@
-//! Повторное подтверждение личности перед входом в чужой аккаунт.
+//! Re-confirming identity before entering someone else's account.
 //!
-//! Passkey не старше пяти минут — основной путь. Там, где passkey недоступен
-//! (инстанс на `http://` без домена), подходит одноразовый recovery-код.
+//! A passkey is the main path; a one-time recovery code covers instances where
+//! WebAuthn isn't available at all (plain `http://`, no domain).
 //!
-//! Успешное подтверждение открывает окно на 15 минут: иначе десять кодов
-//! сгорели бы за десять входов ровно там, где других кодов взять негде.
+//! Confirming opens a 15-minute window rather than authorising a single entry.
+//! On the recovery-code path that's the difference between ten impersonations
+//! and ten burnt codes, on exactly the instances that have no other second
+//! factor to fall back on.
 
 use crate::api::auth::passkeys::LoginVerifyReq;
 use crate::api::auth::AuthUser;
@@ -15,7 +17,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-/// Открыто ли окно и чем его можно открыть.
+/// Whether the window is open, and what could open it.
 pub async fn status(State(state): State<AppState>, user: AuthUser) -> AppResult<Json<Value>> {
     Ok(Json(json!({
         "active": crate::db::step_up_active(&state.db, user.user_id).await?,
@@ -25,14 +27,13 @@ pub async fn status(State(state): State<AppState>, user: AuthUser) -> AppResult<
     })))
 }
 
-/// Подтвердить passkey.
 pub async fn confirm_passkey(
     State(state): State<AppState>,
     user: AuthUser,
     Json(req): Json<LoginVerifyReq>,
 ) -> AppResult<Json<Value>> {
     let owner = crate::api::auth::passkeys::verify_login(&state, &req).await?;
-    // Ключ обязан быть свой: чужой подтверждает чужую личность.
+    // `verify_login` only proves the key is valid, not that it's this user's.
     if owner != user.user_id {
         return Err(AppError::Forbidden(
             "this key belongs to another account".into(),
@@ -47,7 +48,7 @@ pub struct CodeReq {
     pub code: String,
 }
 
-/// Подтвердить recovery-кодом. Код сгорает — он одноразовый.
+/// The code is consumed whether or not it turns out to belong to this user.
 pub async fn confirm_recovery(
     State(state): State<AppState>,
     user: AuthUser,

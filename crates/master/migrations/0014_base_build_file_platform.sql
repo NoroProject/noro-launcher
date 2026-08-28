@@ -1,8 +1,8 @@
--- Java и natives различаются по ОС, но файлы сборки платформы не знали: мастер
--- раскладывал рантайм только под себя, и на других системах JVM не стартовала.
+-- Java and natives differ per OS, so a base build file has to say which one it
+-- is for.
 ALTER TABLE base_build_files
     ADD COLUMN IF NOT EXISTS platform TEXT;
 
--- NULL значит «нужен всем» — так ведут себя все уже загруженные файлы.
+-- NULL means every platform needs it, which is how existing rows behave.
 CREATE INDEX IF NOT EXISTS base_build_files_platform
     ON base_build_files (base_build_id, platform);

@@ -1,6 +1,7 @@
-//! Источник встроенных ассетов (шрифты + иконки). Регистрация через
-//! `application().with_assets(AppAssets)` — это и есть «фикс шрифтов»: GPUI
-//! берёт шрифт Inter из бинарника, не завися от системных шрифтов.
+//! Fonts and icons compiled into the binary.
+//!
+//! Has to be handed to `application().with_assets(AppAssets)`; without that GPUI
+//! falls back to whatever the system has installed.
 
 use gpui::SharedString;
 use std::borrow::Cow;
@@ -24,15 +25,12 @@ impl gpui::AssetSource for AppAssets {
     }
 }
 
-/// Байты встроенных шрифтов для регистрации в текстовой системе GPUI.
 pub fn fonts() -> Vec<Cow<'static, [u8]>> {
     [
         "fonts/Inter-Regular.ttf",
         "fonts/PressStart2P-Regular.ttf",
-        // Шрифт мелкой типографики — открытая реализация майнкрафтовского.
-        // Silkscreen отпал из-за отсутствия кириллицы, Pixelify Sans — из-за
-        // дыр в ней (не было заглавных «О» и «П»), Handjet оказался слишком
-        // узким. У Monocraft покрытие полное.
+        // Monocraft for small pixel type: the other open Minecraft-style faces
+        // either have no Cyrillic or have gaps in it.
         "fonts/Monocraft.ttf",
         "fonts/Monocraft-Bold.ttf",
     ]

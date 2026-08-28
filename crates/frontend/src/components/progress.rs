@@ -1,5 +1,3 @@
-//! Горизонтальный прогресс-бар 0..1 с маджентовой заливкой.
-
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, IntoElement};
 
@@ -7,8 +5,8 @@ pub fn progress_bar(fraction: f32) -> impl IntoElement {
     bar(fraction, 12.)
 }
 
-/// Тот же бар, но тоньше — для строк отдельных стадий, где полос сразу
-/// несколько и обычная высота забивает оверлей.
+/// For the per-stage rows: several bars share that overlay and the full height
+/// fills it.
 pub fn slim_progress_bar(fraction: f32) -> impl IntoElement {
     bar(fraction, 8.)
 }

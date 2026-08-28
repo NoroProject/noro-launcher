@@ -1,5 +1,5 @@
-//! Живой канал до агентов игровых серверов: наказания применяются сразу, а не
-//! к следующему входу игрока.
+//! Live channel to game server agents, so a punishment lands now rather than on
+//! the player's next login.
 
 pub mod cases;
 pub mod hub;

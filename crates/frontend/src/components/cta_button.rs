@@ -1,5 +1,3 @@
-//! Кремовая CTA-кнопка в стиле ATOM (вход через Discord, «Играть»).
-
 use crate::icons::ic;
 use crate::theme::*;
 use gpui::{
@@ -7,7 +5,6 @@ use gpui::{
     Window,
 };
 
-/// Большая кремовая кнопка с опциональной иконкой.
 pub fn cta_button(
     id: impl Into<ElementId>,
     icon: Option<&'static str>,

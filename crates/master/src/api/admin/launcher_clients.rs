@@ -1,4 +1,4 @@
-//! Статистика по установленным лаунчерам.
+//! Stats over installed launchers.
 
 use crate::api::auth::AdminAuth;
 use crate::api::paging::PageQuery;
@@ -12,23 +12,19 @@ use std::collections::BTreeMap;
 
 #[derive(serde::Serialize)]
 pub struct ClientsReport {
-    /// Версия, которую мастер сейчас раздаёт. `None` — ни одна не выкачена.
+    /// What the master is serving right now. `None` if nothing is rolled out.
     pub current_version: Option<String>,
     pub total: i64,
-    /// Сколько сидит не на текущей версии — те, к кому вопросы «а почему не работает».
+    /// Clients on anything other than `current_version`.
     pub outdated: i64,
-    /// Сколько клиентов на каждой версии и платформе.
     pub by_version: BTreeMap<String, i64>,
     pub by_platform: BTreeMap<String, i64>,
     pub clients: Vec<crate::db::LauncherClientRow>,
 }
 
-/// `GET /api/admin/launcher/clients`
-///
-/// Сводка считается по всей таблице, а список отдаётся страницей. Раньше и то и
-/// другое бралось из одной выдачи на 500 строк: при большем числе установок
-/// «всего» упиралось в 500, а разбивка по версиям строилась по случайным пятистам
-/// — цифры выглядели правдоподобно и врали.
+/// The totals and the breakdowns are counted in the database, over every row;
+/// only `clients` is a page. Deriving them from the page instead gives numbers
+/// that look plausible and are wrong once there are more installs than fit.
 pub async fn clients(
     State(state): State<AppState>,
     admin: AdminAuth,
@@ -42,7 +38,7 @@ pub async fn clients(
 
     let outdated = match &current_version {
         Some(current) => crate::db::launcher_clients_outdated(&state.db, current).await?,
-        // Ни одна версия не выкачена — «отстающих» не с чем сравнивать.
+        // Nothing rolled out, so nothing to be behind.
         None => 0,
     };
 
@@ -56,8 +52,8 @@ pub async fn clients(
     }))
 }
 
-/// Разбивка по колонке. Пустое значение — клиент, выпущенный до того, как её
-/// начали слать; в отчёте это `unknown`, а не пустая строка.
+/// Breakdown by column. Clients from before a column was reported come back as
+/// `unknown` rather than an empty string.
 async fn counts(state: &AppState, column: &str) -> AppResult<BTreeMap<String, i64>> {
     Ok(crate::db::launcher_client_counts(&state.db, column)
         .await?

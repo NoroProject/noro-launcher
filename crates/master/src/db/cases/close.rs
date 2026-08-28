@@ -1,14 +1,15 @@
-//! Закрытие дела: вердикт, закрытые жалобы и обратная связь их авторам.
+//! Closing a case: the verdict, the reports it covers, and feedback to whoever
+//! filed them.
 //!
-//! Без последнего шага жалобы перестают писать через месяц: человек не видит,
-//! что его обращение вообще прочитали.
+//! Skip that last step and people stop reporting within a month — nothing tells
+//! them their report was ever read.
 
 use anyhow::Result;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-/// Закрыть дело. Подтвердилось — `resolved`, остальное — `rejected`: очередь
-/// разбирают по статусу, а причина закрытия живёт в вердикте.
+/// Confirmed becomes `resolved`, anything else `rejected`. The queue is sorted
+/// by status; the reason for closing lives in the verdict.
 pub async fn resolve_case(
     pool: &PgPool,
     id: Uuid,
@@ -36,10 +37,10 @@ pub async fn resolve_case(
     Ok(res.rows_affected() > 0)
 }
 
-/// Закрыть жалобы дела и разложить авторам обратную связь.
+/// Close the case's reports and queue feedback for their authors.
 ///
-/// Текст один на всех: жалобы в деле про одно и то же событие, и рассылать
-/// разные ответы было бы неоткуда — вердикт у дела единственный.
+/// Everyone gets the same text: a case has one verdict, and its reports are all
+/// about the same incident.
 pub async fn close_reports(pool: &PgPool, case_id: Uuid, resolution: &str) -> Result<u64> {
     let res = sqlx::query(
         "UPDATE player_reports

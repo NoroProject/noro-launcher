@@ -1,4 +1,3 @@
-//! iOS-style toggle switch для опциональных модов.
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, App, ClickEvent, ElementId, Window};
 

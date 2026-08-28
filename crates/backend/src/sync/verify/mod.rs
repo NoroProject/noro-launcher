@@ -1,13 +1,13 @@
-//! Сверка игрового каталога с манифестом непосредственно перед запуском.
+//! Checks the instance against the manifest immediately before launch.
 //!
-//! `clean_extra` работает во время синка, а между синком и запуском каталог
-//! никто не перепроверяет. Здесь та же проверка повторяется в последний момент:
-//! лишнее удаляется, расхождения уезжают мастеру как флаг.
+//! `clean_extra` runs during sync, and nothing looks at the directory again
+//! between sync and launch. This repeats the check at the last moment: extras
+//! are deleted, discrepancies go to the master as a flag.
 //!
-//! Реакция намеренно тихая — «восстановлены файлы сборки» и запуск. Честный
-//! игрок (битый диск, антивирус съел файл) ничего не замечает, а тот, кто
-//! подкладывал мод намеренно, не получает подсказки «здесь есть проверка,
-//! обходи её вот тут».
+//! The player-facing reaction is deliberately quiet — "build files restored"
+//! and the game starts. An honest player with a bad disk or an overeager
+//! antivirus notices nothing, and someone who dropped a mod in on purpose
+//! doesn't learn where the check is.
 
 mod cache;
 mod scan;
@@ -17,7 +17,7 @@ use cache::HashCache;
 use schema::{BuildManifest, IntegrityFinding, IntegrityKind, IntegrityReport, UserProfile};
 use std::path::Path;
 
-/// Сверить каталог и починить то, что чинится удалением.
+/// Checks the instance and repairs whatever a deletion can repair.
 pub async fn verify_before_launch(
     instance_dir: &Path,
     manifest: &BuildManifest,
@@ -40,7 +40,7 @@ pub async fn verify_before_launch(
                 findings.push(finding(
                     IntegrityKind::ModifiedFile,
                     &f.path,
-                    Some(format!("ожидался {}, на диске {}", f.sha1, actual)),
+                    Some(format!("expected {}, on disk {}", f.sha1, actual)),
                     false,
                 ));
             }
@@ -51,13 +51,13 @@ pub async fn verify_before_launch(
     findings.extend(scan::remove_extras(instance_dir, manifest, &expected).await);
     findings.extend(scan::forbidden_optionals(manifest, enabled_optional, user));
 
-    // Запрещённые файлы — поверх всех правил путей: они достают и то, что синк
-    // не трогает вовсе.
+    // Blocked files override every path rule — they reach into directories
+    // sync never touches.
     let blocked = crate::sync::blocklist::enforce(instance_dir, &manifest.blocked_files).await;
     let block_launch = blocked.block_launch;
     findings.extend(blocked.findings);
 
-    // Инвентарь несинхронизируемых папок: что игрок положил туда сам.
+    // Inventory of the unsynced directories: what the player put there.
     let known: Vec<String> = manifest
         .verified_files
         .iter()

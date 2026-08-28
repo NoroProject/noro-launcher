@@ -1,5 +1,5 @@
-//! Слой доступа к БД. Используются runtime-проверяемые запросы (sqlx::query*),
-//! т.к. компиляция идёт без живой БД.
+//! Database access. Runtime-checked queries (`sqlx::query*`) throughout — the
+//! build has no live database to check against.
 
 pub mod audit;
 pub mod auth_methods;
@@ -63,7 +63,6 @@ pub use rules::*;
 pub use sessions::*;
 pub use support::*;
 
-/// Подключиться к БД и применить миграции.
 pub async fn connect_and_migrate(database_url: &str) -> Result<PgPool> {
     let pool = PgPoolOptions::new()
         .max_connections(16)
@@ -71,35 +70,26 @@ pub async fn connect_and_migrate(database_url: &str) -> Result<PgPool> {
         .await?;
 
     let migrator = sqlx::migrate!("./migrations");
-    // Расхождение контрольной суммы — отказ, а не повод её переписать.
-    //
-    // Раньше здесь стояло автообновление `_sqlx_migrations.checksum` под то,
-    // что лежит на диске. Оно снимало симптом и оставляло болезнь: правку уже
-    // применённой миграции sqlx второй раз не выполняет, поэтому база начинала
-    // расходиться с файлами, продолжая рапортовать «применено».
-    //
-    // Так и вышло с волной 3: `0050` поправили после применения, суммы молча
-    // переписались, а `player_reports` не появилась ни на одной базе — админка
-    // падала на «relation does not exist», и чинить пришлось отдельной
-    // миграцией. Молчаливая расходимость дороже несостоявшегося старта: второе
-    // видно сразу, первое — через неделю и не там, где сломали.
+    // A checksum mismatch fails the start. Do not "fix" it by rewriting
+    // `_sqlx_migrations.checksum`: sqlx never re-runs an applied migration, so
+    // the edit would not reach the database and it would drift from the files
+    // while still reporting them as applied.
     migrator.run(&pool).await.context(
-        "применение миграций. Если ругается на изменённую миграцию — файл \
-         правили после того, как он уже применился. Возвращайте его как было и \
-         заводите новую миграцию: sqlx не выполняет применённые повторно, и \
-         правка всё равно не доедет до базы",
+        "running migrations. A complaint about a changed migration means the \
+         file was edited after it had already been applied. Put it back and add \
+         a new migration instead — sqlx does not re-run applied ones, so the \
+         edit will never reach the database",
     )?;
 
-    tracing::info!("миграции применены");
+    tracing::info!("migrations applied");
     Ok(pool)
 }
 
-/// Самая свежая миграция, зашитая в этот бинарник.
+/// Latest migration compiled into this binary.
 ///
-/// Нужна бэкапу: дамп со схемой 62 нельзя лить в мастер, который знает 58.
-/// Миграции вперёд не откатываются, и он поднялся бы на данных, которых не
-/// понимает. Считается из тех же файлов, что применяет `connect_and_migrate`,
-/// поэтому разъехаться с реальностью не может.
+/// Restore checks this: a dump at schema 62 must not be loaded into a master
+/// that only knows 58. Migrations don't roll backwards, so it would come up on
+/// data it doesn't understand.
 pub fn known_schema_version() -> i64 {
     sqlx::migrate!("./migrations")
         .iter()

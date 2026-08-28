@@ -1,13 +1,13 @@
-//! Каталог узлов прав, которые агент видит на своём сервере.
+//! Catalogue of permission nodes an agent sees on its own server.
 //!
-//! Перечислить их заранее неоткуда: узлы приносят сами моды, и у каждой сборки
-//! свой набор. Поэтому список присылает агент — тем, что вернул ему
-//! `PermissionGatherEvent`, — а админка потом подсказывает из реальных данных,
-//! а не из захардкоженного перечня.
+//! There is no way to know them up front: nodes come from the mods, and every
+//! modpack has a different set. The agent reports whatever
+//! `PermissionGatherEvent` handed it, and the admin panel autocompletes from
+//! that rather than from a hardcoded list.
 //!
-//! Покрытие неполное по своей природе: сюда попадают только моды, которые
-//! регистрируют узлы через `PermissionAPI`. Кто проверяет права строкой напрямую,
-//! здесь не появится — и обещать обратное нельзя.
+//! Coverage is incomplete by nature — only mods that register through
+//! `PermissionAPI` show up here. A mod that checks a permission string
+//! directly never will.
 
 use crate::api::auth::AgentAuth;
 use crate::error::AppResult;
@@ -16,8 +16,7 @@ use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
-/// Потолок на всякий случай: сборка в полторы сотни модов даёт сотни узлов,
-/// но не десятки тысяч.
+/// Sanity ceiling: 150 mods produce hundreds of nodes, not tens of thousands.
 const MAX_NODES: usize = 5000;
 
 #[derive(Deserialize)]

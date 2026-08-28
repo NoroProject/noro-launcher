@@ -1,7 +1,7 @@
-//! Общие serde-типы, разделяемые между лаунчером, мастером, CLI и (через JSON) web.
+//! Serde types shared by the launcher, master, CLI and — as JSON — the web app.
 //!
-//! Этот крейт не зависит от tokio/axum/sqlx — только сериализация и базовые типы,
-//! поэтому его одинаково тянут и frontend (GPUI), и backend, и master.
+//! Nothing here depends on tokio, axum or sqlx. That's what lets the GPUI
+//! frontend, the backend and the master all pull it in.
 
 pub mod admin_ws;
 pub mod blocklist;
@@ -36,18 +36,18 @@ pub use server::*;
 pub use user::*;
 pub use ws_protocol::*;
 
-/// UUID игрока (Minecraft) детерминированно выводится из привязки к платформе
-/// через UUID v5 в фиксированном namespace. Так один и тот же внешний аккаунт
-/// всегда получает один и тот же MC-UUID, без хранения маппинга.
+/// Namespace for the v5 UUIDs below. There is no stored mapping from external
+/// account to Minecraft UUID — it is derived every time, so this must not change.
 pub const MC_UUID_NAMESPACE: uuid::Uuid = uuid::Uuid::from_bytes([
     0x4e, 0x6f, 0x72, 0x6f, 0x4d, 0x43, 0x55, 0x55, 0x49, 0x44, 0x4e, 0x53, 0x70, 0x61, 0x63, 0x65,
 ]);
 
-/// Детерминированный offline-style MC UUID из привязки: `("discord", "123")`.
+/// Offline-style MC UUID for a linked account, e.g. `("discord", "123")`.
 ///
-/// Имя платформы идёт с заглавной буквы — именно так («Discord:123…») выведены
-/// UUID всех существующих игроков. Схему трогать нельзя: вместе с UUID игрок
-/// теряет инвентарь, прогресс и права на всех серверах сразу.
+/// The provider name is capitalised because every existing player's UUID was
+/// derived from `Discord:123…`. Changing the name scheme changes every UUID, and
+/// a player who loses theirs loses inventory, progress and permissions on every
+/// server at once.
 pub fn mc_uuid_from_identity(provider: &str, provider_user_id: &str) -> uuid::Uuid {
     let mut name = String::with_capacity(provider.len() + provider_user_id.len() + 1);
     let mut chars = provider.chars();
@@ -60,31 +60,28 @@ pub fn mc_uuid_from_identity(provider: &str, provider_user_id: &str) -> uuid::Uu
     uuid::Uuid::new_v5(&MC_UUID_NAMESPACE, name.as_bytes())
 }
 
-/// Детерминированный offline-style MC UUID из Discord ID.
 pub fn mc_uuid_from_discord(discord_id: &str) -> uuid::Uuid {
     mc_uuid_from_identity("discord", discord_id)
 }
 
-/// Детерминированный offline-style MC UUID из Telegram ID.
 pub fn mc_uuid_from_telegram(telegram_id: &str) -> uuid::Uuid {
     mc_uuid_from_identity("telegram", telegram_id)
 }
 
-/// DEV-ONLY seed для ed25519. В режиме разработки мастер выводит из него приватный
-/// ключ подписи манифестов, а лаунчер — публичный ключ для проверки. Так обе
-/// стороны согласованы из коробки. В production мастер задаёт реальный приватный
-/// ключ через env `NORO_SIGNING_KEY`, а лаунчер компилируется с реальным публичным
-/// ключом через env `NORO_SIGNING_PUBKEY`. Этот seed НИКОГДА не должен использоваться
-/// в проде — он публичен в исходниках.
+/// Dev-only ed25519 seed: both sides derive their half of the manifest signing
+/// pair from it, so a local master and a local launcher agree out of the box.
+///
+/// Production passes the real key through `NORO_SIGNING_KEY` (master) and
+/// `NORO_SIGNING_PUBKEY` (launcher, at build time). This seed is in the sources
+/// for anyone to read — it must never reach prod.
 pub const DEV_SIGNING_SEED: [u8; 32] = *b"noro-launcher-dev-signing-seed!!";
 
-/// Имя каталога данных лаунчера внутри системного data-dir.
+/// Name of the launcher's directory inside the system data dir.
 ///
-/// Debug-сборка живёт отдельно от установленной: иначе разработка затирает
-/// боевой `config.json`, инстансы и скачанный core на той же машине, а лаунчер
-/// начинает ходить в локальный мастер, чьи манифесты подписаны dev-ключом.
-/// `NORO_LAUNCHER_DIR` перекрывает выбор, когда нужен ещё один изолированный
-/// профиль.
+/// Debug builds get their own, or development on a machine that also has the
+/// launcher installed would overwrite the real `config.json`, instances and
+/// downloaded core, and point them at a local master signing with the dev key.
+/// `NORO_LAUNCHER_DIR` overrides it when a third isolated profile is needed.
 pub fn launcher_dir_name() -> String {
     match std::env::var("NORO_LAUNCHER_DIR") {
         Ok(custom) if !custom.is_empty() => custom,
@@ -97,26 +94,25 @@ pub fn launcher_dir_name() -> String {
 mod uuid_tests {
     use super::*;
 
-    /// Маппинга Discord → MC в базе нет: UUID выводится заново при каждом
-    /// заходе. Если значение когда-нибудь поедет, игроки потеряют инвентарь,
-    /// прогресс и права на всех серверах сразу — поэтому оно зафиксировано.
+    /// Pins the value, since nothing in the database records what a player's
+    /// UUID used to be — it is re-derived on every login.
     #[test]
     fn discord_id_maps_to_a_stable_uuid() {
         let id = "123456789012345678";
         assert_eq!(
             mc_uuid_from_discord(id).to_string(),
             mc_uuid_from_discord(id).to_string(),
-            "одинаковый вход обязан давать одинаковый UUID"
+            "same input must give the same UUID"
         );
         assert_eq!(
             mc_uuid_from_discord(id),
             uuid::Uuid::new_v5(&MC_UUID_NAMESPACE, b"Discord:123456789012345678"),
-            "схема имени изменилась — все существующие игроки сменят UUID"
+            "name scheme changed — every existing player gets a new UUID"
         );
     }
 
-    /// Разные платформы не должны сталкиваться между собой: одинаковые
-    /// числовые id у Discord и Twitch — обычное совпадение, а не один игрок.
+    /// The same numeric id on Discord and on Twitch is a coincidence, not one
+    /// player.
     #[test]
     fn providers_do_not_collide() {
         assert_ne!(

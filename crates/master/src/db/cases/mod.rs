@@ -1,9 +1,9 @@
-//! Дела: разбор жалобы с лентой событий и срезом чата.
+//! Cases: a report under review, with an event feed and a chat excerpt.
 //!
-//! Дело заводится на игрока и сервер, а не на жалобу: семь жалоб на одного
-//! читера — один разбор. Склейка живёт в `open_case`, а не в вызывающем коде,
-//! потому что дело заводят и агент, и админка, и «одно открытое» должно
-//! значить для них одно и то же.
+//! A case belongs to a player and a server, not to a report — seven reports
+//! about one cheater are one review. The merging happens inside `open_case`
+//! rather than at the call sites, because both the agent and the admin UI open
+//! cases and they have to agree on what "already open" means.
 
 mod close;
 mod events;
@@ -24,7 +24,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CaseRow {
     pub id: Uuid,
-    /// Человеческий номер: печатается как `N-000000001`.
+    /// Human-facing number, printed as `N-000000001`.
     pub number: i64,
     pub target_id: Uuid,
     pub game_server_id: Option<Uuid>,
@@ -75,8 +75,8 @@ pub async fn get_case(pool: &PgPool, id: Uuid) -> Result<Option<CaseRow>> {
     )
 }
 
-/// Взять дело. Замок ставится одним UPDATE: два модератора, нажавшие кнопку
-/// одновременно, не должны получить по меню разбора каждый.
+/// Claim a case. The lock is taken in a single UPDATE so that two moderators
+/// pressing the button at once don't both end up reviewing it.
 pub async fn claim_case(pool: &PgPool, id: Uuid, actor_id: Uuid) -> Result<bool> {
     let res = sqlx::query(
         "UPDATE cases SET status = 'in_review', claimed_by = $2, claimed_at = NOW()
@@ -89,8 +89,8 @@ pub async fn claim_case(pool: &PgPool, id: Uuid, actor_id: Uuid) -> Result<bool>
     Ok(res.rows_affected() > 0)
 }
 
-/// Отпустить дело в очередь. Только тот, кто держит замок: иначе перехват
-/// выглядел бы как «дело освободилось само».
+/// Put a case back in the queue. Only the holder can do this — otherwise a
+/// takeover would look to them like the case released itself.
 pub async fn release_case(pool: &PgPool, id: Uuid, actor_id: Uuid) -> Result<bool> {
     let res = sqlx::query(
         "UPDATE cases SET status = 'open', claimed_by = NULL, claimed_at = NULL
@@ -103,10 +103,9 @@ pub async fn release_case(pool: &PgPool, id: Uuid, actor_id: Uuid) -> Result<boo
     Ok(res.rows_affected() > 0)
 }
 
-/// Открытое дело на игрока и сервер, если оно есть.
-///
-/// Без создания: наказание из игры должно попадать в уже идущий разбор, но
-/// заводить дело на каждый мут за капс незачем.
+/// Look up an open case without creating one. A punishment issued in-game
+/// should land in a review that's already running, but every mute for caps
+/// doesn't need a case of its own.
 pub async fn find_open_case(
     pool: &PgPool,
     target_id: Uuid,
@@ -123,19 +122,18 @@ pub async fn find_open_case(
     .await?)
 }
 
-/// Дело, которое этот модератор ведёт на этом сервере.
+/// Cases this moderator holds on this server.
 ///
-/// Нужно на входе в игру: замок ставится с сайта и переживает перезапуск
-/// сервера, а режим разбора у агента — нет. Без этого модератор видит «в
-/// работе» в панели и «you are not reviewing any case» в чате.
+/// Read when they join the game: the lock is taken on the site and survives a
+/// server restart, but the agent's review mode doesn't. Without this they'd see
+/// "in review" in the panel and "you are not reviewing any case" in chat.
 pub async fn claimed_on_server(
     pool: &PgPool,
     moderator_id: Uuid,
     game_server_id: Uuid,
 ) -> Result<Vec<CaseRow>> {
-    // Все, а не последнее: замков у одного модератора бывает несколько, и
-    // агент должен знать про каждое — иначе переключиться между ними в игре
-    // не выйдет, а панель будет показывать дело, которого у агента нет.
+    // All of them, not just the latest — one moderator can hold several locks,
+    // and the agent needs every one to let them switch between cases in game.
     Ok(sqlx::query_as::<_, CaseRow>(
         "SELECT * FROM cases
           WHERE claimed_by = $1 AND game_server_id = $2 AND status = 'in_review'
@@ -147,7 +145,6 @@ pub async fn claimed_on_server(
     .await?)
 }
 
-/// Привязать жалобу к делу.
 pub async fn attach_report(pool: &PgPool, report_id: Uuid, case_id: Uuid) -> Result<()> {
     sqlx::query("UPDATE player_reports SET case_id = $2 WHERE id = $1")
         .bind(report_id)

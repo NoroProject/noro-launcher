@@ -1,4 +1,4 @@
-//! Запись и чтение журнала админских действий.
+//! Admin action log.
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -48,7 +48,7 @@ pub async fn insert_audit(
     Ok(())
 }
 
-/// Фильтр журнала. Пустые поля не сужают выборку.
+/// Empty fields don't narrow the selection.
 #[derive(Debug, Default)]
 pub struct AuditFilter {
     pub actor_id: Option<Uuid>,
@@ -58,8 +58,8 @@ pub struct AuditFilter {
     pub before_id: Option<i64>,
 }
 
-/// Страница журнала, новые сверху. Пагинация по id, а не по offset: журнал
-/// пополняется во время просмотра, и offset начал бы показывать одно и то же.
+/// Newest first. Paged by id rather than offset — the log grows while it's
+/// being read, and an offset would start repeating rows.
 pub async fn list_audit(pool: &PgPool, f: &AuditFilter, limit: i64) -> Result<Vec<AuditRow>> {
     let rows = sqlx::query_as::<_, AuditRow>(
         "SELECT * FROM audit_log
@@ -82,7 +82,7 @@ pub async fn list_audit(pool: &PgPool, f: &AuditFilter, limit: i64) -> Result<Ve
     Ok(rows)
 }
 
-/// Какие события реально встречаются в журнале.
+/// Which actions actually appear in the log — for the filter dropdown.
 pub async fn distinct_audit_actions(pool: &PgPool) -> Result<Vec<String>> {
     Ok(
         sqlx::query_scalar::<_, String>("SELECT DISTINCT action FROM audit_log ORDER BY action")

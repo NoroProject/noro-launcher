@@ -1,28 +1,17 @@
-//! Что делать с каждым файлом манифеста — по правилам путей.
-//!
-//! Вынесено из `file_sync`, потому что решение перестало быть двоичным:
-//! раньше был выбор «скачать или не скачать», теперь ещё и three-way для
-//! режима `merged`.
+//! What to do with each file in the manifest, driven by the path rules.
 
 use super::merge::{self, BaseHashes, Decision};
 use crate::directories::safe_join;
 use schema::{BuildManifest, ConflictPolicy, FileEntry, PathMode};
 use std::path::Path;
 
-/// Решение по одному файлу.
 pub enum Action {
-    /// Скачать (поставить или обновить).
     Download,
-    /// Оставить как есть.
     Skip,
-    /// Конфликт: обе стороны меняли файл.
+    /// Both sides changed the file.
     Conflict(ConflictPolicy),
 }
 
-/// Что делать с файлом.
-///
-/// `unmanaged` сюда не доходит — такие файлы отсеиваются раньше, до всякой
-/// работы с диском.
 pub async fn decide_file(
     instance_dir: &Path,
     manifest: &BuildManifest,
@@ -39,8 +28,8 @@ pub async fn decide_file(
     match mode {
         PathMode::Unmanaged => Action::Skip,
 
-        // Ставится один раз, дальше принадлежит игроку. Обновлений не будет
-        // никогда — это и есть дефект, ради которого появился `Merged`.
+        // Installed once, then it belongs to the player. It never gets an
+        // update again, which is what `Merged` exists to fix.
         PathMode::UserManaged => {
             if dest.exists() {
                 Action::Skip

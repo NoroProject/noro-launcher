@@ -1,32 +1,30 @@
--- Настоящая проверка WebAuthn вместо доверия к credential_id.
+-- Real WebAuthn verification, replacing a login that trusted credential_id.
 --
--- Старый вход находил запись по credential_id и сразу выдавал сессию: подпись
--- не проверялась, public_key и counter не использовались. credential_id —
--- публичное значение, его отдаёт браузер, так что «знаешь id — вошёл».
---
--- Материала для настоящей проверки в старых записях нет (public_key лежит в
--- произвольном формате, привязки к challenge не было), а оставить их — значит
--- оставить обходной путь мимо новой проверки. Удаляем: вход через Discord у
--- всех сохраняется, никто не теряет доступ.
+-- credential_id is a public value the browser hands over, and the old flow
+-- issued a session as soon as it matched a row — no signature check at all.
+-- Existing rows can't be upgraded (the stored public_key has no defined format
+-- and nothing was bound to a challenge), and keeping them would keep a path
+-- around the new check. Everyone still has Discord login, so nobody is locked
+-- out by this.
 DELETE FROM passkeys;
 
 ALTER TABLE passkeys DROP COLUMN IF EXISTS public_key;
 ALTER TABLE passkeys DROP COLUMN IF EXISTS counter;
 
--- Учётные данные целиком в том виде, в каком их держит webauthn-rs: там и
--- открытый ключ, и счётчик, и флаги — хранить их по кусочкам значит
--- пересобирать структуру библиотеки руками при каждом её обновлении.
+-- The whole credential as webauthn-rs serialises it: key, counter and flags in
+-- one blob. Storing the pieces separately means rebuilding the library's struct
+-- by hand every time it changes.
 ALTER TABLE passkeys ADD COLUMN IF NOT EXISTS credential JSONB NOT NULL;
 ALTER TABLE passkeys ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMPTZ;
 
--- Состояние между /options и /verify. Раньше хранился только challenge, а
--- проверять нужно ещё и политику: user verification, допустимые ключи,
--- привязку к пользователю.
+-- State carried between /options and /verify. A bare challenge isn't enough:
+-- verification also needs the policy — user verification, allowed credentials,
+-- which user this was started for.
 DROP TABLE IF EXISTS passkey_challenges;
 
 CREATE TABLE IF NOT EXISTS webauthn_states (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    -- NULL для входа: кто именно входит, известно только после проверки.
+    -- NULL for login: who is signing in is only known once it verifies.
     user_id    UUID REFERENCES users(id) ON DELETE CASCADE,
     kind       TEXT NOT NULL CHECK (kind IN ('register', 'login')),
     state      JSONB NOT NULL,

@@ -1,4 +1,4 @@
-//! Жизнь сессии после входа: продление и выход. Общее для всех способов войти.
+//! Session lifetime after sign-in: refresh and logout, shared by every method.
 
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -13,7 +13,6 @@ pub struct RefreshReq {
     pub refresh_token: String,
 }
 
-/// Обновить access-токен по refresh-токену.
 pub async fn refresh(
     State(state): State<AppState>,
     Json(req): Json<RefreshReq>,
@@ -30,7 +29,8 @@ pub async fn refresh(
     })))
 }
 
-/// Выйти: удалить текущую сессию (Bearer access-токен).
+/// Drops the session named by the Bearer access token. A missing or malformed
+/// token is not an error — logging out twice should not fail.
 pub async fn logout(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,

@@ -1,9 +1,9 @@
-//! WebSocket админки в браузере.
+//! WebSocket for the admin panel in the browser.
 //!
-//! Отдельный протокол от лаунчерного, а не общий с ним. Общий выглядел бы
-//! дешевле, но тогда браузер получал бы `LogRequest` и `ImpersonateRequest` —
-//! диалоги, которые существуют именно как второй фактор «злоумышленник добрался
-//! до веб-сессии, но не до машины». Отдать их в веб значит убрать этот фактор.
+//! Deliberately separate from the launcher protocol rather than shared with it.
+//! Sharing would hand the browser `LogRequest` and `ImpersonateRequest`, and
+//! those prompts exist precisely as the second factor for "attacker has the web
+//! session but not the machine".
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -11,7 +11,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "t", content = "d")]
 pub enum AdminWsClientMsg {
-    /// Тот же токен сессии, что у REST-запросов админки.
+    /// Same session token the admin REST endpoints take.
     Authenticate {
         access_token: String,
     },
@@ -23,8 +23,8 @@ pub enum AdminWsClientMsg {
 pub enum AdminWsMsg {
     AuthOk,
     AuthFail,
-    /// Карточка дела изменилась. Данных нет: страница сходит за ней сама тем же
-    /// запросом, что и раньше, — и права проверятся там, а не здесь.
+    /// Carries no payload: the page refetches through the usual endpoint, which
+    /// is where permissions get checked.
     CaseUpdated {
         case_id: Uuid,
     },
@@ -33,6 +33,6 @@ pub enum AdminWsMsg {
 
 impl AdminWsMsg {
     pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("AdminWsMsg сериализуется")
+        serde_json::to_string(self).expect("AdminWsMsg is serializable")
     }
 }

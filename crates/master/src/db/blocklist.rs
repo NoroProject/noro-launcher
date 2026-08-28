@@ -1,4 +1,4 @@
-//! Запрещённые файлы.
+//! Blocked files.
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -29,7 +29,8 @@ fn action_from(s: &str) -> BlockAction {
     }
 }
 
-/// Правила для манифеста: глобальные плюс относящиеся к этому серверу.
+/// Rules for a manifest: the global ones (`server_id IS NULL`) plus this
+/// server's own.
 pub async fn blocked_files_for(pool: &PgPool, server_id: Uuid) -> Result<Vec<BlockedFile>> {
     let rows = sqlx::query_as::<_, BlockedFileRow>(
         "SELECT * FROM blocked_files

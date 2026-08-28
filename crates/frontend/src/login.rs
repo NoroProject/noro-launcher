@@ -90,9 +90,9 @@ fn auth_content(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// Кнопка входа ровно одна: способов авторизации стало много, и все они на
-/// сайте. Держать их список ещё и здесь значило бы обновлять лаунчер каждый
-/// раз, когда оператор включает новую платформу.
+/// One button, not a list of providers. The auth methods live on the site;
+/// mirroring them here would mean a launcher release every time the operator
+/// turns another one on.
 fn login_buttons(logging_in: bool, cx: &mut Cx) -> AnyElement {
     if logging_in {
         return waiting_box();

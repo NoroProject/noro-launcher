@@ -1,4 +1,4 @@
-//! Админ: чтение журнала действий.
+//! Reading the action log.
 
 use crate::api::auth::AdminAuth;
 use crate::db::audit::{AuditFilter, AuditRow};
@@ -14,27 +14,28 @@ use uuid::Uuid;
 #[derive(Deserialize)]
 pub struct ListQuery {
     pub actor_id: Option<Uuid>,
-    /// Префикс: `user` покрывает `user.ban`, `user.role.add` и так далее.
+    /// A prefix: `user` covers `user.ban`, `user.role.add` and so on.
     pub action: Option<String>,
     pub target_kind: Option<String>,
     pub target_id: Option<String>,
-    /// Курсор: следующая страница — записи старше этого id.
+    /// Cursor. The next page is the rows older than this id.
     pub before_id: Option<i64>,
     pub limit: Option<i64>,
 }
 
-/// Справочник для фильтра: какие события бывают и как они называются.
+/// Vocabulary for the filter UI.
 ///
-/// Реестр из кода, а не `SELECT DISTINCT`: иначе в списке не было бы событий,
-/// которые ещё ни разу не случились, — а искать чаще всего надо именно их.
+/// Built from the registry in code rather than `SELECT DISTINCT`, so that
+/// events which have never fired are still offered — those are usually the ones
+/// worth filtering for.
 pub async fn actions(
     State(state): State<AppState>,
     admin: AdminAuth,
 ) -> AppResult<Json<serde_json::Value>> {
     admin.require(PERM_AUDIT)?;
 
-    // Что реально встречается в журнале — чтобы старые события, выпавшие из
-    // реестра, не пропали из фильтра молча.
+    // Plus whatever is actually in the log, so retired events don't silently
+    // drop out of the filter along with the rows they belong to.
     let seen = crate::db::distinct_audit_actions(&state.db).await?;
 
     let mut items: Vec<serde_json::Value> = crate::audit::actions::ALL

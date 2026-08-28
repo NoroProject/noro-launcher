@@ -1,4 +1,4 @@
-//! Уборка хранилища: объекты, на которые больше никто не ссылается.
+//! Storage cleanup: objects nothing references any more.
 
 use crate::api::auth::AdminAuth;
 use crate::audit;
@@ -8,10 +8,8 @@ use axum::extract::State;
 use axum::Json;
 use schema::PERM_STORAGE;
 
-/// `GET /api/admin/storage/orphans` — только посчитать, ничего не трогая.
-///
-/// Обход читает всю БД и весь каталог хранилища, поэтому запускается вручную,
-/// а не по расписанию.
+/// Count orphans without touching them. The sweep reads the whole database and
+/// the whole storage tree, so it's triggered by hand rather than on a schedule.
 pub async fn scan_orphans(
     State(state): State<AppState>,
     admin: AdminAuth,
@@ -21,10 +19,8 @@ pub async fn scan_orphans(
     Ok(Json(report))
 }
 
-/// `DELETE /api/admin/storage/orphans` — то же самое, но с удалением.
-///
-/// Отдельный метод намеренно: удаление не должно случаться от обновления
-/// страницы или повторного GET.
+/// The same sweep, but it deletes. Kept on its own method so a page refresh or
+/// a repeated GET can't wipe the store.
 pub async fn delete_orphans(
     State(state): State<AppState>,
     admin: AdminAuth,
@@ -45,7 +41,7 @@ pub async fn delete_orphans(
     tracing::warn!(
         count = report.orphan_count,
         bytes = report.orphan_bytes,
-        "удалены неиспользуемые объекты хранилища"
+        "deleted unreferenced storage objects"
     );
     Ok(Json(report))
 }

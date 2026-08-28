@@ -1,8 +1,7 @@
-//! Дела на стороне канала: режим разбора уходит агенту, действия приходят обратно.
+//! Cases over the agent channel: review mode goes out, actions come back.
 //!
-//! Мастер — единственный, кто ставит замок и ведёт ленту: команда `/case` в
-//! игре и кнопка на сайте одинаково могут проиграть гонку, и решать это должна
-//! одна сторона.
+//! The master is the only side that takes the lock and writes the feed. An
+//! in-game `/case` and a button on the site can equally lose the race.
 
 use super::proto::ToAgent;
 use crate::db::cases::{CaseRow, IncomingMessage};
@@ -11,10 +10,7 @@ use crate::state::AppState;
 use serde_json::json;
 use uuid::Uuid;
 
-/// Дело взяли — отправить модератору режим разбора.
-///
-/// Всё для меню едет одним кадром: агент не ходит за карточкой на мастер,
-/// иначе меню открывалось бы с задержкой ровно тогда, когда сервер занят.
+/// Case claimed — hand the moderator review mode.
 pub async fn assigned(state: &AppState, case: &CaseRow, moderator_mc: Uuid) {
     let Some(game_server_id) = case.game_server_id else {
         return;
@@ -50,7 +46,7 @@ pub async fn assigned(state: &AppState, case: &CaseRow, moderator_mc: Uuid) {
     state.agents.send_to_game_server(&msg, game_server_id);
 }
 
-/// Дело отпустили или закрыли — вывести модератора из режима.
+/// Case released or closed — take the moderator out of review mode.
 pub fn finished(state: &AppState, case: &CaseRow, moderator_mc: Uuid, closed: bool) {
     let Some(game_server_id) = case.game_server_id else {
         return;
@@ -63,7 +59,6 @@ pub fn finished(state: &AppState, case: &CaseRow, moderator_mc: Uuid, closed: bo
     state.agents.send_to_game_server(&msg, game_server_id);
 }
 
-/// Запросить срез чата у сервера дела.
 pub fn request_chat(state: &AppState, case: &CaseRow, target_mc: Uuid, before_secs: u32) {
     let Some(game_server_id) = case.game_server_id else {
         return;
@@ -87,7 +82,7 @@ pub fn request_inventory(state: &AppState, case: &CaseRow, target_mc: Uuid) {
     state.agents.send_to_game_server(&msg, game_server_id);
 }
 
-/// Модератор взял дело командой в игре.
+/// Moderator claimed a case with an in-game command.
 pub async fn claim_from_game(state: &AppState, case_id: Uuid, moderator_mc: Uuid) {
     let Ok(Some(moderator)) = crate::db::user_by_mc_uuid(&state.db, moderator_mc).await else {
         return;
@@ -114,7 +109,7 @@ pub async fn claim_from_game(state: &AppState, case_id: Uuid, moderator_mc: Uuid
     assigned(state, &case, moderator_mc).await;
 }
 
-/// Действие из режима разбора: телепорт, заморозка, слежка, осмотр.
+/// An action taken in review mode: teleport, freeze, spectate, inspect.
 pub async fn action(
     state: &AppState,
     case_id: Uuid,
@@ -142,7 +137,6 @@ pub async fn action(
     .await;
 }
 
-/// Срез чата от агента.
 pub async fn chat_slice(state: &AppState, case_id: Uuid, messages: &[IncomingMessage]) {
     match crate::db::save_messages(&state.db, case_id, messages).await {
         Ok(0) => {}
@@ -158,11 +152,12 @@ pub async fn chat_slice(state: &AppState, case_id: Uuid, messages: &[IncomingMes
             )
             .await;
         }
-        Err(e) => tracing::warn!(case = %case_id, error = %e, "срез чата не сохранён"),
+        Err(e) => tracing::warn!(case = %case_id, error = %e, "chat slice not saved"),
     }
 }
 
-/// Снимок инвентаря. Лежит в ленте: отдельная таблица под один JSON не нужна.
+/// Inventory snapshot. Stored in the feed — one JSON blob doesn't need its own
+/// table.
 pub async fn inventory(
     state: &AppState,
     server: &GameServerRow,

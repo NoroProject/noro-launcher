@@ -1,16 +1,7 @@
-//! Маскот лаунчера — картинка состояния.
-//!
-//! Пустой экран и долгое ожидание без него выглядели как поломка: игрок видел
-//! иконку-заглушку и не понимал, ждать ему или уже всё сломалось.
-
 use gpui::{img, prelude::*, px, AnyElement};
 
-/// Настроение маскота. Файлы лежат в `assets/mascot-*.png`.
-///
-/// Перечисление зеркалит набор, который рисует `assets/make-mascot.py`, а не
-/// только то, что сейчас показывается. Выкинуть неиспользуемый вариант значило
-/// бы развести enum с генератором: картинка осталась бы, а способа её показать
-/// не стало.
+/// Mirrors what `assets/make-mascot.py` draws, not just what the UI currently
+/// uses. Dropping an unused variant would leave a sprite with no way to show it.
 #[derive(Clone, Copy)]
 #[allow(dead_code)]
 pub enum Mood {
@@ -33,7 +24,7 @@ impl Mood {
     }
 }
 
-/// Картинка маскота заданной высоты; ширина подбирается по пропорции спрайта.
+/// Sized by height; the width follows the sprite's aspect ratio.
 pub fn mascot(mood: Mood, height: f32) -> AnyElement {
     img(mood.file())
         .h(px(height))

@@ -1,7 +1,7 @@
-//! Срез чата, приложенный к делу.
+//! The chat excerpt attached to a case.
 //!
-//! Общий чат-лог не ведётся: агент держит последние сообщения в памяти и
-//! отдаёт окно, только когда появился повод — жалоба или наказание.
+//! There is no general chat log. The agent keeps recent messages in memory and
+//! hands over a window only when something happens — a report or a punishment.
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -14,12 +14,12 @@ pub struct CaseMessageRow {
     pub id: Uuid,
     pub at: DateTime<Utc>,
     pub sender_name: String,
-    /// `public`, `local`, `private` или `command`.
+    /// `public`, `local`, `private` or `command`.
     pub channel: String,
     pub content: String,
 }
 
-/// Сообщение из буфера агента, ещё не привязанное к делу.
+/// A message from the agent's buffer, not yet attached to a case.
 #[derive(Debug, Clone, Deserialize)]
 pub struct IncomingMessage {
     pub at: DateTime<Utc>,
@@ -40,8 +40,8 @@ pub async fn list_messages(pool: &PgPool, case_id: Uuid) -> Result<Vec<CaseMessa
     .await?)
 }
 
-/// Строка среза рядом с указанным временем. Часы клиента и сервера расходятся,
-/// поэтому ищем в окне, а не по точному совпадению; ближайшая и есть та самая.
+/// The excerpt line nearest to a given time. Client and server clocks drift, so
+/// this searches a window and takes the closest hit rather than matching exactly.
 pub async fn message_near(
     pool: &PgPool,
     case_id: Uuid,
@@ -63,8 +63,8 @@ pub async fn message_near(
     .await?)
 }
 
-/// Сохранить срез. Повтор того же окна отбрасывается по (время, отправитель):
-/// агент шлёт срез и при жалобе, и при наказании, и они перекрываются.
+/// Save an excerpt. Duplicates are dropped on (time, sender): the agent sends a
+/// window on both reports and punishments, and those windows overlap.
 pub async fn save_messages(
     pool: &PgPool,
     case_id: Uuid,

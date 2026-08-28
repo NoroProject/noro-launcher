@@ -1,4 +1,4 @@
-//! Новости для ленты лаунчера.
+//! News feed for the launcher.
 
 use crate::state::AppState;
 

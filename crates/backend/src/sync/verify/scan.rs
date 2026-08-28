@@ -1,4 +1,4 @@
-//! Что именно сверяется и что считается лишним.
+//! What gets checked, and what counts as an extra file.
 
 use super::finding;
 use crate::directories::safe_join;
@@ -9,11 +9,9 @@ use schema::{
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-/// Виды файлов, которые вообще имеет смысл сверять.
-///
-/// Ассеты, библиотеки и JRE — это десятки тысяч файлов на гигабайты; их подмена
-/// не даёт игроку ничего, ради чего стоило бы держать его перед пустым окном
-/// лишние полминуты. Смысл проверки в модах и конфигах.
+/// Assets, libraries and the JRE are tens of thousands of files and gigabytes
+/// on disk, and swapping one gains a player nothing worth half a minute of
+/// staring at an empty window. Mods and configs are the point.
 fn is_checked(kind: ArtifactKind) -> bool {
     matches!(
         kind,
@@ -21,7 +19,7 @@ fn is_checked(kind: ArtifactKind) -> bool {
     )
 }
 
-/// Файлы манифеста, которые должны лежать на диске именно сейчас.
+/// Manifest files that should be on disk right now.
 pub fn expected_files<'a>(
     manifest: &'a BuildManifest,
     enabled_optional: &[String],
@@ -35,25 +33,25 @@ pub fn expected_files<'a>(
         .filter(|f| f.matches_platform())
         .filter(|f| is_checked(manifest.kind_of(&f.path)))
         .filter(|f| !off.contains(&f.path))
-        // Правки в user-managed — это правки игрока, а не расхождение.
+        // An edit under user-managed is the player's edit, not a discrepancy.
         .filter(|f| !is_protected(&f.path, &manifest.user_managed_paths))
         .filter(|f| !is_protected(&f.path, &manifest.unmanaged_paths))
         .collect()
 }
 
-/// Удалить из managed-каталогов то, чего нет в манифесте.
+/// Deletes anything in the managed directories that the manifest doesn't list.
 pub async fn remove_extras(
     instance_dir: &Path,
     manifest: &BuildManifest,
     expected: &[&FileEntry],
 ) -> Vec<IntegrityFinding> {
-    // Ищем только там, где файлы принадлежат сборке целиком. Обход всего
-    // инстанса — это `saves/` на гигабайты и десятки тысяч ассетов.
+    // Only where every file belongs to the build. Walking the whole instance
+    // means gigabytes of `saves/` and tens of thousands of assets.
     const MANAGED_DIRS: [&str; 2] = ["mods", "config"];
 
     let known: HashSet<&str> = expected.iter().map(|f| f.path.as_str()).collect();
-    // Выключенный опциональный мод — не лишний файл: он лежит на месте и ждёт,
-    // когда его включат обратно.
+    // A disabled optional mod is not an extra file — it sits there waiting to
+    // be switched back on.
     let from_manifest: HashSet<&str> = manifest
         .verified_files
         .iter()
@@ -95,10 +93,10 @@ pub async fn remove_extras(
     out
 }
 
-/// Включённые limited-моды, права на которые нет.
+/// Limited mods the player enabled without the permission for them.
 ///
-/// Их файлов в манифесте уже нет (мастер фильтрует), так что сам факт включения
-/// означает, что список правил клиент.
+/// The master strips those files from the manifest, so the enabled flag being
+/// set at all means the client edited the list.
 pub fn forbidden_optionals(
     manifest: &BuildManifest,
     enabled_optional: &[String],
@@ -114,9 +112,9 @@ pub fn forbidden_optionals(
         .iter()
         .filter(|name| match known.get(name.as_str()) {
             Some(limited) => *limited && !user.can_use_optional(&manifest.server_id, name, true),
-            // Имени нет в манифесте — почти всегда это выбор, сохранённый до
-            // того, как мод убрали из сборки. Флаг тут был бы ложным, а ничего
-            // сверх него такой клиент не получает: файлов мода на диске нет.
+            // Name not in the manifest: almost always a choice saved before the
+            // mod was dropped from the build. Flagging it would be a false
+            // positive, and the client gains nothing — the files aren't there.
             None => false,
         })
         .map(|name| finding(IntegrityKind::ForbiddenOptionalMod, name, None, false))

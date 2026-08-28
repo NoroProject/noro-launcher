@@ -1,4 +1,4 @@
-//! Способы входа: включён ли и с какими ключами приложения.
+//! Sign-in methods: whether each is on, and the app keys it uses.
 
 use anyhow::Result;
 use sqlx::PgPool;
@@ -32,15 +32,14 @@ pub async fn get(pool: &PgPool, method: &str) -> Result<Option<AuthMethodRow>> {
     Ok(row)
 }
 
-/// Способ, о котором в таблице ничего не сказано, считается включённым: строки
-/// появляются миграцией, и отсутствие записи — это старый инстанс, а не запрет.
+/// A method with no row counts as enabled. Rows arrive by migration, so a
+/// missing one means an older instance, not a ban.
 pub async fn is_enabled(pool: &PgPool, method: &str) -> Result<bool> {
     Ok(get(pool, method).await?.is_none_or(|r| r.enabled))
 }
 
-/// Сохранить настройку. `client_secret = None` — «не трогать»: админка не
-/// показывает текущий секрет, и пустое поле формы означает «оставить как
-/// было», а не «стереть».
+/// `client_secret = None` means leave it alone. The admin UI never shows the
+/// current secret, so an empty form field is "unchanged", not "erase".
 pub async fn save(
     pool: &PgPool,
     method: &str,

@@ -4,7 +4,7 @@ use super::*;
 fn a_fresh_token_carries_the_recognisable_prefix() {
     let secret = generate();
     assert!(secret.starts_with(PREFIX));
-    // 32 байта в hex — угадать нельзя, а сканеру видно, где кончается префикс.
+    // 32 bytes in hex.
     assert_eq!(secret.len(), PREFIX.len() + 64);
 }
 
@@ -28,8 +28,7 @@ fn another_secret_does_not() {
 
 #[test]
 fn the_stored_hash_is_not_itself_a_working_token() {
-    // Ровно то, что чинится этой заменой: раньше содержимое колонки совпадало
-    // с тем, с чем сравнивался предъявленный токен.
+    // Read access to the column must not be enough to authenticate.
     let secret = generate();
     let phc = hash(&secret).unwrap();
     assert!(!verify(&phc, &phc));
@@ -50,5 +49,5 @@ fn the_selector_is_stable() {
 
 #[test]
 fn a_corrupted_hash_rejects_instead_of_panicking() {
-    assert!(!verify(&generate(), "не PHC"));
+    assert!(!verify(&generate(), "not PHC"));
 }

@@ -1,7 +1,5 @@
-//! Строка одной стадии синхронизации: метка, полоса, доля в мегабайтах.
-//!
-//! Стадии качаются параллельно, поэтому строк на экране несколько сразу —
-//! отсюда и приглушённые цвета: они фон для общей полосы, а не соперники ей.
+//! One sync stage: label, bar, megabytes. Stages run in parallel, so several of
+//! these sit under the overall progress bar at once — hence the muted colours.
 
 use crate::components::slim_progress_bar;
 use crate::theme::*;
@@ -42,8 +40,8 @@ pub fn stage_row(stage: SyncStage, done: u64, total: u64) -> AnyElement {
         .into_any_element()
 }
 
-/// Готовую стадию помечаем галочкой: цифры «88 / 88 MB» просят их сверять,
-/// а знать про доехавшую полосу нужно только то, что она доехала.
+/// A finished stage reads "done" rather than "88 / 88 MB" — there's nothing
+/// left to compare.
 fn size_label(done: u64, total: u64, complete: bool) -> String {
     if complete {
         return "done".into();

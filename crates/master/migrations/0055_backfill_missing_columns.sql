@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS chat_filters (
 
 INSERT INTO chat_filters (filter_type, mode, enabled, config)
 VALUES
-    ('ad', 'punish', true, '{"whitelist":["noro.dalynkaa.dev","dalynkaa.dev"]}'::jsonb),
+    ('ad', 'punish', true, '{"whitelist":["example.com"]}'::jsonb),
     ('word', 'deny', true, '{"words":["badword"]}'::jsonb),
     ('caps', 'deny', true, '{"threshold":0.6,"min_length":6}'::jsonb),
     ('flood', 'deny', true, '{"max_messages":3,"window_secs":4}'::jsonb)

@@ -1,4 +1,4 @@
-//! Настройка скрытия из публичного списка онлайна.
+//! Player toggles for the public online list.
 
 use crate::api::auth::AuthUser;
 use crate::error::AppResult;
@@ -13,7 +13,7 @@ pub struct HideFromOnlineReq {
     pub hide: bool,
 }
 
-/// PUT /api/me/hide-from-online — тумблер скрытия из публичного списка.
+/// `PUT /api/me/hide-from-online`
 pub async fn set_hide_from_online(
     State(state): State<AppState>,
     user: AuthUser,
@@ -34,7 +34,8 @@ pub struct SilentJoinReq {
     pub silent: bool,
 }
 
-/// PUT /api/me/silent-join — тумблер автованиша при входе.
+/// `PUT /api/me/silent-join` — auto-vanish on join. Needs a vanish permission:
+/// this is a staff feature, not a privacy setting.
 pub async fn set_silent_join(
     State(state): State<AppState>,
     user: AuthUser,

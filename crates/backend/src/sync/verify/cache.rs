@@ -1,21 +1,20 @@
-//! Кеш хешей по mtime+size.
+//! Hash cache keyed on mtime + size.
 //!
-//! Без него сверка перед каждым запуском перечитывает все моды и конфиги — это
-//! сотни мегабайт и заметная пауза перед окном игры. Файл, у которого не
-//! изменились ни размер, ни время правки, почти наверняка не изменился и сам;
-//! «почти» здесь допустимо, потому что это телеметрия, а не защита.
+//! Without it the pre-launch check rehashes every mod and config, which is
+//! hundreds of megabytes and a visible pause before the game window. A file
+//! whose size and mtime both held still almost certainly didn't change; the
+//! "almost" is fine here because this feeds telemetry, not anti-cheat.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-/// Имя внутри `.noro/` — служебного каталога лаунчера в инстансе.
 const CACHE_PATH: &str = ".noro/hash-cache.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct Entry {
     size: u64,
-    /// Секунды unix-времени: наносекунды на разных ФС округляются по-разному.
+    /// Whole unix seconds — filesystems round sub-second precision differently.
     mtime: i64,
     sha1: String,
 }
@@ -39,7 +38,7 @@ impl HashCache {
         }
     }
 
-    /// SHA1 файла. `None` — файла нет или он не читается.
+    /// `None` when the file is missing or unreadable.
     pub async fn sha1_of(&mut self, path: &Path) -> Option<String> {
         let meta = tokio::fs::metadata(path).await.ok()?;
         let size = meta.len();
@@ -70,8 +69,8 @@ impl HashCache {
         Some(sha1)
     }
 
-    /// Ошибка записи не важна: кеш восстановится следующим проходом, а срывать
-    /// из-за него запуск игры незачем.
+    /// A failed write doesn't matter — the next pass rebuilds the cache, and
+    /// there's no reason to fail a launch over it.
     pub async fn save(&self, instance_dir: &Path) {
         if !self.dirty {
             return;

@@ -1,23 +1,19 @@
-//! Что мастер делает с кадрами, пришедшими от агента.
+//! What the master does with frames from an agent.
 //!
-//! Отдельно от `session.rs`, чтобы та осталась про сокет: разбор кадра и
-//! реакция на него растут вместе с планом, а работа с соединением — нет.
-//!
-//! Ни один обработчик не отвечает агенту: канал односторонний по смыслу,
-//! решения агент принимает сам, а мастер лишь узнаёт о случившемся.
+//! No handler here replies to the agent. The agent decides on its own; the
+//! master only finds out what happened.
 
 use super::proto::FromAgent;
 use crate::db::GameServerRow;
 use crate::state::AppState;
 
-/// Разобрать текстовый кадр и применить его.
-///
-/// Незнакомый кадр — не ошибка: агент может уехать вперёд по версии, и рвать
-/// из-за этого канал значит терять и те кадры, которые мы понимаем.
+/// An unrecognised frame is not an error — the agent may be ahead of us on
+/// version, and tearing down the channel over it loses the frames we do
+/// understand.
 pub async fn handle(state: &AppState, server: &GameServerRow, frame: &str) {
     match serde_json::from_str::<FromAgent>(frame) {
         Ok(msg) => apply(state, server, msg).await,
-        Err(e) => tracing::debug!(server = %server.name, error = %e, "кадр от агента пропущен"),
+        Err(e) => tracing::debug!(server = %server.name, error = %e, "skipped agent frame"),
     }
 }
 
@@ -32,14 +28,14 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
             if let Err(e) =
                 crate::db::game_sessions::start_session(&state.db, uuid, server.id).await
             {
-                tracing::warn!(server = %server.name, player = %uuid, error = %e, "не удалось открыть сессию игрока");
+                tracing::warn!(server = %server.name, player = %uuid, error = %e, "failed to open player session");
             }
             tracing::debug!(
                 server = %server.name,
                 player = %uuid,
                 vanished,
                 ip = ip_hash.as_deref().unwrap_or("-"),
-                "игрок вошёл"
+                "player joined"
             );
             restore_case_mode(state, server, uuid).await;
         }
@@ -53,13 +49,13 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
             )
             .await
             {
-                tracing::warn!(server = %server.name, player = %uuid, error = %e, "не удалось закрыть сессию игрока");
+                tracing::warn!(server = %server.name, player = %uuid, error = %e, "failed to close player session");
             }
             tracing::debug!(
                 server = %server.name,
                 player = %uuid,
                 reason = reason.as_deref().unwrap_or("-"),
-                "игрок вышел"
+                "player left"
             );
         }
         FromAgent::CaseClaim { case, moderator } => {
@@ -79,32 +75,30 @@ async fn apply(state: &AppState, server: &GameServerRow, msg: FromAgent) {
             moderator,
             items,
         } => super::cases::inventory(state, server, case, moderator, items).await,
-        // Рестарт по зависанию — п.39, он приходит вместе с расписаниями и
-        // правом дёргать враппер. Пока это сигнал в журнал: сервер, который не
-        // тикает минуту, обязан быть виден оператору, даже если чинить его
-        // некому.
+        // Anything shorter is only logged: a server that skips a few ticks
+        // recovers on its own, and restarting it would cost more than the stall.
         FromAgent::TickStall { stalled_secs } => {
             tracing::warn!(
                 server = %server.name,
                 stalled_secs,
-                "игровой поток не двигался — перезапускаем зависший сервер через wrapper"
+                "game thread stalled"
             );
             if stalled_secs >= 60 {
                 if let Err(e) = crate::wrapper::ops::power(state, server.server_id, "restart").await
                 {
-                    tracing::error!(server = %server.name, error = %e, "не удалось перезапустить зависший сервер");
+                    tracing::error!(server = %server.name, error = %e, "failed to restart stalled server");
                 }
             }
         }
     }
 }
 
-/// Вернуть модератору режим разбора при входе в игру.
+/// Put a moderator back into review mode when they log in.
 ///
-/// Замок на деле ставится на мастере и живёт в базе, а сессия разбора у
-/// агента — в памяти сервера. Их разводит любой перезапуск сервера и любое
-/// взятие дела с сайта: панель показывает «в работе», а команды `/case …`
-/// отвечают «вы не ведёте разбор». Кадр на входе снова их сводит.
+/// The case lock lives in the database, but the agent's review session only
+/// lives in server memory. A server restart, or claiming the case from the
+/// site, separates the two: the panel says "in progress" while `/case …`
+/// answers that you aren't reviewing anything.
 async fn restore_case_mode(state: &AppState, server: &GameServerRow, mc_uuid: uuid::Uuid) {
     let Ok(Some(user)) = crate::db::user_by_mc_uuid(&state.db, mc_uuid).await else {
         return;
@@ -112,12 +106,12 @@ async fn restore_case_mode(state: &AppState, server: &GameServerRow, mc_uuid: uu
     let cases = match crate::db::cases::claimed_on_server(&state.db, user.id, server.id).await {
         Ok(cases) => cases,
         Err(e) => {
-            tracing::warn!(player = %mc_uuid, error = %e, "дела модератора не прочитались");
+            tracing::warn!(player = %mc_uuid, error = %e, "failed to read moderator's cases");
             return;
         }
     };
     for case in &cases {
-        tracing::debug!(player = %mc_uuid, case = %case.id, "возвращаем режим разбора");
+        tracing::debug!(player = %mc_uuid, case = %case.id, "restoring review mode");
         super::cases::assigned(state, case, mc_uuid).await;
     }
 }

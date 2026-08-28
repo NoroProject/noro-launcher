@@ -1,4 +1,4 @@
-/** Каталог языков и утилиты форматирования. */
+/** Language catalog and formatting helpers. */
 
 export interface LocaleOption {
   code: string

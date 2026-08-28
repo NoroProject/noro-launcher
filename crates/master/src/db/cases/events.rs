@@ -1,4 +1,4 @@
-//! Лента разбора: что делали с делом и откуда.
+//! Case feed: what was done to a case, and from where.
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -13,7 +13,7 @@ pub struct CaseEventRow {
     pub at: DateTime<Utc>,
     pub actor_id: Option<Uuid>,
     pub actor_label: String,
-    /// `web`, `game` или `system` — по ленте должно быть видно, откуда действовали.
+    /// `web`, `game` or `system`.
     pub source: String,
     pub kind: String,
     pub payload: serde_json::Value,

@@ -1,11 +1,7 @@
--- Migration 0023: схема OAuth2-провайдера.
+-- OAuth2 provider schema.
 --
--- Изначально файл имел номер 0021 и столкнулся с 0021_user_skin_presets:
--- sqlx применил presets, а на этом файле упал с VersionMismatch и оборвал
--- всю дальнейшую цепочку. Таблицы временно создавались из Rust-кода
--- (ensure_default_launcher_app) — тот обход удалён вместе с переименованием.
--- CREATE TABLE IF NOT EXISTS оставлены: на dev и проде таблицы уже созданы
--- тем обходом, и миграция должна лечь поверх них без ошибки.
+-- IF NOT EXISTS is load-bearing: these tables were created from Rust for a while
+-- before this file existed, so on older databases they are already there.
 
 CREATE TABLE IF NOT EXISTS oauth_applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -38,7 +34,8 @@ CREATE TABLE IF NOT EXISTS oauth_codes (
     used BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- Официальный лаунчер — доверенное приложение: экран согласия ему не нужен.
+-- The official launcher is trusted, so it skips the consent screen. It is also a
+-- public client — there is no secret to hash.
 INSERT INTO oauth_applications (client_id, client_secret_hash, name, description, redirect_uris, is_trusted)
 VALUES ('noro_launcher', 'public', 'Noro Launcher', 'Официальный лаунчер Noro Network', '["http://127.0.0.1"]', TRUE)
 ON CONFLICT (client_id) DO UPDATE SET is_trusted = TRUE;

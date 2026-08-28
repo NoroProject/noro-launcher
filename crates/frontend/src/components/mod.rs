@@ -1,5 +1,4 @@
-//! UI-компоненты лаунчера. Один компонент = один файл (≤150 строк).
-// Часть компонентов — библиотечные, ещё не везде задействованы.
+// Some of these are library pieces that not every page uses yet.
 #![allow(unused_imports)]
 
 mod badge;

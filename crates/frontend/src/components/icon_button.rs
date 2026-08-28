@@ -1,5 +1,3 @@
-//! Кнопки-иконки.
-
 use crate::icons::ic;
 use crate::theme::*;
 use gpui::{
@@ -7,7 +5,6 @@ use gpui::{
     Window,
 };
 
-/// Кнопка с иконкой и подписью.
 #[allow(dead_code)]
 pub fn icon_btn(
     id: impl Into<ElementId>,
@@ -39,8 +36,8 @@ pub fn icon_btn(
         .on_click(on_click)
 }
 
-/// Компактная кнопка шага для числовых полей. 52-пиксельная `square_icon_btn`
-/// раздувала строку памяти почти до сотни пикселей высоты.
+/// Step button for numeric fields. Smaller than the usual square icon button on
+/// purpose — at 52px the memory row grew to nearly a hundred pixels tall.
 pub fn stepper_btn(
     id: impl Into<ElementId>,
     icon: &'static str,

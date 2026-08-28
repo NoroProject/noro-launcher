@@ -1,4 +1,4 @@
-//! Заготовки для тестов сверки.
+//! Fixtures for the pre-launch verification tests.
 
 use schema::{
     ArtifactKind, BuildManifest, FileEntry, FileSide, IntegrityKind, IntegrityReport, Modloader,
@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 pub const SERVER: &str = "22222222-2222-2222-2222-222222222222";
 
-/// sha1 от содержимого «ok».
+/// sha1 of the body "ok".
 pub const OK_SHA1: &str = "7a85f4764bbd6daf1c3545efbbf0f279a6dc0beb";
 
 pub fn entry(path: &str, sha1: &str, kind: ArtifactKind) -> (FileEntry, (String, ArtifactKind)) {
@@ -69,7 +69,7 @@ pub fn optional(name: &str, limited: bool, files: &[&str]) -> OptionalMod {
     OptionalMod {
         name: name.into(),
         description: String::new(),
-        category: "Геймплей".into(),
+        category: "Gameplay".into(),
         files: files.iter().map(|s| s.to_string()).collect(),
         enabled_by_default: false,
         visible: true,
@@ -109,8 +109,8 @@ pub fn player() -> UserProfile {
     }
 }
 
-/// Свой каталог на каждый тест: проверка удаляет файлы, и общий каталог сделал
-/// бы тесты зависимыми друг от друга.
+/// One directory per test — verification deletes files, so a shared one would
+/// make the tests depend on each other.
 pub struct Scratch(PathBuf);
 
 impl Scratch {

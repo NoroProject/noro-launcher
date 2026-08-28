@@ -3,24 +3,23 @@ package dev.noro.client.ui;
 import java.util.Locale;
 
 /**
- * Срок наказания строкой: {@code 15m}, {@code 2h}, {@code 7d}, {@code 1d 6h}.
- *
- * <p>Тот же формат, что принимает форма на сайте, и те же правила: пусто —
- * навсегда, непонятная строка — не ноль, а отказ. Ноль здесь означал бы
- * «наказать на нисколько», и разница видна только когда уже поздно.
+ * Punishment durations as text: {@code 15m}, {@code 2h}, {@code 7d}, {@code 1d 6h}.
+ * Same format the site's form accepts.
  */
 public final class Duration {
 
     private Duration() {}
 
     /**
-     * Минуты или {@code null} — «навсегда». Возвращает {@code -1}, если строку
-     * разобрать не удалось: вызывающий гасит кнопку, а не отправляет наугад.
+     * Minutes; {@code Long.MIN_VALUE} for forever, {@code -1} when the string
+     * didn't parse. An unparseable string must not fall through to zero — that
+     * would read as "punish for no time at all" and the difference only shows up
+     * once it's too late.
      */
     public static long parse(String text) {
         String value = text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
         if (value.isEmpty()) {
-            return Long.MIN_VALUE; // навсегда
+            return Long.MIN_VALUE; // forever
         }
         long total = 0;
         long number = -1;
@@ -49,7 +48,7 @@ public final class Duration {
             total += number * factor;
             number = -1;
         }
-        // Число без единицы — минуты: «30» в поле срока значит полчаса.
+        // A bare number means minutes: "30" in the duration field is half an hour.
         if (number >= 0) {
             total += number;
         }

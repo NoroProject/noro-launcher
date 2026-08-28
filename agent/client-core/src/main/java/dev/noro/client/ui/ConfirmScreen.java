@@ -4,13 +4,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-/**
- * Подтверждение поверх экрана: «точно?» для того, что трудно отменить.
- *
- * <p>Возврат туда, откуда пришли, а не на пустой экран: отмена не должна
- * стоить дороже согласия. Опасное действие подписано красным — цветом того же
- * смысла, что и на сайте.
- */
+/** "Are you sure?" over the calling screen, for things that are hard to undo. */
 public final class ConfirmScreen extends NoroScreen {
 
     private final Screen parent;
@@ -36,7 +30,7 @@ public final class ConfirmScreen extends NoroScreen {
 
     @Override
     protected void init() {
-        // Окно подтверждения меньше обычного: в нём одна строка и две кнопки.
+        // Smaller than a normal window: one line of text and two buttons.
         super.init();
         windowW = Math.min(width - 8 * Theme.GRID, 64 * Theme.GRID);
         windowH = 24 * Theme.GRID;

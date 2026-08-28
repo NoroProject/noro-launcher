@@ -1,23 +1,23 @@
-//! Кто сейчас в игре, поимённо, по каждому игровому серверу.
+//! Who is in game right now, by name, per game server.
 //!
-//! Живёт в памяти, а не в базе: это снимок настоящего момента, переживать
-//! перезапуск мастера ему незачем — состав приедет со следующим heartbeat.
+//! In memory rather than in the database: it's a snapshot of the present, and
+//! the roster arrives again with the next heartbeat anyway.
 //!
-//! **События только ускоряют, истину задаёт heartbeat.** `join`/`leave`
-//! приходят по каналу, который рвётся, поэтому раз в интервал агент присылает
-//! полный список и [`Roster::reconcile`] заменяет им накопленное. Без этого
-//! после каждого обрыва в списке оставались бы призраки.
+//! Events only make it faster; the heartbeat is the truth. `join`/`leave`
+//! travel over a channel that drops, so the agent periodically sends the full
+//! list and [`Roster::reconcile`] replaces what accumulated. Otherwise every
+//! disconnect would leave ghosts behind.
 
 use dashmap::DashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
 
-/// Состав одного игрового сервера.
+/// One game server's roster.
 ///
-/// Скрытые ванишем лежат отдельно от видимых: публичное число считается по
-/// первым, а сессии и права — по обоим. Слить их в одно множество значит либо
-/// показать скрытого модератора в списке, либо потерять его часы дежурства.
+/// Vanished players are kept apart from visible ones: the public count uses
+/// only the visible set, while sessions and permissions use both. Merging them
+/// would either expose a vanished moderator or lose their on-duty hours.
 #[derive(Default, Clone, Debug)]
 pub struct ServerRoster {
     pub visible: HashSet<Uuid>,
@@ -25,7 +25,7 @@ pub struct ServerRoster {
 }
 
 impl ServerRoster {
-    /// Все, кто на сервере, включая скрытых.
+    /// Everyone on the server, vanished included.
     pub fn everyone(&self) -> impl Iterator<Item = &Uuid> {
         self.visible.iter().chain(self.vanished.iter())
     }
@@ -52,8 +52,8 @@ impl ServerRoster {
 
 #[derive(Clone, Default)]
 pub struct Roster {
-    /// Ключ — `game_servers.id`: состав у каждого сервера свой, даже если
-    /// сборка одна на всех.
+    /// Keyed by `game_servers.id` — each server has its own roster even when
+    /// several share a build.
     servers: Arc<DashMap<Uuid, ServerRoster>>,
 }
 
@@ -71,7 +71,7 @@ impl Roster {
         }
     }
 
-    /// Заменить состав тем, что прислал heartbeat.
+    /// Replace the roster with what the heartbeat reported.
     pub fn reconcile(&self, game_server_id: Uuid, visible: Vec<Uuid>, vanished: Vec<Uuid>) {
         self.servers.insert(
             game_server_id,
@@ -82,7 +82,7 @@ impl Roster {
         );
     }
 
-    /// Сервер отключился — состав больше ничем не подтверждён.
+    /// Server disconnected — nothing confirms the roster any more.
     pub fn clear(&self, game_server_id: Uuid) {
         self.servers.remove(&game_server_id);
     }
@@ -94,8 +94,8 @@ impl Roster {
             .unwrap_or_default()
     }
 
-    /// Где сидит игрок прямо сейчас. Нужно действиям из админки: кикать и
-    /// писать в личку умеет только тот сервер, на котором игрок есть.
+    /// Which server the player is on right now. Admin actions need it — only
+    /// the server holding the player can kick them or message them.
     pub fn locate(&self, uuid: Uuid) -> Option<Uuid> {
         self.servers
             .iter()
@@ -119,7 +119,7 @@ mod tests {
 
         roster.join(server, player, true);
         let snapshot = roster.of(server);
-        assert!(snapshot.visible.is_empty(), "скрытый не остаётся видимым");
+        assert!(snapshot.visible.is_empty(), "vanished must not stay visible");
         assert!(snapshot.vanished.contains(&player));
         assert_eq!(roster.locate(player), Some(server));
     }
@@ -137,7 +137,7 @@ mod tests {
         let snapshot = roster.of(server);
         assert!(
             !snapshot.contains(ghost),
-            "потерянный leave не оставляет призрака"
+            "a lost leave must not leave a ghost"
         );
         assert!(snapshot.contains(real));
     }

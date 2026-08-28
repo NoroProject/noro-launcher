@@ -1,11 +1,6 @@
-//! Выбор версии сборки в нижней панели.
-//!
-//! Раскрывающийся список, а не ряд кнопок: версий у сервера бывает десяток, и
-//! ряд пилюль раздвигал панель до кнопки запуска, а лишние версии просто
-//! уезжали за край.
-//!
-//! Показывается, только когда версий больше одной: у обычного игрока доступна
-//! ровно одна, и пустой селектор был бы шумом на самом видном месте экрана.
+//! Build selector in the bottom bar. A dropdown rather than a row of pills
+//! because a server can carry a dozen builds, and hidden entirely below two —
+//! ordinary players only ever see one.
 
 use super::common::Cx;
 use crate::icons::ic;
@@ -21,7 +16,6 @@ pub fn build_picker(ui: &LauncherUI, server: &ServerEntry, cx: &mut Cx) -> Optio
         return None;
     }
 
-    // Выбранная версия, иначе текущая опубликованная.
     let active = ui
         .selected_build
         .get(&server.id)
@@ -42,8 +36,8 @@ pub fn build_picker(ui: &LauncherUI, server: &ServerEntry, cx: &mut Cx) -> Optio
     )
 }
 
-/// Кнопка с текущей версией. Список раскрывается вверх: панель и так стоит у
-/// нижнего края окна.
+/// The menu opens upward — the bar already sits against the bottom of the
+/// window.
 fn trigger(server_id: Uuid, current: Option<&BuildOption>, open: bool, cx: &mut Cx) -> AnyElement {
     let label = current
         .map(|b| b.version.clone())
@@ -106,8 +100,8 @@ fn menu(server: &ServerEntry, active: Option<Uuid>, cx: &mut Cx) -> AnyElement {
         .bottom(px(40.))
         .left(px(0.))
         .w(px(240.))
-        // Десяток версий — обычное дело для активного сервера, поэтому список
-        // не растёт вверх бесконечно, а прокручивается.
+        // Capped and scrolled: an active server accumulates enough builds that
+        // the list would otherwise run off the top of the window.
         .max_h(px(280.))
         .overflow_y_scroll()
         .p(px(4.))
@@ -123,8 +117,8 @@ fn menu(server: &ServerEntry, active: Option<Uuid>, cx: &mut Cx) -> AnyElement {
 }
 
 fn option(server_id: Uuid, build: &BuildOption, active: bool, cx: &mut Cx) -> AnyElement {
-    // Превью выделяется акцентом даже невыбранным: игрок должен видеть, что
-    // берёт неопубликованную версию, до запуска, а не после.
+    // Unpublished builds carry the accent even when not selected — the player
+    // should see they're picking a preview before launching, not after.
     let build_id = build.id;
 
     div()

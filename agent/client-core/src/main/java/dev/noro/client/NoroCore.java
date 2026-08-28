@@ -15,20 +15,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Ядро клиентских модов Noro: канал с лаунчером и общий вид.
+ * Core of the Noro client mods: the launcher channel and the shared look.
  *
- * <p>Само по себе ядро ничего не показывает. Оно держит одно соединение с
- * лаунчером, раздаёт кадры функциям и даёт им экраны, кнопки и плашки в стиле
- * лаунчера, чтобы «в стиле Noro» не переписывалось в каждом моде заново.
+ * <p>The core shows nothing on its own. It holds one connection to the launcher,
+ * hands frames to features, and gives them screens, buttons and badges so
+ * "Noro-styled" isn't rewritten in every mod.
  *
- * <p>Поверх ядра живут отдельные моды: {@code noro_staff} — инструменты
- * модератора, {@code noro_player} — то, что нужно игроку. Разделены они не для
- * красоты: staff раздаётся по праву и лежит не у всех, а игрок не должен
- * получать половину панели разбора вместе с обычной сборкой.
+ * <p>Separate mods sit on top: {@code noro_staff} for moderator tools,
+ * {@code noro_player} for the rest. Staff is handed out by entitlement and isn't
+ * on every machine — a player must not get half the case panel with an ordinary
+ * build.
  *
- * <p>Ни один из них не носитель прав. Клиент подделывается, jar
- * декомпилируется; любая проверка внутри него украшение. Мастер отвечает 403 —
- * экран показывает отказ, и это единственная линия.
+ * <p>Neither mod carries authority. Clients get patched and jars get decompiled,
+ * so any check in here is decoration. The master answers 403 and the screen shows
+ * the refusal; that's the only line.
  */
 @Mod(value = NoroCore.ID, dist = Dist.CLIENT)
 @EventBusSubscriber(modid = NoroCore.ID, value = Dist.CLIENT)
@@ -38,16 +38,15 @@ public final class NoroCore {
     public static final Logger LOG = LoggerFactory.getLogger("NoroCore");
 
     /**
-     * Функции регистрируются на загрузке своих модов, до входа на сервер.
-     * Список копируемый: регистрация идёт с потока загрузки, а раздача кадров —
-     * с потока сокета.
+     * Copy-on-write because registration runs on the mod loading thread while
+     * frames are dispatched from the socket thread.
      */
     private static final List<Feature> FEATURES = new CopyOnWriteArrayList<>();
 
     /**
-     * Свод правил подключается самим ядром: он нужен и модератору при выдаче
-     * наказания, и игроку — прочитать, за что наказали. Держать его копию в
-     * каждом моде значит однажды показать два разных свода.
+     * The core owns the rule book: a moderator needs it to issue a punishment and
+     * a player needs it to read what they were punished for. A copy per mod would
+     * eventually show two different rule books.
      */
     private static final RuleBook RULES = new RuleBook();
 
@@ -63,17 +62,17 @@ public final class NoroCore {
         return RULES;
     }
 
-    /** Подключить свою функцию к каналу. Вызывается из конструктора мода. */
+    /** Called from a mod's constructor. */
     public static void register(Feature feature) {
         FEATURES.add(feature);
-        LOG.info("функция подключена: {}", feature.id());
+        LOG.info("feature registered: {}", feature.id());
     }
 
     public static Bridge bridge() {
         return BRIDGE;
     }
 
-    /** Вход на сервер — момент, когда файл рукопожатия уже на месте. */
+    /** By login the handshake file is guaranteed to be in place. */
     @SubscribeEvent
     public static void onJoin(ClientPlayerNetworkEvent.LoggingIn event) {
         BRIDGE.connect(Minecraft.getInstance().gameDirectory.toPath());

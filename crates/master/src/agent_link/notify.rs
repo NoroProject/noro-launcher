@@ -1,16 +1,15 @@
-//! Рассылка наказаний на игровые серверы.
+//! Pushing punishments out to game servers.
 //!
-//! Одна точка для всех, кто наказывает: админка, кабинет и сам агент. Иначе
-//! бан из панели долетал бы до игры мгновенно, а бан командой из игры — только
-//! к следующему входу, и объяснить эту разницу было бы нечем.
+//! One entry point for everyone who punishes — admin panel, account page and
+//! the agent itself — so a ban behaves the same however it was issued.
 
 use super::proto::{LivePunishment, ToAgent};
 use crate::db::models::UserRow;
 use crate::db::punishments::PunishmentRow;
 use crate::state::AppState;
 
-/// Наказание выдано. Ошибки только логируем: наказание уже в базе, и падать
-/// из-за того, что кадр не ушёл, значит терять сам факт.
+/// Errors are only logged: the punishment is already in the database, and
+/// failing here because a frame didn't go out would lose it.
 pub async fn punished(state: &AppState, row: &PunishmentRow) {
     let Some(user) = load_user(state, row).await else {
         return;
@@ -31,8 +30,8 @@ pub async fn punished(state: &AppState, row: &PunishmentRow) {
     state.agents.send(&msg, row.server_id);
 }
 
-/// Наказание снято. Кадр уходит той же аудитории, что и выдача: сервер, где
-/// игрок сидит замученным, обязан узнать о снятии, даже если сам его не выдавал.
+/// Goes to the same audience as the original: a server where the player is
+/// sitting muted has to hear about the lift even if it didn't issue the mute.
 pub async fn revoked(state: &AppState, row: &PunishmentRow, actor_label: &str) {
     let Some(user) = load_user(state, row).await else {
         return;
@@ -47,7 +46,6 @@ pub async fn revoked(state: &AppState, row: &PunishmentRow, actor_label: &str) {
     state.agents.send(&msg, row.server_id);
 }
 
-/// Шаблоны сообщений поменяли — агенты перечитают их сами.
 pub fn messages_changed(state: &AppState) {
     state.agents.broadcast(&ToAgent::MessagesChanged);
 }
@@ -73,14 +71,14 @@ pub fn restart_notice(
     }
 }
 
-/// Профиль игрока изменился: роли, права, префикс.
+/// A player's roles, permissions or prefix changed.
 ///
-/// Без этого выданная на сайте роль не значила в игре ничего до перезахода:
-/// `ProfileCache` наполняется на логине и обновляет только муты.
+/// Without this a role granted on the site means nothing in game until the
+/// player relogs: `ProfileCache` is filled at login and only refreshes mutes.
 ///
-/// `None` — перечитать всех. Так уходит правка самой роли: носителей у неё
-/// сколько угодно, и перечислять их здесь значит повторить выборку, которую
-/// агент всё равно сделает по своему списку онлайна.
+/// `None` means re-read everyone, which is how an edit to the role itself
+/// travels — listing its holders here would repeat a query the agent runs
+/// anyway against its own online list.
 pub fn profile_changed(state: &AppState, mc_uuid: Option<uuid::Uuid>) {
     state
         .agents
@@ -156,7 +154,7 @@ async fn load_user(state: &AppState, row: &PunishmentRow) -> Option<UserRow> {
     match crate::db::get_user(&state.db, row.user_id).await {
         Ok(user) => user,
         Err(e) => {
-            tracing::warn!(error = %e, "наказание не ушло агентам: игрок не читается");
+            tracing::warn!(error = %e, "punishment not sent to agents: can't read the player");
             None
         }
     }

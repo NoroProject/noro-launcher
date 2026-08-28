@@ -1,4 +1,4 @@
-//! Порядок и параллельность загрузки по видам артефактов.
+//! Download order and per-stage concurrency.
 
 use bridge::SyncStage;
 use schema::ArtifactKind;
@@ -9,12 +9,10 @@ pub(super) struct StageGroup {
     pub concurrency: usize,
 }
 
-/// Сопоставление стадий и категорий артефактов.
-///
-/// Параллелизм подобран под размер файлов: у ассетов их тысячи по несколько
-/// килобайт, и время уходит на round-trip, а не на передачу — им нужно много
-/// запросов сразу. Крупным архивам это наоборот вредит: они делят один канал
-/// и все финишируют позже, чем если бы качались по очереди.
+/// Concurrency is picked by file size. Assets are thousands of a few kilobytes
+/// each, so the time goes into round-trips and they want many requests in
+/// flight. Large archives are the opposite: they share one link and all finish
+/// later than they would in sequence.
 pub(super) const STAGE_GROUPS: &[StageGroup] = &[
     StageGroup {
         stage: SyncStage::DownloadingJava,
@@ -24,7 +22,7 @@ pub(super) const STAGE_GROUPS: &[StageGroup] = &[
     StageGroup {
         stage: SyncStage::DownloadingMinecraft,
         kinds: &[ArtifactKind::ClientJar],
-        // Один файл — параллелить нечего.
+        // One file, nothing to parallelise.
         concurrency: 2,
     },
     StageGroup {
@@ -39,7 +37,7 @@ pub(super) const STAGE_GROUPS: &[StageGroup] = &[
     StageGroup {
         stage: SyncStage::DownloadingAssets,
         kinds: &[ArtifactKind::Asset, ArtifactKind::AssetIndex],
-        // Мультиплексируются в одно HTTP/2-соединение, так что это не 48 сокетов.
+        // Multiplexed onto one HTTP/2 connection, so this isn't 48 sockets.
         concurrency: 48,
     },
     StageGroup {

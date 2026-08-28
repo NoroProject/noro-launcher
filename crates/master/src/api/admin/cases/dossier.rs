@@ -1,8 +1,7 @@
-//! Досье игрока: ник, роли, действующие наказания и сколько дел подтвердилось.
+//! Player dossier: name, roles, active punishments, confirmed case count.
 //!
-//! Отвечает на вопрос, за которым сейчас уходят на сайт посреди разбора: «он
-//! новичок или у него третий бан за то же». Историю целиком карточка игрока
-//! отдаёт и так — сюда попадает только то, что помещается в плашку.
+//! Just enough to answer "first offence or third ban for the same thing?"
+//! without leaving the case mid-review. Full history stays on the player page.
 
 use crate::api::auth::AdminAuth;
 use crate::error::{AppError, AppResult};
@@ -18,7 +17,6 @@ pub struct DossierQuery {
     pub username: String,
 }
 
-/// GET /api/admin/cases/dossier?username=…
 pub async fn dossier(
     State(state): State<AppState>,
     admin: AdminAuth,
@@ -34,8 +32,7 @@ pub async fn dossier(
         .unwrap_or_default();
     let stats = crate::db::cases::target_stats(&state.db, user.id).await?;
 
-    // Только действующее: в наведении важно текущее состояние, а история —
-    // в карточке дела и на странице игрока.
+    // Active only — a hover card wants the current state, not the log.
     let now = chrono::Utc::now();
     let active: Vec<_> = crate::db::list_punishments(&state.db, user.id)
         .await?

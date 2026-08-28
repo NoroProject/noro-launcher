@@ -1,5 +1,3 @@
-//! Админ: флаги целостности.
-
 use crate::api::auth::AdminAuth;
 use crate::audit::{self, target};
 use crate::db::integrity::IntegrityFlagRow;
@@ -16,7 +14,7 @@ use uuid::Uuid;
 #[derive(Deserialize)]
 pub struct ListQuery {
     pub user_id: Option<Uuid>,
-    /// Только неразобранные — то, что нужно смотреть.
+    /// Unreviewed flags only.
     #[serde(default)]
     pub open: bool,
     pub limit: Option<i64>,
@@ -34,7 +32,6 @@ pub async fn list(
     Ok(Json(rows))
 }
 
-/// Пометить разобранным.
 pub async fn review(
     State(state): State<AppState>,
     admin: AdminAuth,

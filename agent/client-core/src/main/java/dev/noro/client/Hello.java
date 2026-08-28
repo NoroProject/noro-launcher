@@ -9,15 +9,13 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 /**
- * Отметка для сервера: у этого клиента наши моды.
+ * Tells the server this client has our mods. Carries no data — what matters is
+ * that the channel was negotiated at all.
  *
- * <p>Ничего не передаёт — важен сам факт, что канал согласован. Ядро едет в
- * каждой сборке лаунчера, поэтому канал есть ровно у тех, у кого вместе со
- * сборкой приехал и пак с плашками.
- *
- * <p>По нему сервер понимает, что выдавать пак не надо: он уже стоит и загружен
- * при запуске игры. Иначе клиент перезагружал бы ресурсы на каждом входе — ради
- * того, что у него и так есть.
+ * <p>The core ships in every launcher build, and so does the prefix pack, so a
+ * client with this channel already has the pack loaded. The server uses that to
+ * skip sending it; otherwise the client would reload resources on every join for
+ * something it already has.
  */
 @EventBusSubscriber(modid = NoroCore.ID, bus = EventBusSubscriber.Bus.MOD)
 public final class Hello {
@@ -39,8 +37,8 @@ public final class Hello {
 
     @SubscribeEvent
     public static void register(RegisterPayloadHandlersEvent event) {
-        // Необязательный: сервер без агента про канал не знает, и это не повод
-        // не пускать игрока.
+        // Optional: a server without the agent doesn't know this channel, and
+        // that's no reason to refuse the player.
         event.registrar("1").optional().playToClient(Payload.TYPE, Payload.CODEC, (payload, context) -> {});
     }
 }

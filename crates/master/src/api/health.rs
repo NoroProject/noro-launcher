@@ -1,4 +1,4 @@
-//! Health-check для оркестратора и мониторинга.
+//! Health check for the orchestrator and monitoring.
 
 use crate::state::AppState;
 use axum::extract::State;
@@ -6,10 +6,10 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 
-/// `GET /health` — жив ли мастер и отвечает ли БД.
+/// `GET /health`
 ///
-/// Проверка идёт до базы намеренно: процесс, поднятый без работающего
-/// PostgreSQL, отвечает на HTTP, но не может обслужить ни один запрос.
+/// Reaches the database on purpose: a process started without a working
+/// PostgreSQL still answers HTTP but can't serve a single request.
 pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
     match sqlx::query("SELECT 1").execute(&state.db).await {
         Ok(_) => (
@@ -17,7 +17,7 @@ pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
             Json(serde_json::json!({ "status": "ok", "version": env!("CARGO_PKG_VERSION") })),
         ),
         Err(e) => {
-            tracing::error!(error = %e, "health-check: БД недоступна");
+            tracing::error!(error = %e, "health check: database unavailable");
             (
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(serde_json::json!({ "status": "db_unavailable" })),

@@ -1,7 +1,8 @@
-//! Обмен подтверждённого гранта на сессию.
+//! Trading an approved grant for a session.
 //!
-//! Ходит сюда сам лаунчер, своим текущим Bearer: токен уезжает по уже
-//! аутентифицированному каналу, а не через браузер, URL или аргументы процесса.
+//! The launcher calls this with its own bearer token, so the impersonated
+//! token comes back over an already-authenticated channel instead of through a
+//! browser, a URL or process arguments.
 
 use crate::api::auth::AuthUser;
 use crate::audit;
@@ -14,8 +15,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-/// Сколько живёт сессия impersonation. Полчаса: этого хватает разобраться в
-/// проблеме, и не хватает забыть, что ты в чужом аккаунте.
+/// Long enough to look into a problem, short enough that nobody forgets which
+/// account they're in.
 const SESSION_TTL_MINS: i64 = 30;
 
 #[derive(Deserialize)]
@@ -23,7 +24,6 @@ pub struct ClaimReq {
     pub grant_id: Uuid,
 }
 
-/// Забрать сессию по подтверждённому гранту.
 pub async fn claim(
     State(state): State<AppState>,
     user: AuthUser,
@@ -35,8 +35,8 @@ pub async fn claim(
             AppError::Forbidden("grant not found, not approved or already used".into())
         })?;
 
-    // Права могли измениться между запросом и подтверждением — проверяем ещё
-    // раз: между двумя проверками прошла минута, и за неё роль могли снять.
+    // Re-check: minutes can pass between requesting a grant and claiming it,
+    // and a role can be taken away in that gap.
     let actor = crate::db::load_profile(&state.db, grant.actor_id).await?;
     let target = crate::db::load_profile(&state.db, grant.target_id).await?;
     if !super::can_impersonate(&actor, &target) {
@@ -68,7 +68,7 @@ pub async fn claim(
         }),
     )
     .await;
-    tracing::warn!(actor = %actor.username, target = %target.username, "начата сессия impersonation");
+    tracing::warn!(actor = %actor.username, target = %target.username, "impersonation session started");
 
     Ok(Json(json!({
         "access_token": access_token.to_string(),

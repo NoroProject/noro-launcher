@@ -1,25 +1,24 @@
-//! Кого можно «надеть».
+//! Who may be impersonated.
 //!
-//! При выбранной модели «под impersonation доступно всё, что доступно игроку»
-//! это единственная преграда против эскалации привилегий: без неё админ с
-//! правом impersonate входит в аккаунт другого админа и получает его права.
-//! Поэтому правило жёсткое и проверяется на сервере при каждом гранте.
+//! An impersonated session carries everything the target can do, so this check
+//! is the only thing standing between the impersonate permission and full
+//! privilege escalation. It runs on the server for every grant.
 
 use schema::{permission_matches, UserProfile};
 
-/// Строго ли права цели покрываются правами актора.
+/// Whether the actor's permissions cover the target's.
 ///
-/// «Покрываются» — по тем же шаблонам, что и обычная проверка: `noro.admin.*`
-/// у актора покрывает `noro.admin.users` у цели. Иначе правило запрещало бы
-/// почти всё: у игроков права выданы поимённо, у админов — шаблонами.
+/// Coverage uses the same wildcards as a normal permission check — an actor
+/// holding `noro.admin.*` covers a target's `noro.admin.users`. Matching
+/// literally would deny nearly everything: players are granted by name, admins
+/// by pattern.
 pub fn can_impersonate(actor: &UserProfile, target: &UserProfile) -> bool {
-    // Себя надевать незачем, и это скрыло бы действия админа под видом
-    // impersonation.
+    // Impersonating yourself would just hide your own actions behind an
+    // impersonation record.
     if actor.id == target.id {
         return false;
     }
-    // Root — операторский аккаунт с полным доступом; «надеть» его значит
-    // получить всё, что есть в системе.
+    // Root is the operator account, so it covers everything by definition.
     if target.is_root {
         return false;
     }

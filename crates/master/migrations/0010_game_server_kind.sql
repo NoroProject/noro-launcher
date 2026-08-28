@@ -1,16 +1,12 @@
--- Тип игрового сервера и переезд адреса со сборки.
---
--- Адрес лежал в `servers` и дублировал адреса игровых серверов. Теперь он
--- живёт только здесь: прокси — точка входа для игрока, бэкенды — то, где
--- крутится агент и считается онлайн.
+-- `kind` splits proxies (the address players connect to) from backends (where
+-- the agent runs and online is counted). The address now lives only here.
 ALTER TABLE game_servers ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'server';
 
--- У сборок, которым игровые сервера ещё не завели, адрес превращается в
--- обычный сервер: раньше он был единственным, значит на него и заходили.
+-- Builds that never got a game_server row keep their old address as a backend.
 --
--- Секрет для такой записи неизвестен никому: в token_hash кладётся значение,
--- прообраз которого не существует. Агент по нему не подключится, пока админ
--- не перевыпустит секрет — это честнее, чем выдать общий предсказуемый.
+-- The token_hash below has no preimage — nobody, including us, knows a secret
+-- that hashes to it. The agent stays locked out until an admin reissues one,
+-- which beats seeding a predictable shared secret.
 INSERT INTO game_servers (server_id, name, mc_host, mc_port, token_hash, kind)
 SELECT s.id,
        s.name,

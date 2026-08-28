@@ -1,5 +1,5 @@
-//! Чем можно войти на этом инстансе. Публичная ручка: страница входа не должна
-//! показывать кнопку, за которой ничего нет.
+//! What you can sign in with on this instance. Public, so the login page never
+//! shows a button with nothing behind it.
 
 use super::config;
 use super::provider::Provider;
@@ -20,21 +20,20 @@ pub async fn list(State(state): State<AppState>) -> AppResult<Json<Value>> {
 
     Ok(Json(json!({
         "providers": providers,
-        // Passkey требует не только флага: без публичных адресов WebAuthn не
-        // инициализируется, и кнопка вела бы в отказ.
+        // The flag alone isn't enough: WebAuthn doesn't initialise without
+        // public URLs configured, and the button would lead to a refusal.
         "passkey": state.webauthn.is_some() && passkey_enabled(&state).await?,
     })))
 }
 
-/// Включён ли вход по passkey. Отдельно от наличия WebAuthn: оператор может
-/// выключить способ, даже когда технически он доступен.
+/// Separate from whether WebAuthn is configured: the operator can switch the
+/// method off even when it would technically work.
 pub async fn passkey_enabled(state: &AppState) -> AppResult<bool> {
     Ok(crate::db::auth_methods::is_enabled(&state.db, PASSKEY).await?)
 }
 
-/// Отказ, если passkey выключен оператором. Проверяется в каждой ручке
-/// passkey: выключенный способ входа обязан быть выключен и для того, кто
-/// зовёт API напрямую, а не только для кнопки на сайте.
+/// Called from every passkey handler: a disabled sign-in method has to be
+/// disabled for direct API callers too, not just for the button on the site.
 pub async fn require_passkey_enabled(state: &AppState) -> AppResult<()> {
     if passkey_enabled(state).await? {
         return Ok(());

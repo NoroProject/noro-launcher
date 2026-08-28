@@ -1,4 +1,4 @@
-//! Ошибка в rp_id не лечится: passkey привязывается к домену навсегда.
+//! A wrong rp_id can't be fixed later: a passkey is bound to its domain for good.
 
 use super::*;
 
@@ -37,7 +37,7 @@ fn unrelated_domains_fail_at_startup_not_at_login() {
 
 #[test]
 fn a_suffix_that_is_not_a_subdomain_is_rejected() {
-    // "notexample.dev" оканчивается на "example.dev" как строка, но доменом
-    // ему не является — иначе чужой сайт получил бы наши ключи.
+    // "notexample.dev" ends with "example.dev" as a string but isn't a
+    // subdomain of it; otherwise someone else's site would get our keys.
     assert!(rp_id("https://example.dev", "https://notexample.dev").is_err());
 }

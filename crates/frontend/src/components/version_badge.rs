@@ -1,14 +1,8 @@
-//! Версия запущенной сборки — мелкой строкой в углу.
-//!
-//! Раньше версию показывал только блок обновления, да и то чужую: ту, что
-//! доступна к установке. Свою узнать было неоткуда, кроме файла `version` в
-//! каталоге данных, а без неё непонятно, дошло ли обновление.
-
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement};
 
-/// Берётся из Cargo при компиляции, поэтому всегда соответствует бинарнику —
-/// в отличие от файла на диске, который пишет bootstrapper.
+/// Baked in by Cargo, so it always matches the running binary — unlike the
+/// `version` file on disk, which the bootstrapper writes.
 pub fn version_badge() -> AnyElement {
     div()
         .font_family(FONT_PIXEL_ALT)

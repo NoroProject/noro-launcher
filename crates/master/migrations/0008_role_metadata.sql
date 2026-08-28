@@ -1,13 +1,9 @@
--- Дополнительные свойства ролей.
+-- The master and LuckPerms keep separate role models on purpose; `lp_group` is
+-- the only thing tying them together, and it is what the syncer matches on. NULL
+-- means the role is not projected into the game at all.
 --
--- lp_group — имя группы в LuckPerms. Базы намеренно раздельные: у мастера своя
--- модель ролей, у LuckPerms своя. Это поле — единственная точка их связи, по
--- нему синхронизатор поймёт, какой группе соответствует роль. NULL означает,
--- что роль в игру не проецируется.
---
--- icon — короткая строка: имя иконки из набора либо юникод-символ. Хранится
--- текстом, а не файлом: роль показывается рядом с ником, и там нужен глиф,
--- переживающий и веб, и чат в игре.
+-- `icon` is an icon name or a unicode glyph, not a file: it is drawn next to the
+-- nickname both on the site and in in-game chat.
 
 ALTER TABLE roles ADD COLUMN IF NOT EXISTS lp_group TEXT;
 ALTER TABLE roles ADD COLUMN IF NOT EXISTS icon TEXT;

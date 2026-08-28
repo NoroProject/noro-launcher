@@ -1,8 +1,7 @@
-//! Passkey: регистрация в кабинете и вход по WebAuthn.
+//! Passkeys: registration in the cabinet and WebAuthn sign-in.
 //!
-//! Подпись проверяется библиотекой `webauthn-rs` — вместе с challenge, origin,
-//! rpId и счётчиком. До этого достаточно было знать `credential_id`, который
-//! браузер отдаёт публично.
+//! `webauthn-rs` does the verification — signature, challenge, origin, rpId and
+//! the counter. Nothing here re-checks any of that by hand.
 
 mod login;
 mod register;
@@ -12,8 +11,8 @@ pub use register::{delete_passkey, list_passkeys, register_options, register_ver
 
 use crate::error::AppError;
 
-/// Ответ на `/options`: опции для браузера плюс id состояния, которое мастер
-/// придержал у себя. Клиент возвращает его в `/verify`.
+/// Reply to `/options`: browser options plus the id of the state the master
+/// kept for itself. The client hands that id back to `/verify`.
 #[derive(serde::Serialize)]
 pub struct ChallengeRes<T> {
     pub state_id: uuid::Uuid,
@@ -21,9 +20,9 @@ pub struct ChallengeRes<T> {
     pub options: T,
 }
 
-/// Провал проверки не должен подсказывать, чего именно не хватило: подробности
-/// уезжают в лог, наружу — одна формулировка.
+/// A failure must not hint at what was missing: details go to the log, the
+/// caller always gets the same sentence.
 fn reject(err: webauthn_rs::prelude::WebauthnError) -> AppError {
-    tracing::warn!(error = %err, "проверка WebAuthn не пройдена");
+    tracing::warn!(error = %err, "WebAuthn verification failed");
     AppError::Unauthorized("That key did not match".into())
 }

@@ -22,11 +22,10 @@ web/.vercel
 web/.turbo
 web/coverage
 
-# java-агенты
+# java agents
 agent/**/.gradle/
-# Одним правилом на любую глубину: у версионных сборок каталог лежит в
-# agent/mod/versions/<mc>-<loader>/build, и прежние agent/build + agent/*/build
-# до него не доставали — 1138 артефактов оказались в индексе.
+# Any depth: versioned builds sit in agent/mod/versions/<mc>-<loader>/build,
+# which plain agent/build and agent/*/build never reached.
 agent/**/build/
 agent/**/bin/
 *.class
@@ -35,7 +34,7 @@ agent/**/.classpath
 agent/**/.project
 agent/**/.settings/
 
-# данные мастера
+# master data
 /data
 master_data/
 *.sqlite
@@ -43,7 +42,7 @@ master_data/
 *.sqlite-shm
 *.sqlite-wal
 
-# ключи (не коммитим приватные ключи подписи)
+# signing keys
 *.pem
 ed25519_private*
 secrets/
@@ -51,17 +50,13 @@ secrets/
 *.jks
 *.keystore
 
-# Черновики и архивы под рукой: собранные агенты, распаковки, разовые скрипты.
+# scratch space: built agents, unpacked archives, one-off scripts
 /scratch/
 
-# Клоны чужих репозиториев, с которыми делаются мосты к NoroAgentApi: TAB и
-# StyledChat. Лежат в vendor/, чтобы не мешаться в корне, и в индекс не идут —
-# у каждого свой upstream.
-# 915 МБ со своим .git внутри — одна `git add -A`, и это уедет в историю.
+# Clones of third-party repos we bridge to NoroAgentApi (TAB, StyledChat). Each
+# tracks its own upstream, and together they run to ~915 MB with .git included.
 /vendor/
 
-# Рабочие файлы скрипта пересоздания OCI-инстанса: конкретные OCID тенанси,
-# лог попыток и id созданного инстанса. Шаблон — scripts/oci-launch.env.example.
-/scripts/oci-launch.env
-/scripts/oci-retry-launch.log
-/scripts/.last-instance-ocid
+# Working files of the OCI instance scripts — they hold tenancy OCIDs. The
+# scripts went away with the move to AWS, but the files are still on disk.
+/scripts/oci-*

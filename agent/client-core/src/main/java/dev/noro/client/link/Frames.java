@@ -5,12 +5,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 /**
- * Конверт кадра: {@code {"type": …, "data": {…}}}.
+ * Frame envelope: {@code {"type": …, "data": {…}}}.
  *
- * <p>Тут нет ни одного имени кадра. Их знают функции — конверт лишь
- * подписывает, что внутри, и разбирает `data` в тот класс, который функция
- * попросила. Иначе транспорт пришлось бы править на каждую новую возможность
- * мода, и «вспомогательный» превратился бы в «дела и немного всего».
+ * <p>Deliberately contains no frame names. Features know those; the envelope
+ * only labels what's inside and parses {@code data} into whatever class the
+ * feature asked for. Otherwise the transport would need editing for every new
+ * capability.
  */
 public final class Frames {
 
@@ -18,7 +18,7 @@ public final class Frames {
 
     private Frames() {}
 
-    /** Имя кадра. {@code null} — это не наш конверт. */
+    /** Frame name, or {@code null} when this isn't our envelope. */
     public static String type(JsonObject envelope) {
         JsonElement type = envelope == null ? null : envelope.get("type");
         return type == null || type.isJsonNull() ? null : type.getAsString();
@@ -32,15 +32,15 @@ public final class Frames {
         }
     }
 
-    /** Содержимое кадра. Кадр без полей — обычное дело, отдаём пустой объект. */
+    /** A frame with no fields is common, so a missing {@code data} parses as an empty object. */
     public static <T> T data(JsonObject envelope, Class<T> target) {
         JsonElement data = envelope.get("data");
         return GSON.fromJson(data == null || data.isJsonNull() ? new JsonObject() : data, target);
     }
 
     /**
-     * Кадр наружу. Без полей — {@code {"type": …}} без {@code data}: половина
-     * намерений именно такие, и лишний пустой объект та сторона не ждёт.
+     * Outbound frame. A field-less one is written as {@code {"type": …}} with no
+     * {@code data} — the other side doesn't expect a stray empty object.
      */
     public static String write(Object frame) {
         JsonObject root = new JsonObject();

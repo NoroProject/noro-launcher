@@ -1,8 +1,5 @@
--- Какой лаунчер у какого игрока.
---
--- Раньше версия клиента не доходила до мастера вообще: сказать, кто остался на
--- старой сборке и почему у него «не работает», было нечем. Одна строка на
--- игрока — история не нужна, важно текущее состояние.
+-- Which launcher build each player is on, so "it doesn't work for me" can be
+-- answered. One row per player: the current state is what matters, not history.
 CREATE TABLE IF NOT EXISTS launcher_clients (
     user_id      UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     version      TEXT NOT NULL DEFAULT '',

@@ -1,9 +1,6 @@
-//! Пиксельный заголовок/логотип в стиле ATOM.
-
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, FontWeight, IntoElement, SharedString};
 
-/// Крупный пиксельный заголовок (логотип). `size` — высота шрифта в px.
 pub fn pixel_title(text: impl Into<SharedString>, size: f32, color: u32) -> impl IntoElement {
     div()
         .font_family(FONT_PIXEL)
@@ -14,7 +11,6 @@ pub fn pixel_title(text: impl Into<SharedString>, size: f32, color: u32) -> impl
         .child(text.into())
 }
 
-/// Компактная пиксельная подпись секции.
 #[allow(dead_code)]
 pub fn pixel_label(text: impl Into<SharedString>, color: u32) -> impl IntoElement {
     div()

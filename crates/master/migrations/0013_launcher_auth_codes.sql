@@ -1,11 +1,8 @@
--- Мастер отдавал токены лаунчеру POST-запросом на 127.0.0.1:{port}, то есть на
--- собственный localhost. Совпадало это только когда мастер запущен на машине
--- игрока; с боевого сервера запрос уходил внутрь контейнера, и лаунчер вечно
--- висел в «ожидании».
---
--- Теперь браузер игрока сам открывает loopback лаунчера, получив одноразовый
--- код, а за токенами лаунчер идёт к мастеру по HTTPS. Токены не попадают ни в
--- историю браузера, ни в логи прокси — в URL едет только код с коротким TTL.
+-- One-time codes for the launcher login handoff. The player's browser hits the
+-- launcher's loopback port with a code, and the launcher trades it for tokens
+-- over HTTPS. Only the code travels in a URL, so tokens stay out of browser
+-- history and proxy logs — and the master never has to reach the player's
+-- machine, which it cannot do from inside a container anyway.
 CREATE TABLE IF NOT EXISTS launcher_auth_codes (
     code          UUID PRIMARY KEY,
     user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

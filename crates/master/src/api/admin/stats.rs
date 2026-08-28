@@ -1,5 +1,3 @@
-//! Админ: статистика.
-
 use crate::api::auth::AdminAuth;
 use crate::error::AppResult;
 use crate::state::AppState;

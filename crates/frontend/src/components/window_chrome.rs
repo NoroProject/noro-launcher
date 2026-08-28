@@ -1,5 +1,3 @@
-//! Кастомная оконная рамка: перетаскивание, переключатель языка, свернуть, закрыть.
-
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
@@ -9,7 +7,7 @@ use gpui::{
 };
 use i18n::{t, Locale};
 
-/// Верхняя панель окна. `compact` — тонкий вариант для основного интерфейса.
+/// `compact` is the thinner bar used once the launcher is past login.
 pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> AnyElement {
     let active = ui.locale;
     div()
@@ -21,23 +19,20 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
         .items_center()
         .px(px(16.))
         .gap(px(4.))
-        // Перетаскивание окна за рамку — но не за самый край.
-        //
-        // Панель занимает всю ширину и упирается в верхнюю кромку окна, а там
-        // проходит системная зона ресайза. Когда `start_window_move()` висел на
-        // всей площади, система успевала показать курсор ресайза, после чего
-        // нажатие уводило окно в move: курсор мигал, размер не менялся, а
-        // AppKit ругался «Window move completed without beginning».
+        // The bar runs into the top edge of the window, where the system resize
+        // zone lives. Starting a move in there fights the resize: the cursor
+        // flickers, nothing resizes, and AppKit complains about a move that
+        // completed without beginning.
         .on_mouse_down(MouseButton::Left, |event: &MouseDownEvent, window, _| {
             if !in_resize_edge(event.position, window.viewport_size()) {
                 window.start_window_move();
             }
         })
         .children(impersonate_pill(ui, cx))
-        // Windows двигает окно сам, по ответу на WM_NCHITTEST, — там
-        // `start_window_move()` не делает ничего, и шапка не таскалась вовсе.
-        // Метку вешаем на пустую часть: накрыть ею всю панель нельзя, система
-        // сочтёт кнопки частью заголовка и съест клики по ним.
+        // Windows drags the window itself, from its answer to WM_NCHITTEST;
+        // `start_window_move()` does nothing there. Only the empty stretch is
+        // marked — cover the whole bar and the system treats the buttons as
+        // title bar and eats clicks on them.
         .child(
             div()
                 .flex_1()
@@ -51,12 +46,8 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
         .into_any_element()
 }
 
-/// Отметка «вы в чужом аккаунте» прямо в рамке окна.
-///
-/// Раньше это была полоса во всю ширину под рамкой. Она забирала у контента
-/// полсотни пикселей на каждом экране и по весу читалась как часть интерфейса
-/// лаунчера, хотя относится к окну целиком. Здесь она столь же постоянна, но
-/// стоит там же, где остальные свойства окна, и не двигает содержимое.
+/// "You are in someone else's account", in the chrome rather than as a banner
+/// under it — it belongs to the window, and here it doesn't push content down.
 fn impersonate_pill(ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> Option<AnyElement> {
     let name = ui.impersonating_as.clone()?;
 
@@ -107,10 +98,8 @@ fn impersonate_pill(ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> Option<Any
     )
 }
 
-/// Ширина системной зоны ресайза по краям окна.
-///
-/// macOS ловит ресайз в нескольких пикселях от кромки; берём с запасом, иначе
-/// попасть в неё мышью почти невозможно.
+/// macOS takes a resize within a couple of pixels of the edge. This is wider
+/// than that on purpose — otherwise hitting the zone with a mouse is a chore.
 const RESIZE_EDGE: f32 = 6.;
 
 fn in_resize_edge(position: Point<Pixels>, viewport: Size<Pixels>) -> bool {

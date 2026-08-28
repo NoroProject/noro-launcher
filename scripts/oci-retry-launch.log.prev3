@@ -1,6 +1,0 @@
-2026-08-21 03:01:40 targets: tiTw:UK-LONDON-1-AD-1=ocid1.bootvolume.oc1.uk-london-1.abwgiljtkap62z24hecgir2cni3gwolwulwly55piuhmwzhgfiiubzwbri2a tiTw:UK-LONDON-1-AD-2=ocid1.bootvolume.oc1.uk-london-1.abwgiljrkchiqc3mpyvckkkjyefksyvul6gfrk6vy3owru4zgscr6esjgk4q
-2026-08-21 03:01:40 shape=VM.Standard.A1.Flex configs='1:1 2:12' name=noro-prod
-03:01:42 #1 tiTw:UK-LONDON-1-AD-1 1c/1G: no capacity
-03:01:59 #2 tiTw:UK-LONDON-1-AD-2 1c/1G: no capacity
-2026-08-21 03:02:14 #3 tiTw:UK-LONDON-1-AD-1: throttled, sleeping 300s
-2026-08-21 03:02:14       "code": "TooManyRequests",    "status": 429,

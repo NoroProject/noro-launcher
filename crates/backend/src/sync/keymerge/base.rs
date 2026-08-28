@@ -1,21 +1,17 @@
-//! Копии исходных версий конфигов.
+//! Copies of the configs as the server last installed them.
 //!
-//! Слияние по ключам, в отличие от файлового three-way, требует не хеш, а сам
-//! текст того, что установил сервер в прошлый раз.
+//! Key-level merging needs the actual text of the base version, not just its
+//! hash the way the file-level three-way does.
 
 use super::is_mergeable;
 use std::path::Path;
 
-/// Где лежит копия исходного файла для три-стороннего слияния.
 pub fn base_copy_path(instance_dir: &Path, rel: &str) -> std::path::PathBuf {
     instance_dir.join(".noro/base").join(rel)
 }
 
-/// Отложить то, что установил сервер, — это и станет базой в следующий раз.
-///
-/// Копия делается только для путей, где слияние по ключам вообще применимо:
-/// хранить копии всех конфигов ради формата, который мы не умеем сливать, —
-/// цена без выигрыша.
+/// Only copies paths we can actually merge by key — keeping a copy of every
+/// config for a format we can't merge costs disk and buys nothing.
 pub async fn remember_base(instance_dir: &Path, rel: &str) {
     if !is_mergeable(rel) {
         return;

@@ -1,8 +1,8 @@
-//! WebSocket-сессия агента: `GET /api/agent/link`.
+//! Agent WebSocket session: `GET /api/agent/link`.
 //!
-//! Соединение открывает агент — до игровой машины снаружи дороги может и не
-//! быть. Авторизация та же, что у остального агентского API: секрет игрового
-//! сервера, из него же мастер берёт, о какой сборке речь.
+//! The agent dials out, since there may be no route into the game machine from
+//! outside. Auth is the same as the rest of the agent API: the game server
+//! secret, which also tells the master which build this is.
 
 use crate::api::auth::AgentAuth;
 use crate::db::GameServerRow;
@@ -27,7 +27,7 @@ async fn session(socket: WebSocket, state: AppState, server: GameServerRow) {
     let (mut sink, mut stream) = socket.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
     let conn_id = state.agents.register(server.server_id, server.id, tx);
-    tracing::info!(server = %name, "агент подключился к каналу наказаний");
+    tracing::info!(server = %name, "agent connected to punishment channel");
 
     let send_task = tokio::spawn(async move {
         while let Some(frame) = rx.recv().await {
@@ -37,8 +37,8 @@ async fn session(socket: WebSocket, state: AppState, server: GameServerRow) {
         }
     });
 
-    // Наказания агент по-прежнему выдаёт обычным POST — на них нужен ответ с
-    // телом. Сюда приходят события игры, ответа на которые не бывает.
+    // Punishments still go out over POST, which needs a response body. What
+    // arrives here is game events, and those are never answered.
     while let Some(Ok(message)) = stream.next().await {
         match message {
             Message::Text(frame) => super::inbox::handle(&state, &server, &frame).await,
@@ -47,10 +47,10 @@ async fn session(socket: WebSocket, state: AppState, server: GameServerRow) {
         }
     }
 
-    tracing::info!(server = %name, "агент отключился от канала наказаний");
+    tracing::info!(server = %name, "agent disconnected from punishment channel");
     state.agents.unregister(conn_id);
-    // Состав онлайна больше ничем не подтверждён. Только когда ушёл последний
-    // агент этого сервера: переподключение не должно опустошать список.
+    // Nothing confirms the roster any more. Only once the last agent for this
+    // server is gone — a reconnect must not empty the list.
     if !state.agents.has_game_server(server.id) {
         state.roster.clear(server.id);
     }

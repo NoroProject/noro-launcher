@@ -1,11 +1,9 @@
 /**
- * Разбор отказа мастера. Nuxt подхватывает `utils/` сам.
+ * Parsing master rejections. Nuxt picks `utils/` up on its own.
  *
- * Мастер отвечает `{"error": {"code", "message"}}` — см. `AppError::into_response`.
- * Код машинный и стабильный, по нему ветвится логика; сообщение человеческое,
- * его показывают. Раньше тело было одной строкой, и вид отказа склеивался с
- * причиной («forbidden: step_up_required») — интерфейсу приходилось искать
- * подстроку, а разбор был продублирован в двух местах и успел разойтись.
+ * The master answers with `{"error": {"code", "message"}}` — see
+ * `AppError::into_response`. The code is machine-readable and stable, so logic
+ * branches on it; the message is human text and gets shown as-is.
  */
 
 type FetchLike = {
@@ -23,7 +21,6 @@ function envelope(err: unknown): { code?: unknown; message?: unknown } | null {
   return error as { code?: unknown; message?: unknown }
 }
 
-/** Промах в одном поле формы. */
 export interface ApiFieldError {
   field: string
   code: string
@@ -31,17 +28,16 @@ export interface ApiFieldError {
 }
 
 /**
- * Номер отказа из реестра мастера (`error_codes.rs`).
- *
- * Его называет человек: «у меня 1307». Слаг для этого не годится — его не
- * продиктуешь по телефону и не запомнишь со скриншота.
+ * Failure number from the master's registry (`error_codes.rs`) — the thing a
+ * player quotes over the phone or off a screenshot. A slug wouldn't survive
+ * that trip.
  */
 export function apiErrorNumber(err: unknown): number | null {
   const n = (envelope(err) as { number?: unknown } | null)?.number
   return typeof n === 'number' ? n : null
 }
 
-/** Текст с номером в скобках — то, что видит человек. */
+/** Message with the number in brackets — the form the user sees. */
 export function apiErrorLabel(err: unknown): string | null {
   const message = apiErrorMessage(err)
   if (!message) return null
@@ -49,18 +45,15 @@ export function apiErrorLabel(err: unknown): string | null {
   return number ? `${message} (${number})` : message
 }
 
-/** Машинный код отказа, если мастер его прислал. */
 export function apiErrorCode(err: unknown): string | null {
   const code = envelope(err)?.code
   return typeof code === 'string' ? code : null
 }
 
 /**
- * Поля, которые мастер не принял. Пусто — отказ не про форму.
+ * Fields the master refused. Empty when the failure isn't about the form.
  *
- * Приходит только у `validation_error`, см. `api::validate` на мастере. Форма
- * по этому списку подсвечивает виноватые поля вместо того, чтобы показывать
- * один абзац под собой.
+ * Only sent with `validation_error` — see `api::validate` on the master.
  */
 export function apiErrorFields(err: unknown): ApiFieldError[] {
   const details = (envelope(err) as { details?: unknown } | null)?.details
@@ -71,23 +64,21 @@ export function apiErrorFields(err: unknown): ApiFieldError[] {
   )
 }
 
-/** Промахи, разложенные по имени поля: то, что нужно форме для подсветки. */
 export function apiFieldMessages(err: unknown): Record<string, string> {
   const out: Record<string, string> = {}
   for (const d of apiErrorFields(err)) {
-    // Первый промах по полю и есть тот, что показываем: их редко больше одного,
-    // а два сообщения в одной подписи не помещаются.
+    // First error per field wins — two messages don't fit under one label.
     if (!(d.field in out)) out[d.field] = d.message
   }
   return out
 }
 
-/** Текст отказа для показа пользователю. `null` — мастер ничего не объяснил. */
+/** Failure text to show the user. `null` means the master explained nothing. */
 export function apiErrorMessage(err: unknown): string | null {
   const message = envelope(err)?.message
   if (typeof message === 'string' && message) return message
 
-  // Не наш конверт: сырое тело строкой или `{message}` от прокси/Nuxt.
+  // Not our envelope: a raw string body, or `{message}` from a proxy or Nuxt.
   const data = (err as FetchLike)?.data
   if (typeof data === 'string' && data) return data
   if (typeof data === 'object' && data) {
@@ -97,7 +88,6 @@ export function apiErrorMessage(err: unknown): string | null {
   return null
 }
 
-/** HTTP-статус отказа, как его отдаёт `$fetch`. */
 export function apiErrorStatus(err: unknown): number | null {
   const e = err as FetchLike
   return e?.statusCode ?? e?.status ?? null

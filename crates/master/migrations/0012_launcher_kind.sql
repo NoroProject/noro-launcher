@@ -1,11 +1,9 @@
--- Мастер хранил только core — то, что качает bootstrapper. Сам установщик,
--- который скачивает игрок, не сохранялся нигде, поэтому раздавать его с сайта
--- было нечем.
+-- Splits the core the bootstrapper pulls from the installer a player downloads
+-- off the site. Only the core used to be stored, so there was nothing to serve.
 ALTER TABLE launcher_versions
     ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'core';
 
--- Уникальность была по (version, platform); теперь одна и та же версия
--- существует в двух видах, и старое ограничение их бы столкнуло.
+-- One version now exists in two kinds, so uniqueness has to include it.
 ALTER TABLE launcher_versions
     DROP CONSTRAINT IF EXISTS launcher_versions_version_platform_key;
 

@@ -1,11 +1,11 @@
-//! Цитата: модератор ткнул в строку чата, которую видел своими глазами.
+//! Quoting a chat line a moderator pointed at in game.
 //!
-//! Клиент не источник доказательств — он лишь указывает на них. Мод шлёт
-//! отправителя, время и хеш текста; в дело едет строка из среза, снятого
-//! агентом. Подделать переписку правым кликом поэтому невозможно.
+//! The client points at evidence, it doesn't supply it: the mod sends sender,
+//! timestamp and a hash, and the text that lands in the case comes from the
+//! agent's own chat capture. A right-click can't fabricate a conversation.
 //!
-//! Строки в срезе ещё нет — просим срез у сервера тем же путём, что и кнопка
-//! «спросить игру»: она приедет и встанет в дело сама.
+//! If the capture doesn't have the line yet, request one and record the quote
+//! anyway — it fills in when the capture arrives.
 
 use crate::api::auth::AdminAuth;
 use crate::error::{AppError, AppResult};
@@ -18,21 +18,20 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
-/// Насколько расходятся часы клиента и сервера, чтобы строку всё ещё считать
-/// той же. Пять секунд: больше — и в окно попадёт соседняя реплика.
+/// How far the client and server clocks may drift and still be the same line.
+/// Widen this and the window starts catching the neighbouring message instead.
 const MATCH_WINDOW_SECS: i64 = 5;
 
 #[derive(Deserialize)]
 pub struct QuoteReq {
     pub sender: String,
     pub at: DateTime<Utc>,
-    /// Хеш текста у клиента. Не доказательство, а сверка: сошёлся — мод и
-    /// сервер точно про одну строку.
+    /// The client's hash of the text. Not evidence — a cross-check that the mod
+    /// and the server mean the same line.
     #[serde(default)]
     pub hash: String,
 }
 
-/// POST /api/admin/cases/{id}/quote
 pub async fn quote(
     State(state): State<AppState>,
     admin: AdminAuth,
@@ -48,8 +47,9 @@ pub async fn quote(
         crate::db::cases::message_near(&state.db, id, &req.sender, req.at, MATCH_WINDOW_SECS)
             .await?;
 
-    // Строки нет — попросим срез. Событие всё равно пишем: указание модератора
-    // само по себе часть разбора, даже если доказательство подъедет позже.
+    // No line yet: ask for a capture. The event gets written either way — the
+    // moderator pointing at something is part of the record even if the text
+    // only shows up later.
     if found.is_none() {
         if let Ok(Some(target)) = crate::db::get_user(&state.db, case.target_id).await {
             crate::agent_link::cases::request_chat(&state, &case, target.mc_uuid, 600);

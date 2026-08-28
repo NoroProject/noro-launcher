@@ -1,26 +1,23 @@
-//! Применение базы запрещённых файлов.
+//! Enforcing the blocked-files list.
 //!
-//! Проверяется и внутри `unmanaged`, и внутри `user_managed`: в этом весь
-//! смысл — папка ресурспаков не синхронизируется, но xray оттуда удаляется.
-//! Поэтому обход идёт по всему инстансу, а не по managed-путям.
-//!
-//! `saves/` исключён жёстко: там гигабайты, а запрещённых файлов не бывает.
+//! The walk covers the whole instance rather than only managed paths, because
+//! `unmanaged` and `user_managed` are exactly where this has to reach:
+//! `resourcepacks/` is never synced, but an xray pack in it still gets removed.
 
 use schema::{BlockAction, BlockedFile, IntegrityFinding, IntegrityKind};
 use std::path::Path;
 
-/// Куда не ходим ни при каких правилах: дорого и бессмысленно.
+/// Never walked, whatever the rules say — gigabytes of saves and assets that
+/// can't hold a blocked file anyway.
 const SKIP_DIRS: [&str; 4] = ["saves", "assets", "libraries", "logs"];
 
-/// Что нашли и что сделали.
 #[derive(Default)]
 pub struct Report {
     pub findings: Vec<IntegrityFinding>,
-    /// Нашёлся файл с действием `block_launch`.
+    /// A file with the `block_launch` action was found.
     pub block_launch: bool,
 }
 
-/// Пройти инстанс и применить правила.
 pub async fn enforce(instance_dir: &Path, rules: &[BlockedFile]) -> Report {
     let mut report = Report::default();
     if rules.is_empty() {
@@ -43,7 +40,7 @@ pub async fn enforce(instance_dir: &Path, rules: &[BlockedFile]) -> Report {
                 false
             }
         };
-        tracing::warn!(path = %rel, reason = %rule.reason, "запрещённый файл");
+        tracing::warn!(path = %rel, reason = %rule.reason, "blocked file");
         report.findings.push(IntegrityFinding {
             kind: IntegrityKind::ExtraFile,
             subject: rel,
@@ -54,7 +51,6 @@ pub async fn enforce(instance_dir: &Path, rules: &[BlockedFile]) -> Report {
     report
 }
 
-/// Файлы, которые вообще имеет смысл проверять.
 async fn candidates(instance_dir: &Path) -> Vec<(String, std::path::PathBuf)> {
     let root = instance_dir.to_path_buf();
     tokio::task::spawn_blocking(move || {
@@ -62,7 +58,6 @@ async fn candidates(instance_dir: &Path) -> Vec<(String, std::path::PathBuf)> {
             .into_iter()
             .filter_entry(|e| {
                 let name = e.file_name().to_string_lossy();
-                // Служебное лаунчера и заведомо тяжёлое — мимо.
                 !name.starts_with(".noro") && !SKIP_DIRS.contains(&name.as_ref())
             })
             .filter_map(|e| e.ok())

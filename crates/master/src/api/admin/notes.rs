@@ -1,4 +1,4 @@
-//! Админ: заметки и журнал запусков на карточке игрока.
+//! Notes and the launch journal on a player's card.
 
 use crate::api::auth::AdminAuth;
 use crate::api::paging::{Page, PageQuery};
@@ -50,8 +50,7 @@ pub async fn add(
         &body.chars().take(4000).collect::<String>(),
     )
     .await?;
-    // В аудит не пишем: заметка и так подписана автором и датой, а дублировать
-    // её текст в журнал значит разносить одно и то же по двум местам.
+    // Deliberately not audited: the note already carries its author and date.
     Ok(Json(json!(row)))
 }
 
@@ -67,7 +66,7 @@ pub async fn delete(
     Ok(Json(json!({ "ok": true })))
 }
 
-/// Журнал запусков: с какой сборкой и какими модами игрок заходил.
+/// Launch journal: which build and which mods the player came in with.
 pub async fn play_sessions(
     State(state): State<AppState>,
     admin: AdminAuth,

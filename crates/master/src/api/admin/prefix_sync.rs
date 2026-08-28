@@ -1,9 +1,7 @@
-//! Пересобрать плашки по кнопке, а не на каждую правку роли.
+//! Rebuilding the badge pack is a button, not a side effect of editing a role.
 //!
-//! Раньше пак пересобирался при каждом обращении агента, то есть фактически на
-//! каждый вход игрока. Админ правит роли пачкой — цвет, потом текст, потом
-//! соседнюю роль, — и после каждой правки игроки получали новый пак и новую
-//! перезагрузку ресурсов. Теперь момент выбирает человек.
+//! Roles get edited in batches, and every rebuild hands every online player a
+//! new pack and a resource reload. Let someone pick the moment instead.
 
 use crate::api::auth::AdminAuth;
 use crate::error::AppResult;
@@ -13,7 +11,6 @@ use axum::extract::State;
 use axum::Json;
 use schema::PERM_ROLES_EDIT;
 
-/// `POST /api/admin/roles/sync-badges`
 pub async fn sync(
     State(state): State<AppState>,
     admin: AdminAuth,

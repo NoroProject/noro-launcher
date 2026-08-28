@@ -1,5 +1,3 @@
-//! Стандартная кнопка (акцентная/вторичная).
-
 use crate::theme::*;
 use gpui::{
     div, prelude::*, px, rgb, App, ClickEvent, ElementId, FontWeight, IntoElement, SharedString,

@@ -1,28 +1,24 @@
 /**
- * Пути сайта и внешние ссылки — одним местом.
+ * Site paths and external links in one place. A path typed inline in markup
+ * survives until the page is renamed, and a broken link doesn't fail — it
+ * quietly serves a 404.
  *
- * Путь, набранный строкой в разметке, живёт до первого переименования
- * страницы: найти его потом можно только текстовым поиском по всему вебу, а
- * промахнувшаяся ссылка не падает, а молча ведёт на 404. Здесь же каждый путь
- * записан один раз, а разделы админки заодно видны списком.
- *
- * Всё вызывается как функция, даже когда параметров нет: `link.rules()` и
- * `link.rule(code)` рядом читаются одинаково, а половина констант вперемешку с
- * половиной функций — нет.
+ * Everything is a function even with no parameters: `link.rules()` and
+ * `link.rule(code)` read the same side by side.
  */
 
-/** Разделы сайта, открытые всем. */
+/** Pages open to everyone. */
 export const link = {
   home: () => '/',
   servers: () => '/servers',
   rules: () => '/rules',
-  /** Пункт свода: тот же якорь, что ставит агент в ссылке из бана. */
+  /** Same anchor the agent puts in the link from a ban message. */
   rule: (code: string) => `/rules#rule-${code}`,
   skin: () => '/skin',
   setup: () => '/setup',
   oauth2Authorize: () => '/oauth2/authorize',
 
-  /** `next` — куда вернуть после входа; кодируется здесь, а не на месте. */
+  /** `next` is where to go after sign-in; encoded here, not at each caller. */
   login: (next?: string) => (next ? `/login?next=${encodeURIComponent(next)}` : '/login'),
 
   cabinet: () => '/cabinet',
@@ -31,7 +27,7 @@ export const link = {
   cabinetApps: () => '/cabinet/apps',
 }
 
-/** Админка. Отдельным объектом: у неё свой вход и свои права. */
+/** Admin. Its own object: separate entry point, separate permissions. */
 export const adminLink = {
   root: () => '/admin',
   apps: () => '/admin/apps',
@@ -70,14 +66,14 @@ export const adminLink = {
   user: (id: string) => `/admin/users/${id}`,
 }
 
-/** Чужие сайты. Хостов у мода два, и вспоминать их формат каждый раз незачем. */
+/** Third-party sites. A mod can live on either host. */
 export const externalLink = {
   modrinth: (slug: string) => `https://modrinth.com/mod/${slug}`,
   curseforge: (slug: string) => `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
 
   /**
-   * Страница мода по провайдеру. Готовый адрес возвращается как есть: в базе
-   * попадаются и полные ссылки вместо идентификатора.
+   * Mod page for a provider. A ready URL comes back untouched — the database
+   * holds full links in the id column in places.
    */
   mod: (provider: string | null | undefined, projectId: string | null | undefined) => {
     if (!projectId) return ''

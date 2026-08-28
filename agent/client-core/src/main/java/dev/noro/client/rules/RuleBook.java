@@ -10,22 +10,17 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Свод правил — общий для всех модов Noro.
+ * The rule book, shared by all Noro mods.
  *
- * <p>Живёт в ядре, а не в панели разбора: правила нужны и модератору при выдаче
- * наказания, и игроку, чтобы прочитать, за что его наказали. Два кэша одного и
- * того же расходились бы ровно в тот момент, когда свод правят.
- *
- * <p>Свод публичен намеренно — на него ссылается каждый бан, и забаненный
- * обязан прочитать, за что именно. Прав на него не нужно.
+ * <p>Public on purpose: every ban cites a rule and the banned player has to be
+ * able to read it, so no permission is required to fetch this.
  */
 public final class RuleBook implements Feature {
 
-    /** Пункт свода. */
     public record Rule(String id, String category_id, String code, String title,
                        String description, int sort_order) {}
 
-    /** Вилка наказания по пункту: что за него бывает и в каких границах. */
+    /** What a rule allows as punishment, and within which bounds. */
     public record Sanction(String rule_id, String kind, Long min_minutes, Long max_minutes) {}
 
     private record Payload(List<Rule> rules, List<Sanction> sanctions) {}
@@ -61,21 +56,20 @@ public final class RuleBook implements Feature {
         bridge = null;
     }
 
-    /** Перечитать свод. Меняется он редко, поэтому спрашиваем по надобности. */
+    /** Refetch. The book changes rarely, so this is on demand rather than polled. */
     public void request() {
         if (bridge != null) {
             bridge.send(new RequestRules());
         }
     }
 
-    /** Намерение живёт рядом со сводом: больше его никто не шлёт. */
     public record RequestRules() {}
 
     public boolean loaded() {
         return !rules.isEmpty();
     }
 
-    /** Пункты по порядку; пустой запрос — весь свод. */
+    /** An empty query returns the whole book. */
     public List<Rule> search(String query) {
         String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         List<Rule> out = new ArrayList<>();
@@ -99,7 +93,7 @@ public final class RuleBook implements Feature {
         return null;
     }
 
-    /** Что этот пункт разрешает: из них модератор и выбирает. */
+    /** The set a moderator picks from for this rule. */
     public List<Sanction> sanctionsOf(String ruleId) {
         List<Sanction> out = new ArrayList<>();
         for (Sanction sanction : sanctions) {

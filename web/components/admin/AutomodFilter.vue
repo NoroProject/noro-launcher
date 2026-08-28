@@ -84,7 +84,7 @@ const counted = computed(() => props.filterType === 'flood' || draft.value.mode 
 
       <label v-if="filterType === 'ad'" class="block md:col-span-3">
         <span class="noro-label mb-1.5 block">{{ t('admin-automod-whitelist') }}</span>
-        <input v-model="draft.whitelistRaw" class="noro-input w-full" placeholder="noro.dalynkaa.dev, dalynkaa.dev">
+        <input v-model="draft.whitelistRaw" class="noro-input w-full" placeholder="example.com, cdn.example.com">
       </label>
 
       <label v-if="filterType === 'word'" class="block md:col-span-3">

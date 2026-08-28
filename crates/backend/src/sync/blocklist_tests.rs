@@ -1,5 +1,5 @@
-//! Смысл базы в том, что она достаёт файл там, куда синк не ходит. Это и
-//! проверяется в первую очередь.
+//! The point of the list is that it reaches files sync never looks at, so
+//! that is what these check first.
 
 use super::*;
 use std::path::PathBuf;
@@ -40,50 +40,50 @@ fn rule(pattern: &str, action: BlockAction) -> BlockedFile {
 
 #[tokio::test]
 async fn a_banned_file_inside_an_unsynced_folder_is_still_removed() {
-    // Ровно то, ради чего база и нужна: resourcepacks/ не синхронизируется,
-    // но xray оттуда удаляется.
+    // The whole reason the list exists: resourcepacks/ is never synced, but
+    // an xray pack in it still gets deleted.
     let dir = Scratch::new("unsynced");
-    dir.write("resourcepacks/super-xray.zip", "запрещённое");
-    dir.write("resourcepacks/обычный.zip", "нормальное");
+    dir.write("resourcepacks/super-xray.zip", "blocked");
+    dir.write("resourcepacks/plain.zip", "fine");
 
     let report = enforce(dir.path(), &[rule("*xray*", BlockAction::Delete)]).await;
 
     assert_eq!(report.findings.len(), 1);
     assert!(report.findings[0].repaired);
     assert!(!dir.path().join("resourcepacks/super-xray.zip").exists());
-    assert!(dir.path().join("resourcepacks/обычный.zip").exists());
+    assert!(dir.path().join("resourcepacks/plain.zip").exists());
 }
 
 #[tokio::test]
 async fn flag_reports_without_deleting() {
     let dir = Scratch::new("flag");
-    dir.write("mods/подозрительный.jar", "содержимое");
+    dir.write("mods/suspicious.jar", "contents");
 
-    let report = enforce(dir.path(), &[rule("*подозрительный*", BlockAction::Flag)]).await;
+    let report = enforce(dir.path(), &[rule("*suspicious*", BlockAction::Flag)]).await;
 
     assert_eq!(report.findings.len(), 1);
     assert!(!report.findings[0].repaired);
-    assert!(dir.path().join("mods/подозрительный.jar").exists());
+    assert!(dir.path().join("mods/suspicious.jar").exists());
     assert!(!report.block_launch);
 }
 
 #[tokio::test]
 async fn block_launch_stops_the_game() {
     let dir = Scratch::new("block");
-    dir.write("mods/cheat.jar", "содержимое");
+    dir.write("mods/cheat.jar", "contents");
 
     let report = enforce(dir.path(), &[rule("*cheat*", BlockAction::BlockLaunch)]).await;
 
     assert!(report.block_launch);
-    // Не удаляем: игрок должен увидеть, из-за чего его не пускают.
+    // Kept on disk so the player can see what is holding the launch.
     assert!(dir.path().join("mods/cheat.jar").exists());
 }
 
 #[tokio::test]
 async fn a_hash_rule_catches_a_renamed_file() {
     let dir = Scratch::new("hash");
-    dir.write("resourcepacks/безобидное.zip", "запрещённое содержимое");
-    let sha1 = crate::sync::integrity::sha1_file(&dir.path().join("resourcepacks/безобидное.zip"))
+    dir.write("resourcepacks/harmless.zip", "blocked contents");
+    let sha1 = crate::sync::integrity::sha1_file(&dir.path().join("resourcepacks/harmless.zip"))
         .await
         .unwrap();
 
@@ -92,26 +92,26 @@ async fn a_hash_rule_catches_a_renamed_file() {
         &[BlockedFile {
             pattern: None,
             sha1: Some(sha1),
-            reason: "известная сборка xray".into(),
+            reason: "known xray build".into(),
             action: BlockAction::Delete,
         }],
     )
     .await;
 
     assert_eq!(report.findings.len(), 1);
-    assert!(!dir.path().join("resourcepacks/безобидное.zip").exists());
+    assert!(!dir.path().join("resourcepacks/harmless.zip").exists());
 }
 
 #[tokio::test]
 async fn saves_are_never_scanned() {
-    // Там гигабайты, а запрещённых файлов не бывает.
+    // Gigabytes of world data, and no blocked file ever lives there.
     let dir = Scratch::new("saves");
-    dir.write("saves/Мир/xray-data.dat", "что угодно");
+    dir.write("saves/World/xray-data.dat", "anything");
 
     let report = enforce(dir.path(), &[rule("*xray*", BlockAction::Delete)]).await;
 
     assert!(report.findings.is_empty());
-    assert!(dir.path().join("saves/Мир/xray-data.dat").exists());
+    assert!(dir.path().join("saves/World/xray-data.dat").exists());
 }
 
 #[tokio::test]
@@ -128,7 +128,7 @@ async fn the_launcher_service_directory_is_left_alone() {
 #[tokio::test]
 async fn an_empty_ruleset_does_no_work() {
     let dir = Scratch::new("empty");
-    dir.write("mods/xray.jar", "содержимое");
+    dir.write("mods/xray.jar", "contents");
 
     let report = enforce(dir.path(), &[]).await;
 

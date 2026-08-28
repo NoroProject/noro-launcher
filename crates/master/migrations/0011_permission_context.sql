@@ -1,18 +1,15 @@
--- Контекст сервера у прав и каталог известных узлов.
---
--- До сих пор право действовало везде. Теперь у него может быть сборка:
--- NULL — глобально, иначе только на этом сервере. Тот же смысл, что context
--- у LuckPerms, но без общей машинерии контекстов: сборка — единственное
--- измерение, которое здесь есть.
+-- Scopes a permission to one build: NULL is global, otherwise it only applies on
+-- that server. Same idea as a LuckPerms context, minus the general machinery —
+-- the build is the only dimension we have.
 
 ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS server_id uuid
     REFERENCES servers(id) ON DELETE CASCADE;
 ALTER TABLE user_permissions ADD COLUMN IF NOT EXISTS server_id uuid
     REFERENCES servers(id) ON DELETE CASCADE;
 
--- Первичный ключ должен различать одно и то же право в разных контекстах.
--- NULL в PostgreSQL не равен сам себе, поэтому уникальность глобальных прав
--- держим отдельным частичным индексом.
+-- The key has to tell the same permission apart across contexts. NULL is not
+-- equal to itself in Postgres, so global rows need their own partial index —
+-- a plain unique constraint would let them be inserted twice.
 ALTER TABLE role_permissions DROP CONSTRAINT IF EXISTS role_permissions_pkey;
 CREATE UNIQUE INDEX IF NOT EXISTS role_permissions_scoped
     ON role_permissions (role_id, permission, server_id) WHERE server_id IS NOT NULL;
@@ -25,8 +22,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_permissions_scoped
 CREATE UNIQUE INDEX IF NOT EXISTS user_permissions_global
     ON user_permissions (user_id, permission) WHERE server_id IS NULL;
 
--- Каталог узлов, которые агент видит на своём сервере. Нужен админке для
--- автодополнения: перечислить их заранее неоткуда, их приносят сами моды.
+-- Nodes the agent has seen on its server, for autocomplete in the admin panel.
+-- Mods bring their own, so there is no list to ship ahead of time.
 CREATE TABLE IF NOT EXISTS permission_nodes (
     server_id  uuid NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
     node       text NOT NULL,

@@ -1,7 +1,4 @@
-//! Админ-API бэкапов игрового сервера.
-//!
-//! Создание, просмотр, восстановление и удаление zip-снимков директории сервера.
-//! Все операции закрыты правом `noro.admin.wrapper`.
+//! Zip snapshots of a game server directory: create, list, restore, delete.
 
 use crate::api::auth::AdminAuth;
 use crate::error::AppResult;

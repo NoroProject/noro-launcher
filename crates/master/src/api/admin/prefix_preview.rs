@@ -1,9 +1,7 @@
-//! Предпросмотр плашки роли: та же картинка, что уедет в игру.
+//! Role badge preview — renders the exact PNG the game will show.
 //!
-//! Отдельным маршрутом, а не полем в JSON роли: плашка это PNG, и рисовать её
-//! в вебе заново значило бы завести вторую реализацию шрифта — она разъехалась
-//! бы с настоящей на первой же правке. Здесь админка видит ровно то, что увидит
-//! игрок.
+//! Its own route rather than a field on the role JSON: drawing the badge in the
+//! web UI would mean a second font implementation to keep in step with this one.
 
 use crate::api::auth::AdminAuth;
 use crate::error::AppResult;
@@ -16,21 +14,19 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct Ask {
-    /// Что написать. Пусто — покажем название роли, как и в игре.
+    /// Badge text. Empty falls back to the role name, same as in game.
     #[serde(default)]
     pub text: String,
-    /// Цвет роли, `#rrggbb`. Мусор превратится в серый, а не в ошибку.
+    /// `#rrggbb`. Anything unparseable renders grey instead of failing.
     #[serde(default)]
     pub color: String,
-    /// Ник рядом с плашкой. Пусто — только плашка.
+    /// Name to draw beside the badge. Empty means badge only.
     #[serde(default)]
     pub name: String,
 }
 
-/// `GET /api/admin/prefix-badge?text=…&color=…`
-///
-/// Параметрами, а не по идентификатору роли: так предпросмотр обновляется прямо
-/// во время набора, до сохранения.
+/// Takes the fields as query parameters rather than a role id, so the preview
+/// updates while someone types instead of only after a save.
 pub async fn badge(_admin: AdminAuth, Query(ask): Query<Ask>) -> AppResult<impl IntoResponse> {
     _admin.require(PERM_ROLES_VIEW)?;
     let text = if ask.text.trim().is_empty() {
@@ -46,8 +42,8 @@ pub async fn badge(_admin: AdminAuth, Query(ask): Query<Ask>) -> AppResult<impl 
     Ok((
         [
             (CONTENT_TYPE, "image/png"),
-            // Картинка меняется вместе с полем, поэтому не кэшируем: иначе
-            // предпросмотр застынет на первом варианте.
+            // The URL changes with every keystroke but browsers still cache it;
+            // without this the preview sticks on the first render.
             (CACHE_CONTROL, "no-store"),
         ],
         png,

@@ -1,4 +1,4 @@
-//! Очередь дел и репутация репортеров.
+//! The case queue and reporter reputation.
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -21,16 +21,16 @@ pub struct CaseListRow {
     pub resolved_at: Option<DateTime<Utc>>,
     pub verdict: Option<String>,
     pub rule_code: Option<String>,
-    /// Жалоб в деле и сколько *разных* людей их написали: десять жалоб от
-    /// одного обиженного и от десяти разных — разный вес.
+    /// Reports in the case, and how many *distinct* people filed them. Ten from
+    /// one aggrieved player and ten from ten aren't worth the same.
     pub reports_count: i64,
     pub reporters_count: i64,
     pub last_report_at: Option<DateTime<Utc>>,
 }
 
-/// Источник строк. Вынесен отдельно от списка колонок, чтобы счётчик считался
-/// по тем же соединениям, что и выборка: поиск идёт по именам из `users` и
-/// `game_servers`, и `count(*)` без них дал бы другое число.
+/// Kept separate from the column list so the count runs over the same joins as
+/// the page. Search hits names in `users` and `game_servers`, so a `count(*)`
+/// without those joins would come out different.
 const FROM_SQL: &str = "
       FROM cases c
       LEFT JOIN users tu ON tu.id = c.target_id
@@ -55,14 +55,14 @@ const COLUMNS_SQL: &str = "
            r.last_report_at
 ";
 
-/// Поиск по очереди: ник нарушителя, сервер, кто взял дело, номер дела.
+/// Queue search: offender name, server, whoever claimed the case, case number.
 ///
-/// Номер сравнивается как текст: модератор вводит «142» из чужого сообщения и
-/// ждёт, что найдётся дело №142, а не диапазон.
+/// The number is compared as text — a moderator pastes "142" from someone
+/// else's message and expects case 142, not a range.
 ///
-/// `$1::text IS NULL` — это «поиска нет». Условие стоит в запросе всегда, чтобы
-/// плейсхолдер не пропадал: Postgres выводит их число по наибольшему
-/// упомянутому, и запрос, где есть $2 и $3, но нет $1, не готовится вовсе.
+/// `$1::text IS NULL` means "no search". The condition is always present so the
+/// placeholder never disappears: Postgres derives the parameter count from the
+/// highest one mentioned, and a query with $2 and $3 but no $1 won't prepare.
 const SEARCH_SQL: &str = "($1::text IS NULL OR (
        tu.mc_username ILIKE $1 ESCAPE '\\'
     OR gs.name        ILIKE $1 ESCAPE '\\'
@@ -70,18 +70,13 @@ const SEARCH_SQL: &str = "($1::text IS NULL OR (
     OR c.number::text LIKE  $1 ESCAPE '\\'
 ))";
 
-/// Очередь. Открытые сверху и по числу разных жалобщиков: пять человек про
-/// чит важнее одной жалобы на мат, и разбирать надо с них.
+/// A page of the queue plus the total under the same condition.
 ///
-/// Возвращает и счётчик по тому же условию. Раньше открытые дела отдавались без
-/// лимита вовсе, а архив — с зашитым `LIMIT 100` и без счётчика: сто первое дело
-/// не показывалось и не считалось, и по интерфейсу это было неотличимо от «дел
-/// больше нет».
+/// Open cases are ordered by distinct reporter count: five people on a cheater
+/// outrank one report about swearing.
 ///
-/// `like` — шаблон `%…%` с уже экранированными подстановочными знаками (см.
-/// `PageQuery::like`). Ищет мастер, а не клиент: раньше админка и мод тянули
-/// очередь целиком и фильтровали у себя, поэтому находилось только то, что
-/// попало в загруженную страницу.
+/// `like` is a `%…%` pattern with the wildcards already escaped — see
+/// `PageQuery::like`.
 pub async fn list_cases(
     pool: &PgPool,
     open_only: bool,
@@ -126,8 +121,9 @@ pub async fn get_case_view(pool: &PgPool, id: Uuid) -> Result<Option<CaseListRow
         .await?)
 }
 
-/// Сколько жалоб человека подтвердилось. Не хранится колонкой: строк на
-/// игрока десятки, а лишнее поле пришлось бы чинить после каждой правки дела.
+/// How many of a player's reports were upheld. Computed rather than stored —
+/// there are only tens of rows per player, and a cached column would have to be
+/// repaired after every edit to a case.
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct ReporterStats {
     pub total: i64,
@@ -149,8 +145,7 @@ pub async fn reporter_stats(pool: &PgPool, user_id: Uuid) -> Result<ReporterStat
     .await?)
 }
 
-/// Сколько дел завели на игрока и сколько из них подтвердилось. Тот же счёт,
-/// что у жалобщика, но с другой стороны: там вес слова, здесь — история.
+/// The same counts as `reporter_stats`, but for the player being reported.
 pub async fn target_stats(pool: &PgPool, user_id: Uuid) -> Result<ReporterStats> {
     Ok(sqlx::query_as::<_, ReporterStats>(
         "SELECT COUNT(*) AS total,
@@ -163,7 +158,8 @@ pub async fn target_stats(pool: &PgPool, user_id: Uuid) -> Result<ReporterStats>
     .await?)
 }
 
-/// Жалобы внутри дела — с именем автора и его репутацией.
+/// A report inside a case, with the author's name resolved. Reputation is not
+/// included here — call `reporter_stats` for it.
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct CaseReportRow {
     pub id: Uuid,

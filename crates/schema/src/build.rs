@@ -1,11 +1,10 @@
-//! BuildManifest — главный документ синхронизации между мастером и лаунчером.
+//! `BuildManifest`: what the master tells the launcher to sync.
 
 use crate::manifest_args::ManifestArg;
 use crate::server::Modloader;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// На какой стороне нужен файл.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum FileSide {
@@ -21,32 +20,30 @@ impl FileSide {
     }
 }
 
-/// Один файл, который лаунчер обязан иметь с точным SHA1.
+/// A file the launcher must have at exactly this SHA1.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FileEntry {
-    /// Относительный путь от корня игровой папки: "mods/jei.jar".
+    /// Relative to the instance root: `mods/jei.jar`.
     pub path: String,
     pub sha1: String,
     pub size: u64,
-    /// URL для скачивания с мастера (обычно /files/{sha1}).
+    /// Usually `/files/{sha1}` on the master.
     pub url: String,
     #[serde(default)]
     pub side: FileSide,
-    /// Исполняемый ли файл (для java-бинарников на unix нужен chmod +x).
+    /// Java binaries on unix need `chmod +x`.
     #[serde(default)]
     pub executable: bool,
-    /// Платформа, которой файл предназначен ("windows-x86_64"). `None` — всем.
+    /// Which platform this file is for, e.g. `windows-x86_64`. `None` means all.
     ///
-    /// Java-рантайм и natives — разные бинарники под каждую ОС. Без пометки
-    /// сборка несла рантайм только той платформы, на которой крутится мастер, и
-    /// на остальных JVM не запускалась.
+    /// The Java runtime and natives are a different binary per OS. Untagged, a
+    /// build shipped whichever runtime the master itself runs on, and the JVM
+    /// wouldn't start anywhere else.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platform: Option<String>,
 }
 
 impl FileEntry {
-    /// Нужен ли файл этой машине. Java и natives помечены платформой, остальное
-    /// одинаково всюду.
     pub fn matches_platform(&self) -> bool {
         self.platform
             .as_deref()
@@ -54,8 +51,8 @@ impl FileEntry {
     }
 }
 
-/// Категория артефакта — помогает лаунчеру понимать стадию синхронизации и
-/// собирать classpath (libraries попадают в classpath, mods тоже, assets — нет).
+/// Drives the sync progress stages and classpath assembly — libraries and mods
+/// go on the classpath, assets don't.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ArtifactKind {
@@ -71,28 +68,26 @@ pub enum ArtifactKind {
     Other,
 }
 
-/// Триггер опционального мода — авто-включение по условию (например, наличие GPU).
+/// Condition under which an optional mod switches itself on.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ModTrigger {
-    /// Включить по умолчанию для всех.
     Always,
-    /// Включить только если есть право.
     RequiresPermission(String),
 }
 
-/// Опциональный мод — набор файлов, которые пользователь может включить/выключить.
+/// A group of files the player can toggle on and off.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OptionalMod {
     pub name: String,
     pub description: String,
-    /// "Производительность", "Интерфейс", "Геймплей".
+    /// Free-form grouping in the UI: "Performance", "Interface", "Gameplay".
     pub category: String,
-    /// Пути файлов этого мода (они присутствуют в verified_files).
+    /// Paths of this mod's files; all of them are also in `verified_files`.
     pub files: Vec<String>,
     pub enabled_by_default: bool,
     pub visible: bool,
-    /// Требует право `noro.optional.<server_id>.<name>`.
+    /// Requires the `noro.optional.<server_id>.<name>` permission.
     pub limited: bool,
     #[serde(default)]
     pub dependencies: Vec<String>,
@@ -100,11 +95,11 @@ pub struct OptionalMod {
     pub conflicts: Vec<String>,
     #[serde(default)]
     pub triggers: Vec<ModTrigger>,
-    /// Системы, где мод имеет смысл: `windows`, `macos`, `linux`. Пусто — все.
+    /// `windows`, `macos`, `linux`. Empty means all of them.
     ///
-    /// Нужно модам с нативными библиотеками: на чужой системе такой мод не
-    /// просто бесполезен, он роняет запуск, а игрок видит только «игра
-    /// закрылась» и чинить это ему нечем.
+    /// Matters for mods carrying native libraries: on the wrong OS they don't
+    /// just do nothing, they kill the launch, and all the player sees is the
+    /// game closing.
     #[serde(default)]
     pub os: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -114,10 +109,8 @@ pub struct OptionalMod {
 }
 
 impl OptionalMod {
-    /// Годится ли мод для этой системы. Пустой список — годится везде.
-    ///
-    /// Сравнение по `std::env::consts::OS`: `windows`, `macos`, `linux` — та же
-    /// нотация, что и в платформах лаунчера, только без архитектуры.
+    /// `os` is a `std::env::consts::OS` value — the launcher's platform strings
+    /// without the architecture half.
     pub fn runs_on(&self, os: &str) -> bool {
         self.os.is_empty()
             || self
@@ -127,7 +120,6 @@ impl OptionalMod {
     }
 }
 
-/// Рекомендованные клиентские настройки для конкретной сборки.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RecommendedClientSettings {
     pub memory_min_mb: u32,
@@ -154,8 +146,8 @@ fn default_allow_optional_mod_suggestions() -> bool {
     true
 }
 
-/// Главный документ синхронизации. Подписывается ed25519 ключом мастера;
-/// публичный ключ зашит в бинарник лаунчера.
+/// Signed with the master's ed25519 key; the public half is compiled into the
+/// launcher binary.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BuildManifest {
     pub build_id: Uuid,
@@ -164,40 +156,38 @@ pub struct BuildManifest {
     pub mc_version: String,
     pub modloader: Modloader,
     pub modloader_version: Option<String>,
-    /// Главный класс для запуска JVM (берётся из version.json модлоадера).
+    /// From the modloader's `version.json`.
     pub main_class: String,
-    /// Дополнительные JVM-аргументы из version.json (модульные флаги Forge и т.п.).
+    /// Extra JVM arguments from `version.json` — Forge's module flags and such.
     #[serde(default)]
     pub jvm_args: Vec<ManifestArg>,
-    /// Game-аргументы (--tweakClass и т.п.) с плейсхолдерами.
+    /// Game arguments with placeholders, e.g. `--tweakClass`.
     #[serde(default)]
     pub game_args: Vec<ManifestArg>,
-    /// Имя версии ассетов ("1.21" или "legacy").
+    /// Asset index name: `1.21` or `legacy`.
     pub assets_index_name: String,
 
-    /// Файлы, которые ВСЕГДА сверяются по SHA1 и перезаписываются.
-    /// Лишние файлы в этих директориях УДАЛЯЮТСЯ.
+    /// Always checked against their SHA1 and overwritten. Anything else found in
+    /// these directories is deleted.
     pub verified_files: Vec<FileEntry>,
 
-    /// Привязка путей к категориям (для стадий прогресса и classpath).
-    /// Ключ — path из verified_files.
+    /// Keyed by `verified_files` path. Feeds progress stages and the classpath.
     #[serde(default)]
     pub artifact_kinds: std::collections::BTreeMap<String, ArtifactKind>,
 
-    /// Пути, которые лаунчер НЕ ТРОГАЕТ (saves, screenshots, options.txt).
+    /// Never touched: saves, screenshots, options.txt.
     pub unmanaged_paths: Vec<String>,
-    /// Единый упорядоченный список правил (§10.6). Побеждает последнее
-    /// совпавшее. Пусто — манифест от мастера, который ещё не умеет их слать:
-    /// тогда правила выводятся из двух списков выше.
+    /// Ordered rules (§10.6); the last match wins. Empty means the manifest came
+    /// from a master too old to send them, and rules get derived from the two
+    /// lists above instead.
     #[serde(default)]
     pub path_rules: Vec<crate::path_rules::PathRule>,
-    /// Запрещённые файлы. Едут внутри подписи — иначе список подменяется на
-    /// клиенте. Приоритет выше всех правил путей, включая `unmanaged`: папка
-    /// ресурспаков не синхронизируется, но xray оттуда удаляется.
+    /// Inside the signature, or the list could be swapped out on the client.
+    /// Outranks every path rule including `unmanaged`.
     #[serde(default)]
     pub blocked_files: Vec<crate::blocklist::BlockedFile>,
 
-    /// Пути, где пользователь МОЖЕТ добавлять файлы (не удаляются).
+    /// The player may add files here; they don't get deleted.
     pub user_managed_paths: Vec<String>,
 
     pub optional_mods: Vec<OptionalMod>,
@@ -208,21 +198,21 @@ pub struct BuildManifest {
     #[serde(default)]
     pub recommended_client_settings: RecommendedClientSettings,
 
-    /// ed25519-подпись над канонической сериализацией манифеста БЕЗ этого поля.
+    /// ed25519 over the manifest serialized with this field empty.
     #[serde(default, with = "serde_bytes_vec")]
     pub signature: Vec<u8>,
 }
 
 impl BuildManifest {
-    /// Байты для подписи/проверки: тот же манифест, но с пустой подписью,
-    /// сериализованный в canonical JSON (serde_json детерминирован по структуре).
+    /// Both signing and verification go through here. serde_json is
+    /// deterministic for a given struct, so the two sides see the same bytes.
     pub fn signing_bytes(&self) -> Vec<u8> {
         let mut clone = self.clone();
         clone.signature = Vec::new();
-        serde_json::to_vec(&clone).expect("BuildManifest всегда сериализуется")
+        serde_json::to_vec(&clone).expect("BuildManifest is always serializable")
     }
 
-    /// Суммарный размер всех клиентских файлов (для прогресс-бара).
+    /// Denominator for the progress bar.
     pub fn total_client_size(&self) -> u64 {
         self.verified_files
             .iter()
@@ -239,7 +229,8 @@ impl BuildManifest {
     }
 }
 
-/// serde-хелпер: Vec<u8> как массив чисел (надёжно для JSON, не зависит от base64-фичи).
+/// `Vec<u8>` as a JSON array of numbers, so this doesn't depend on serde's
+/// base64 feature being on.
 mod serde_bytes_vec {
     use serde::{Deserialize, Deserializer, Serializer};
 
@@ -274,8 +265,8 @@ mod optional_mod_tests {
         }
     }
 
-    /// Без списка систем мод годится везде: так лежат все сборки, сделанные до
-    /// появления поля, и молча спрятать их от игроков нельзя.
+    /// Every build made before the field existed has an empty list, and those
+    /// mods must not silently disappear from the player's list.
     #[test]
     fn empty_list_means_every_system() {
         assert!(mod_for(&[]).runs_on("windows"));
@@ -289,7 +280,7 @@ mod optional_mod_tests {
         assert!(!windows_only.runs_on("macos"));
     }
 
-    /// Регистр приходит из админки, где его набирают руками.
+    /// The list is typed by hand in the admin panel.
     #[test]
     fn ignores_letter_case() {
         assert!(mod_for(&["Windows"]).runs_on("windows"));

@@ -6,23 +6,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Файл рукопожатия, который лаунчер кладёт в каталог игры на запуск.
+ * Handshake file the launcher drops into the game directory on launch.
  *
- * <p>Мод знает только свой gameDir и не должен угадывать, где установлен
- * лаунчер, — поэтому порт и ключ лежат рядом с игрой. Файла нет — значит игру
- * запустили не через лаунчер, и панели просто не будет.
+ * <p>The mod only knows its own gameDir and shouldn't have to guess where the
+ * launcher is installed, so the port and key sit next to the game. No file means
+ * the game was started outside the launcher and there is simply no panel.
  */
 public record Handshake(int port, String key, int protocol) {
 
-    /** Имя файла — общее с лаунчером, см. {@code mod_link::HANDSHAKE_FILE}. */
+    /** Shared with the launcher, see {@code mod_link::HANDSHAKE_FILE}. */
     public static final String FILE = "noro-bridge.json";
 
-    /** Версия договора, которую понимает этот мод. */
+    /** Contract version this mod speaks. */
     public static final int PROTOCOL = 1;
 
     private static final Gson GSON = new Gson();
 
-    /** {@code null} — рукопожатия нет; это обычный случай, а не ошибка. */
+    /** {@code null} when there is no handshake — the ordinary case, not an error. */
     public static Handshake read(Path gameDir) {
         Path file = gameDir.resolve(FILE);
         if (!Files.isReadable(file)) {
@@ -35,7 +35,7 @@ public record Handshake(int port, String key, int protocol) {
             }
             return handshake;
         } catch (Exception e) {
-            NoroCore.LOG.warn("рукопожатие не прочиталось: {}", e.toString());
+            NoroCore.LOG.warn("could not read handshake: {}", e.toString());
             return null;
         }
     }

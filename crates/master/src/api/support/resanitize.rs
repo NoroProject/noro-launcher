@@ -1,27 +1,27 @@
-//! Второй проход санитизации, уже на мастере.
+//! Second sanitising pass, on the master this time.
 //!
-//! Обязателен и не является дублированием: клиента можно подменить, и логи от
-//! подменённого клиента не должны попасть во вьювер вместе с токенами. Первый
-//! проход в лаунчере нужен ради другого — чтобы игрок в предпросмотре видел
-//! ровно то, что уедет.
+//! Not redundant with the launcher's pass: a patched client can send whatever
+//! it likes, and its logs must not reach the viewer with tokens still in them.
+//! The launcher pass exists for a different reason — so the player's preview
+//! shows exactly what will be uploaded.
 
 use anyhow::{bail, Result};
 use std::io::{Cursor, Read, Write};
 use zip::write::SimpleFileOptions;
 use zip::{ZipArchive, ZipWriter};
 
-/// Потолок на распакованный файл: архив может быть zip-бомбой.
+/// Cap on the uncompressed size of one entry — the archive may be a zip bomb.
 const MAX_ENTRY_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_ENTRIES: usize = 64;
 
-/// Разобрать архив, очистить содержимое и собрать заново.
+/// Unpack the archive, redact every entry and pack it again.
 ///
-/// Возвращает ошибку на всём, что не разбирается: принять непонятный архив и
-/// положить его в хранилище значит потерять смысл проверки.
+/// Anything that doesn't parse is an error: storing an archive we couldn't read
+/// would defeat the point of the pass.
 pub fn resanitize_zip(bytes: &[u8]) -> Result<Vec<u8>> {
     let mut archive = ZipArchive::new(Cursor::new(bytes))?;
     if archive.len() > MAX_ENTRIES {
-        bail!("в бандле слишком много файлов: {}", archive.len());
+        bail!("too many files in the bundle: {}", archive.len());
     }
 
     let mut out = ZipWriter::new(Cursor::new(Vec::new()));
@@ -33,15 +33,15 @@ pub fn resanitize_zip(bytes: &[u8]) -> Result<Vec<u8>> {
             continue;
         }
         if entry.size() > MAX_ENTRY_BYTES {
-            bail!("файл {} в бандле слишком велик", entry.name());
+            bail!("bundle entry {} is too large", entry.name());
         }
-        // Имя из архива в файловую систему не попадает — оно только внутри
-        // нового zip, но обход каталогов в нём тоже ни к чему.
+        // The name never reaches the filesystem — it only goes into the new
+        // zip — but there's no reason to carry traversal into that either.
         let name = entry.name().replace('\\', "/").replace("..", "_");
 
         let mut raw = String::new();
         if entry.read_to_string(&mut raw).is_err() {
-            // Бинарь в бандле логов не нужен и очистке не поддаётся.
+            // Binary content can't be redacted and has no place in a log bundle.
             continue;
         }
         out.start_file(&name, options)?;

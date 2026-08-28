@@ -1,10 +1,7 @@
--- Доступ к сборкам стал правом (`noro.build.<server>.<build>`), и лаунчер
--- показывает только те версии, на которые право есть.
---
--- Без этой строки выкат отобрал бы доступ у всех разом: у роли `player` базовых
--- прав нет вовсе, вход на нелимитные серверы держался на логике `limited=false`.
--- Wildcard сохраняет прежнее поведение — все видят все сборки; сузить его можно
--- в админке, заменив на `noro.build.<server>.*` или на конкретные версии.
+-- Build access is now a permission (`noro.build.<server>.<build>`) and the
+-- launcher only lists versions the player holds one for. `player` had no
+-- permissions at all, so without this row the rollout would lock everyone out at
+-- once. The wildcard keeps the old behaviour; narrow it in the admin panel.
 INSERT INTO role_permissions (role_id, permission)
 SELECT id, 'noro.build.*' FROM roles WHERE name = 'player'
 ON CONFLICT DO NOTHING;

@@ -1,46 +1,39 @@
-//! Режим `merged`: three-way по хешам, без хранения копий файлов.
+//! `merged` mode: a three-way compare by hash, without keeping file copies.
 //!
-//! Главный дефект `user_managed` в том, что файл не обновляется никогда:
-//! сервер поправил конфиг мода — игрок остаётся на старом навсегда, даже если
-//! сам файл ни разу не трогал.
-//!
-//! Решение стоит один json: в `.noro/base-hashes.json` лежит sha1 того, что мы
-//! установили в прошлый раз. Сравнение «моё против базы» и «серверное против
-//! базы» отвечает на вопрос, кто именно менял файл.
+//! Under `user_managed` a file is never updated again — the server fixes a mod
+//! config and the player stays on the old one forever, even having never
+//! touched it. All this needs to do better is one json: `.noro/base-hashes.json`
+//! holds the sha1 of whatever we installed last time, and comparing mine and
+//! theirs against that base says who actually changed the file.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-/// Имя внутри служебного каталога лаунчера.
 const BASE_PATH: &str = ".noro/base-hashes.json";
 
-/// Что делать с файлом.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
-    /// Игрок не трогал — обновить.
+    /// Untouched by the player — take the server's version.
     Update,
-    /// Сервер не менял — оставить как есть.
+    /// Unchanged on the server — keep the player's edits.
     KeepMine,
-    /// Меняли обе стороны.
+    /// Both sides changed it.
     Conflict,
-    /// Совпадает всё — делать нечего.
     Nothing,
 }
 
-/// Решение по одному файлу.
-///
-/// `mine` — `None`, если файла нет: тогда его надо поставить, кто бы что ни
-/// менял. `base` — `None` при первом проходе, и это тоже «поставить»: базы ещё
-/// нет, спорить не с чем.
+/// `mine` is `None` when the file is missing — install it, whoever changed
+/// what. `base` is `None` on the first pass, which also means install: there is
+/// no base to argue with yet.
 pub fn decide(mine: Option<&str>, base: Option<&str>, theirs: &str) -> Decision {
     let Some(mine) = mine else {
         return Decision::Update;
     };
     let Some(base) = base else {
-        // База неизвестна. Совпало с серверным — ничего не делаем, разошлось —
-        // это правки игрока, которых мы не видели: считаем конфликтом, а не
-        // поводом затереть.
+        // No base to compare against. Matching the server means nothing to do;
+        // differing means edits we never saw, and those are worth a conflict
+        // rather than an overwrite.
         return if mine == theirs {
             Decision::Nothing
         } else {
@@ -49,11 +42,8 @@ pub fn decide(mine: Option<&str>, base: Option<&str>, theirs: &str) -> Decision 
     };
 
     match (mine == base, theirs == base) {
-        // Игрок не трогал, сервер обновил.
         (true, false) => Decision::Update,
-        // Игрок правил, сервер не менял.
         (false, true) => Decision::KeepMine,
-        // Правили обе стороны.
         (false, false) => {
             if mine == theirs {
                 Decision::Nothing
@@ -65,7 +55,7 @@ pub fn decide(mine: Option<&str>, base: Option<&str>, theirs: &str) -> Decision 
     }
 }
 
-/// Хеши того, что мы установили в прошлый раз.
+/// Hashes of what we installed last time.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct BaseHashes(HashMap<String, String>);
 
@@ -85,8 +75,8 @@ impl BaseHashes {
         self.0.insert(path.to_string(), sha1.to_string());
     }
 
-    /// Ошибка записи не срывает запуск: без базы следующий проход просто
-    /// посчитает файлы неизвестными и не станет ничего затирать.
+    /// A failed write doesn't abort the launch: without a base the next pass
+    /// treats the files as unknown and refuses to overwrite anything.
     pub async fn save(&self, instance_dir: &Path) {
         let path = instance_dir.join(BASE_PATH);
         if let Some(parent) = path.parent() {
@@ -98,10 +88,8 @@ impl BaseHashes {
     }
 }
 
-/// Отложить версию игрока перед тем, как взять серверную.
-///
-/// Без копии `take_theirs` означал бы «молча стереть правки», а это ровно то,
-/// от чего режим и защищает.
+/// Set the player's version aside before taking the server's. Without the copy,
+/// resolving a conflict would silently destroy their edits.
 pub async fn backup_conflict(instance_dir: &Path, rel: &str, stamp: &str) -> std::io::Result<()> {
     let src = instance_dir.join(rel);
     let dst = instance_dir.join(".noro/conflicts").join(stamp).join(rel);

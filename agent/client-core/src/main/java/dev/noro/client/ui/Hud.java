@@ -5,19 +5,14 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
 /**
- * Примитивы HUD: плашки поверх игры в стиле лаунчера.
+ * HUD primitives: launcher-styled overlays drawn on top of the game. Never grabs
+ * input.
  *
- * <p>HUD не отнимает управление и ничем не выдаёт себя: ни звука, ни частиц, ни
- * слота интерфейса. Полноэкранный GUI открывается отдельно и только когда
- * действительно нужен.
- *
- * <p>Углы именованы, а не заданы координатами: когда над игрой рисуют сразу
- * несколько функций — разбор, кошелёк, статус сборки, — им нужно договариваться
- * о местах, и договариваться проще про «правый верх», чем про пиксели.
+ * <p>Corners are named rather than given as coordinates so several features
+ * drawing at once can agree on placement.
  */
 public final class Hud {
 
-    /** Отступ от края экрана. */
     public static final int MARGIN = 2 * Theme.GRID;
 
     public enum Corner {
@@ -29,7 +24,7 @@ public final class Hud {
 
     private Hud() {}
 
-    /** Плашка в углу. Возвращает её верх — под ней можно рисовать следующую. */
+    /** Returns the card's top edge, so the next one can stack against it. */
     public static int card(GuiGraphics g, Corner corner, int w, int h, int stackedAbove) {
         Minecraft mc = Minecraft.getInstance();
         int screenW = mc.getWindow().getGuiScaledWidth();
@@ -39,7 +34,7 @@ public final class Hud {
             case TOP_RIGHT, BOTTOM_RIGHT -> screenW - w - MARGIN;
         };
         int y = switch (corner) {
-            // Сверху — под эффектами зелий и бафами: там уже занято.
+            // Below the potion effect icons — that strip is already taken.
             case TOP_LEFT, TOP_RIGHT -> MARGIN + 6 * Theme.GRID + stackedAbove;
             case BOTTOM_LEFT, BOTTOM_RIGHT -> screenH - h - MARGIN - stackedAbove;
         };
@@ -47,7 +42,6 @@ public final class Hud {
         return y;
     }
 
-    /** Строка «подпись — значение»: из них состоит почти любая плашка. */
     public static void row(GuiGraphics g, int x, int y, int w, Component label, Component value, int valueColor) {
         Minecraft mc = Minecraft.getInstance();
         g.drawString(mc.font, label, x, y, Theme.TEXT_MUTED);
@@ -55,7 +49,7 @@ public final class Hud {
         g.drawString(mc.font, value, x + w - valueWidth, y, valueColor);
     }
 
-    /** Полоса: время до конца, прогресс, доля. Пустая — просто рамка. */
+    /** Progress bar. {@code fraction} is clamped to 0..1. */
     public static void bar(GuiGraphics g, int x, int y, int w, double fraction, int color) {
         int h = Theme.GRID;
         g.fill(x, y, x + w, y + h, Theme.BG_INPUT);

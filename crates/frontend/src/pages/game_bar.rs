@@ -30,8 +30,6 @@ pub fn bottom_bar(
         .flex()
         .items_center()
         .child(version_block(server))
-        // Селектор — сразу за текущей версией: выбор относится к ней, а не к
-        // кнопке запуска. Когда версия одна, ничего не добавляется.
         .children(
             super::build_picker::build_picker(ui, server, cx).map(|p| div().ml(px(20.)).child(p)),
         )
@@ -56,8 +54,7 @@ pub fn bottom_bar(
 fn console_button(active: bool, cx: &mut Cx) -> AnyElement {
     div()
         .id("toggle-console")
-        // 56 — как у кнопки запуска рядом: два элемента одной группы разной
-        // высоты читаются как оплошность, а не как решение.
+        // Matches the play button beside it.
         .size(px(56.))
         .rounded(px(R_SM))
         .cursor_pointer()
@@ -85,8 +82,8 @@ fn console_button(active: bool, cx: &mut Cx) -> AnyElement {
 }
 
 fn version_block(server: &ServerEntry) -> AnyElement {
-    // Прочерк, а не «draft»: сборки нет вовсе, а «draft» читался как «есть, но
-    // черновая» — и игрок ждал кнопку «играть», которой не будет.
+    // A dash rather than "draft": there is no build at all here, and "draft"
+    // reads as "there is one, it's just rough".
     let version = server.current_version.as_deref().unwrap_or("—");
     div()
         .flex()
@@ -157,8 +154,8 @@ fn play_button(
         )
         .into_any_element();
     }
-    // Действие одно и то же — синхронизация с последующим запуском, но называть
-    // его «играть», когда на диске пусто или лежит прошлая версия, — врать.
+    // Same action every time — sync, then launch. Only the label moves, because
+    // calling it "play" with nothing on disk would be a lie.
     let (icon, label) = match build {
         BuildState::Missing => ("download", t("game-install")),
         BuildState::Outdated => ("refresh", t("game-update")),

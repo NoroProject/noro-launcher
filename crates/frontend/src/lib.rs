@@ -1,5 +1,3 @@
-//! GPUI-фронтенд лаунчера noro.
-
 mod assets;
 mod components;
 mod console_controls;
@@ -53,10 +51,8 @@ impl gpui::Render for LauncherUI {
             .font_family(FONT_PIXEL_ALT)
             .text_color(rgb(TEXT_PRIMARY))
             .text_sm()
-            // Кастомная оконная рамка (перетаскивание, RU/ENG, свернуть, закрыть).
             .child(components::window_chrome(compact_chrome, self, cx))
             .child(div().flex_1().min_h_0().child(body))
-            // Тост-уведомление.
             .when(self.toast.is_some(), |d| {
                 d.child(pages::toast_overlay(self, cx))
             })
@@ -82,7 +78,8 @@ fn open_window(
             )),
             titlebar: Some(gpui::TitlebarOptions {
                 title: Some(SharedString::new_static("noro launcher")),
-                // Прозрачный титлбар + спрятанные системные кнопки — рисуем свою рамку.
+                // Transparent titlebar, traffic lights parked off-screen: the
+                // chrome is drawn by `components::window_chrome`.
                 appears_transparent: true,
                 traffic_light_position: Some(point(px(-120.), px(-120.))),
             }),
@@ -93,7 +90,6 @@ fn open_window(
             let view_weak: WeakEntity<LauncherUI> = view.downgrade();
             cx.set_global(GlobalLauncherUI(view.clone()));
 
-            // Задача-приёмник сообщений от backend.
             cx.spawn({
                 let frontend_recv = frontend_recv.clone();
                 move |async_app: &mut AsyncApp| {
@@ -119,14 +115,13 @@ fn open_window(
     );
 }
 
-/// Точка входа frontend. Блокирует поток до выхода из приложения.
+/// Blocks the calling thread until the app exits.
 pub fn start(backend_handle: BackendHandle, frontend_recv: FrontendReceiver) {
     let frontend_recv = Arc::new(tokio::sync::Mutex::new(frontend_recv));
 
     application()
         .with_assets(assets::AppAssets)
         .run(move |cx: &mut App| {
-            // Регистрируем встроенные шрифты (Inter + пиксельные) — «фикс шрифтов».
             let _ = cx.text_system().add_fonts(assets::fonts());
             open_window(cx, backend_handle.clone(), frontend_recv.clone());
             cx.activate(true);

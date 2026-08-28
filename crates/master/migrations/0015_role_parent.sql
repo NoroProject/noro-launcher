@@ -1,16 +1,16 @@
--- Наследование ролей: права родителя действуют и у потомка.
+-- Role inheritance: a child also gets the parent's permissions.
 --
--- Родитель один, а не список: цепочки vip → vip+ → vip++ хватает на всё, ради
--- чего это заводится, а множественное наследование сразу требует правил
--- разрешения конфликтов, которых у нас нет — право либо есть, либо нет.
+-- A single parent rather than a list. Multiple inheritance would need conflict
+-- resolution rules, and there is nothing to resolve here — a permission is
+-- either granted or it isn't. Chains like vip -> vip+ -> vip++ cover the cases
+-- this exists for.
 --
--- ON DELETE SET NULL, а не CASCADE: удаление родителя не должно уносить с собой
--- дочерние роли вместе с их собственными правами и всеми, кому они выданы.
--- Потомок просто остаётся при своих.
+-- SET NULL rather than CASCADE: deleting a parent must not take child roles with
+-- it, along with their own permissions and everyone holding them.
 --
--- Цикл (A → B → A) база не запрещает — это проверяет API при смене родителя.
--- Рекурсивные обходы всё равно написаны через UNION, который на цикле сходится,
--- чтобы кривые данные не вешали резолвер прав.
+-- Cycles (A -> B -> A) are not blocked here; the API checks on reparent. The
+-- recursive traversals use UNION, which terminates on a cycle regardless, so bad
+-- data can't hang the permission resolver.
 
 ALTER TABLE roles ADD COLUMN IF NOT EXISTS parent_id uuid
     REFERENCES roles(id) ON DELETE SET NULL;

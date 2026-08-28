@@ -1,23 +1,23 @@
-//! Копирование сборки целиком.
+//! Duplicating a whole build.
 //!
-//! Файлы при этом не копируются физически: FileStore адресуется по sha1, и
-//! новая сборка ссылается на те же объекты. Стоимость копии — вставка строк,
-//! а не перезаливка модпака.
+//! Nothing is copied on disk: the FileStore is addressed by sha1, so the new
+//! build points at the same objects. A copy costs a few row inserts, not a
+//! re-upload of the modpack.
 
 use anyhow::Result;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-/// Скопировать сборку в новую версию того же сервера.
+/// Copy a build into a new version of the same server.
 ///
-/// Переносятся все настройки и весь список файлов. Не переносятся:
-/// публикация (копия всегда черновик), подпись манифеста (её надо ставить
-/// заново — файлы те же, но `version` в манифесте другой) и дата создания.
+/// Settings and the file list carry over. Publication does not (the copy is
+/// always a draft), nor does the manifest signature — same files, but a
+/// different `version` in the manifest, so it has to be signed again.
 ///
-/// Колонки не перечисляются поимённо намеренно: `to_jsonb(b)` берёт их все, и
-/// новая колонка в `builds` попадает в копию сама. Явный список пришлось бы
-/// дополнять руками, а забытая настройка проявилась бы не при копировании, а
-/// у игрока — расхождением поведения между версиями сборки.
+/// Columns are deliberately not listed by name: `to_jsonb(b)` takes them all,
+/// so a new column in `builds` ends up in the copy on its own. An explicit list
+/// would have to be maintained by hand, and a forgotten setting would surface
+/// on a player's machine rather than here.
 pub async fn duplicate_build(pool: &PgPool, src: Uuid, version: &str) -> Result<Uuid> {
     let mut tx = pool.begin().await?;
 
@@ -64,7 +64,6 @@ pub async fn duplicate_build(pool: &PgPool, src: Uuid, version: &str) -> Result<
     Ok(new_id)
 }
 
-/// Сервер, которому принадлежит сборка.
 pub async fn build_server_id(pool: &PgPool, build_id: Uuid) -> Result<Option<Uuid>> {
     Ok(
         sqlx::query_scalar("SELECT server_id FROM builds WHERE id = $1")

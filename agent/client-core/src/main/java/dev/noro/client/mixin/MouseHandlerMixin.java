@@ -9,14 +9,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Пока открыто радиальное меню, мышь двигает выбор, а не голову.
+ * While the radial menu is open the mouse moves the selection, not the head.
  *
- * <p>Иначе прицеливаться приходится поворотом вида: работает, но модератор в
- * ванише крутится на месте, а после закрытия камеру надо возвращать рывком.
- *
- * <p>Накопленную дельту забираем здесь же и отменяем поворот: {@code
- * MouseHandler} обнуляет её сразу после этого вызова, и другого места, где её
- * ещё видно, нет.
+ * <p>The delta has to be taken here: {@code MouseHandler} zeroes it right after
+ * this call, and there is no other place it's still visible.
  */
 @Mixin(MouseHandler.class)
 public abstract class MouseHandlerMixin {

@@ -1,19 +1,18 @@
-/** Свод правил: дерево разделов, поиск и подписи. Nuxt подхватывает `utils/`. */
+/** Rulebook: category tree, search and labels. Nuxt picks `utils/` up itself. */
 
 import type { Rule, RuleCategory, RuleNode, RuleSanction } from '~/types/rules'
 
-/** Перевод: сюда его передают, потому что каталог живёт в контексте Nuxt. */
+/** Passed in rather than imported: the catalog lives in the Nuxt context. */
 type Translate = (key: string, args?: Record<string, string | number>) => string
 
-/** Название вида наказания: `server_ban` → «Бан на сервере». */
 export function kindLabel(kind: string, t: Translate): string {
   return t(`web-sanction-${kind.replace('_', '-')}`)
 }
 
 /**
- * Допустимое наказание одной строкой: «Мут 30m–2h», «Бан от 7d». Сроки
- * остаются в записи админа: переводить вилку в прозу («не более двух часов»)
- * пришлось бы на каждом языке заново.
+ * Allowed sanction on one line: "Mute 30m–2h", "Ban from 7d". Durations stay
+ * in the admin's own notation — spelling a range out in prose would have to be
+ * redone for every language.
  */
 export function formatSanction(sanction: RuleSanction, t: Translate): string {
   const kind = kindLabel(sanction.kind, t)
@@ -29,13 +28,13 @@ export function formatSanction(sanction: RuleSanction, t: Translate): string {
   return t('web-sanction-any', { kind })
 }
 
-/** Срок по умолчанию для варианта: нижняя граница, иначе верхняя. */
+/** Default duration for a variant: the lower bound, else the upper one. */
 export function defaultMinutes(sanction: RuleSanction): number | null {
   if (sanction.kind === 'warn') return null
   return sanction.min_minutes ?? sanction.max_minutes ?? null
 }
 
-/** Укладывается ли срок в рамки варианта. Та же проверка, что и на сервере. */
+/** Whether a duration fits the variant. Mirrors the check on the server. */
 export function sanctionAllows(sanction: RuleSanction, minutes: number | null): boolean {
   if (sanction.kind === 'warn') return true
   if (minutes === null) return sanction.max_minutes === null
@@ -44,7 +43,7 @@ export function sanctionAllows(sanction: RuleSanction, minutes: number | null): 
   return true
 }
 
-/** Совпадает ли правило с поисковым запросом: код, заголовок или текст. */
+/** Matches on code, title or body text. */
 export function ruleMatches(rule: Rule, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
@@ -56,12 +55,12 @@ export function ruleMatches(rule: Rule, query: string): boolean {
 }
 
 /**
- * Плоские списки — в дерево любой глубины.
+ * Flat lists into a tree of any depth.
  *
- * Раздел без единого подходящего правила выпадает целиком: при поиске «мут»
- * страница, состоящая из пустых заголовков, ничего не отвечает на вопрос.
- * Раздел, чей родитель не пришёл (удалён, чужой свод), становится корневым —
- * иначе его правила исчезли бы вместе с ним.
+ * A category with no matching rules drops out entirely, so a search doesn't
+ * leave a page of empty headings. A category whose parent never arrived
+ * (deleted, or from another rulebook) becomes a root instead of vanishing
+ * along with its rules.
  */
 export function buildRuleTree(
   categories: RuleCategory[],
@@ -92,7 +91,7 @@ export function buildRuleTree(
       node.children = sort(node.children)
       node.total = node.rules.length + node.children.reduce((sum, c) => sum + c.total, 0)
     }
-    // В админке пустой раздел остаётся: его только что завели, чтобы наполнить.
+    // The admin keeps empty categories: one was just created to be filled.
     return list
       .filter(node => keepEmpty || node.total > 0)
       .sort((a, b) => byOrder(a.category, b.category))
@@ -100,7 +99,7 @@ export function buildRuleTree(
   return sort(roots)
 }
 
-/** Правила вне разделов: показываются последними, но не теряются. */
+/** Rules with no category. Shown last, but not lost. */
 export function looseRules(rules: Rule[], categories: RuleCategory[], query = ''): Rule[] {
   const known = new Set(categories.map(c => c.id))
   return rules
@@ -108,10 +107,7 @@ export function looseRules(rules: Rule[], categories: RuleCategory[], query = ''
     .sort(byOrder)
 }
 
-/**
- * Следующий свободный код в разделе: «1.» + номер. Админ его правит, но в
- * девяти случаях из десяти правило просто дописывают в конец раздела.
- */
+/** Next free code in a category. The admin can edit it; usually they don't. */
 export function nextRuleCode(categoryCode: string, siblings: Rule[]): string {
   const prefix = categoryCode.trim().replace(/\.$/, '')
   const used = siblings
@@ -121,7 +117,7 @@ export function nextRuleCode(categoryCode: string, siblings: Rule[]): string {
   return prefix ? `${prefix}.${next}` : String(next)
 }
 
-/** Следующий номер раздела: «3» в корне, «2.4» внутри второго раздела. */
+/** Next category number: "3" at the root, "2.4" inside the second category. */
 export function nextCategoryCode(parentCode: string, siblings: RuleCategory[]): string {
   const prefix = parentCode.trim().replace(/\.$/, '')
   const used = siblings

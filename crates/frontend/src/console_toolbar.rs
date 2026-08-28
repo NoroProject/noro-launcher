@@ -67,8 +67,6 @@ pub fn toolbar(view: &ConsoleWindow, logs: &[LogEntry], cx: &mut Cx) -> AnyEleme
                 v.status_message = format!("COPIED {lines}");
                 v.copy_success = true;
 
-                // Сброс состояния через 2 секунды используя GPUI таймер
-                // Мы используем правильную сигнатуру spawn: (WeakEntity, &mut AsyncApp)
                 cx.spawn(|view: WeakEntity<ConsoleWindow>, cx: &mut AsyncApp| {
                     let mut cx = cx.clone();
                     async move {

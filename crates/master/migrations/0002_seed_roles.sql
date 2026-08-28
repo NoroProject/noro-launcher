@@ -1,4 +1,4 @@
--- Базовые роли. player выдаётся всем автоматически.
+-- Base roles. `player` is handed out automatically on first login.
 
 INSERT INTO roles (name, display_name, color, is_default, sort_order)
 VALUES
@@ -7,14 +7,12 @@ VALUES
     ('admin',  'Админ', '#5865F2', FALSE, 100)
 ON CONFLICT (name) DO NOTHING;
 
--- player: доступ к публичным серверам и опциональным модам (нелимитным — без прав вообще).
--- Здесь только право входа на все нелимитные серверы покрывается логикой (limited=false),
--- поэтому базовых прав у player нет. VIP получает все опциональные моды.
+-- `player` deliberately gets nothing: entry to non-limited servers is decided by
+-- `servers.limited = false`, not by a grant.
 INSERT INTO role_permissions (role_id, permission)
 SELECT id, 'noro.optional.*' FROM roles WHERE name = 'vip'
 ON CONFLICT DO NOTHING;
 
--- admin: полный доступ.
 INSERT INTO role_permissions (role_id, permission)
 SELECT id, '*' FROM roles WHERE name = 'admin'
 ON CONFLICT DO NOTHING;

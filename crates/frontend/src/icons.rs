@@ -1,4 +1,4 @@
-//! Иконки из `assets/icons/<name>.svg` (встроены в бинарник).
+//! Icons come from `assets/icons/<name>.svg`, embedded in the binary.
 
 use gpui::{prelude::*, px, rgb, svg};
 

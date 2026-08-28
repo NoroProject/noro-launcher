@@ -1,5 +1,3 @@
-//! Маленький цветной бейдж.
-
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, IntoElement, SharedString};
 

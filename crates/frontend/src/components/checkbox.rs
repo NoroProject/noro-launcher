@@ -1,5 +1,3 @@
-//! Квадратный чекбокс в стиле ATOM.
-
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, App, ClickEvent, ElementId, IntoElement, Window};
 

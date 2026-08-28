@@ -1,5 +1,5 @@
-//! Ошибка здесь — это эскалация привилегий: админ надевает другого админа и
-//! получает его права. Проверяется обе стороны — что можно и что нельзя.
+//! A bug here is privilege escalation, so both directions are covered: what is
+//! allowed and what must be refused.
 
 use super::*;
 use uuid::Uuid;
@@ -39,8 +39,8 @@ fn an_admin_can_impersonate_an_ordinary_player() {
 
 #[test]
 fn wildcards_cover_named_permissions() {
-    // Права игроков выданы поимённо, у админов — шаблонами. Без сопоставления
-    // по шаблонам правило запрещало бы почти всё.
+    // Players are granted by name, admins by pattern. Matching literally would
+    // refuse nearly everything.
     let actor = user(1, &["noro.admin.*"]);
     let target = user(2, &["noro.admin.users"]);
     assert!(can_impersonate(&actor, &target));
@@ -48,7 +48,7 @@ fn wildcards_cover_named_permissions() {
 
 #[test]
 fn an_admin_cannot_impersonate_another_admin() {
-    // Тот самый случай, ради которого правило и существует.
+    // The case the whole rule exists for.
     let actor = user(1, &["noro.admin.users", "noro.admin.impersonate"]);
     let target = user(2, &["noro.admin.builds"]);
     assert!(!can_impersonate(&actor, &target));
@@ -66,7 +66,7 @@ fn a_superadmin_can_impersonate_anyone_but_root() {
 
 #[test]
 fn nobody_can_impersonate_themselves() {
-    // Иначе действия админа прятались бы под видом impersonation.
+    // Otherwise an admin's own actions could hide behind an impersonation.
     let actor = user(1, &["*"]);
     assert!(!can_impersonate(&actor, &actor));
 }
@@ -80,9 +80,8 @@ fn a_single_extra_permission_is_enough_to_refuse() {
 
 #[test]
 fn a_player_without_permissions_cannot_be_used_to_reach_further() {
-    // У актора нет вообще ничего — надевать некого, даже пустого игрока:
-    // само право impersonate проверяется отдельно, но подмножество тут пустое
-    // и формально сходится.
+    // With nothing on either side the subset check trivially passes; holding
+    // the impersonate permission at all is checked elsewhere.
     let actor = user(1, &[]);
     assert!(can_impersonate(&actor, &user(2, &[])));
     assert!(!can_impersonate(&actor, &user(3, &["noro.launcher.beta"])));

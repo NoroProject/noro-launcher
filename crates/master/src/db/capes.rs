@@ -75,7 +75,7 @@ pub async fn set_user_granted_capes(pool: &PgPool, user_id: Uuid, cape_ids: &[Uu
         .execute(&mut *tx)
         .await?;
     }
-    // Если текущий экипированный плащ игрока больше не в списке доступных — сбрасываем его
+    // Unequip the current cape if the new grant list no longer covers it.
     let current_url: Option<String> =
         sqlx::query_scalar("SELECT cape_url FROM users WHERE id = $1")
             .bind(user_id)

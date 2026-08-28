@@ -1,12 +1,11 @@
-//! API для серверных агентов (плагин Paper, моды NeoForge и Fabric).
+//! API for game-server agents (the Paper plugin, the NeoForge and Fabric mods).
 //!
-//! Агент живёт на игровом сервере и знает игрока только по MC UUID. Мастер —
-//! источник истины по ролям, доступу и наказаниям; сервер получается его
-//! проекцией, а не второй независимой базой.
+//! An agent knows a player only by MC UUID; the master stays the source of
+//! truth for roles, access and punishments.
 //!
-//! Авторизация — секретом конкретного игрового сервера, а не админ-токеном:
-//! сервер должен уметь спросить только про себя. Из секрета же берётся, на
-//! какой сервер заходит игрок, поэтому подменить его в запросе нельзя.
+//! Auth is the individual game server's secret rather than the admin token, so
+//! a server can only ask about itself. Which server a player is joining is
+//! taken from that secret too, so a request can't claim to be elsewhere.
 
 pub mod chat_filters;
 pub mod heartbeat;

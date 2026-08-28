@@ -1,8 +1,7 @@
--- Базовая схema noro-launcher.
+-- Initial schema.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Пользователи
 CREATE TABLE IF NOT EXISTS users (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     discord_id       TEXT UNIQUE NOT NULL,
@@ -18,7 +17,6 @@ CREATE TABLE IF NOT EXISTS users (
     last_login_at    TIMESTAMPTZ
 );
 
--- Роли
 CREATE TABLE IF NOT EXISTS roles (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name         TEXT UNIQUE NOT NULL,
@@ -50,7 +48,7 @@ CREATE TABLE IF NOT EXISTS user_permissions (
     PRIMARY KEY (user_id, permission)
 );
 
--- OAuth-сессии лаунчера/сайта (наши Bearer-токены поверх Discord)
+-- Our own bearer tokens for the launcher and the site, issued on top of Discord.
 CREATE TABLE IF NOT EXISTS oauth_sessions (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -62,7 +60,7 @@ CREATE TABLE IF NOT EXISTS oauth_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_oauth_user ON oauth_sessions(user_id);
 
--- Yggdrasil-сессии (для MC-сервера: join/hasJoined)
+-- Yggdrasil sessions, used by the game server for join/hasJoined.
 CREATE TABLE IF NOT EXISTS mc_sessions (
     user_id      UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     access_token UUID NOT NULL,
@@ -73,7 +71,6 @@ CREATE TABLE IF NOT EXISTS mc_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_mc_sessions_token ON mc_sessions(access_token);
 
--- Серверные профили
 CREATE TABLE IF NOT EXISTS servers (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name           TEXT NOT NULL,
@@ -90,7 +87,6 @@ CREATE TABLE IF NOT EXISTS servers (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Сборки
 CREATE TABLE IF NOT EXISTS builds (
     id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     server_id          UUID NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
@@ -112,7 +108,7 @@ CREATE TABLE IF NOT EXISTS builds (
 );
 CREATE INDEX IF NOT EXISTS idx_builds_server ON builds(server_id);
 
--- Файлы сборки (моды/конфиги; vanilla-артефакты — в mojang_artifacts)
+-- Mods and configs only. Vanilla artifacts live in mojang_artifacts.
 CREATE TABLE IF NOT EXISTS build_files (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     build_id     UUID NOT NULL REFERENCES builds(id) ON DELETE CASCADE,
@@ -125,7 +121,7 @@ CREATE TABLE IF NOT EXISTS build_files (
 );
 CREATE INDEX IF NOT EXISTS idx_build_files_build ON build_files(build_id);
 
--- Кеш Mojang/loader артефактов (шарятся между сборками)
+-- Mojang and modloader artifacts, shared across builds.
 CREATE TABLE IF NOT EXISTS mojang_artifacts (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     artifact_type TEXT NOT NULL,
@@ -137,7 +133,7 @@ CREATE TABLE IF NOT EXISTS mojang_artifacts (
     UNIQUE (path)
 );
 
--- Ядра серверов (server.jar)
+-- Uploaded server.jar per server.
 CREATE TABLE IF NOT EXISTS server_cores (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     server_id   UUID NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
@@ -149,7 +145,6 @@ CREATE TABLE IF NOT EXISTS server_cores (
     uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Новости
 CREATE TABLE IF NOT EXISTS news (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title           TEXT NOT NULL,
@@ -160,7 +155,7 @@ CREATE TABLE IF NOT EXISTS news (
     published_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Admin-токены (CLI/CI)
+-- Non-interactive tokens for CLI and CI.
 CREATE TABLE IF NOT EXISTS admin_tokens (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        TEXT NOT NULL,
@@ -178,13 +173,12 @@ CREATE TABLE IF NOT EXISTS oauth_states (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Версии лаунчера
 CREATE TABLE IF NOT EXISTS launcher_versions (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     version    TEXT NOT NULL,
     platform   TEXT NOT NULL,
     sha256     TEXT NOT NULL,
-    file_sha1  TEXT NOT NULL DEFAULT '',   -- ключ в FileStore для раздачи
+    file_sha1  TEXT NOT NULL DEFAULT '',   -- FileStore key the download is served from
     size       BIGINT NOT NULL DEFAULT 0,
     signature  TEXT NOT NULL,
     is_current BOOLEAN NOT NULL DEFAULT FALSE,
@@ -192,7 +186,6 @@ CREATE TABLE IF NOT EXISTS launcher_versions (
     UNIQUE (version, platform)
 );
 
--- Задачи сборки лаунчера
 CREATE TABLE IF NOT EXISTS launcher_build_jobs (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     github_tag TEXT NOT NULL,
@@ -201,7 +194,6 @@ CREATE TABLE IF NOT EXISTS launcher_build_jobs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- История игровых сессий (для статистики playtime)
 CREATE TABLE IF NOT EXISTS play_sessions (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

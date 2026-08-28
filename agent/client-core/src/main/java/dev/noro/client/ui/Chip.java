@@ -7,11 +7,8 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 
 /**
- * Чип: маленькая кнопка-переключатель, как {@code noro-chip} на сайте.
- *
- * <p>Из них собран выбор варианта наказания и быстрые сроки. Отличается от
- * кнопки не размером, а смыслом: чип показывает состояние («выбрано»), а не
- * действие, поэтому выбранный остаётся подсвеченным.
+ * A small toggle, like {@code noro-chip} on the site. Differs from a button in
+ * meaning rather than size: a chip shows state, so the selected one stays lit.
  */
 public final class Chip extends AbstractButton {
 

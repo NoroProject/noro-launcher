@@ -1,48 +1,47 @@
-//! База запрещённых файлов.
+//! Banned files.
 //!
-//! Едет внутри подписанного манифеста — иначе список подменяется на клиенте, и
-//! вся затея теряет смысл.
+//! Ships inside the signed manifest, or the list could just be swapped out on
+//! the client.
 //!
-//! Приоритет выше всех правил путей, включая `unmanaged`: в этом и смысл —
-//! папка ресурспаков не синхронизируется, но xray оттуда удаляется.
+//! These rules outrank every path rule, `unmanaged` included — that's the point:
+//! the resourcepacks folder isn't synced, but xray still gets deleted from it.
 //!
-//! Честно о границах: SHA1 обходится изменением одного байта, маска имени —
-//! переименованием. Обе ловят ленивых, а не мотивированных. Настоящий охват
-//! даёт «файла нет в манифесте» (§10.4), и это отдельная механика.
+//! Both matchers are cheap to defeat: a hash by changing one byte, a name mask
+//! by renaming. They catch the lazy. Real coverage comes from "file is not in
+//! the manifest" (§10.4), which lives elsewhere.
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum BlockAction {
-    /// Удалить и продолжить. Умолчание: игрок видит нейтральное сообщение.
+    /// Delete and carry on. The player sees a neutral message.
     #[default]
     Delete,
-    /// Оставить, но сообщить админу. Для случаев, где удаление дороже ошибки.
+    /// Leave it, but tell an admin. For cases where deleting costs more than a
+    /// false positive.
     Flag,
-    /// Не пускать в игру, пока файл на месте.
+    /// Refuse to launch while the file is there.
     BlockLaunch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockedFile {
-    /// Маска имени: `*xray*`. Пусто — правило только по хешу.
+    /// Name mask, e.g. `*xray*`. `None` means match on hash alone.
     #[serde(default)]
     pub pattern: Option<String>,
-    /// Точный SHA1. Пусто — правило только по маске.
+    /// Exact SHA1. `None` means match on the mask alone.
     #[serde(default)]
     pub sha1: Option<String>,
-    /// Зачем запрещён — попадает в флаг админу.
+    /// Goes into the admin flag.
     pub reason: String,
     #[serde(default)]
     pub action: BlockAction,
 }
 
 impl BlockedFile {
-    /// Подпадает ли файл под правило.
-    ///
-    /// Оба условия, если заданы оба: правило «этот хеш под этим именем» строже
-    /// каждого по отдельности и даёт меньше ложных срабатываний.
+    /// When both a mask and a hash are set, both have to match — "this hash
+    /// under this name" is narrower than either half and misfires less.
     pub fn matches(&self, rel_path: &str, sha1: &str) -> bool {
         let by_name = match &self.pattern {
             Some(p) => glob_match(&rel_path.to_lowercase(), &p.to_lowercase()),
@@ -52,15 +51,15 @@ impl BlockedFile {
             Some(h) => h.eq_ignore_ascii_case(sha1),
             None => true,
         };
-        // Пустое правило не должно матчить всё подряд.
+        // An empty rule would otherwise match everything.
         (self.pattern.is_some() || self.sha1.is_some()) && by_name && by_hash
     }
 }
 
-/// Маска с `*` в любом месте: `*xray*`, `mods/x*.jar`.
+/// `*` anywhere: `*xray*`, `mods/x*.jar`.
 fn glob_match(text: &str, pattern: &str) -> bool {
-    // Без звёзд это точный путь, а не префикс: иначе `mods/banned.jar` удаляло
-    // бы и `mods/banned.jar.bak`.
+    // With no star it's an exact path, not a prefix — otherwise
+    // `mods/banned.jar` would also take out `mods/banned.jar.bak`.
     if !pattern.contains('*') {
         return text == pattern;
     }
@@ -79,7 +78,7 @@ fn glob_match(text: &str, pattern: &str) -> bool {
         if part.is_empty() {
             continue;
         }
-        // Последний кусок без `*` на конце обязан завершать строку.
+        // A trailing segment with no `*` after it has to end the string.
         if i == parts.len() - 1 && !pattern.ends_with('*') {
             return rest.ends_with(part);
         }
@@ -91,7 +90,6 @@ fn glob_match(text: &str, pattern: &str) -> bool {
     true
 }
 
-/// Первое сработавшее правило.
 pub fn first_match<'a>(
     rules: &'a [BlockedFile],
     rel_path: &str,

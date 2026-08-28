@@ -1,7 +1,6 @@
--- Каталоги локализации в формате Fluent (.ftl).
--- Текст лежит прямо в БД: каталоги маленькие (единицы КБ) и меняются целиком,
--- поэтому content-addressed стор здесь только мешал бы — понадобилась бы
--- сборка мусора при каждом сохранении из админки.
+-- Fluent (.ftl) catalogues, kept inline instead of in the file store. They are a
+-- few KB and always replaced whole, so content addressing would only buy us a
+-- garbage collection pass on every save from the admin panel.
 
 CREATE TABLE IF NOT EXISTS translations (
     locale     TEXT PRIMARY KEY,

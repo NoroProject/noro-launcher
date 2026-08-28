@@ -1,30 +1,27 @@
-//! Фоновая уборка протухших строк авторизации и логов.
+//! Background sweep of expired auth rows and logs.
 
 use sqlx::PgPool;
 use std::time::Duration;
 
-/// Как часто проходить по таблицам.
 const INTERVAL: Duration = Duration::from_secs(60 * 60);
 
-/// Сколько сессия живёт после истечения access-токена.
+/// How long a session sticks around after its access token expires.
 const SESSION_GRACE: &str = "90 days";
 
-/// Запустить уборку в фоне.
 pub fn spawn(pool: PgPool) {
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(INTERVAL);
         loop {
             ticker.tick().await;
             if let Err(e) = sweep(&pool).await {
-                tracing::warn!(error = %e, "уборка протухших сессий не удалась");
+                tracing::warn!(error = %e, "cleanup sweep failed");
             }
         }
     });
 }
 
-/// Один проход. Возвращает число удалённых строк по каждой таблице.
+/// One pass over every table. Counts go to the log, not to the caller.
 async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
-    // Одноразовые коды с коротким TTL: после истечения они бесполезны.
     let codes = delete(pool, "DELETE FROM oauth_codes WHERE expires_at < NOW()").await?;
     let launcher_codes = delete(
         pool,
@@ -32,16 +29,13 @@ async fn sweep(pool: &PgPool) -> anyhow::Result<()> {
     )
     .await?;
 
-    // Истёкшие баны.
     let unbanned = crate::db::expire_punishments(pool).await?;
     if unbanned > 0 {
-        tracing::info!(count = unbanned, "сняты истёкшие баны");
+        tracing::info!(count = unbanned, "expired punishments lifted");
     }
 
-    // Бандлы логов старше 30 дней.
     let bundles = delete(pool, "DELETE FROM support_bundles WHERE expires_at < NOW()").await?;
 
-    // Срабатывания автомодерации старше 30 дней.
     let triggers = delete(
         pool,
         "DELETE FROM automod_triggers WHERE created_at < NOW() - INTERVAL '30 days'",

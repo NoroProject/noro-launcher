@@ -11,13 +11,11 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Канал с лаунчером: один WebSocket на loopback.
+ * One WebSocket to the launcher over loopback.
  *
- * <p>WebSocket берётся из JDK — игра идёт на Java 21, и тащить ради одного
- * сокета зависимость незачем. Токена и URL мастера здесь нет: мод шлёт
- * намерение, к мастеру ходит лаунчер.
- *
- * <p>Про содержимое кадров труба не знает ничего — она раздаёт их функциям.
+ * <p>No master token or URL lives here: the mod sends an intent, the launcher
+ * talks to the master. The pipe knows nothing about frame contents — it hands
+ * them to features.
  */
 public final class Bridge {
 
@@ -35,8 +33,8 @@ public final class Bridge {
     }
 
     /**
-     * Подключиться, если лаунчер оставил рукопожатие. Файла нет — игру
-     * запустили не через лаунчер, и это не ошибка, а обычный случай.
+     * Connect if the launcher left a handshake. No file means the game was
+     * started without the launcher — ordinary, not an error.
      */
     public void connect(Path gameDir) {
         if (connected()) {
@@ -54,12 +52,12 @@ public final class Bridge {
                     features.forEach(f -> f.connected(this));
                 })
                 .exceptionally(e -> {
-                    NoroCore.LOG.warn("канал с лаунчером не открылся: {}", e.toString());
+                    NoroCore.LOG.warn("launcher channel did not open: {}", e.toString());
                     return null;
                 });
     }
 
-    /** Первый кадр соединения. Общий для всех функций — он про канал, не про них. */
+    /** First frame on the connection. Shared by all features — it's about the channel, not them. */
     public record Hello(String key, int protocol) {}
 
     public void send(Object frame) {
@@ -81,25 +79,24 @@ public final class Bridge {
         JsonObject envelope = Frames.envelope(text);
         String type = Frames.type(envelope);
         if (type == null) {
-            NoroCore.LOG.debug("не конверт: {}", text);
+            NoroCore.LOG.debug("not an envelope: {}", text);
             return;
         }
-        // Кадр предлагается всем функциям, а не первой согласившейся: свод
-        // правил нужен и панели разбора, и игрокским экранам, а «кто первый
-        // зарегистрировался, тот и получил» зависело бы от порядка загрузки
-        // модов — то есть от случайности.
+        // Every feature gets the frame, not just the first taker: the rule book
+        // is needed by both the case panel and the player screens, and
+        // first-registered-wins would depend on mod load order.
         boolean taken = false;
         for (Feature feature : features) {
             taken |= feature.accept(type, envelope);
         }
         if (!taken) {
-            // Незнакомый кадр не рвёт соединение: мод уезжает со сборкой и
-            // живёт у людей дольше, чем эта версия лаунчера.
-            NoroCore.LOG.debug("кадр {} никому не подошёл", type);
+            // An unknown frame doesn't drop the connection — the mod ships with
+            // the build and outlives this launcher version on people's machines.
+            NoroCore.LOG.debug("frame {} matched no feature", type);
         }
     }
 
-    /** Кадры собираются целиком: WebSocket отдаёт их кусками. */
+    /** Reassembles frames — the WebSocket delivers them in chunks. */
     private final class Listener implements WebSocket.Listener {
         private final StringBuilder chunks = new StringBuilder();
 
@@ -124,7 +121,7 @@ public final class Bridge {
 
         @Override
         public void onError(WebSocket ws, Throwable error) {
-            NoroCore.LOG.debug("канал оборвался: {}", error.toString());
+            NoroCore.LOG.debug("channel broke: {}", error.toString());
             socket.set(null);
             features.forEach(Feature::disconnected);
         }

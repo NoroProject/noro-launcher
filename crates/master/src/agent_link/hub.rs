@@ -1,13 +1,12 @@
-//! Реестр агентов, подключённых за наказаниями.
+//! Registry of agents connected for punishments.
 //!
-//! Отдельно от `WrapperHub`: враппер — это процесс-надзиратель снаружи сервера,
-//! он есть не везде и умеет только консоль. Агент живёт внутри игры и знает
-//! игроков, а без своего канала узнавал бы о бане игрока не раньше следующего
-//! входа — то есть уже после того, как тот дописал в чат.
+//! Separate from `WrapperHub`: the wrapper supervises the server process from
+//! outside and only speaks console, while the agent runs inside the game and
+//! knows players.
 //!
-//! Ключ — id соединения, а не игрового сервера: один сервер сборки может
-//! переподключаться, и вытеснять живое соединение мёртвым здесь нечем — в
-//! отличие от враппера, адресных запросов «ответь мне» тут нет.
+//! Keyed by connection id rather than game server, because a server may
+//! reconnect and there is nothing here to evict a live connection with a dead
+//! one — unlike the wrapper, this channel has no "answer me" requests.
 
 use super::proto::ToAgent;
 use dashmap::DashMap;
@@ -19,11 +18,11 @@ use uuid::Uuid;
 pub type ConnId = u64;
 
 struct Conn {
-    /// Сборка, к которой относится игровой сервер: мут и бан на сборке идут
-    /// только её серверам.
+    /// The build this game server belongs to; a build-wide mute or ban only
+    /// reaches its own servers.
     server_id: Uuid,
-    /// Сам игровой сервер: по нему адресуются кадры «этому серверу» и по нему
-    /// же ведётся состав онлайна.
+    /// The game server itself — used to address a single server and to track
+    /// its online roster.
     game_server_id: Uuid,
     tx: UnboundedSender<String>,
 }
@@ -57,15 +56,14 @@ impl AgentHub {
         self.conns.remove(&id);
     }
 
-    /// Остался ли ещё хоть один живой агент этого игрового сервера. Спрашивают
-    /// при обрыве: чистить состав онлайна можно только когда ушёл последний.
+    /// Asked on disconnect: the online roster may only be cleared once the last
+    /// agent for this server is gone.
     pub fn has_game_server(&self, game_server_id: Uuid) -> bool {
         self.conns
             .iter()
             .any(|conn| conn.game_server_id == game_server_id)
     }
 
-    /// Кадр одному игровому серверу — тому, где сидит адресат.
     pub fn send_to_game_server(&self, msg: &ToAgent, game_server_id: Uuid) {
         let Some(frame) = encode(msg) else {
             return;
@@ -81,12 +79,11 @@ impl AgentHub {
         self.conns.len()
     }
 
-    /// Разослать всем агентам сети.
     pub fn broadcast(&self, msg: &ToAgent) {
         self.send(msg, None);
     }
 
-    /// Разослать агентам одной сборки. `None` — всем.
+    /// Send to the agents of one build, or to every agent when `None`.
     pub fn send(&self, msg: &ToAgent, server_id: Option<Uuid>) {
         let Some(frame) = encode(msg) else {
             return;
@@ -102,10 +99,9 @@ impl AgentHub {
 fn encode(msg: &ToAgent) -> Option<String> {
     match serde_json::to_string(msg) {
         Ok(frame) => Some(frame),
-        // Кадр собирается из наших же типов: сюда можно попасть только ошибкой
-        // в коде, и глотать её молча нельзя.
+        // The frame is built from our own types, so getting here means a bug.
         Err(e) => {
-            tracing::error!(error = %e, "не удалось собрать кадр для агента");
+            tracing::error!(error = %e, "failed to encode agent frame");
             None
         }
     }

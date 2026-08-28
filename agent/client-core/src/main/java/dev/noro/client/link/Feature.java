@@ -3,27 +3,19 @@ package dev.noro.client.link;
 import com.google.gson.JsonObject;
 
 /**
- * Одна возможность мода.
- *
- * <p>Мод вспомогательный, а не «панель дел с довесками»: разбор — первая
- * функция, но не единственная и не привилегированная. Каждая живёт своим
- * пакетом, объявляет свои кадры и получает от транспорта только те, что назвала
- * своими.
+ * One capability of the mod. Each lives in its own package, declares its own
+ * frames, and gets from the transport only the ones it claims. Case review is
+ * the first feature, not a privileged one.
  */
 public interface Feature {
 
-    /** Короткое имя для логов и настроек. */
+    /** Short name for logs and settings. */
     String id();
 
-    /**
-     * Кадр от лаунчера. {@code true} — «мой, разобрал»; {@code false} —
-     * «не мой», и его предложат следующей функции.
-     */
+    /** Return {@code true} if this frame was ours and handled; otherwise it moves on to the next feature. */
     boolean accept(String type, JsonObject envelope);
 
-    /** Канал открылся: можно спрашивать то, что нужно этой функции сразу. */
     default void connected(Bridge bridge) {}
 
-    /** Канал закрылся: лаунчер выключили или игра выходит. */
     default void disconnected() {}
 }

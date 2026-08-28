@@ -1,7 +1,7 @@
-//! CSRF-state входа: то, что помнит мастер, пока игрок ходит на платформу.
+//! The CSRF state the master remembers while a player is off at the platform.
 //!
-//! Строка одноразовая — читается через `DELETE ... RETURNING`, поэтому один и
-//! тот же `state` нельзя предъявить дважды.
+//! Single use: it is read with `DELETE ... RETURNING`, so the same `state`
+//! can't be presented twice.
 
 use super::provider::Provider;
 use crate::error::{AppError, AppResult};
@@ -12,7 +12,8 @@ use uuid::Uuid;
 pub struct StateRow {
     pub redirect: Option<String>,
     pub provider: String,
-    /// Не пусто — это привязка платформы к уже вошедшему игроку, а не вход.
+    /// Set when this is a platform link for an already signed-in player rather
+    /// than a sign-in.
     pub link_user_id: Option<Uuid>,
 }
 
@@ -22,7 +23,7 @@ fn random() -> String {
     hex::encode(bytes)
 }
 
-/// Завести state и вернуть его значение для адреса платформы.
+/// Returns the state value to put in the platform's authorize URL.
 pub async fn create(
     state: &AppState,
     p: Provider,
@@ -42,7 +43,6 @@ pub async fn create(
     Ok(csrf)
 }
 
-/// Забрать state и погасить его.
 pub async fn consume(state: &AppState, csrf: &str) -> AppResult<StateRow> {
     sqlx::query_as::<_, StateRow>(
         "DELETE FROM oauth_states WHERE state = $1 RETURNING redirect, provider, link_user_id",
