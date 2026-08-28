@@ -76,4 +76,4 @@ If you are unsure whether your use is covered, ask before shipping. Permission
 for specific uses can be granted in writing, and usually is when the intent is
 clear.
 
-Open an issue at https://github.com/NoroProject/NoroLauncher/issues
+Open an issue at https://github.com/NoroProject/noro-launcher/issues
