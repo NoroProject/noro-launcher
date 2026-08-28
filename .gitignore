@@ -60,3 +60,4 @@ secrets/
 # Working files of the OCI instance scripts — they hold tenancy OCIDs. The
 # scripts went away with the move to AWS, but the files are still on disk.
 /scripts/oci-*
+.cargo/
