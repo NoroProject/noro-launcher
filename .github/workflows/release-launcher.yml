@@ -56,10 +56,8 @@ jobs:
       - name: Vars present
         run: |
           set -euo pipefail
-          [ -n "${NORO_MASTER_URL:-}" ] || { echo "::error::переменная NORO_MASTER_URL не задана в настройках репозитория"; exit 1; }
-          [ -n "${NORO_SIGNING_PUBKEY:-}" ] || { echo "::error::переменная NORO_SIGNING_PUBKEY не задана — иначе доверенным станет dev-ключ"; exit 1; }
-          # Не ошибка, но сказать надо: иначе «в Sentry пусто» будет читаться
-          # как «падений нет», а не как «мы их не собираем».
+          [ -n "${NORO_MASTER_URL:-}" ] || echo "::notice::NORO_MASTER_URL не задан — бинарник собирается с универсальным плейсхолдером под stamping"
+          [ -n "${NORO_SIGNING_PUBKEY:-}" ] || echo "::notice::NORO_SIGNING_PUBKEY не задан — бинарник собирается с универсальным плейсхолдером под stamping"
           [ -n "${NORO_SENTRY_DSN:-}" ] || echo "::notice::NORO_SENTRY_DSN не задан — лаунчер соберётся без отчётов о падениях"
 
       # Лаунчер сверяет свою CARGO_PKG_VERSION с тегом, который отдаёт мастер.

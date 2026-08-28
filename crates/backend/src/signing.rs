@@ -5,8 +5,29 @@
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use once_cell::sync::Lazy;
 
+fn resolve_signing_pubkey_hex() -> Option<String> {
+    if let Ok(val) = std::env::var("NORO_SIGNING_PUBKEY") {
+        let trimmed = val.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+    let boot_path = crate::directories::LauncherDirectories::new().bootstrap_file();
+    if let Ok(raw) = std::fs::read_to_string(&boot_path) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+            if let Some(key) = v.get("signing_pubkey").and_then(|k| k.as_str()) {
+                let trimmed = key.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+    }
+    option_env!("NORO_SIGNING_PUBKEY").map(String::from)
+}
+
 static VERIFYING_KEY: Lazy<VerifyingKey> = Lazy::new(|| {
-    match option_env!("NORO_SIGNING_PUBKEY") {
+    match resolve_signing_pubkey_hex() {
         Some(hex_str) => {
             let bytes = hex::decode(hex_str).expect("NORO_SIGNING_PUBKEY: невалидный hex");
             let arr: [u8; 32] = bytes

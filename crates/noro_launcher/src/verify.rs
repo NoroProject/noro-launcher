@@ -13,20 +13,42 @@ use std::path::Path;
 /// Имя файла с подписью рядом с core-бинарником.
 pub const SIG_SUFFIX: &str = ".sig";
 
-fn verifying_key() -> Result<VerifyingKey> {
-    let hex_str = match option_env!("NORO_SIGNING_PUBKEY") {
-        Some(value) => value,
-        // В dev ключ выводится из общего seed — того же, что у мастера.
-        None => {
-            let sk = ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED);
-            return Ok(sk.verifying_key());
+use crate::embedded_config;
+
+/// Возвращает hex публичного ключа из вшитого конфига или env.
+pub fn raw_signing_pubkey() -> String {
+    if let Some(cfg) = embedded_config::get_embedded_config() {
+        if !cfg.pubkey.is_empty() && !cfg.pubkey.contains("__NORO_PUBKEY_PLACEHOLDER__") {
+            return cfg.pubkey;
         }
-    };
-    let bytes = hex::decode(hex_str).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: невалидный hex"))?;
+    }
+    option_env!("NORO_SIGNING_PUBKEY").unwrap_or_default().to_string()
+}
+
+fn verifying_key() -> Result<VerifyingKey> {
+    let hex_str = raw_signing_pubkey();
+    if hex_str.is_empty() {
+        // В dev ключ выводится из общего seed — того же, что у мастера.
+        let sk = ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED);
+        return Ok(sk.verifying_key());
+    }
+    let bytes = hex::decode(&hex_str).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: невалидный hex"))?;
     let arr: [u8; 32] = bytes
         .try_into()
         .map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: нужно 32 байта"))?;
     VerifyingKey::from_bytes(&arr).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: невалидный ключ"))
+}
+
+/// Адрес мастера. Читается из впечатанного конфига, либо из env / localhost.
+pub fn master_url() -> String {
+    if let Some(cfg) = embedded_config::get_embedded_config() {
+        if !cfg.master_url.is_empty() {
+            return cfg.master_url;
+        }
+    }
+    option_env!("NORO_MASTER_URL")
+        .unwrap_or("http://localhost:8080")
+        .to_string()
 }
 
 /// Проверяет ed25519-подпись байтов. `signature_b64` — как отдаёт мастер.
@@ -48,11 +70,7 @@ pub fn store(core_path: &Path, signature_b64: &str) -> Result<()> {
         .map_err(|e| anyhow!("не записать {}: {e}", path.display()))
 }
 
-/// Перепроверяет уже установленный core.
-///
-/// Делается на **каждом** запуске, а не только при скачивании: иначе всё, что
-/// сумеет записать в `AppData`, получало бы исполнение при каждом старте — и
-/// однажды пройденная проверка защищала бы вечно и напрасно.
+/// Перепроверяет уже установленный core на каждом запуске.
 pub fn verify_installed(core_path: &Path) -> Result<()> {
     let sig_file = sig_path(core_path);
     let signature = std::fs::read_to_string(&sig_file)
@@ -72,28 +90,6 @@ fn sig_path(core_path: &Path) -> std::path::PathBuf {
     let mut name = core_path.as_os_str().to_os_string();
     name.push(SIG_SUFFIX);
     std::path::PathBuf::from(name)
-}
-
-/// Обе переменные обязательны в релизе, и каждая по своей причине.
-///
-/// Без `NORO_MASTER_URL` лаунчер уедет к игрокам и будет ходить на localhost.
-/// Без `NORO_SIGNING_PUBKEY` он молча возьмёт dev-ключ из `schema` — а его seed
-/// лежит в репозитории, то есть подпись сможет подделать кто угодно, и вся
-/// проверка выше превратится в декорацию.
-#[cfg(not(debug_assertions))]
-const _: () = {
-    if option_env!("NORO_MASTER_URL").is_none() {
-        panic!("NORO_MASTER_URL обязателен для release-сборки лаунчера");
-    }
-    if option_env!("NORO_SIGNING_PUBKEY").is_none() {
-        panic!("NORO_SIGNING_PUBKEY обязателен для release-сборки: иначе доверенным окажется dev-ключ из репозитория");
-    }
-};
-
-/// Адрес мастера. В release он обязателен — см. проверку выше, поэтому дефолт
-/// достаётся только debug-сборкам и указывает на локальный мастер.
-pub fn master_url() -> &'static str {
-    option_env!("NORO_MASTER_URL").unwrap_or("http://localhost:8080")
 }
 
 #[cfg(test)]

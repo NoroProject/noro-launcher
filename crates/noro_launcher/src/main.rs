@@ -6,6 +6,7 @@
 //! который обновляется автоматически в `AppData/noro-launcher/`.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod embedded_config;
 mod splash;
 mod verify;
 
@@ -38,7 +39,7 @@ fn main() -> ExitCode {
     // всё, что сумеет записать в AppData, исполнялось бы вечно.
     if core_path.exists() {
         match verify::verify_installed(&core_path) {
-            Ok(()) if !rt.block_on(update_pending(&app_dir)) => return run_core(&core_path),
+            Ok(()) if !rt.block_on(update_pending(&app_dir)) => return run_core(&core_path, &app_dir),
             Ok(()) => eprintln!("на мастере лежит другая версия — обновляемся"),
             Err(e) => {
                 eprintln!("установленный лаунчер не прошёл проверку подписи: {e:#}");
@@ -55,6 +56,7 @@ fn main() -> ExitCode {
     let work_dir = app_dir.clone();
     let work_core = core_path.clone();
     let launch_path = core_path.clone();
+    let splash_app_dir = app_dir.clone();
 
     // Запуск core висит на колбэке `run_with`, а не на коде после него: оттуда
     // до нас доходит только Linux. На macOS и Windows GPUI убивает процесс
@@ -73,19 +75,15 @@ fn main() -> ExitCode {
             if res.is_err() {
                 return;
             }
+            let mut cmd = prepare_core_cmd(&launch_path, &splash_app_dir);
             #[cfg(unix)]
             {
                 use std::os::unix::process::CommandExt;
-                let err = std::process::Command::new(&launch_path)
-                    .args(std::env::args_os().skip(1))
-                    .exec();
+                let err = cmd.exec();
                 eprintln!("не удалось запустить {}: {err}", launch_path.display());
             }
             #[cfg(not(unix))]
-            if let Err(e) = std::process::Command::new(&launch_path)
-                .args(std::env::args_os().skip(1))
-                .spawn()
-            {
+            if let Err(e) = cmd.spawn() {
                 eprintln!("не удалось запустить {}: {e}", launch_path.display());
             }
         })),
@@ -139,9 +137,30 @@ fn core_binary_name() -> &'static str {
     }
 }
 
-fn run_core(path: &std::path::Path) -> ExitCode {
+fn prepare_core_cmd(path: &std::path::Path, app_dir: &std::path::Path) -> std::process::Command {
+    let master_url = verify::master_url();
+    let pubkey = verify::raw_signing_pubkey();
+
+    let bootstrap_path = app_dir.join("bootstrap.json");
+    let bootstrap_data = serde_json::json!({
+        "master_url": master_url,
+        "signing_pubkey": pubkey,
+    });
+    if let Ok(json_str) = serde_json::to_string_pretty(&bootstrap_data) {
+        let _ = std::fs::write(bootstrap_path, json_str);
+    }
+
     let mut cmd = std::process::Command::new(path);
     cmd.args(std::env::args_os().skip(1));
+    cmd.env("NORO_MASTER_URL", &master_url);
+    if !pubkey.is_empty() {
+        cmd.env("NORO_SIGNING_PUBKEY", &pubkey);
+    }
+    cmd
+}
+
+fn run_core(path: &std::path::Path, app_dir: &std::path::Path) -> ExitCode {
+    let mut cmd = prepare_core_cmd(path, app_dir);
 
     #[cfg(unix)]
     {

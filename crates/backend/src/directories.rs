@@ -26,6 +26,11 @@ impl LauncherDirectories {
         self.root.join("config.json")
     }
 
+    /// Файл начальной конфигурации мастера (bootstrap).
+    pub fn bootstrap_file(&self) -> PathBuf {
+        self.root.join("bootstrap.json")
+    }
+
     /// Файл выбранных опциональных модов (по серверам).
     pub fn optional_mods_file(&self) -> PathBuf {
         self.root.join("optional_mods.json")

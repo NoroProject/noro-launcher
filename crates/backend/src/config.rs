@@ -81,6 +81,23 @@ fn default_locale() -> String {
 /// `noro_launcher::verify`. Здесь остаётся только dev-адрес: подставлять сюда
 /// боевой домен значило бы, что отладочная сборка молча ходит в прод.
 fn default_master_url() -> String {
+    if let Ok(val) = std::env::var("NORO_MASTER_URL") {
+        let trimmed = val.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    let boot_path = crate::directories::LauncherDirectories::new().bootstrap_file();
+    if let Ok(raw) = std::fs::read_to_string(&boot_path) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+            if let Some(url) = v.get("master_url").and_then(|u| u.as_str()) {
+                let trimmed = url.trim();
+                if !trimmed.is_empty() {
+                    return trimmed.to_string();
+                }
+            }
+        }
+    }
     option_env!("NORO_MASTER_URL")
         .unwrap_or("http://localhost:8080")
         .to_string()
