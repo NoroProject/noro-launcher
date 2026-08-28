@@ -14,12 +14,11 @@ trap 'rm -rf "$STAGE"' EXIT
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 
-# UDRO is an uncompressed read-only disk image: allows in-place binary stamping
-# of the embedded server address by the master server, and signs cleanly with rcodesign.
+# UDZO is a compressed read-only disk image: smaller size and strictly protected.
 hdiutil create \
   -volname "$VOLNAME" \
   -srcfolder "$STAGE" \
-  -ov -format UDRO \
+  -ov -format UDZO \
   -quiet \
   "$OUT"
 

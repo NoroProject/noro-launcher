@@ -75,6 +75,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
     strategy:
       fail-fast: false
       matrix:
@@ -122,6 +123,9 @@ jobs:
 
       - name: Build
         shell: bash
+        env:
+          NORO_MASTER_URL: https://api.noro.dalynkaa.dev
+          NORO_SIGNING_PUBKEY: ${{ secrets.NORO_SIGNING_PUBKEY }}
         run: |
           set -euo pipefail
           # release-symbols, not release: same optimised code plus the string
@@ -166,8 +170,33 @@ jobs:
           grep -qE "Found [1-9]" dif-upload.log \
             || echo "::warning::Sentry found no symbols in $DIR — traces for this target will be unnamed"
 
+      - name: Import signing certificate
+        if: matrix.os == 'macos-latest' && env.MACOS_CERT_P12 != ''
+        shell: bash
+        env:
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          PASS="$(uuidgen)"
+          security create-keychain -p "$PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$PASS" "$KEYCHAIN"
+          printf '%s' "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -k "$PASS" "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12"
+          echo "MACOS_SIGN_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | grep 'Developer ID Application' | head -1 | sed -E 's/.*\"(.*)\"/\1/')" >> "$GITHUB_ENV"
+
       - name: Package
         shell: bash
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
           set -euo pipefail
           mkdir -p dist
@@ -180,11 +209,17 @@ jobs:
             macos-latest)
               cp "$OUT/noro-launcher" dist/noro-launcher-${{ matrix.target }}
               cp "$OUT/noro-launcher-core" dist/noro-launcher-core-${{ matrix.target }}
-              codesign --force --sign - --timestamp=none "dist/noro-launcher-${{ matrix.target }}"
-              codesign --force --sign - --timestamp=none "dist/noro-launcher-core-${{ matrix.target }}"
-              bash .github/scripts/make-app.sh "$OUT/noro-launcher" NoroLauncher.app
-              codesign --force --deep --sign - --timestamp=none NoroLauncher.app
+              IDENTITY="${MACOS_SIGN_IDENTITY:--}"
+              if [ "$IDENTITY" = "-" ]; then
+                codesign --force --sign - --timestamp=none "dist/noro-launcher-${{ matrix.target }}"
+                codesign --force --sign - --timestamp=none "dist/noro-launcher-core-${{ matrix.target }}"
+              else
+                codesign --force --sign "$IDENTITY" --options runtime --timestamp "dist/noro-launcher-${{ matrix.target }}"
+                codesign --force --sign "$IDENTITY" --options runtime --timestamp "dist/noro-launcher-core-${{ matrix.target }}"
+              fi
+              bash .github/scripts/make-app.sh "$OUT/noro-launcher" NoroLauncher.app "${TAG#v}"
               bash .github/scripts/make-dmg.sh NoroLauncher.app dist/noro-launcher-${{ matrix.target }}.dmg
+              bash .github/scripts/notarize.sh dist/noro-launcher-${{ matrix.target }}.dmg
               ;;
             *)
               cp "$OUT/noro-launcher" dist/noro-launcher-${{ matrix.target }}
