@@ -38,8 +38,7 @@ pub struct EmbeddedConfig {
     pub pubkey: String,
 }
 
-pub fn get_embedded_config() -> Option<EmbeddedConfig> {
-    let slice = unsafe { &NORO_EMBEDDED_CONFIG[..] };
+pub fn parse_embedded_config_slice(slice: &[u8]) -> Option<EmbeddedConfig> {
     let start_pos = slice.windows(CFG_START.len()).position(|w| w == CFG_START)?;
     let content_start = start_pos + CFG_START.len();
     let end_pos = slice[content_start..].windows(CFG_END.len()).position(|w| w == CFG_END)?;
@@ -53,6 +52,10 @@ pub fn get_embedded_config() -> Option<EmbeddedConfig> {
     }
 
     Some(EmbeddedConfig { master_url, pubkey })
+}
+
+pub fn get_embedded_config() -> Option<EmbeddedConfig> {
+    parse_embedded_config_slice(unsafe { &NORO_EMBEDDED_CONFIG[..] })
 }
 
 #[cfg(test)]
@@ -69,14 +72,9 @@ mod tests {
         let stamped = b"NORO_CFG_START:{\"master_url\":\"https://test.noro.dev\",\"pubkey\":\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\"}                :NORO_CFG_END\0";
         let mut buf = [b' '; EMBEDDED_CONFIG_LEN];
         buf[..stamped.len()].copy_from_slice(stamped);
-        unsafe {
-            let backup = NORO_EMBEDDED_CONFIG;
-            NORO_EMBEDDED_CONFIG = buf;
-            let cfg = get_embedded_config().expect("должен распарсить");
-            assert_eq!(cfg.master_url, "https://test.noro.dev");
-            assert_eq!(cfg.pubkey, "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
-            NORO_EMBEDDED_CONFIG = backup;
-        }
+        let cfg = parse_embedded_config_slice(&buf).expect("должен распарсить");
+        assert_eq!(cfg.master_url, "https://test.noro.dev");
+        assert_eq!(cfg.pubkey, "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
     }
 }
 
