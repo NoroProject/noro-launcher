@@ -22,15 +22,22 @@ pub fn raw_signing_pubkey() -> String {
         }
     }
     from_bootstrap("signing_pubkey").unwrap_or_else(|| {
-        option_env!("NORO_SIGNING_PUBKEY").unwrap_or_default().to_string()
+        option_env!("NORO_SIGNING_PUBKEY")
+            .unwrap_or_default()
+            .to_string()
     })
 }
 
 fn from_bootstrap(key: &str) -> Option<String> {
-    let path = dirs::data_dir()?.join(schema::launcher_dir_name()).join("bootstrap.json");
+    let path = dirs::data_dir()?
+        .join(schema::launcher_dir_name())
+        .join("bootstrap.json");
     let content = std::fs::read_to_string(path).ok()?;
     let val: serde_json::Value = serde_json::from_str(&content).ok()?;
-    val.get(key)?.as_str().filter(|s| !s.trim().is_empty()).map(|s| s.trim().to_string())
+    val.get(key)?
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().to_string())
 }
 
 fn verifying_key() -> Result<VerifyingKey> {
@@ -40,7 +47,9 @@ fn verifying_key() -> Result<VerifyingKey> {
         return Ok(sk.verifying_key());
     }
     let bytes = hex::decode(&hex_str).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: not valid hex"))?;
-    let arr: [u8; 32] = bytes.try_into().map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: expected 32 bytes"))?;
+    let arr: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: expected 32 bytes"))?;
     VerifyingKey::from_bytes(&arr).map_err(|_| anyhow!("NORO_SIGNING_PUBKEY: not a valid key"))
 }
 
@@ -57,7 +66,9 @@ pub fn master_url() -> String {
         }
     }
     from_bootstrap("master_url").unwrap_or_else(|| {
-        option_env!("NORO_MASTER_URL").unwrap_or("http://localhost:8080").to_string()
+        option_env!("NORO_MASTER_URL")
+            .unwrap_or("http://localhost:8080")
+            .to_string()
     })
 }
 

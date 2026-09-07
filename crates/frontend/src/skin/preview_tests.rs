@@ -1,5 +1,5 @@
-//! Тесты рендерера: что yaw и sway реально доходят до растеризатора и что
-//! оборот замыкается.
+//! Yaw and sway are easy to lose silently — the figure keeps animating either
+//! way. These check that both actually reach the rasteriser.
 
 use super::*;
 use image::{ImageEncoder, RgbaImage};
@@ -68,9 +68,9 @@ fn the_turn_shows_every_side() {
 
 #[test]
 fn sway_moves_limbs_without_touching_the_facing() {
-    // Тело в тестовом скине прозрачное, поэтому качание конечностей на картинке
-    // не видно — проверяем на модели: тот же yaw при разной фазе даёт ту же
-    // ориентацию, то есть sway не подмешивается в поворот.
+    // The test skin's body is transparent, so the sway itself never shows up in
+    // the image. What this checks is the other half: the same yaw at a different
+    // phase gives the same orientation, so sway doesn't leak into the rotation.
     let skin = test_skin();
     assert_eq!(at(&skin, 40.0, 0.0), at(&skin, 40.0, 0.5));
 }
@@ -80,17 +80,16 @@ fn a_rendered_frame_is_bgra_and_full_size() {
     let skin = test_skin();
     let frame = render_view(&skin, None, 0.0, 0.0).expect("frame renders");
     let size = frame.size(0);
-    // Кадр рендерится в размерах суперсэмплинга, а не в логических PREVIEW_*:
-    // единого множителя SUPERSAMPLE тут нет с тех пор, как ширину и высоту
-    // развели по отдельным константам.
+    // The frame comes out at the supersample size, not the logical PREVIEW_*.
     assert_eq!(u32::from(size.width), SUPERSAMPLE_W);
     assert_eq!(u32::from(size.height), SUPERSAMPLE_H);
 
-    // Красная маска лица должна лежать в синем канале BGRA — если забыть своп,
-    // скин поедет в неправильных цветах, а тесты растеризатора этого не увидят.
+    // The red face has to land in the blue channel of BGRA. Forget the swap and
+    // the skin renders in the wrong colours, which the rasteriser tests don't
+    // see.
     let bytes = frame.as_bytes(0).expect("frame data");
     let has_red_as_bgr = bytes
         .chunks_exact(4)
         .any(|p| p[3] > 200 && p[2] > 200 && p[1] < 80 && p[0] < 80);
-    assert!(has_red_as_bgr, "ожидали красный как B=0,G=0,R=255 в BGRA");
+    assert!(has_red_as_bgr, "expected red as B=0,G=0,R=255 in BGRA");
 }

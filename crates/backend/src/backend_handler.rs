@@ -1,4 +1,5 @@
-//! Обработка сообщений: MessageToBackend (от frontend) и ServerWsMsg (от мастера).
+//! Message handling: `MessageToBackend` from the frontend, `ServerWsMsg` from
+//! the master.
 
 use std::path::PathBuf;
 
@@ -11,10 +12,8 @@ use schema::{ClientWsMsg, ServerWsMsg};
 use uuid::Uuid;
 
 impl BackendState {
-    /// Запрос манифеста с учётом выбранной игроком версии.
-    ///
-    /// Без выбора уходит `None`, и мастер отдаёт текущую опубликованную —
-    /// поведение по умолчанию не меняется.
+    /// `build_id` stays `None` while the player has not pinned a version, and
+    /// the master answers with whatever is published right now.
     fn request_manifest_msg(&self, server_id: Uuid) -> ClientWsMsg {
         ClientWsMsg::RequestBuildManifest {
             server_id,
@@ -28,7 +27,6 @@ impl BackendState {
         }
     }
 
-    /// Команда от frontend.
     pub async fn handle_to_backend(&mut self, msg: MessageToBackend) {
         match msg {
             MessageToBackend::StartWebLogin { modal_action } => {
@@ -117,10 +115,9 @@ impl BackendState {
                 modal.set_stage("Waiting for biometric authentication...");
 
                 tokio::spawn(async move {
-                    // 1. Попытка нативного Touch ID / Windows Hello из системного Keyring
-                    if let Ok(true) = crate::auth::biometrics::authenticate_biometrics(
-                        "Авторизация в Noro Launcher",
-                    ) {
+                    if let Ok(true) =
+                        crate::auth::biometrics::authenticate_biometrics("Sign in to Noro Launcher")
+                    {
                         if let Some(stored) = token_store::load() {
                             let key = stored.access_token.clone();
                             let base = master.trim_end_matches('/');
@@ -149,7 +146,7 @@ impl BackendState {
                         }
                     }
 
-                    // 2. Токена в Keyring нет — обычный вход через сайт.
+                    // Nothing usable in the keyring, so fall back to the site.
                     modal.set_stage("Waiting for sign in on the website...");
                     let cancelled = {
                         let m = modal.clone();
@@ -187,7 +184,7 @@ impl BackendState {
 
             MessageToBackend::RequestServerList => {
                 self.ctx.ws.send(ClientWsMsg::RequestServerList);
-                // Отдадим кэш сразу, если есть.
+                // Answer from the cache while the request is in flight.
                 if !self.servers.is_empty() {
                     self.ctx.send(MessageToFrontend::ServerList {
                         servers: self.servers.clone(),
@@ -254,15 +251,15 @@ impl BackendState {
                     Some(id) => {
                         c.selected_build.insert(server_id, id);
                     }
-                    // Возврат к текущей версии — это отсутствие записи, а не
-                    // запомненный id: иначе выбор «залипнет» на старой сборке,
-                    // когда админ выкатит новую.
+                    // Going back to the current version means no entry at all.
+                    // Storing the id instead would pin the player to that build
+                    // once the admin publishes a newer one.
                     None => {
                         c.selected_build.remove(&server_id);
                     }
                 });
-                // Манифест перезапрашивается сразу: игрок ждёт, что список
-                // файлов и модов обновится под выбранную версию.
+                // Re-request right away: the file and mod lists have to follow
+                // the version that was just picked.
                 self.ctx.ws.send(self.request_manifest_msg(server_id));
             }
 
@@ -358,7 +355,7 @@ impl BackendState {
                             limit: page.limit,
                         }),
                         Err(e) => {
-                            tracing::error!(error = %e, "поиск в каталоге не удался");
+                            tracing::error!(error = %e, "catalog search failed");
                             ctx.send(MessageToFrontend::CatalogFailed {
                                 message: e.to_string(),
                             });
@@ -380,8 +377,8 @@ impl BackendState {
                         urlencoding::encode(&provider),
                         urlencoding::encode(&project_id),
                     );
-                    // Поля страницы совпадают с ModProjectInfo по именам, а всё
-                    // лишнее из ответа мастера serde просто игнорирует.
+                    // The page's fields line up with `ModProjectInfo` by name,
+                    // and serde drops whatever else the master sends.
                     let loaded = async {
                         http.get(&url)
                             .send()
@@ -394,7 +391,7 @@ impl BackendState {
                     match loaded {
                         Ok(project) => ctx.send(MessageToFrontend::ModProjectLoaded { project }),
                         Err(e) => {
-                            tracing::error!(error = %e, "страница мода не загрузилась");
+                            tracing::error!(error = %e, "mod page failed to load");
                             ctx.send(MessageToFrontend::CatalogFailed {
                                 message: e.to_string(),
                             });
@@ -425,8 +422,8 @@ impl BackendState {
             }
 
             MessageToBackend::SetCrashReports { enabled } => {
-                // Применится со следующего запуска: Sentry поднимается до GPUI,
-                // а снять уже установленный хук паники на ходу нельзя.
+                // Takes effect on the next start: Sentry comes up before GPUI,
+                // and an installed panic hook can't be taken back off.
                 self.ctx.config.update(|c| c.crash_reports = enabled);
                 self.send_config_state();
             }
@@ -657,7 +654,6 @@ impl BackendState {
             }
 
             MessageToBackend::Quit => {
-                // Убить запущенные игры.
                 let running: Vec<_> = self.ctx.running.lock().keys().copied().collect();
                 for id in running {
                     if let Some(g) = self.ctx.running.lock().get(&id) {
@@ -668,7 +664,6 @@ impl BackendState {
         }
     }
 
-    /// Запуск сервера: запросить манифест (или взять кэш), затем sync+launch.
     async fn launch_server(&mut self, server_id: Uuid, modal: bridge::ModalAction) {
         if self.login_info().is_none() {
             modal.fail("Sign in required");
@@ -697,10 +692,10 @@ impl BackendState {
         }
     }
 
-    /// Начать sync+launch для уже доступного манифеста.
+    /// Sync and launch for a manifest that is already in hand.
     fn begin_launch(&mut self, server_id: Uuid, manifest: schema::BuildManifest) {
         let Some(modal) = self.pending_launch.remove(&server_id) else {
-            return; // не мы инициировали
+            return; // nobody asked for a launch
         };
         let (Some(login), Some(user)) = (self.login_info(), self.user.clone()) else {
             return;
@@ -720,7 +715,6 @@ impl BackendState {
         });
     }
 
-    /// Отправить текущую конфигурацию во frontend.
     pub fn send_config_state(&self) {
         let c = self.ctx.config.get();
         let server_settings = c
@@ -753,10 +747,10 @@ impl BackendState {
         });
     }
 
-    /// Обновить паки и шейдеры, не выходя из игры.
+    /// Update packs and shaders without leaving the game.
     ///
-    /// Молча, если обновлять нечего: кадр «синхронизировано» на каждый чих
-    /// научит игрока его не замечать.
+    /// Silent when there is nothing to update: a "synced" toast for every
+    /// little thing teaches the player to ignore it.
     fn live_sync(&self, server_id: uuid::Uuid, manifest: schema::BuildManifest) {
         let dir = self.ctx.dirs.instance(&server_id);
         let client = self.ctx.http.clone();
@@ -765,8 +759,9 @@ impl BackendState {
             match crate::sync::live::apply(&client, &dir, &manifest).await {
                 Ok(done) if done.nothing() => {}
                 Ok(done) => {
-                    // Файлы подменены, но игра держит в памяти прежние. Ручки
-                    // «перезагрузи ресурсы» снаружи процесса нет — просим мод.
+                    // The files on disk changed, but the game still holds the
+                    // old ones in memory. Nothing outside the process can make
+                    // it reload resources, so the mod is asked to.
                     ctx.mod_link.send(mod_link::ToMod::ReloadResources {
                         packs: done.updated.clone(),
                     });
@@ -776,13 +771,12 @@ impl BackendState {
                         locked: done.locked,
                     });
                 }
-                Err(e) => tracing::warn!(error = %e, "живая синхронизация не удалась"),
+                Err(e) => tracing::warn!(error = %e, "live sync failed"),
             }
         });
     }
 
-    /// Вычислить и отправить опциональные моды сервера (с учётом прав).
-    /// Сообщить фронту, что сейчас можно сделать со сборкой.
+    /// Tells the frontend what can be done with the build right now.
     fn send_build_state(&self, server_id: uuid::Uuid, manifest: &schema::BuildManifest) {
         let dir = self.ctx.dirs.instance(&server_id);
         self.ctx.send(bridge::MessageToFrontend::BuildStateChanged {
@@ -861,7 +855,6 @@ impl BackendState {
             });
     }
 
-    /// Сообщение от мастера.
     pub async fn handle_from_master(&mut self, msg: ServerWsMsg) {
         match msg {
             ServerWsMsg::AuthOk { user } => {
@@ -884,7 +877,6 @@ impl BackendState {
             }
             ServerWsMsg::AuthFail { reason } => {
                 tracing::warn!("auth fail: {reason}");
-                // Токен недействителен — выходим.
                 let _ = token_store::clear();
                 self.access_token = None;
                 self.user = None;
@@ -903,16 +895,14 @@ impl BackendState {
                 let server_id = manifest.server_id;
                 self.manifests.insert(server_id, manifest.clone());
                 self.send_server_recommendation(server_id, &manifest);
-                // Всегда отдаём опц. моды во frontend (для карточки сервера).
                 self.send_optional_mods(server_id, &manifest);
                 self.send_build_state(server_id, &manifest);
                 if self.pending_launch.contains_key(&server_id) {
                     self.begin_launch(server_id, manifest);
                 } else {
-                    // Игра может быть запущена прямо сейчас. Полную
-                    // синхронизацию под ней запускать нельзя — она снесёт то,
-                    // что держит JVM, — но паки и шейдеры игра читает по
-                    // требованию, и их можно обновить не выходя из игры.
+                    // The game may be running right now. A full sync would
+                    // delete files the JVM is holding, but packs and shaders
+                    // are read on demand and can be swapped under it.
                     self.live_sync(server_id, manifest);
                 }
             }
@@ -938,10 +928,10 @@ impl BackendState {
             ServerWsMsg::BuildsChanged { server_id } => {
                 let had_manifest = self.manifests.remove(&server_id).is_some();
                 self.ctx.ws.send(ClientWsMsg::RequestServerList);
-                // Манифест нужен и тому, кто сборку ещё не открывал в этой
-                // сессии: если папка на диске есть, значит человек в неё играет,
-                // и живая синхронизация должна дойти до него, а не ждать, пока
-                // он зайдёт на страницу сервера.
+                // The manifest matters even for a build nobody opened this
+                // session: a directory on disk means the player uses it, and
+                // live sync should reach them without waiting for them to visit
+                // the server page.
                 let installed = self.ctx.dirs.instance(&server_id).exists();
                 if self.user.is_some()
                     && (had_manifest || installed || self.pending_launch.contains_key(&server_id))
@@ -1003,9 +993,8 @@ impl BackendState {
                     expires_in_secs,
                 });
             }
-            // Карточка дела изменилась — перечитать её и разослать подписчикам.
-            // Игра не запущена, панели нет — кадр просто некуда класть, и это
-            // нормальный случай, а не сбой.
+            // With no game running there is no panel to push this to, which is
+            // the ordinary situation rather than a failure.
             ServerWsMsg::CaseUpdated { case_id } => {
                 self.ctx.mod_link.case_updated(&self.ctx, case_id);
             }
@@ -1013,10 +1002,7 @@ impl BackendState {
         }
     }
 
-    /// Выполнить действие, о котором попросил админ.
-    ///
-    /// Всё, что стирает файлы или прерывает работу, сначала спрашивает игрока:
-    /// иначе это уже не поддержка, а управление чужим компьютером.
+    /// Anything that erases files or interrupts the player asks them first.
     fn run_remote_action(
         &mut self,
         action: schema::RemoteAction,
@@ -1034,7 +1020,7 @@ impl BackendState {
         self.perform_remote_action(action, server_id);
     }
 
-    /// Собственно выполнение — после подтверждения либо сразу, если его не надо.
+    /// The run itself: after confirmation, or straight away when none is needed.
     pub fn perform_remote_action(&mut self, action: schema::RemoteAction, server_id: Option<Uuid>) {
         if action == schema::RemoteAction::KillGame {
             let running: Vec<_> = self.ctx.running.lock().keys().copied().collect();
@@ -1051,7 +1037,7 @@ impl BackendState {
                 key: "notif-remote-action-done".into(),
                 args: [(
                     "detail".to_string(),
-                    format!("процесс игры остановлен ({killed})"),
+                    format!("game process stopped ({killed})"),
                 )]
                 .into(),
                 level: schema::NotifLevel::Info,
@@ -1064,7 +1050,7 @@ impl BackendState {
             tokio::spawn(async move {
                 ctx.send(MessageToFrontend::AddNotification {
                     key: "notif-remote-action-done".into(),
-                    args: [("detail".to_string(), "лаунчер перезапускается...".into())].into(),
+                    args: [("detail".to_string(), "the launcher is restarting...".into())].into(),
                     level: schema::NotifLevel::Info,
                 });
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -1088,18 +1074,14 @@ impl BackendState {
                     });
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, action = action.as_str(), "действие не выполнено")
+                    tracing::warn!(error = %e, action = action.as_str(), "action failed")
                 }
             }
         });
     }
 
-    /// Собрать бандл и показать игроку, что именно уйдёт.
-    ///
-    /// Предпросмотр — не украшение: без него фича неотличима от слежки, а с ним
-    /// игрок видит `C:\Users\*****` вместо своего имени. Принудительный режим
-    /// собирает и отправляет сразу, но модалку всё равно показывает: журнал
-    /// покажет это в любом случае, а честность дешевле недоверия.
+    /// Collect the bundle and show the player exactly what would leave their
+    /// machine. Forced mode sends it anyway, but still shows the modal.
     fn prepare_log_request(
         &mut self,
         request_id: Uuid,
@@ -1134,8 +1116,8 @@ impl BackendState {
                 files,
             });
 
-            // Принудительный режим не ждёт ответа: спрашивать там, где ответ
-            // ничего не решает, значит врать игроку.
+            // Forced mode doesn't wait for the answer — the prompt above is a
+            // notice, not a question.
             if forced {
                 if let Some(token) = token {
                     let _ = crate::support::send_for_request(
@@ -1152,7 +1134,6 @@ impl BackendState {
         });
     }
 
-    /// Ответ игрока на запрос логов.
     fn answer_log_request(&mut self, request_id: Uuid, accepted: bool) {
         self.ctx.ws.send(ClientWsMsg::LogRequestResponse {
             request_id,
@@ -1187,15 +1168,13 @@ impl BackendState {
                     args: std::collections::BTreeMap::new(),
                     level: schema::NotifLevel::Info,
                 }),
-                Err(e) => tracing::warn!(error = %e, "логи по запросу не отправлены"),
+                Err(e) => tracing::warn!(error = %e, "requested logs were not sent"),
             }
         });
     }
 
-    /// Ответ на диалог входа в чужой аккаунт.
-    ///
-    /// Отказ так же важен, как согласие: мастер ждёт ответа, и молчание
-    /// оставило бы веб-страницу админа в поллинге до истечения гранта.
+    /// A refusal has to go back too: the master waits for an answer, and
+    /// silence leaves the admin's page polling until the grant expires.
     fn answer_impersonate(&mut self, grant_id: Uuid, accepted: bool) {
         self.ctx
             .ws
@@ -1207,8 +1186,8 @@ impl BackendState {
         let Some(token) = self.access_token.clone() else {
             return;
         };
-        // Свой токен запоминаем до подмены: выход из чужого аккаунта — это
-        // возврат к нему, а не повторный вход.
+        // Keep our own token before the swap: leaving the other account means
+        // going back to it, not signing in again.
         self.own_token = Some(token.clone());
         let ctx = self.ctx.clone();
         let master = self.ctx.config.get().master_url;
@@ -1222,7 +1201,7 @@ impl BackendState {
                     });
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "не удалось войти в аккаунт игрока");
+                    tracing::warn!(error = %e, "could not enter the player's account");
                     ctx.send(MessageToFrontend::AddNotification {
                         key: "notif-impersonate-failed".into(),
                         args: [("reason".to_string(), e.to_string())].into(),
@@ -1233,7 +1212,6 @@ impl BackendState {
         });
     }
 
-    /// Вернуться в свой аккаунт.
     fn exit_impersonation(&mut self) {
         let Some(own) = self.own_token.take() else {
             return;
@@ -1244,16 +1222,17 @@ impl BackendState {
             .send(MessageToFrontend::ImpersonationChanged { as_username: None });
     }
 
-    /// «Сообщить о проблеме»: собрать логи и отправить их мастеру.
+    /// "Report a problem": collect the logs and send them to the master.
     ///
-    /// Работает в фоне: сборка читает файлы с диска, а держать из-за этого
-    /// интерфейс нельзя. Результат приезжает уведомлением.
+    /// Runs in the background, since collecting reads files off disk; the
+    /// result comes back as a notification.
     fn send_support_bundle(&self, server_id: Option<Uuid>) {
         let Some(token) = self.access_token.clone() else {
             self.notify("notif-sign-in-first", schema::NotifLevel::Error);
             return;
         };
-        // Без сервера логов нет: игра пишет их в каталог инстанса.
+        // No server means no logs: the game writes them into the instance
+        // directory.
         let Some(server_id) = server_id.or_else(|| self.manifests.keys().copied().next()) else {
             self.notify("notif-support-nothing-to-send", schema::NotifLevel::Warning);
             return;
@@ -1274,7 +1253,7 @@ impl BackendState {
             .await
             {
                 Ok(id) => {
-                    tracing::info!(%id, "бандл логов отправлен");
+                    tracing::info!(%id, "support bundle sent");
                     ctx.send(MessageToFrontend::AddNotification {
                         key: "notif-support-sent".into(),
                         args: std::collections::BTreeMap::new(),
@@ -1282,7 +1261,7 @@ impl BackendState {
                     });
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "бандл логов не отправлен");
+                    tracing::warn!(error = %e, "support bundle not sent");
                     ctx.send(MessageToFrontend::AddNotification {
                         key: "notif-support-failed".into(),
                         args: [("reason".to_string(), e.to_string())].into(),
@@ -1302,9 +1281,7 @@ impl BackendState {
     }
 }
 
-/// Multipart upload of skin bytes to master using the launcher access token (Bearer).
-/// Returns the fresh UserProfile from /api/me/skin (same as cabinet).
-/// Смена модели скина. Ответ тот же, что у загрузки: обновлённый профиль.
+/// Switches the skin model. Answers with the updated profile, same as an upload.
 async fn set_skin_model_on_master(
     http: &reqwest::Client,
     master: &str,

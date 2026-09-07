@@ -1,4 +1,4 @@
-//! Состояние UI и обработка сообщений от backend.
+//! UI state, and the handling of messages from the backend.
 
 use bridge::{
     BackendHandle, ClientSettingsState, GameLogLevel, LoginErrorKind, MessageToBackend,
@@ -14,7 +14,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use uuid::Uuid;
 
-/// Текущий экран.
 #[derive(Clone, PartialEq)]
 pub enum Page {
     Login,
@@ -29,13 +28,13 @@ pub enum Page {
     Settings,
 }
 
-/// Состояние синхронизации/игры конкретного сервера.
+/// Sync and run state for one server.
 #[derive(Default, Clone)]
 pub struct SyncUiState {
     pub stage: String,
     pub detail: String,
-    /// Байты по стадиям загрузки: они идут параллельно, и у каждой своя полоса.
-    /// BTreeMap — чтобы порядок строк не зависел от того, кто отчитался первым.
+    /// Bytes per download stage — they run in parallel and each gets its own
+    /// bar. BTreeMap so the row order doesn't depend on who reported first.
     pub stages: std::collections::BTreeMap<SyncStage, (u64, u64)>,
     pub syncing: bool,
     pub failed: Option<String>,
@@ -61,7 +60,6 @@ impl SyncUiState {
     }
 }
 
-/// Собрать текст уведомления из ключа и аргументов, пришедших по мосту.
 fn translate_notification(key: &str, args: &std::collections::BTreeMap<String, String>) -> String {
     if args.is_empty() {
         return i18n::t(key);
@@ -73,14 +71,12 @@ fn translate_notification(key: &str, args: &std::collections::BTreeMap<String, S
     i18n::t_args(key, &fluent)
 }
 
-/// Тост-уведомление.
 #[derive(Clone)]
 pub struct Toast {
     pub text: String,
     pub level: NotifLevel,
 }
 
-/// Конфиг для экрана настроек.
 #[derive(Clone)]
 pub struct UiConfig {
     pub memory_min_mb: u32,
@@ -89,8 +85,8 @@ pub struct UiConfig {
     pub show_console_on_launch: bool,
     pub fullscreen: bool,
     pub crash_reports: bool,
-    /// Вшит ли DSN в сборку. Нет — строку настройки не показываем: переключать
-    /// было бы нечего, а обещание «мы это шлём» оказалось бы ложным.
+    /// Whether a DSN is baked into this build. Without one the settings row is
+    /// hidden — the toggle would flip but there is nowhere to send.
     pub crash_reports_available: bool,
     pub master_url: String,
 }
@@ -117,7 +113,6 @@ pub struct LogEntry {
     pub text: String,
 }
 
-/// Вкладка страницы профиля.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum ProfileTab {
     #[default]
@@ -134,20 +129,20 @@ pub struct SavedSkinPreset {
     pub preview: Option<Arc<RenderImage>>,
 }
 
-/// Корневая сущность UI (GPUI Render).
 pub struct LauncherUI {
     pub backend: BackendHandle,
     pub page: Page,
     pub profile_tab: ProfileTab,
     pub user: Option<UserProfile>,
     pub skin_image: Option<Arc<Image>>,
-    /// Текущий кадр превью. `RenderImage`, а не `Image`: рисуется синхронно.
+    /// Current preview frame. `RenderImage` and not `Image`, because it draws
+    /// synchronously.
     pub skin_preview: Option<Arc<RenderImage>>,
     pub skin_bytes: Option<Vec<u8>>,
     pub skin_url: Option<String>,
-    /// Поворот фигуры в градусах.
+    /// Rotation of the figure, in degrees.
     pub skin_yaw: f32,
-    /// Фаза покачивания конечностей в `[0, 1)`. Своя, не завязана на поворот.
+    /// Limb sway phase in `[0, 1)`. Its own clock, not tied to the rotation.
     pub skin_sway: f32,
     pub skin_loading: bool,
     pub skin_uploading: bool,
@@ -163,11 +158,10 @@ pub struct LauncherUI {
     pub preset_images: std::collections::HashMap<String, std::sync::Arc<gpui::Image>>,
     pub custom_presets: Vec<SavedSkinPreset>,
     pub cape_selector_open: bool,
-    /// Раскрыт ли список версий сборки в нижней панели.
     pub build_picker_open: bool,
     pub avatar_image: Option<Arc<Image>>,
     pub avatar_loading: bool,
-    /// Язык интерфейса. Сам каталог живёт в глобальном состоянии i18n.
+    /// UI language. The catalog itself lives in i18n's global state.
     pub locale: i18n::Locale,
     pub online: bool,
     pub logging_in: bool,
@@ -177,16 +171,16 @@ pub struct LauncherUI {
     pub mod_catalog_provider: String,
     pub mod_catalog_query: String,
     pub mod_catalog_focus: Option<gpui::FocusHandle>,
-    /// Страница выбранного мода: описание, скриншоты, ссылки.
     pub mod_project: Option<bridge::ModProjectInfo>,
     pub mod_detail_gallery: bool,
     pub mod_catalog_total: u32,
     pub mod_catalog_offset: u32,
     pub mod_catalog_limit: u32,
-    /// Почему каталог пуст. `None` — либо ещё ищем, либо всё в порядке.
+    /// Why the catalog is empty. `None` means either still searching, or
+    /// nothing is wrong.
     pub mod_catalog_error: Option<String>,
-    /// Переименование пресета скина: id и черновик имени. Правится прямо в
-    /// карточке — системного диалога ввода текста нет ни на одной платформе.
+    /// The skin preset being renamed: its id and the draft name. Edited in the
+    /// card itself — no platform here has a system text input dialog.
     pub renaming_preset: Option<(String, String)>,
     pub rename_focus: Option<gpui::FocusHandle>,
     pub startup_checking: bool,
@@ -196,11 +190,10 @@ pub struct LauncherUI {
     pub login_key_focus: Option<gpui::FocusHandle>,
 
     pub servers: Vec<ServerEntry>,
-    /// Версия, выбранная игроком по серверам. Нет записи — текущая.
+    /// Build the player picked, per server. No entry means the current one.
     pub selected_build: std::collections::HashMap<Uuid, Option<Uuid>>,
     pub news: Vec<NewsItem>,
     pub sync: HashMap<Uuid, SyncUiState>,
-    /// Что делать со сборкой: ставить, обновлять или запускать.
     pub build_state: HashMap<Uuid, bridge::BuildState>,
     pub logs: HashMap<Uuid, Vec<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
@@ -225,37 +218,32 @@ pub struct LauncherUI {
     pub server_settings: HashMap<Uuid, ClientSettingsState>,
     pub server_recommendations: HashMap<Uuid, ClientSettingsState>,
     pub console_window: Option<gpui::WindowHandle<ConsoleWindow>>,
-    /// Запрос на вход в чужой аккаунт, ждущий подтверждения.
     pub impersonate_prompt: Option<ImpersonatePrompt>,
-    /// Ник игрока, от чьего имени сейчас работает лаунчер.
+    /// Username the launcher is currently acting as.
     pub impersonating_as: Option<String>,
-    /// Запрос логов, ждущий решения.
     pub log_request_prompt: Option<LogRequestPrompt>,
-    /// Открыт ли предпросмотр того, что уйдёт.
     pub log_request_preview_open: bool,
-    /// Предложенное админом действие, ждущее решения.
     pub remote_action_prompt: Option<RemoteActionPrompt>,
 }
 
-/// Действие, о котором просит админ.
+/// An action an admin is asking the player to take.
 pub struct RemoteActionPrompt {
     pub action: schema::RemoteAction,
     pub server_id: Option<Uuid>,
     pub actor_username: String,
 }
 
-/// Запрос логов от админа.
 pub struct LogRequestPrompt {
     pub request_id: Uuid,
     pub actor_username: String,
     pub reason: String,
-    /// Собран без спроса: логи уже уехали, модалка только сообщает.
+    /// Collected without asking: the logs have already gone, and the modal only
+    /// says so.
     pub forced: bool,
     pub preview: String,
     pub files: Vec<(String, u64)>,
 }
 
-/// Диалог «войти в аккаунт игрока».
 pub struct ImpersonatePrompt {
     pub grant_id: Uuid,
     pub target_username: String,
@@ -290,7 +278,7 @@ const CONSOLE_WINDOW_MIN_SIZE: (f32, f32) = (720., 440.);
 
 impl LauncherUI {
     pub fn new(backend: BackendHandle) -> Self {
-        // Запросим контент сразу (ответ придёт, когда ws подключится).
+        // Ask right away; the answer comes once the ws connects.
         backend.send(MessageToBackend::RequestServerList);
         backend.send(MessageToBackend::RequestNews);
         Self {
@@ -434,7 +422,7 @@ impl LauncherUI {
         self.background_loading.insert(server_id);
         cx.spawn(async move |this, cx| {
             let expected_url = url.clone();
-            let result = crate::image_loader::load_image_from_url(url).await;
+            let result = crate::image_loader::load_image_capped(url, 1600).await;
             let _ = this.update(cx, |state, cx| {
                 state.background_loading.remove(&server_id);
                 if state.background_image_urls.get(&server_id) != Some(&expected_url) {
@@ -479,7 +467,7 @@ impl LauncherUI {
         self.icons_loading.insert(server_id);
         cx.spawn(async move |this, cx| {
             let expected_url = url.clone();
-            let result = crate::image_loader::load_image_from_url(url).await;
+            let result = crate::image_loader::load_image_capped(url, 256).await;
             let _ = this.update(cx, |state, cx| {
                 state.icons_loading.remove(&server_id);
                 if state.server_icon_urls.get(&server_id) != Some(&expected_url) {
@@ -505,7 +493,7 @@ impl LauncherUI {
         }
         self.optional_mod_icons_loading.insert(url.clone());
         cx.spawn(async move |this, cx| {
-            let result = crate::image_loader::load_image_from_url(url.clone()).await;
+            let result = crate::image_loader::load_image_capped(url.clone(), 128).await;
             let _ = this.update(cx, |state, cx| {
                 state.optional_mod_icons_loading.remove(&url);
                 if let Ok(image) = result {
@@ -577,7 +565,7 @@ impl LauncherUI {
     pub fn save_current_skin_preset(&mut self) {
         if let Some(bytes) = &self.skin_bytes {
             let num = self.custom_presets.len() + 1;
-            let name = format!("Смерч {}", num);
+            let name = format!("Skin {}", num);
             let id = uuid::Uuid::new_v4().to_string();
             let preset = SavedSkinPreset {
                 id,
@@ -616,7 +604,6 @@ impl LauncherUI {
         }
     }
 
-    /// Обработать сообщение от backend.
     pub fn on_message(&mut self, msg: MessageToFrontend, cx: &mut Context<Self>) {
         match msg {
             MessageToFrontend::LoginSuccess { user } => {
@@ -636,7 +623,7 @@ impl LauncherUI {
                 self.startup_checking = false;
                 self.login_error = Some(match kind {
                     LoginErrorKind::Cancelled => i18n::t("error-sign-in-cancelled"),
-                    // `r` — ключ перевода от мастера, а не готовый текст.
+                    // `r` is a translation key from the master, not text.
                     LoginErrorKind::Rejected(r) => i18n::t(&r),
                     LoginErrorKind::Network(e) => format!("Network: {e}"),
                 });
@@ -697,10 +684,11 @@ impl LauncherUI {
                 }
             }
             MessageToFrontend::LocaleCatalog { code, ftl } => {
-                // Каталог с мастера перекрывает встроенный; битый — игнорируем.
+                // The master's catalog overrides the built-in one; a broken one
+                // is ignored.
                 if let Some(loc) = i18n::Locale::from_code(&code) {
                     if loc == self.locale && !i18n::install_catalog(loc, &ftl) {
-                        tracing::warn!("каталог перевода с мастера не разобрался");
+                        tracing::warn!("translation catalog from the master did not parse");
                     }
                 }
             }
@@ -738,7 +726,7 @@ impl LauncherUI {
                 self.mod_catalog_error = Some(message);
             }
             MessageToFrontend::ModProjectLoaded { project } => {
-                // Ответ мог прийти после того, как игрок ушёл на другой мод.
+                // The reply can land after the player has moved to another mod.
                 let still_open = self
                     .mod_catalog_selected
                     .as_ref()
@@ -758,12 +746,12 @@ impl LauncherUI {
                 s.syncing = stage != SyncStage::Done;
                 if stage.is_download() {
                     s.stages.insert(stage, (done, total));
-                    // Стадий в работе несколько — называть заголовком одну из
-                    // них значило бы врать про остальные.
+                    // Several stages run at once, so no single one of them gets
+                    // to be the heading.
                     s.stage = "Downloading...".into();
                 } else {
-                    // Проверка файлов открывает новый прогон: полосы прошлого
-                    // запуска к нему не относятся.
+                    // Checking files opens a new pass; the bars from the last
+                    // run don't belong to it.
                     if stage == SyncStage::CheckingFiles && done == 0 {
                         s.stages.clear();
                     }
@@ -784,18 +772,15 @@ impl LauncherUI {
                 updated,
                 locked,
             } => {
-                // Игра запущена, и в ней появились новые паки. Само по себе это
-                // не видно: клиенту нужна перезагрузка ресурсов, а решает это
-                // игрок — посреди боя она некстати.
+                // New packs arrived while the game is running. Nothing shows
+                // until the client reloads its resources, and that's the
+                // player's call: mid-fight it isn't welcome.
                 let s = self.sync.entry(server_id).or_default();
                 s.stage = if locked.is_empty() {
-                    format!(
-                        "Обновлено наборов: {}. Нажмите F3+T, чтобы применить",
-                        updated.len()
-                    )
+                    format!("{} pack(s) updated. Press F3+T to apply", updated.len())
                 } else {
                     format!(
-                        "Обновлено наборов: {}. Ещё {} встанут при следующем запуске",
+                        "{} pack(s) updated, {} more will land on next launch",
                         updated.len(),
                         locked.len()
                     )
@@ -854,7 +839,6 @@ impl LauncherUI {
                     logs.drain(0..drain);
                 }
 
-                // Обновить открытую консоль, если она есть.
                 if let Some(handle) = &self.console_window {
                     let _ = handle.update(cx, |view, _, cx| {
                         if view.server_id == server_id {
@@ -868,7 +852,6 @@ impl LauncherUI {
                                 view.logs.drain(0..drain);
                             }
 
-                            // Вычисляем количество элементов с учетом текущих фильтров
                             use crate::console_model::filtered_logs;
                             let visible_count = filtered_logs(
                                 &view.logs,
@@ -1039,9 +1022,9 @@ impl LauncherUI {
         cx.notify();
     }
 
-    // --- Действия из UI ---
+    // --- Actions from the UI ---
 
-    /// Вход через сайт: платформ много, и все они живут там.
+    /// Sign in through the website: every provider we support lives there.
     pub fn start_login(&mut self) {
         self.logging_in = true;
         self.login_error = None;
@@ -1086,8 +1069,8 @@ impl LauncherUI {
         self.backend.send(MessageToBackend::UploadSkin { bytes });
     }
 
-    /// Сменить модель скина. Картинка остаётся, меняется ширина рук; профиль
-    /// приедет обратно тем же путём, что и после загрузки.
+    /// Switch the skin model. The image stays as it is and only the arm width
+    /// changes; the profile comes back the same way it does after an upload.
     pub fn set_skin_model(&mut self, slim: bool, _cx: &mut Context<Self>) {
         if self.skin_uploading || self.user.as_ref().is_none_or(|u| u.skin_slim == slim) {
             return;
@@ -1100,8 +1083,8 @@ impl LauncherUI {
         self.load_news_image(id, cx);
     }
 
-    /// Картинка новости тянется лениво — на списке она не нужна, а новостей
-    /// может быть много.
+    /// News images load lazily: the list doesn't need them, and there can be a
+    /// lot of news.
     pub fn load_news_image(&mut self, id: Uuid, cx: &mut Context<Self>) {
         if self.news_images.contains_key(&id) || self.news_images_loading.contains(&id) {
             return;
@@ -1118,7 +1101,7 @@ impl LauncherUI {
 
         self.news_images_loading.insert(id);
         cx.spawn(async move |this, cx| {
-            let result = crate::image_loader::load_image_from_url(url).await;
+            let result = crate::image_loader::load_image_capped(url, 1200).await;
             let _ = this.update(cx, |state, cx| {
                 state.news_images_loading.remove(&id);
                 if let Ok(image) = result {
@@ -1153,11 +1136,9 @@ impl LauncherUI {
             .send(MessageToBackend::KillGame { server_id: id });
     }
 
-    /// Включить или выключить опциональный мод.
-    ///
-    /// Включение проверяется правилами сборки: несовместимый мод и мод без
-    /// своей зависимости не включаются, а игрок получает причину. Молча гасить
-    /// соседа нельзя — выбор между двумя несовместимыми модами его, а не наш.
+    /// Enabling is checked against the build's rules: a conflicting mod, or one
+    /// missing a dependency, stays off and the player is told why. The other
+    /// side of a conflict is never switched off for them.
     pub fn toggle_optional(&mut self, server_id: Uuid, name: &str) {
         if let Some(mods) = self.optional_mods.get_mut(&server_id) {
             let turning_on = mods
@@ -1186,10 +1167,10 @@ impl LauncherUI {
         }
     }
 
-    /// Что мешает включить мод. `None` — включать можно.
+    /// What stands in the way of enabling the mod. `None` means it can go on.
     ///
-    /// Правила общие с мастером (`schema::optional`): разъедься они, лаунчер
-    /// разрешал бы то, что мастер отвергает.
+    /// The rules are shared with the master (`schema::optional`); let them drift
+    /// apart and the launcher would allow what the master then rejects.
     fn blocking_issue(mods: &[OptionalModInfo], name: &str) -> Option<Toast> {
         let known: Vec<schema::build::OptionalMod> = mods.iter().map(Self::as_rule).collect();
         let enabled: Vec<String> = mods
@@ -1215,8 +1196,8 @@ impl LauncherUI {
         })
     }
 
-    /// Из того, что знает интерфейс, — в правило сборки. Интерфейсу хватает
-    /// имени и связей: остальные поля правила на решение не влияют.
+    /// Only the name and the links matter to `can_enable`, so the rest of the
+    /// rule is filled in with blanks.
     fn as_rule(m: &OptionalModInfo) -> schema::build::OptionalMod {
         schema::build::OptionalMod {
             name: m.name.clone(),
@@ -1235,10 +1216,9 @@ impl LauncherUI {
         }
     }
 
-    /// Выбрать версию сборки для сервера.
-    ///
-    /// `None` — вернуться к текущей опубликованной. Выбор хранит бэкенд: он же
-    /// перезапрашивает манифест, поэтому список файлов и модов обновится сам.
+    /// `None` goes back to the currently published build. The backend keeps the
+    /// choice and re-requests the manifest, so the file and mod lists follow on
+    /// their own.
     pub fn select_build(&mut self, server_id: Uuid, build_id: Option<Uuid>) {
         self.selected_build.insert(server_id, build_id);
         self.backend.send(MessageToBackend::SelectBuild {
@@ -1278,19 +1258,14 @@ impl LauncherUI {
             .send(MessageToBackend::SetFullscreen { enabled });
     }
 
-    /// Отправка отчётов о падениях. Вступает в силу со следующего запуска:
-    /// Sentry поднимается до GPUI, и снять его хук паники на ходу нельзя.
+    /// Takes effect on the next launch: Sentry comes up before GPUI, and its
+    /// panic hook can't be removed while the process runs.
     pub fn set_crash_reports(&mut self, enabled: bool) {
         self.config.crash_reports = enabled;
         self.backend
             .send(MessageToBackend::SetCrashReports { enabled });
     }
 
-    /// «Сообщить о проблеме»: собрать логи текущего сервера и отправить.
-    ///
-    /// Сервер не указан — backend возьмёт тот, чей манифест уже загружен: логи
-    /// лежат в каталоге инстанса, и без сервера отправлять нечего.
-    /// Ответить на запрос логов.
     pub fn answer_log_request(&mut self, accepted: bool) {
         let Some(prompt) = self.log_request_prompt.take() else {
             return;
@@ -1301,7 +1276,6 @@ impl LauncherUI {
         });
     }
 
-    /// Ответить на предложенное действие.
     pub fn answer_remote_action(&mut self, accepted: bool) {
         let Some(prompt) = self.remote_action_prompt.take() else {
             return;
@@ -1313,12 +1287,11 @@ impl LauncherUI {
         });
     }
 
-    /// Закрыть окно принудительного сбора: отвечать там нечего.
+    /// Close the forced-collection modal; there is nothing to answer there.
     pub fn dismiss_log_request(&mut self) {
         self.log_request_prompt = None;
     }
 
-    /// Ответить на диалог входа в чужой аккаунт.
     pub fn answer_impersonate(&mut self, accepted: bool) {
         let Some(prompt) = self.impersonate_prompt.take() else {
             return;
@@ -1329,11 +1302,11 @@ impl LauncherUI {
         });
     }
 
-    /// Выйти из чужого аккаунта.
     pub fn exit_impersonation(&mut self) {
         self.backend.send(MessageToBackend::ImpersonateExit);
     }
 
+    /// No server id: the backend picks the one whose manifest is already loaded.
     pub fn send_support_bundle(&mut self) {
         self.backend
             .send(MessageToBackend::SendSupportBundle { server_id: None });
@@ -1374,7 +1347,7 @@ impl LauncherUI {
             .send(MessageToBackend::OpenServerClientFolder { server_id });
     }
 
-    /// Переключить язык интерфейса. Каталог с мастера подтянет backend.
+    /// Switch the UI language. The backend pulls the catalog from the master.
     pub fn set_locale(&mut self, locale: i18n::Locale) {
         if self.locale == locale {
             return;

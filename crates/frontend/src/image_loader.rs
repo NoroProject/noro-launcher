@@ -21,6 +21,57 @@ pub async fn load_image_from_url(url: String) -> Result<Arc<Image>, String> {
     rx.await.map_err(|_| "image loader stopped".to_string())?
 }
 
+/// Like `load_image_from_url`, but shrinks anything larger than `max_side`
+/// first.
+///
+/// Art comes off the master at whatever size it was uploaded — a build icon at
+/// 1024×1024 that gets drawn the size of a fingernail, a background at full
+/// width. GPUI decodes those to RGBA and keeps them both in the heap and as a
+/// GPU texture, so every pixel we never show is paid for twice.
+///
+/// Not for skins: they are 64×64 pixel art and go through the 3D renderer.
+pub async fn load_image_capped(url: String, max_side: u32) -> Result<Arc<Image>, String> {
+    if url.starts_with("data:") {
+        return decode_data_url(&url);
+    }
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    std::thread::spawn(move || {
+        let result = fetch_image(url).map(|image| {
+            let (format, bytes) = match downscale(&image.bytes, max_side) {
+                Some(smaller) => smaller,
+                None => (image.format, image.bytes),
+            };
+            Arc::new(Image::from_bytes(format, bytes))
+        });
+        let _ = tx.send(result);
+    });
+    rx.await.map_err(|_| "image loader stopped".to_string())?
+}
+
+/// `None` when the image is already small enough or can't be decoded.
+///
+/// Keeps an alpha channel as PNG and sends everything else to JPEG — re-encoding
+/// a photographic background as PNG would undo the saving in transit.
+fn downscale(bytes: &[u8], max_side: u32) -> Option<(ImageFormat, Vec<u8>)> {
+    let img = image::load_from_memory(bytes).ok()?;
+    if img.width() <= max_side && img.height() <= max_side {
+        return None;
+    }
+    let scaled = img.resize(max_side, max_side, image::imageops::FilterType::Lanczos3);
+    let mut out = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut out);
+    if img.color().has_alpha() {
+        scaled.write_to(&mut cursor, image::ImageFormat::Png).ok()?;
+        Some((ImageFormat::Png, out))
+    } else {
+        scaled
+            .into_rgb8()
+            .write_to(&mut cursor, image::ImageFormat::Jpeg)
+            .ok()?;
+        Some((ImageFormat::Jpeg, out))
+    }
+}
+
 pub async fn load_image_and_bytes(url: String) -> Result<(Arc<Image>, Vec<u8>), String> {
     if url.starts_with("data:") {
         let img = decode_data_url(&url)?;

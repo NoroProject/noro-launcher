@@ -28,7 +28,7 @@ pub async fn run(
             // less than reinstalling the whole build.
             let removed = remove_dir(&dir.join("assets")).await;
             Ok(Outcome {
-                message: format!("кэш ассетов очищен ({removed})"),
+                message: format!("asset cache cleared ({removed})"),
             })
         }
         RemoteAction::ReinstallBuild => {
@@ -39,17 +39,17 @@ pub async fn run(
             let _ = tokio::fs::remove_file(dir.join(".noro-build")).await;
             let removed = remove_dir(&dir.join("mods")).await;
             Ok(Outcome {
-                message: format!("сборка помечена к переустановке ({removed})"),
+                message: format!("build marked for reinstall ({removed})"),
             })
         }
         RemoteAction::VerifyIntegrity => Ok(Outcome {
-            message: "проверка целостности пройдёт при следующем запуске".into(),
+            message: "integrity will be checked on next launch".into(),
         }),
         RemoteAction::RestartLauncher => Ok(Outcome {
-            message: "лаунчер перезапустится".into(),
+            message: "the launcher will restart".into(),
         }),
         RemoteAction::KillGame => Ok(Outcome {
-            message: "процесс игры остановлен".into(),
+            message: "game process stopped".into(),
         }),
     }
 }
@@ -65,7 +65,7 @@ fn instance_dir(dirs: &LauncherDirectories, server_id: Option<Uuid>) -> Result<s
 /// returned word is interpolated into the player-facing message.
 async fn remove_dir(path: &Path) -> &'static str {
     match tokio::fs::remove_dir_all(path).await {
-        Ok(()) => "удалено",
-        Err(_) => "уже пусто",
+        Ok(()) => "removed",
+        Err(_) => "already empty",
     }
 }

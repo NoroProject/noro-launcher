@@ -29,7 +29,10 @@ fn start_on_first_thread_only_on_macos() {
     if cfg!(target_os = "macos") {
         assert_eq!(got, ["-XstartOnFirstThread"]);
     } else {
-        assert!(got.is_empty(), "not macOS, but the argument got through: {got:?}");
+        assert!(
+            got.is_empty(),
+            "not macOS, but the argument got through: {got:?}"
+        );
     }
 }
 

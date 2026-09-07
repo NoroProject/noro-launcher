@@ -150,7 +150,10 @@ fn a_missing_file_is_rebuilt_even_when_the_stamp_matches() {
 
     std::fs::remove_file(dir.join("servers.dat")).unwrap();
 
-    assert!(sync(&dir, &server).unwrap(), "missing file has to come back");
+    assert!(
+        sync(&dir, &server).unwrap(),
+        "missing file has to come back"
+    );
     assert!(
         names(&dir).contains(&("Main".into(), "create.example.dev".into())),
         "the server should be back in the list: {:?}",

@@ -1,20 +1,20 @@
-//! Цикл превью скина: два независимых часа — покачивание конечностей идёт
-//! всегда с одной скоростью, поворот стоит на месте, пока фигуру тянут мышью.
+//! The skin preview loop runs two independent clocks: limb sway always moves at
+//! the same speed, while the rotation stands still for as long as the figure is
+//! being dragged.
 
 use crate::skin;
 use crate::state::{LauncherUI, Page};
 use gpui::Context;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// Период кадра. Замер: полный кадр (растеризация 560×680 + BGRA) — ~4 мс, так
-/// что 60 к/с укладывается с запасом; на 30 к/с вращение заметно рвано.
+/// Frame period. A whole frame — rasterise plus the BGRA swap — costs about
+/// 4 ms, so 60 fps fits with room to spare; at 30 the rotation visibly stutters.
 const FRAME: Duration = Duration::from_millis(16);
-/// Полный цикл взмаха рук и ног.
 const SWAY_PERIOD_MS: f32 = 2400.0;
-/// Скорость автоповорота — полный оборот примерно за 6 секунд.
+/// A full turn takes roughly six seconds.
 const YAW_DEG_PER_SEC: f32 = 60.0;
 
-/// Всё, что нужно фоновому рендеру для одного кадра.
 pub(crate) struct FrameJob {
     skin: Vec<u8>,
     cape: Option<Vec<u8>>,
@@ -23,13 +23,13 @@ pub(crate) struct FrameJob {
 }
 
 impl LauncherUI {
-    /// Сдвинуть часы и собрать задание на кадр. `None` — рендерить нечего.
+    /// Advances the clocks. `None` means there is nothing to render.
     fn next_frame_job(&mut self, elapsed: Duration) -> Option<FrameJob> {
         let skin = self.skin_bytes.clone()?;
         if self.page != Page::Profile {
             return None;
         }
-        let dt = elapsed.as_secs_f32().min(0.25); // после долгой паузы не прыгаем
+        let dt = elapsed.as_secs_f32().min(0.25); // don't jump after a long pause
         self.skin_sway = (self.skin_sway + dt * 1000.0 / SWAY_PERIOD_MS).fract();
         if !self.skin_dragging {
             self.skin_yaw = (self.skin_yaw + dt * YAW_DEG_PER_SEC).rem_euclid(360.0);
@@ -42,7 +42,8 @@ impl LauncherUI {
         })
     }
 
-    /// Довернуть фигуру рукой. Кадр подхватит цикл — отдельно рисовать не нужно.
+    /// The loop picks the new angle up on its next frame; nothing to redraw
+    /// here.
     pub fn rotate_skin(&mut self, degrees: f32, cx: &mut Context<Self>) {
         self.skin_yaw = (self.skin_yaw + degrees).rem_euclid(360.0);
         cx.notify();
@@ -61,12 +62,11 @@ impl LauncherUI {
                 let elapsed = last.elapsed();
                 last = started;
                 let Ok(job) = this.update(cx, |state, _| state.next_frame_job(elapsed)) else {
-                    break; // окно закрылось
+                    break; // window closed
                 };
                 let Some(job) = job else {
-                    // Профиль закрыт или скина нет — цикл гасим совсем. Раньше
-                    // он просыпался четырежды в секунду всё время работы
-                    // лаунчера, хотя рисовать было нечего.
+                    // Profile closed or no skin: stop the loop rather than
+                    // leave it waking up with nothing to draw.
                     let _ = this.update(cx, |state, _| state.skin_anim_running = false);
                     break;
                 };
@@ -78,18 +78,30 @@ impl LauncherUI {
                     .await;
 
                 let alive = this.update(cx, |state, cx| {
-                    // Кадр не отрисовался — оставляем предыдущий, иначе моргнёт.
+                    // Frame didn't render: keep the previous one, or it blinks.
                     if let Some(frame) = frame {
-                        state.skin_preview = Some(frame);
+                        // Hand the old frame back to GPUI. It caches every
+                        // RenderImage in the sprite atlas by id and never evicts
+                        // one on its own, so dropping our Arc frees the pixels
+                        // but leaves the texture — half a megabyte every 16 ms.
+                        //
+                        // Unless a saved preset kept this exact frame: then the
+                        // texture is still on screen and evicting it just makes
+                        // GPUI upload it again on the next paint.
+                        if let Some(stale) = state.skin_preview.replace(frame) {
+                            if Arc::strong_count(&stale) == 1 {
+                                cx.drop_image(stale, None);
+                            }
+                        }
                         cx.notify();
                     }
                 });
                 if alive.is_err() {
                     break;
                 }
-                // Пауза с учётом того, что кадр уже отнял. Раньше ждали FRAME
-                // поверх рендера, и период выходил ~37 мс вместо 33 — то есть
-                // частота всегда была ниже заявленной.
+                // Sleep for what's left of the period. Waiting a whole FRAME on
+                // top of the render would put the real rate below the declared
+                // one.
                 executor
                     .timer(FRAME.saturating_sub(started.elapsed()))
                     .await;

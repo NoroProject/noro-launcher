@@ -95,7 +95,7 @@ fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .gap(px(8.))
         .child(sub_tab_button(
             "tab-main",
-            "ОСНОВНАЯ",
+            "OVERVIEW",
             current == ProfileTab::Overview,
             |this, cx| {
                 this.profile_tab = ProfileTab::Overview;
@@ -105,7 +105,7 @@ fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         ))
         .child(sub_tab_button(
             "tab-capes",
-            "ПЛАЩИ",
+            "CAPES",
             current == ProfileTab::Capes,
             |this, cx| {
                 this.profile_tab = ProfileTab::Capes;
@@ -115,7 +115,7 @@ fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         ))
         .child(sub_tab_button(
             "tab-presets",
-            "ПРЕСЕТЫ",
+            "PRESETS",
             current == ProfileTab::Skins,
             |this, cx| {
                 this.profile_tab = ProfileTab::Skins;

@@ -1,9 +1,10 @@
-//! GPUI-facing helper: один кадр превью в готовом для отрисовки виде.
+//! GPUI-facing helper: one preview frame, ready to draw.
 //!
-//! Кадры отдаются как `RenderImage`, а не как PNG-`Image`. `Image` декодируется
-//! асинхронно через asset-кеш, поэтому при первом показе кадра рисовать нечего —
-//! отсюда моргание. `RenderImage` резолвится синхронно и мимо кеша, так что
-//! кадр появляется сразу и не оседает в памяти навсегда.
+//! Frames come back as `RenderImage` rather than a PNG `Image`. `Image` decodes
+//! asynchronously through the asset cache, so the first time a frame is shown
+//! there is nothing to draw yet — that's the blink. `RenderImage` resolves
+//! synchronously and past the cache, so the frame is there at once and doesn't
+//! stay in memory forever.
 
 use super::{render_rgba, View};
 use gpui::RenderImage;
@@ -13,16 +14,16 @@ use std::sync::Arc;
 /// Preview size in logical px — matches the card in the profile page.
 pub const PREVIEW_W: u32 = 280;
 pub const PREVIEW_H: u32 = 340;
-/// High performance scaling factor for silky smooth 60 FPS animation.
+/// Rendered larger than the preview and scaled down — cheap antialiasing.
 const SUPERSAMPLE_W: u32 = 350;
 const SUPERSAMPLE_H: u32 = 425;
 
 /// Slight downward tilt, so the figure is seen a bit from above.
 const IDLE_PITCH: f64 = 6.0;
 
-/// Отрисовать фигуру при заданном повороте и фазе покачивания.
-/// `sway` — прогресс цикла конечностей в `[0, 1)`; с `yaw` он не связан, чтобы
-/// вращение мышью не разгоняло и не отматывало анимацию рук и ног.
+/// `sway` is the limb cycle's progress in `[0, 1)`. It is deliberately
+/// unrelated to `yaw`, so dragging the figure with the mouse doesn't speed up
+/// or rewind the arms and legs.
 pub fn render_view(
     skin_png: &[u8],
     cape_png: Option<&[u8]>,
@@ -36,7 +37,7 @@ pub fn render_view(
         ..View::default()
     };
     let mut canvas = render_rgba(skin_png, cape_png, SUPERSAMPLE_W, SUPERSAMPLE_H, &view)?;
-    // GPUI грузит текстуры как BGRA.
+    // GPUI uploads textures as BGRA.
     for pixel in canvas.chunks_exact_mut(4) {
         pixel.swap(0, 2);
     }

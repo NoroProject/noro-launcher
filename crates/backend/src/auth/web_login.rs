@@ -190,14 +190,14 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 
-const SUCCESS_HTML: &str = r#"<!doctype html><html lang="ru"><head><meta charset="utf-8">
-<title>Вход выполнен</title><style>body{font-family:system-ui,sans-serif;background:#0b1626;
+const SUCCESS_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Signed in</title><style>body{font-family:system-ui,sans-serif;background:#0b1626;
 color:#dbe6ff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-h1{color:#e85aa5}</style></head><body><div style="text-align:center"><h1>Вход выполнен</h1>
-<p>Вы можете закрыть эту вкладку и вернуться в лаунчер.</p></div></body></html>"#;
+h1{color:#e85aa5}</style></head><body><div style="text-align:center"><h1>Signed in</h1>
+<p>You can close this tab and go back to the launcher.</p></div></body></html>"#;
 
-const CANCELLED_HTML: &str = r#"<!doctype html><html lang="ru"><head><meta charset="utf-8">
-<title>Авторизация отменена</title><style>body{font-family:system-ui,sans-serif;background:#0b1626;
+const CANCELLED_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Sign-in cancelled</title><style>body{font-family:system-ui,sans-serif;background:#0b1626;
 color:#dbe6ff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-h1{color:#e85aa5}</style></head><body><div style="text-align:center"><h1>Авторизация отменена</h1>
-<p>Вы отклонили запрос доступа. Можете закрыть эту вкладку и вернуться в лаунчер.</p></div></body></html>"#;
+h1{color:#e85aa5}</style></head><body><div style="text-align:center"><h1>Sign-in cancelled</h1>
+<p>You declined the access request. You can close this tab and go back to the launcher.</p></div></body></html>"#;

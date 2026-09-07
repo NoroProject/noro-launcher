@@ -325,7 +325,10 @@ impl BackendState {
                 }
             }
             Ok(r) if r.status().as_u16() == 401 || r.status().as_u16() == 403 => {
-                tracing::info!("restore_session: token expired ({}), refreshing", r.status());
+                tracing::info!(
+                    "restore_session: token expired ({}), refreshing",
+                    r.status()
+                );
                 self.try_refresh().await;
             }
             Ok(r) => {
@@ -463,12 +466,11 @@ pub struct Launch {
     pub login: LoginInfo,
     pub connect: Option<ServerConnect>,
     pub enabled_optional: Vec<String>,
-    /// Карточка сборки — её игровые серверы уедут в servers.dat инстанса.
+    /// The build's card; its game servers end up in the instance's servers.dat.
     pub server: Option<ServerEntry>,
     pub modal: bridge::ModalAction,
 }
 
-/// Запустить синхронизацию и игру в фоне.
 pub fn spawn_sync_and_launch(req: Launch) {
     let Launch {
         ctx,
@@ -484,12 +486,11 @@ pub fn spawn_sync_and_launch(req: Launch) {
     tokio::spawn(async move {
         let instance_dir = ctx.dirs.instance(&server_id);
 
-        // Прогресс синхронизации → frontend + модалка.
         let to_fe = ctx.frontend.clone();
         let modal_clone = modal.clone();
-        // Стадии загрузки идут параллельно, а полоса в модалке одна. Держим
-        // последний отчёт каждой стадии и показываем сумму — иначе полоса
-        // скакала бы туда-сюда вслед за тем, чей отчёт пришёл последним.
+        // Download stages run in parallel but the modal has one bar. Keeping the
+        // last report per stage and showing the sum stops the bar jumping back
+        // and forth with whichever stage reported last.
         let totals: Arc<Mutex<BTreeMap<bridge::SyncStage, (u64, u64)>>> =
             Arc::new(Mutex::new(BTreeMap::new()));
         let progress: crate::sync::ProgressFn = Arc::new(move |stage, done, total, file| {
@@ -542,22 +543,23 @@ pub fn spawn_sync_and_launch(req: Launch) {
             return;
         }
         ctx.send(MessageToFrontend::SyncComplete { server_id });
-        // Файлы уже на месте — кнопка должна перестать звать ставить или обновлять.
+        // The files are in place, so the button has to stop offering to install
+        // or update.
         ctx.send(MessageToFrontend::BuildStateChanged {
             server_id,
             state: crate::sync::build_state(&instance_dir, &manifest),
         });
         modal.finish();
 
-        // Сверка каталога с манифестом в последний момент: между синком и
-        // запуском файлы никто не проверяет. Лишнее удаляется, расхождения
-        // уезжают мастеру. Игрок при этом видит нейтральное сообщение и
-        // продолжает запуск — флаг это повод для разбора, а не отказ.
+        // Nothing looks at the directory between the sync and the launch, so
+        // check it against the manifest here. Extra files go, mismatches go to
+        // the master, and the player keeps launching: a finding is something to
+        // look into later, not a refusal.
         let report =
             crate::sync::verify_before_launch(&instance_dir, &manifest, &enabled_optional, &user)
                 .await;
         if !report.findings.is_empty() {
-            tracing::warn!(findings = report.findings.len(), "сверка нашла расхождения");
+            tracing::warn!(findings = report.findings.len(), "found mismatched files");
             ctx.send(MessageToFrontend::AddNotification {
                 key: "notif-build-files-restored".into(),
                 args: std::collections::BTreeMap::new(),
@@ -567,8 +569,9 @@ pub fn spawn_sync_and_launch(req: Launch) {
         let blocked = report.block_launch;
         ctx.ws.send(ClientWsMsg::ReportIntegrity { report });
         if blocked {
-            // Не удаляем сами: игрок должен увидеть, из-за чего его не пускают,
-            // а удаление молча выглядело бы поломкой лаунчера.
+            // The file is left where it is: the player has to see what is
+            // holding them up, and deleting it quietly would look like the
+            // launcher breaking.
             ctx.send(MessageToFrontend::AddNotification {
                 key: "notif-launch-blocked".into(),
                 args: std::collections::BTreeMap::new(),
@@ -576,23 +579,22 @@ pub fn spawn_sync_and_launch(req: Launch) {
             });
             ctx.send(MessageToFrontend::SyncFailed {
                 server_id,
-                reason: "запуск заблокирован: найден запрещённый файл".into(),
+                reason: "launch blocked: a forbidden file was found".into(),
             });
             return;
         }
 
-        // После синхронизации файлов, но до запуска: игра читает servers.dat
-        // на старте и перезаписывает его при выходе. Список серверов не повод
-        // не пустить игрока, поэтому ошибку только логируем.
+        // After the sync but before the launch: the game reads servers.dat at
+        // start and rewrites it on exit. A broken server list is no reason to
+        // keep the player out, so failures are only logged.
         if let Some(server) = &server {
             match crate::servers_dat::sync(&instance_dir, server) {
-                Ok(true) => tracing::info!("servers.dat обновлён по игровым серверам сборки"),
+                Ok(true) => tracing::info!("servers.dat updated from the build's game servers"),
                 Ok(false) => {}
-                Err(e) => tracing::warn!("servers.dat не обновлён: {e}"),
+                Err(e) => tracing::warn!("servers.dat not updated: {e}"),
             }
         }
 
-        // Запуск игры.
         let launch_config = ctx
             .config
             .get()
@@ -604,9 +606,9 @@ pub fn spawn_sync_and_launch(req: Launch) {
         let online = server.as_ref().and_then(|s| s.online);
         let max_online = server.as_ref().and_then(|s| s.max_online);
 
-        // Канал с модом разбора поднимаем до запуска: мод читает файл
-        // рукопожатия на старте игры, и опоздать здесь значит остаться без
-        // панели до следующего входа.
+        // The channel to the case mod has to be up before the game starts: the
+        // mod reads the handshake file once, at startup, and being late here
+        // means no panel until the next login.
         ctx.mod_link.start(&ctx, instance_dir.clone()).await;
 
         match game_runner::launch(
@@ -627,14 +629,13 @@ pub fn spawn_sync_and_launch(req: Launch) {
                 ctx.mod_link.stop().await;
                 ctx.send(MessageToFrontend::SyncFailed {
                     server_id,
-                    reason: format!("запуск не удался: {e}"),
+                    reason: format!("launch failed: {e}"),
                 });
             }
         }
     });
 }
 
-/// Управлять запущенным процессом: логи, ожидание, kill.
 async fn run_game_process(
     ctx: Ctx,
     server_id: Uuid,
@@ -667,7 +668,6 @@ async fn run_game_process(
     ctx.send(MessageToFrontend::GameStarted { server_id });
     ctx.ws.send(ClientWsMsg::ReportGameStart { server_id });
 
-    // Чтение stdout/stderr через новый log_reader.
     if let Some(stdout) = child.stdout.take() {
         tokio::spawn(crate::log_reader::spawn_log_reader(
             stdout,
@@ -693,33 +693,17 @@ async fn run_game_process(
         ));
     }
 
-    // Ожидание выхода или kill с активной проверкой PID каждые 500 мс.
-    let mut poll_interval = tokio::time::interval(std::time::Duration::from_millis(500));
-    let exit_ok = loop {
-        tokio::select! {
-            status = child.wait() => {
-                break status.map(|s| s.success()).unwrap_or(false);
-            }
-            _ = kill_rx.recv() => {
-                let _ = child.start_kill();
-                let _ = child.wait().await;
-                break false;
-            }
-            _ = poll_interval.tick() => {
-                match child.try_wait() {
-                    Ok(Some(status)) => break status.success(),
-                    Ok(None) => {}
-                    Err(e) => {
-                        tracing::error!("ошибка проверки статуса процесса игры: {e}");
-                        break false;
-                    }
-                }
-            }
+    let exit_ok = tokio::select! {
+        status = child.wait() => status.map(|s| s.success()).unwrap_or(false),
+        _ = kill_rx.recv() => {
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+            false
         }
     };
 
-    // Игра закрылась — гасим канал и убираем ключ: оставить файл рукопожатия
-    // лежать значит обещать доступ, которого больше нет.
+    // The game is gone, so the channel comes down with it: a handshake file
+    // left on disk promises access that no longer exists.
     ctx.mod_link.stop().await;
 
     let playtime = started.elapsed().as_secs();

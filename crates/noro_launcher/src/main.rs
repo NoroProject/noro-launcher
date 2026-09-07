@@ -38,7 +38,9 @@ fn main() -> ExitCode {
     // otherwise anything that can write to AppData gets executed forever.
     if core_path.exists() {
         match verify::verify_installed(&core_path) {
-            Ok(()) if !rt.block_on(update_pending(&app_dir)) => return run_core(&core_path, &app_dir),
+            Ok(()) if !rt.block_on(update_pending(&app_dir)) => {
+                return run_core(&core_path, &app_dir)
+            }
             Ok(()) => eprintln!("master has a different version, updating"),
             Err(e) => {
                 eprintln!("the installed launcher failed its signature check: {e:#}");
@@ -107,8 +109,8 @@ fn splash_preview() -> ExitCode {
         rx,
         move || {
             let stages = [
-                ("Проверка версии…", 0u64),
-                ("Загрузка launcher-v1.2.3", 15_358_608),
+                ("Checking version…", 0u64),
+                ("Downloading launcher-v1.2.3", 15_358_608),
             ];
             loop {
                 for (label, total) in stages {
@@ -229,7 +231,7 @@ async fn download_core(
             total,
         });
     };
-    say("Проверка версии…", 0, 0);
+    say("Checking version…", 0, 0);
     let master_url = verify::master_url();
     let platform = current_platform();
     let url = format!(
@@ -267,7 +269,7 @@ async fn download_core(
         .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| anyhow::anyhow!("master sent no version"))?;
 
-    say(&format!("Загрузка {version}"), 0, 0);
+    say(&format!("Downloading {version}"), 0, 0);
     let mut resp = client.get(download_url).send().await?.error_for_status()?;
 
     // Chunk by chunk for the progress bar; reqwest hands them over without
@@ -282,7 +284,7 @@ async fn download_core(
         let done = bytes.len() as u64;
         if total > 0 && done * 100 / total > reported {
             reported = done * 100 / total;
-            say(&format!("Загрузка {version}"), done, total);
+            say(&format!("Downloading {version}"), done, total);
         }
     }
 
@@ -311,7 +313,7 @@ async fn download_core(
     std::fs::write(&version_file, version)
         .with_context(|| format!("could not write {}", version_file.display()))?;
 
-    say("Готово", 1, 1);
+    say("Done", 1, 1);
     Ok(())
 }
 

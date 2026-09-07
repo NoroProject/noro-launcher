@@ -130,23 +130,23 @@ fn update_activity(
 
     let (details, state_str, start_ts) = match state {
         DiscordRpcState::Launcher { server_name } => {
-            let details = "В лаунчере NORO".to_string();
+            let details = "In the NORO launcher".to_string();
             let state_str = match server_name {
-                Some(name) => format!("Сервер: {name}"),
-                None => "Выбирает сервер".to_string(),
+                Some(name) => format!("Server: {name}"),
+                None => "Picking a server".to_string(),
             };
             (details, state_str, launcher_start_time)
         }
         DiscordRpcState::GameLoading { server_name } => (
-            format!("Запуск: {server_name}"),
-            "Загрузка ресурсов...".to_string(),
+            format!("Starting: {server_name}"),
+            "Loading resources...".to_string(),
             launcher_start_time,
         ),
         DiscordRpcState::GameMenu {
             server_name,
             start_timestamp,
         } => (
-            "В главном меню".to_string(),
+            "In the main menu".to_string(),
             server_name.clone(),
             *start_timestamp as i64,
         ),
@@ -156,10 +156,10 @@ fn update_activity(
             online_max,
             start_timestamp,
         } => {
-            let details = format!("Играет на {server_name}");
+            let details = format!("Playing on {server_name}");
             let state_str = match (online_current, online_max) {
-                (Some(cur), Some(max)) => format!("Онлайн: {cur}/{max}"),
-                _ => "На сервере".to_string(),
+                (Some(cur), Some(max)) => format!("Online: {cur}/{max}"),
+                _ => "On the server".to_string(),
             };
             (details, state_str, *start_timestamp as i64)
         }

@@ -9,7 +9,7 @@ impl LauncherUI {
             return;
         };
 
-        // Забираем до того, как поля профиля разъедутся по замыканиям ниже.
+        // Taken before the profile's fields get moved into the closures below.
         let avatar_url = user.avatar_url().map(str::to_string);
 
         // Invalidate on texture change (new url after an upload).
@@ -91,7 +91,8 @@ impl LauncherUI {
         self.skin_sway = 0.0;
     }
 
-    /// Запустить цикл отрисовки. Ждём плащ, иначе первые кадры уйдут без него.
+    /// Start the render loop. Waits for the cape, or the first frames go out
+    /// without it.
     fn refresh_skin_preview(&mut self, cx: &mut Context<Self>) {
         if self.cape_loading {
             return;

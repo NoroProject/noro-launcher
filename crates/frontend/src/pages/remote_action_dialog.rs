@@ -1,10 +1,15 @@
 //! "An admin is asking you to do something" modal: restart, cache reset, and so on.
+//!
+//! Four of the five actions have translation keys. `kill_game`, the per-action
+//! descriptions and the "requested by" line have none yet — they are English
+//! literals until the keys exist in noro-shared.
 
 use super::common::Cx;
 use crate::components::btn;
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, FontWeight};
+use i18n::t;
 use schema::RemoteAction;
 
 pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
@@ -12,24 +17,24 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
 
     let (title, desc) = match prompt.action {
         RemoteAction::VerifyIntegrity => (
-            "Сверка файлов",
-            "Администратор запросил автоматическую проверку целостности файлов.",
+            t("remote-action-verify_integrity"),
+            "The admin asked for an automatic file integrity check.",
         ),
         RemoteAction::ClearAssetCache => (
-            "Сброс кэша ассетов",
-            "Администратор просит очистить кэш ассетов для исправления возможных сбоев.",
+            t("remote-action-clear_asset_cache"),
+            "The admin asks to clear the asset cache to sort out possible glitches.",
         ),
         RemoteAction::ReinstallBuild => (
-            "Переустановка сборки",
-            "Администратор просит полностью переустановить текущую сборку.",
+            t("remote-action-reinstall_build"),
+            "The admin asks to reinstall the current build from scratch.",
         ),
         RemoteAction::RestartLauncher => (
-            "Перезапуск лаунчера",
-            "Администратор запросил перезапуск лаунчера.",
+            t("remote-action-restart_launcher"),
+            "The admin asked to restart the launcher.",
         ),
         RemoteAction::KillGame => (
-            "Завершение процесса игры",
-            "Администратор просит принудительно закрыть запущенный процесс Minecraft.",
+            "Stop the game process".to_string(),
+            "The admin asks to force-close the running Minecraft process.",
         ),
     };
 
@@ -65,10 +70,7 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                         div()
                             .text_size(px(12.))
                             .text_color(rgb(TEXT_PRIMARY))
-                            .child(format!(
-                                "Запрос от администратора: {}",
-                                prompt.actor_username
-                            )),
+                            .child(format!("Requested by {}", prompt.actor_username)),
                     )
                     .child(
                         div()
@@ -82,7 +84,7 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                             .gap(px(8.))
                             .child(btn(
                                 "remote-action-accept",
-                                "Выполнить",
+                                t("remote-action-accept"),
                                 true,
                                 cx.listener(|this, _e, _w, cx| {
                                     this.answer_remote_action(true);
@@ -91,7 +93,7 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                             ))
                             .child(btn(
                                 "remote-action-decline",
-                                "Отклонить",
+                                t("remote-action-decline"),
                                 false,
                                 cx.listener(|this, _e, _w, cx| {
                                     this.answer_remote_action(false);

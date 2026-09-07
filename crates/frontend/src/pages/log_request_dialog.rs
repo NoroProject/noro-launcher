@@ -17,7 +17,7 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     let files = prompt
         .files
         .iter()
-        .map(|(name, size)| format!("{name} — {} КБ", size / 1024))
+        .map(|(name, size)| format!("{name} — {} KB", size / 1024))
         .collect::<Vec<_>>()
         .join("\n");
 

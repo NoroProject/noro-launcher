@@ -66,7 +66,7 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                         div()
                             .text_size(px(11.))
                             .text_color(rgb(TEXT_MUTED))
-                            .child(format!("{} c", prompt.expires_in_secs)),
+                            .child(format!("{} s", prompt.expires_in_secs)),
                     )
                     .child(
                         div()

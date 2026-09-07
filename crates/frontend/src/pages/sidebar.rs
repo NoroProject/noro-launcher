@@ -52,9 +52,10 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         )
         .child(
             div()
+                .id("sidebar-servers-scroll")
                 .flex_1()
                 .min_h_0()
-                .overflow_hidden()
+                .overflow_y_scroll()
                 .px(px(8.))
                 .py(px(8.))
                 .flex()

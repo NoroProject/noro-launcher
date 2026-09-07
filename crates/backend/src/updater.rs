@@ -46,10 +46,7 @@ pub async fn install_update(
     // Nothing touches disk until both checks pass.
     let actual = sha256_hex(&bytes);
     if !actual.eq_ignore_ascii_case(&version.sha256) {
-        bail!(
-            "sha256 mismatch: expected {}, got {actual}",
-            version.sha256
-        );
+        bail!("sha256 mismatch: expected {}, got {actual}", version.sha256);
     }
     if !crate::signing::verify_bytes(&bytes, &version.signature) {
         bail!("binary signature is not valid");

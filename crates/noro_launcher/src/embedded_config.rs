@@ -40,9 +40,13 @@ pub struct EmbeddedConfig {
 }
 
 pub fn parse_embedded_config_slice(slice: &[u8]) -> Option<EmbeddedConfig> {
-    let start_pos = slice.windows(CFG_START.len()).position(|w| w == CFG_START)?;
+    let start_pos = slice
+        .windows(CFG_START.len())
+        .position(|w| w == CFG_START)?;
     let content_start = start_pos + CFG_START.len();
-    let end_pos = slice[content_start..].windows(CFG_END.len()).position(|w| w == CFG_END)?;
+    let end_pos = slice[content_start..]
+        .windows(CFG_END.len())
+        .position(|w| w == CFG_END)?;
     let raw = &slice[content_start..content_start + end_pos];
     let v: serde_json::Value = serde_json::from_slice(raw).ok()?;
     let master_url = v.get("master_url")?.as_str()?.trim().to_string();
@@ -75,7 +79,9 @@ mod tests {
         buf[..stamped.len()].copy_from_slice(stamped);
         let cfg = parse_embedded_config_slice(&buf).expect("should parse");
         assert_eq!(cfg.master_url, "https://test.noro.dev");
-        assert_eq!(cfg.pubkey, "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+        assert_eq!(
+            cfg.pubkey,
+            "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+        );
     }
 }
-
