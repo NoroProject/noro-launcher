@@ -1,21 +1,20 @@
-# CLAUDE.md
+# noro-launcher — Agent Guidelines (CLAUDE.md)
 
-Essential summary. Full rules in **[INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
+Desktop Minecraft launcher: bootstrapper, core daemon, GPUI interface. Public repository, AGPL-3.0.
 
-## Hard Requirements
-- **Keep it Simple.** No unnecessary abstractions, no workarounds left in place.
-- **≤150 lines per file** — target for new code; **400 is the hard ceiling**.
-  Over 150 needs a one-line reason at the top. See INSTRUCTIONS §21.1.
-- **One component = one file.**
-- **Dark-first**, ATOM style. **Colors from tokens only.**
-- **4-pt Grid.** Every dimension must be a multiple of 4.
-- **UI is English-only.**
-- **Web: Bun only.** Never use npm.
-- **GPUI:** Pinned version. Do not move to main.
-- **SQLx:** Runtime-checked queries only.
+Detailed repository instructions: **[./INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
+Root project ideology and universal rules: **[../INSTRUCTIONS.md](../INSTRUCTIONS.md)**.
+
+## Quick Summary
+- **Two Binaries:** `noro-launcher` (bootstrapper, never updates itself for SmartScreen reputation) and `noro-launcher-core` (daemon + GPUI).
+- **Public Hygiene:** English comments only; use `example.com` (no private domains/tokens).
+- **GPUI Engine:** Pinned GPUI revision; drop old textures with `cx.drop_image(old, None)` to prevent leaks; downscale RGBA images.
+- **Verification:** `cargo check`, `cargo clippy -- -D warnings`, `cargo test`, `cargo fmt`.
 
 ## Commands
 ```bash
 cargo check --workspace
-cd web && bun run dev
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo fmt --all
 ```

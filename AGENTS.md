@@ -1,9 +1,19 @@
-# AGENTS.md
+# noro-launcher — Agent Guidelines (AGENTS.md)
 
-Full project instructions are consolidated in **[INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
-All agents must follow the rules defined there.
+Detailed repository instructions: **[./INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
+Root project ideology and universal rules: **[../INSTRUCTIONS.md](../INSTRUCTIONS.md)**.
 
-## Mandatory Agent Rules:
-- **Strict i18n Localization:** ALL user-facing text (titles, labels, buttons, badges, input placeholders, field hints, tooltips) MUST be localized using Fluent FTL translation keys in `ru.ftl` and `en.ftl`. Hardcoded strings or untranslated placeholders in UI components are forbidden.
-- **No Automatic Git Push / Tagging:** Local `git commit` is encouraged for clean history. However, NEVER perform `git push` or create/push release tags automatically. Push to GitHub ONLY when explicitly requested by the user.
-- **Strict Tag Naming (`v*` only):** NEVER create or push tags prefixed with `master-v*`. ONLY standard release tags starting with `v*` (e.g., `v1.7.12`) are permitted.
+## Mandatory Launcher Rules:
+- **Public AGPL-3.0 Repository:** All code comments in English. No private domains, internal credentials, or personal paths (use `example.com`).
+- **Strict i18n Localization:** ALL user-visible strings must go through `i18n::t`. Add keys to `noro-shared` (`en.ftl` and `ru.ftl`) first.
+- **GPUI Texture Memory:** Drop replaced images in loops via `cx.drop_image(old, None)` when no other `Arc` references remain. Downscale images to display size.
+- **No Automatic Git Push / Tagging:** Local `git commit` is encouraged. NEVER `git push` or push release tags automatically without explicit user instruction.
+- **Strict Tag Naming (`v*` only):** NEVER use `master-v*` tags. Standard release tags only (e.g., `v1.7.12`).
+
+## Verification:
+```bash
+cargo check --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo fmt --all
+```
