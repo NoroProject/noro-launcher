@@ -149,7 +149,7 @@ async fn add_authlib(
     dirs: &LauncherDirectories,
     cmd: &mut Command,
 ) {
-    if let Ok(authlib) = ensure_authlib_injector(client, dirs).await {
+    if let Ok(authlib) = ensure_authlib_injector(client, config, dirs).await {
         // authlib-injector wants the Yggdrasil API root, not the master's root:
         // it fetches the ALI metadata from there and derives the authserver and
         // sessionserver paths from it.

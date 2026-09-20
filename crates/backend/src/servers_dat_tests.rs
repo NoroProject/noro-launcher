@@ -12,6 +12,9 @@ fn node(name: &str, host: &str, port: u16, proxy: bool) -> GameServerEntry {
         max_online: 20,
         live: true,
         proxy,
+        proxy_id: None,
+        proxy_role: None,
+        is_default: false,
     }
 }
 

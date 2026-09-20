@@ -1,11 +1,15 @@
+use crate::config::LauncherConfig;
 use crate::directories::LauncherDirectories;
-use anyhow::{anyhow, Result};
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 
-/// Fetched from upstream, not from the master, and only once — the jar is
-/// version-independent and every instance uses the same copy.
+/// Downloads authlib-injector from the master server so the launcher, wrapper
+/// and node all run the exact same version. Before this the launcher fetched
+/// the jar straight from upstream, causing version mismatches whenever the
+/// upstream released a new build.
 pub async fn ensure_authlib_injector(
     client: &reqwest::Client,
+    config: &LauncherConfig,
     dirs: &LauncherDirectories,
 ) -> Result<PathBuf> {
     let path = dirs.authlib_injector();
@@ -13,23 +17,21 @@ pub async fn ensure_authlib_injector(
         return Ok(path);
     }
 
-    tracing::info!("downloading authlib-injector");
-    let meta: serde_json::Value = client
-        .get("https://authlib-injector.yushi.moe/artifact/latest.json")
-        .send()
-        .await?
-        .json()
-        .await?;
-    let url = meta["download_url"]
-        .as_str()
-        .ok_or_else(|| anyhow!("authlib-injector metadata has no download_url"))?;
+    tracing::info!("downloading authlib-injector from the master");
+    let url = format!(
+        "{}/api/agent/authlib-injector.jar",
+        config.master_url.trim_end_matches('/')
+    );
     let bytes = client
-        .get(url)
+        .get(&url)
         .send()
-        .await?
-        .error_for_status()?
+        .await
+        .context("authlib-injector: request failed")?
+        .error_for_status()
+        .context("authlib-injector: bad status")?
         .bytes()
-        .await?;
+        .await
+        .context("authlib-injector: reading body")?;
 
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;

@@ -999,6 +999,7 @@ impl BackendState {
                 self.ctx.mod_link.case_updated(&self.ctx, case_id);
             }
             ServerWsMsg::Pong => {}
+            ServerWsMsg::ModuleMessage { .. } => {}
         }
     }
 
