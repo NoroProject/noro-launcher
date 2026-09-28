@@ -116,46 +116,28 @@ fn has_any(text: &str, words: &[&str]) -> bool {
     words.iter().any(|word| text.contains(word))
 }
 
-pub fn is_mod_installed(ui: &LauncherUI, server_id: uuid::Uuid, hit_title: &str) -> bool {
-    let clean_title = hit_title
-        .chars()
+/// Имя без знаков препинания и в нижнем регистре — им сравниваются мод из
+/// каталога и то, что уже лежит в сборке.
+pub fn normalized(name: &str) -> String {
+    name.chars()
         .filter(|c| c.is_alphanumeric())
         .collect::<String>()
-        .to_lowercase();
-    if clean_title.is_empty() {
+        .to_lowercase()
+}
+
+/// Есть ли этот мод в самой сборке.
+///
+/// Считает только ключ заголовка и смотрит в готовое множество. Раньше функция
+/// перебирала все файлы сборки и для каждого собирала новую строку — на каждую
+/// карточку и на каждый кадр. Двадцать карточек по паре сотен файлов давали
+/// сотни тысяч аллокаций в секунду и 145 мс на кадр.
+pub fn is_mod_installed(ui: &LauncherUI, server_id: uuid::Uuid, hit_title: &str) -> bool {
+    let key = normalized(hit_title);
+    if key.is_empty() {
         return false;
     }
-
-    if let Some(mods) = ui.optional_mods.get(&server_id) {
-        if mods.iter().any(|m| {
-            let clean_name = m
-                .name
-                .chars()
-                .filter(|c| c.is_alphanumeric())
-                .collect::<String>()
-                .to_lowercase();
-            !clean_name.is_empty() && clean_title == clean_name
-        }) {
-            return true;
-        }
-    }
-
-    if let Some(files) = ui.installed_files.get(&server_id) {
-        if files.iter().any(|f| {
-            let file_name = std::path::Path::new(f)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(f);
-            let clean_file = file_name
-                .chars()
-                .filter(|c| c.is_alphanumeric())
-                .collect::<String>()
-                .to_lowercase();
-            clean_file.starts_with(&clean_title) || clean_title == clean_file
-        }) {
-            return true;
-        }
-    }
-
-    false
+    let Some(keys) = ui.installed_keys.get(&server_id) else {
+        return false;
+    };
+    keys.contains(&key) || keys.iter().any(|k| k.starts_with(&key))
 }

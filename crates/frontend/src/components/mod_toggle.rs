@@ -13,9 +13,12 @@ pub fn mod_toggle(
         .h(px(22.))
         .rounded_full()
         .flex_shrink_0()
-        .bg(if enabled { rgb(SUCCESS) } else { rgb(BG_INPUT) })
+        // Кремовый, а не зелёный: включённый мод — это не «всё хорошо», а
+        // выбор игрока, и зелёный светофор среди кремовых акцентов выглядел
+        // деталью из другого интерфейса.
+        .bg(if enabled { rgb(CTA) } else { rgb(BG_INPUT) })
         .border_1()
-        .border_color(if enabled { rgb(SUCCESS) } else { rgb(BORDER) })
+        .border_color(if enabled { rgb(CTA) } else { rgb(BORDER) })
         .relative()
         .when(allowed, |d| d.cursor_pointer().on_click(on_click))
         .when(!allowed, |d| d.opacity(0.35))
@@ -27,7 +30,7 @@ pub fn mod_toggle(
                 .size(px(16.))
                 .rounded_full()
                 .bg(if enabled {
-                    rgba(0x12233dff)
+                    rgb(ON_CTA)
                 } else {
                     rgb(TEXT_MUTED)
                 }),

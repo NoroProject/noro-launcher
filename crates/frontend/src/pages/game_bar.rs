@@ -58,21 +58,23 @@ fn console_button(active: bool, cx: &mut Cx) -> AnyElement {
         .size(px(56.))
         .rounded(px(R_SM))
         .cursor_pointer()
+        // Включённая иконка-кнопка подсвечивается кремовым, как в сайдбаре:
+        // магента здесь была третьим значением «включено» на один интерфейс.
         .bg(if active {
-            rgb(BG_CARD_HOV)
+            rgba((CTA << 8) | 0x18)
         } else {
             rgb(BG_INPUT)
         })
         .border_1()
-        .border_color(rgb(if active { ACCENT } else { BORDER }))
+        .border_color(rgb(if active { CTA } else { BORDER }))
         .flex()
         .items_center()
         .justify_center()
         .hover(|d| d.bg(rgb(BG_CARD_HOV)))
         .child(ic(
-            "layers",
+            "terminal",
             20.,
-            if active { ACCENT } else { TEXT_SECONDARY },
+            if active { CTA } else { TEXT_SECONDARY },
         ))
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.toggle_console(cx);

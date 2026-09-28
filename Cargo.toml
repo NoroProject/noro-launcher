@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.package]
-version = "2.0.3"
+version = "2.0.4"
 edition = "2021"
 license = "AGPL-3.0-only"
 authors = ["noro"]
@@ -98,10 +98,29 @@ dirs = "5"
 keyring = { version = "3", default-features = false }
 url = "2"
 urlencoding = "2"
+# Системные плашки. `z` — zbus, чистый Rust: фича `d` притащила бы libdbus и
+# сломала cross-сборку под aarch64. На macOS и Windows бэкенд свой, и выбор
+# здесь их не касается.
+notify-rust = { version = "4", default-features = false, features = ["z"] }
 open = "5"
 discord-rich-presence = "0.2.4"
 memchr = "2"
 regex = "1"
+
+# Отладочная сборка: свой код без оптимизаций, чужой — с ними.
+#
+# GPUI, разбор картинок и раскладка текста в debug работают в разы медленнее
+# оптимизированных, и цена видна прямо в окне: список модов с двумя десятками
+# иконок выдавал 6 fps при 311 мс на кадр, хотя тот же экран без картинок —
+# 30 мс. Это не свойство интерфейса, это отсутствие оптимизаций у зависимостей.
+#
+# Зависимости собираются один раз и потом лежат в кеше, так что на скорость
+# правок это не влияет: перекомпилируется только код лаунчера.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
 
 [profile.release]
 opt-level = 3

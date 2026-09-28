@@ -1,6 +1,6 @@
 //! Sidebar: logo, server list, buttons along the bottom.
 use super::common::Cx;
-use super::sidebar_parts::{collapsed_logo_toggle, empty_hint, logo, nav_icon};
+use super::sidebar_parts::{collapsed_logo_toggle, dot_icon, empty_hint, logo, nav_icon};
 use super::sidebar_server::server_item;
 use super::sidebar_user::user_card;
 use crate::state::{LauncherUI, Page};
@@ -66,40 +66,74 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     d.child(empty_hint())
                 }),
         )
+        // Иконки и карточка профиля разными строками. В одну они не помещались:
+        // на пять кнопок и имя в сайдбаре 280 px, и имя схлопывалось в две
+        // точки — единственное, что человек там ищет.
         .child(
             div()
-                .h(px(64.))
                 .border_t_1()
                 .border_color(rgb(BORDER))
-                .px(px(if collapsed { 4. } else { 12. }))
+                .px(px(if collapsed { 4. } else { 8. }))
+                .py(px(8.))
                 .flex()
-                .items_center()
+                .flex_col()
+                .gap(px(4.))
+                // Свёрнутый сайдбар: колокольчик остаётся, иначе уведомления
+                // из него недостижимы вовсе.
+                .child(nav_row(ui, collapsed, cx))
+                .when(!collapsed, |d| d.child(user_card(ui, cx)))
                 .when(collapsed, |d| {
-                    d.justify_center()
+                    d.items_center()
                         .child(super::sidebar_user::user_avatar_only(ui, cx))
-                })
-                .when(!collapsed, |d| {
-                    d.gap(px(4.))
-                        .child(user_card(ui, cx))
-                        .child(nav_icon(
-                            "news-bottom",
-                            "newspaper",
-                            ui.page == Page::News,
-                            cx.listener(|this, _e: &ClickEvent, _w, cx| {
-                                this.page = Page::News;
-                                cx.notify();
-                            }),
-                        ))
-                        .child(nav_icon(
-                            "settings-bottom",
-                            "settings",
-                            ui.page == Page::Settings,
-                            cx.listener(|this, _e: &ClickEvent, _w, cx| {
-                                this.page = Page::Settings;
-                                cx.notify();
-                            }),
-                        ))
                 }),
         )
+        .into_any_element()
+}
+
+/// The row of section buttons above the profile card.
+fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
+    div()
+        .flex()
+        .when(collapsed, |d| d.flex_col().items_center())
+        .when(!collapsed, |d| d.justify_between())
+        .gap(px(2.))
+        .child(super::notifications::bell(ui, cx))
+        .child(dot_icon(
+            "messages-bottom",
+            "mail",
+            ui.page == Page::Messages,
+            super::messages::unread_total(ui) > 0,
+            cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                this.page = Page::Messages;
+                cx.notify();
+            }),
+        ))
+        .child(nav_icon(
+            "account-bottom",
+            "shield",
+            ui.page == Page::Account,
+            cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                this.page = Page::Account;
+                cx.notify();
+            }),
+        ))
+        .child(nav_icon(
+            "news-bottom",
+            "newspaper",
+            ui.page == Page::News,
+            cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                this.page = Page::News;
+                cx.notify();
+            }),
+        ))
+        .child(nav_icon(
+            "settings-bottom",
+            "settings",
+            ui.page == Page::Settings,
+            cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                this.page = Page::Settings;
+                cx.notify();
+            }),
+        ))
         .into_any_element()
 }

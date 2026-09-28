@@ -1,6 +1,6 @@
 //! Picking a skin file through the platform's native dialog.
 
-use crate::state::{LauncherUI, SavedSkinPreset, Toast};
+use crate::state::{LauncherUI, SavedSkinPreset};
 use gpui::{AppContext, ClickEvent, Context, PathPromptOptions, Window};
 use i18n::t;
 use schema::NotifLevel;
@@ -97,10 +97,7 @@ fn skin_name(path: &Path) -> String {
 
 fn report(this: &gpui::WeakEntity<LauncherUI>, cx: &mut gpui::AsyncApp, text: String) {
     let _ = this.update(cx, |this, cx| {
-        this.toast = Some(Toast {
-            text,
-            level: NotifLevel::Warning,
-        });
+        this.notify_toast(text, NotifLevel::Warning, cx);
         cx.notify();
     });
 }

@@ -72,8 +72,8 @@ pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             cx,
         ))
         .child(tab(
-            "tab-mods",
-            t("nav-mods"),
+            "tab-optional",
+            t("nav-optional"),
             matches!(page, crate::state::Page::ServerMods(_)),
             move |this, cx| {
                 if let Some(id) = sid {
@@ -84,6 +84,29 @@ pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             },
             cx,
         ))
+        // Свой контент — отдельная вкладка, и только там, где сборка его
+        // разрешает. Раньше в каталог попадали кнопкой «предложить мод» на
+        // чужом экране: место для того, чтобы поставить себе шейдер, человек
+        // там не ищет.
+        .when(
+            sid.is_some_and(|id| ui.allow_personal_content.get(&id).copied().unwrap_or(false)),
+            |d| {
+                d.child(tab(
+                    "tab-content",
+                    t("nav-content"),
+                    matches!(page, crate::state::Page::ServerModCatalog(_)),
+                    move |this, cx| {
+                        if let Some(id) = sid {
+                            this.open_server(id);
+                            this.content_mode = crate::state::ContentMode::Install;
+                            this.page = crate::state::Page::ServerModCatalog(id);
+                            cx.notify();
+                        }
+                    },
+                    cx,
+                ))
+            },
+        )
         .child(tab(
             "tab-settings",
             t("nav-settings"),
@@ -153,4 +176,46 @@ pub fn progress_label(s: &crate::state::SyncUiState) -> String {
             total as f64 / 1_048_576.0
         )
     }
+}
+
+/// Unix seconds as a short local date and time.
+///
+/// Fixed format rather than a locale one: GPUI has no date formatter, and the
+/// alternative is an ICU dependency for six lines of text. Zero prints as a
+/// dash — it is what an absent timestamp parses to, and "1 Jan 1970" reads as a
+/// real date somebody then tries to explain.
+pub fn short_date(unix_seconds: i64) -> String {
+    if unix_seconds <= 0 {
+        return "—".to_string();
+    }
+    chrono::DateTime::from_timestamp(unix_seconds, 0)
+        .map(|utc| {
+            chrono::DateTime::<chrono::Local>::from(utc)
+                .format("%d.%m.%Y %H:%M")
+                .to_string()
+        })
+        .unwrap_or_else(|| "—".to_string())
+}
+
+/// Unix seconds as a time of day, `14:47`.
+pub fn short_time(unix_seconds: i64) -> String {
+    stamp(unix_seconds, "%H:%M")
+}
+
+/// Unix seconds as a day, `27.09.2026`. Used for the separators in a chat.
+pub fn short_day(unix_seconds: i64) -> String {
+    stamp(unix_seconds, "%d.%m.%Y")
+}
+
+fn stamp(unix_seconds: i64, format: &str) -> String {
+    if unix_seconds <= 0 {
+        return "—".to_string();
+    }
+    chrono::DateTime::from_timestamp(unix_seconds, 0)
+        .map(|utc| {
+            chrono::DateTime::<chrono::Local>::from(utc)
+                .format(format)
+                .to_string()
+        })
+        .unwrap_or_else(|| "—".to_string())
 }

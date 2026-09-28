@@ -7,7 +7,7 @@ use super::profile_user::user_card;
 use super::skin_drag;
 use crate::state::{LauncherUI, ProfileTab};
 use crate::theme::*;
-use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight};
+use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent};
 use i18n::t;
 
 pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
@@ -90,12 +90,17 @@ fn right_column(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 
 fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let current = ui.profile_tab;
+    let (overview, capes, presets) = (
+        t("profile-tab-overview"),
+        t("profile-tab-capes"),
+        t("profile-tab-presets"),
+    );
     div()
         .flex()
         .gap(px(8.))
         .child(sub_tab_button(
             "tab-main",
-            "OVERVIEW",
+            overview,
             current == ProfileTab::Overview,
             |this, cx| {
                 this.profile_tab = ProfileTab::Overview;
@@ -105,7 +110,7 @@ fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         ))
         .child(sub_tab_button(
             "tab-capes",
-            "CAPES",
+            capes,
             current == ProfileTab::Capes,
             |this, cx| {
                 this.profile_tab = ProfileTab::Capes;
@@ -115,7 +120,7 @@ fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         ))
         .child(sub_tab_button(
             "tab-presets",
-            "PRESETS",
+            presets,
             current == ProfileTab::Skins,
             |this, cx| {
                 this.profile_tab = ProfileTab::Skins;
@@ -131,31 +136,16 @@ fn sub_tabs_bar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 
 fn sub_tab_button(
     id: &'static str,
-    label: &'static str,
+    label: impl Into<gpui::SharedString>,
     active: bool,
     on_click: impl Fn(&mut LauncherUI, &mut Cx) + 'static,
     cx: &mut Cx,
 ) -> AnyElement {
-    div()
-        .id(id)
-        .h(px(34.))
-        .px(px(16.))
-        .flex()
-        .items_center()
-        .rounded(px(R_SM))
-        .cursor_pointer()
-        .bg(if active {
-            rgba(0xf3e7b3f0)
-        } else {
-            rgba(0x0f2036d8)
-        })
-        .border_1()
-        .border_color(rgb(if active { CTA_HOV } else { BORDER }))
-        .text_color(rgb(if active { ON_CTA } else { TEXT_SECONDARY }))
-        .font_family(FONT_PIXEL_ALT)
-        .text_size(px(13.))
-        .font_weight(FontWeight::BOLD)
-        .child(label)
-        .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| on_click(this, cx)))
-        .into_any_element()
+    crate::components::segment(
+        id,
+        None,
+        label,
+        active,
+        cx.listener(move |this, _e: &ClickEvent, _w, cx| on_click(this, cx)),
+    )
 }

@@ -1,7 +1,16 @@
 //! Launcher pages facade.
 
+mod account;
+mod account_rules;
+mod account_thread;
 mod build_picker;
 mod common;
+mod compose;
+mod content_card;
+mod content_installed;
+mod content_search;
+mod content_toolbar;
+mod content_versions;
 mod game;
 mod game_bar;
 pub mod game_console;
@@ -9,14 +18,17 @@ mod game_empty;
 mod game_status;
 mod game_sync;
 mod impersonate_dialog;
+mod java_picker;
 mod log_request_dialog;
 mod markdown;
+mod messages;
 mod mod_detail;
 mod mod_detail_body;
 mod mod_detail_parts;
 mod mod_icon;
 mod news;
 mod news_detail;
+mod notifications;
 mod profile;
 mod profile_cape;
 mod profile_skin;
@@ -38,5 +50,6 @@ mod sidebar_user;
 mod skin_drag;
 mod toast;
 
+pub use mod_icon::normalized as normalized_mod_name;
 pub use shell::launcher_shell;
 pub use toast::toast_overlay;

@@ -1,0 +1,271 @@
+// Over 150 lines: one thin client for every player-facing endpoint the master
+// has. Split per area it would be six copies of the same four lines.
+//! The player's own data on the master, over HTTP.
+//!
+//! The socket carries what the master decides to push; this carries what the
+//! launcher decides to ask for. Splitting them that way keeps the protocol from
+//! growing a request/response pair for every list the interface shows — a feed,
+//! a thread of messages and a rule book are pages, and a page is a GET.
+//!
+//! Every call needs the session token, so it is taken once at construction. A
+//! call made without one is a bug in the caller, not a reason to ask the player
+//! to sign in again, and it comes back as `Unauthorized`.
+
+use anyhow::{anyhow, Context, Result};
+use schema::java::JavaRuntimeOption;
+use schema::personal::{InstallRequest, PersonalItem};
+use schema::Page;
+use serde::de::DeserializeOwned;
+use serde_json::{json, Value};
+use uuid::Uuid;
+
+/// What the master offers for this build, and what the player picked.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct JavaRuntimes {
+    pub options: Vec<JavaRuntimeOption>,
+    pub default_component: String,
+    pub selected: Option<String>,
+}
+
+pub struct MasterApi {
+    base: String,
+    token: String,
+    http: reqwest::Client,
+}
+
+impl MasterApi {
+    /// `None` when nobody is signed in: everything here is somebody's own data,
+    /// and there is no anonymous version of it to fetch.
+    pub fn new(http: reqwest::Client, master_url: &str, token: Option<String>) -> Option<Self> {
+        Some(Self {
+            base: master_url.trim_end_matches('/').to_string(),
+            token: token?,
+            http,
+        })
+    }
+
+    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let res = self
+            .http
+            .get(format!("{}{path}", self.base))
+            .bearer_auth(&self.token)
+            .send()
+            .await
+            .context("the master is not answering")?;
+        parse(res).await
+    }
+
+    async fn post<T: DeserializeOwned>(&self, path: &str, body: &Value) -> Result<T> {
+        let res = self
+            .http
+            .post(format!("{}{path}", self.base))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await
+            .context("the master is not answering")?;
+        parse(res).await
+    }
+
+    async fn put<T: DeserializeOwned>(&self, path: &str, body: &Value) -> Result<T> {
+        let res = self
+            .http
+            .put(format!("{}{path}", self.base))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await
+            .context("the master is not answering")?;
+        parse(res).await
+    }
+
+    async fn delete(&self, path: &str) -> Result<()> {
+        let res = self
+            .http
+            .delete(format!("{}{path}", self.base))
+            .bearer_auth(&self.token)
+            .send()
+            .await
+            .context("the master is not answering")?;
+        parse::<Value>(res).await.map(|_| ())
+    }
+
+    // ── Notifications ───────────────────────────────────────────────────────
+
+    pub async fn notifications(
+        &self,
+        offset: u32,
+        limit: u32,
+        unread_only: bool,
+    ) -> Result<Page<schema::notifications::Notification>> {
+        self.get(&format!(
+            "/api/notifications?offset={offset}&limit={limit}&unread={unread_only}"
+        ))
+        .await
+    }
+
+    pub async fn unread_count(&self) -> Result<i64> {
+        let v: Value = self.get("/api/notifications/unread").await?;
+        Ok(v.get("unread").and_then(Value::as_i64).unwrap_or(0))
+    }
+
+    /// Returns the new unread count — the master already knows it, and a second
+    /// request to find out would race with the next notification arriving.
+    pub async fn mark_read(&self, id: Uuid) -> Result<i64> {
+        let v: Value = self
+            .post(&format!("/api/notifications/{id}/read"), &json!({}))
+            .await?;
+        Ok(v.get("unread").and_then(Value::as_i64).unwrap_or(0))
+    }
+
+    pub async fn mark_all_read(&self) -> Result<()> {
+        self.post::<Value>("/api/notifications/read-all", &json!({}))
+            .await
+            .map(|_| ())
+    }
+
+    // ── Personal content ────────────────────────────────────────────────────
+
+    pub async fn personal_content(&self, server_id: Uuid) -> Result<Vec<PersonalItem>> {
+        self.get(&format!("/api/me/content?server_id={server_id}"))
+            .await
+    }
+
+    pub async fn install_content(&self, req: &InstallRequest) -> Result<PersonalItem> {
+        self.post("/api/me/content", &serde_json::to_value(req)?)
+            .await
+    }
+
+    pub async fn remove_content(&self, id: Uuid) -> Result<()> {
+        self.delete(&format!("/api/me/content/{id}")).await
+    }
+
+    pub async fn set_content_enabled(&self, id: Uuid, enabled: bool) -> Result<()> {
+        self.post::<Value>(
+            &format!("/api/me/content/{id}/enabled"),
+            &json!({ "enabled": enabled }),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    // ── Catalogue ───────────────────────────────────────────────────────────
+
+    pub async fn catalog_search(&self, query: &str) -> Result<Value> {
+        self.get(&format!("/api/catalog/search?{query}")).await
+    }
+
+    pub async fn catalog_project(&self, provider: &str, id: &str) -> Result<Value> {
+        self.get(&format!("/api/catalog/{provider}/project/{id}"))
+            .await
+    }
+
+    pub async fn catalog_versions(&self, provider: &str, id: &str, query: &str) -> Result<Value> {
+        self.get(&format!(
+            "/api/catalog/{provider}/project/{id}/versions?{query}"
+        ))
+        .await
+    }
+
+    // ── Java runtimes ───────────────────────────────────────────────────────
+
+    pub async fn java_runtimes(&self, server_id: Uuid) -> Result<JavaRuntimes> {
+        self.get(&format!(
+            "/api/me/java?server_id={server_id}&platform={}",
+            schema::current_platform()
+        ))
+        .await
+    }
+
+    /// `None` goes back to the runtime the build ships.
+    ///
+    /// Slow on a first pick: the master downloads the runtime before it records
+    /// the choice, so that a recorded choice always has files behind it.
+    pub async fn set_java_runtime(&self, server_id: Uuid, component: Option<&str>) -> Result<()> {
+        self.put::<Value>(
+            "/api/me/java",
+            &json!({
+                "server_id": server_id,
+                "platform": schema::current_platform(),
+                "component": component,
+            }),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    // ── The rest of the player's own pages ──────────────────────────────────
+
+    pub async fn punishments(&self) -> Result<Value> {
+        self.get("/api/me/punishments").await
+    }
+
+    pub async fn rules(&self) -> Result<Value> {
+        self.get("/api/rules").await
+    }
+
+    pub async fn tickets(&self, offset: u32, limit: u32) -> Result<Value> {
+        self.get(&format!("/api/tickets?offset={offset}&limit={limit}"))
+            .await
+    }
+
+    pub async fn ticket(&self, id: Uuid) -> Result<Value> {
+        self.get(&format!("/api/tickets/{id}")).await
+    }
+
+    pub async fn ticket_reply(&self, id: Uuid, content: &str) -> Result<Value> {
+        self.post(
+            &format!("/api/tickets/{id}/messages"),
+            &json!({ "content": content }),
+        )
+        .await
+    }
+
+    pub async fn open_ticket(&self, subject: &str, content: &str) -> Result<Value> {
+        self.post(
+            "/api/tickets",
+            &json!({ "subject": subject, "content": content }),
+        )
+        .await
+    }
+
+    pub async fn dm_threads(&self) -> Result<Value> {
+        self.get("/api/dm").await
+    }
+
+    pub async fn dm_thread(&self, peer: Uuid, offset: u32, limit: u32) -> Result<Value> {
+        self.get(&format!("/api/dm/{peer}?offset={offset}&limit={limit}"))
+            .await
+    }
+
+    pub async fn dm_send(&self, peer: Uuid, body: &str) -> Result<Value> {
+        self.post(&format!("/api/dm/{peer}"), &json!({ "body": body }))
+            .await
+    }
+
+    pub async fn dm_mark_read(&self, peer: Uuid) -> Result<()> {
+        self.post::<Value>(&format!("/api/dm/{peer}/read"), &json!({}))
+            .await
+            .map(|_| ())
+    }
+}
+
+/// The master's refusals carry a message; keeping it is the difference between
+/// "could not install" and "staff blocked this mod".
+async fn parse<T: DeserializeOwned>(res: reqwest::Response) -> Result<T> {
+    let status = res.status();
+    let body = res.text().await.unwrap_or_default();
+    if !status.is_success() {
+        let detail = serde_json::from_str::<Value>(&body)
+            .ok()
+            .and_then(|v| {
+                v.get("error")
+                    .or_else(|| v.get("message"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+            .unwrap_or_else(|| body.chars().take(200).collect());
+        return Err(anyhow!("{status}: {detail}"));
+    }
+    serde_json::from_str(&body).context("the master answered with something unexpected")
+}

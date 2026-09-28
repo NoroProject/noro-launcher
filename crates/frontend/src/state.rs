@@ -14,6 +14,21 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// What the button on a catalogue card does.
+///
+/// Two modes rather than two buttons: the choice is a stance, not a per-mod
+/// decision — either the player is kitting out their own client, or they are
+/// telling staff what the build is missing. A card with both buttons makes
+/// every card ask a question that was already answered.
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub enum ContentMode {
+    /// Install it for this player only.
+    #[default]
+    Install,
+    /// Ask staff to add it to the build for everyone.
+    Suggest,
+}
+
 #[derive(Clone, PartialEq)]
 pub enum Page {
     Login,
@@ -26,6 +41,20 @@ pub enum Page {
     NewsDetail(Uuid),
     Profile,
     Settings,
+    /// Punishments, tickets and the rule book — the player's standing with the
+    /// project, in one place.
+    Account,
+    /// Conversations, and one of them when it is open.
+    Messages,
+}
+
+/// Which of the account page's three lists is showing.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum AccountTab {
+    #[default]
+    Punishments,
+    Tickets,
+    Rules,
 }
 
 /// Sync and run state for one server.
@@ -73,8 +102,26 @@ fn translate_notification(key: &str, args: &std::collections::BTreeMap<String, S
 
 #[derive(Clone)]
 pub struct Toast {
+    /// Растёт на каждую плашку. Нужен, чтобы таймер снял именно свою: пока он
+    /// спит, стопка успевает смениться целиком.
+    pub id: u64,
     pub text: String,
     pub level: NotifLevel,
+}
+
+impl Toast {
+    /// Сколько плашка живёт.
+    ///
+    /// Чем хуже новость, тем дольше: «скин загружен» читается краем глаза, а
+    /// причину, по которой не запустилась игра, человек ещё и перечитывает.
+    pub fn lifetime(&self) -> std::time::Duration {
+        let secs = match self.level {
+            NotifLevel::Error => 9,
+            NotifLevel::Warning => 7,
+            _ => 4,
+        };
+        std::time::Duration::from_secs(secs)
+    }
 }
 
 #[derive(Clone)]
@@ -161,6 +208,8 @@ pub struct LauncherUI {
     pub build_picker_open: bool,
     pub avatar_image: Option<Arc<Image>>,
     pub avatar_loading: bool,
+    /// Frame counters. Idle unless `NORO_PERF` is set.
+    pub perf: crate::perf::Perf,
     /// UI language. The catalog itself lives in i18n's global state.
     pub locale: i18n::Locale,
     pub online: bool,
@@ -198,22 +247,46 @@ pub struct LauncherUI {
     pub logs: HashMap<Uuid, Vec<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
     pub installed_files: HashMap<Uuid, Vec<String>>,
+    /// Имена того, что сборка уже везёт, приведённые к виду для сравнения.
+    ///
+    /// Считается один раз на приход манифеста: карточка каталога спрашивает
+    /// «это уже стоит?» на каждом кадре, и приводить к общему виду сотни имён
+    /// каждый раз — это и есть тормоза списка.
+    pub installed_keys: HashMap<Uuid, std::collections::HashSet<String>>,
     pub allow_mod_suggestions: HashMap<Uuid, bool>,
+    /// Разрешает ли сборка свой контент. Вкладки «Моды» без этого нет вовсе:
+    /// кнопка, ведущая к отказу, хуже её отсутствия.
+    pub allow_personal_content: HashMap<Uuid, bool>,
     pub suggested_mods: HashSet<String>,
-    pub background_images: HashMap<Uuid, Arc<Image>>,
+    pub background_images: HashMap<Uuid, Arc<RenderImage>>,
     pub news_images: HashMap<Uuid, Arc<Image>>,
     news_images_loading: HashSet<Uuid>,
-    pub server_icons: HashMap<Uuid, Arc<Image>>,
-    pub optional_mod_icons: HashMap<String, Arc<Image>>,
+    pub server_icons: HashMap<Uuid, Arc<RenderImage>>,
+    /// Уже разобранные пиксели, а не сжатый файл: `Image` уходит в кеш ассетов
+    /// GPUI и разбирается там при отрисовке, и на списке из двадцати иконок это
+    /// стоило 311 мс на кадр против 30 мс на том же экране без картинок.
+    pub optional_mod_icons: HashMap<String, Arc<RenderImage>>,
     background_image_urls: HashMap<Uuid, String>,
     server_icon_urls: HashMap<Uuid, String>,
     background_loading: HashSet<Uuid>,
     icons_loading: HashSet<Uuid>,
     optional_mod_icons_loading: HashSet<String>,
+    /// Картинки, которых нет: 404, оборванная ссылка, отказ провайдера.
+    ///
+    /// Без этого списка неудача ничем не отличалась от «ещё не пробовали»:
+    /// запрос уходил заново на каждом кадре, а завершение каждой попытки
+    /// дёргало перерисовку — то есть следующий кадр, то есть следующую попытку.
+    /// Десяток битых иконок в выдаче каталога так укладывал весь интерфейс.
+    optional_mod_icons_failed: HashSet<String>,
+    /// То же для фонов и значков сборок, по адресу картинки.
+    image_failed: HashSet<String>,
 
     pub update_available: Option<LauncherVersion>,
     pub updating: bool,
-    pub toast: Option<Toast>,
+    /// Стопка плашек, старые сверху. Одна на всё окно теряла предыдущую:
+    /// синхронизация умеет сообщить о трёх вещах подряд, и видно было третью.
+    pub toasts: Vec<Toast>,
+    next_toast_id: u64,
     pub config: UiConfig,
     pub server_settings: HashMap<Uuid, ClientSettingsState>,
     pub server_recommendations: HashMap<Uuid, ClientSettingsState>,
@@ -224,6 +297,80 @@ pub struct LauncherUI {
     pub log_request_prompt: Option<LogRequestPrompt>,
     pub log_request_preview_open: bool,
     pub remote_action_prompt: Option<RemoteActionPrompt>,
+
+    // ── Notifications ───────────────────────────────────────────────────────
+    /// The feed, newest first. The master owns it; this is the page on screen.
+    pub notifications: Vec<schema::notifications::Notification>,
+    pub notifications_total: i64,
+    pub unread: i64,
+    pub notifications_open: bool,
+    pub notifications_loading: bool,
+    pub notifications_unread_only: bool,
+
+    // ── Personal content ────────────────────────────────────────────────────
+    pub personal_content: HashMap<Uuid, Vec<schema::personal::PersonalItem>>,
+    /// Versions of one project, keyed by provider and project id.
+    pub content_versions: HashMap<(String, String), Vec<bridge::ContentVersionInfo>>,
+    /// Which project's version list is open, if any.
+    pub content_picker: Option<(String, String)>,
+    /// Показывать в списке версий и те, что сборке не подходят.
+    ///
+    /// По умолчанию выключено: у популярного мода полсотни версий, из них
+    /// подходит одна-две, и искать их глазами среди строк «не выпущена под эту
+    /// сборку» — не выбор, а поиск. Но список не прячется совсем: увидеть, что
+    /// мод вообще существует под другие версии, бывает важно.
+    pub content_versions_all: bool,
+    pub content_kind: schema::personal::ContentKind,
+    pub content_mode: ContentMode,
+    pub content_busy: bool,
+    /// The master's own wording for the last refusal.
+    pub content_error: Option<String>,
+    /// Showing installed content instead of the catalogue.
+    pub content_show_installed: bool,
+    /// `relevance` · `downloads` · `follows` · `newest` · `updated`.
+    pub content_sort: String,
+    /// Сборка, для которой каталог уже спрашивали, и висит ли запрос сейчас.
+    ///
+    /// Без этих двух полей условие «список пуст — спроси» срабатывало на
+    /// каждом кадре: пустая выдача или ещё не пришедший ответ давали шестьдесят
+    /// запросов в секунду, и лагал от этого не только лаунчер, но и мастер, —
+    /// он на каждый из них ходил в Modrinth.
+    pub content_requested_for: Option<Uuid>,
+    pub content_searching: bool,
+
+    // ── Java runtime ────────────────────────────────────────────────────────
+    pub java_options: HashMap<Uuid, Vec<schema::java::JavaRuntimeOption>>,
+    pub java_selected: HashMap<Uuid, Option<String>>,
+    pub java_default: HashMap<Uuid, String>,
+    /// A pick is downloading a runtime on the master; it takes a while.
+    pub java_busy: bool,
+    pub java_picker_open: bool,
+
+    // ── The player's own pages ──────────────────────────────────────────────
+    pub account_tab: AccountTab,
+    /// Какие списки аккаунта уже спрашивали.
+    ///
+    /// Проверка «список пуст — спроси» стоит в рендере, то есть срабатывает на
+    /// каждом кадре. У игрока без наказаний, без обращений или до ответа
+    /// мастера это давало запрос на кадр — шестьдесят в секунду, каждый со
+    /// своей перерисовкой по ответу. Отсюда и «лагают все списки».
+    pub account_requested: HashSet<&'static str>,
+    pub punishments: Vec<bridge::PunishmentView>,
+    pub rules: Vec<bridge::RuleView>,
+    pub rules_query: String,
+    pub rules_focus: Option<gpui::FocusHandle>,
+    pub tickets: Vec<bridge::TicketView>,
+    /// The ticket that is open, with its thread.
+    pub ticket_open: Option<(Uuid, String, String, Vec<bridge::TicketMessageView>)>,
+    pub dm_threads: Vec<bridge::DmThreadView>,
+    /// Список переписок уже спрашивали. Проверка по пустому списку не годится:
+    /// она стоит в рендере и у аккаунта без переписок давала запрос на кадр.
+    pub dm_requested: bool,
+    /// The conversation that is open.
+    pub dm_open: Option<bridge::DmThreadOpen>,
+    /// What is being typed, in whichever of the two is open.
+    pub compose: String,
+    pub compose_focus: Option<gpui::FocusHandle>,
 }
 
 /// An action an admin is asking the player to take.
@@ -308,6 +455,7 @@ impl LauncherUI {
             build_picker_open: false,
             avatar_image: None,
             avatar_loading: false,
+            perf: Default::default(),
             locale: i18n::Locale::default(),
             online: false,
             logging_in: false,
@@ -338,7 +486,9 @@ impl LauncherUI {
             logs: HashMap::new(),
             optional_mods: HashMap::new(),
             installed_files: HashMap::new(),
+            installed_keys: HashMap::new(),
             allow_mod_suggestions: HashMap::new(),
+            allow_personal_content: HashMap::new(),
             suggested_mods: HashSet::new(),
             background_images: HashMap::new(),
             news_images: HashMap::new(),
@@ -350,6 +500,8 @@ impl LauncherUI {
             background_loading: HashSet::new(),
             icons_loading: HashSet::new(),
             optional_mod_icons_loading: HashSet::new(),
+            optional_mod_icons_failed: HashSet::new(),
+            image_failed: HashSet::new(),
             update_available: None,
             impersonate_prompt: None,
             log_request_prompt: None,
@@ -357,11 +509,52 @@ impl LauncherUI {
             remote_action_prompt: None,
             impersonating_as: None,
             updating: false,
-            toast: None,
+            toasts: Vec::new(),
+            next_toast_id: 0,
             config: UiConfig::default(),
             server_settings: HashMap::new(),
             server_recommendations: HashMap::new(),
             console_window: None,
+
+            notifications: Vec::new(),
+            notifications_total: 0,
+            unread: 0,
+            notifications_open: false,
+            notifications_loading: false,
+            notifications_unread_only: false,
+
+            personal_content: HashMap::new(),
+            content_versions: HashMap::new(),
+            content_picker: None,
+            content_versions_all: false,
+            content_kind: schema::personal::ContentKind::Mod,
+            content_mode: ContentMode::default(),
+            content_busy: false,
+            content_error: None,
+            content_show_installed: false,
+            content_sort: "relevance".to_string(),
+            content_requested_for: None,
+            content_searching: false,
+
+            java_options: HashMap::new(),
+            java_selected: HashMap::new(),
+            java_default: HashMap::new(),
+            java_busy: false,
+            java_picker_open: false,
+
+            account_tab: AccountTab::default(),
+            account_requested: HashSet::new(),
+            punishments: Vec::new(),
+            rules: Vec::new(),
+            rules_query: String::new(),
+            rules_focus: None,
+            tickets: Vec::new(),
+            ticket_open: None,
+            dm_threads: Vec::new(),
+            dm_requested: false,
+            dm_open: None,
+            compose: String::new(),
+            compose_focus: None,
         }
     }
 
@@ -410,9 +603,10 @@ impl LauncherUI {
         let Some(url) = url.filter(|u| !u.trim().is_empty()) else {
             return;
         };
-        if self.background_image_urls.get(&server_id) == Some(&url)
-            && (self.background_images.contains_key(&server_id)
-                || self.background_loading.contains(&server_id))
+        if self.image_failed.contains(&url)
+            || (self.background_image_urls.get(&server_id) == Some(&url)
+                && (self.background_images.contains_key(&server_id)
+                    || self.background_loading.contains(&server_id)))
         {
             return;
         }
@@ -422,7 +616,7 @@ impl LauncherUI {
         self.background_loading.insert(server_id);
         cx.spawn(async move |this, cx| {
             let expected_url = url.clone();
-            let result = crate::image_loader::load_image_capped(url, 1600).await;
+            let result = crate::image_loader::load_render_image_capped(url, 1600).await;
             let _ = this.update(cx, |state, cx| {
                 state.background_loading.remove(&server_id);
                 if state.background_image_urls.get(&server_id) != Some(&expected_url) {
@@ -430,15 +624,27 @@ impl LauncherUI {
                 }
                 match result {
                     Ok(image) => {
-                        state.background_images.insert(server_id, image);
+                        // Старую текстуру возвращаем GPUI: атлас держит каждый
+                        // `RenderImage` по id и сам ничего не вытесняет, так что
+                        // смена фона иначе оставляла бы за собой мегабайты.
+                        if let Some(stale) = state.background_images.insert(server_id, image) {
+                            if Arc::strong_count(&stale) == 1 {
+                                cx.drop_image(stale, None);
+                            }
+                        }
                     }
                     Err(err) => {
+                        // Один раз на адрес. Раньше неудача не запоминалась, и
+                        // следующий кадр качал снова — вместе с новым тостом
+                        // об ошибке на каждую попытку.
+                        state.image_failed.insert(expected_url);
                         let mut args = i18n::FluentArgs::new();
                         args.set("reason", err.to_string());
-                        state.toast = Some(Toast {
-                            text: i18n::t_args("error-background-failed", &args),
-                            level: NotifLevel::Warning,
-                        });
+                        state.notify_toast(
+                            i18n::t_args("error-background-failed", &args),
+                            NotifLevel::Warning,
+                            cx,
+                        );
                     }
                 }
                 cx.notify();
@@ -456,9 +662,10 @@ impl LauncherUI {
         let Some(url) = url.filter(|u| !u.trim().is_empty()) else {
             return;
         };
-        if self.server_icon_urls.get(&server_id) == Some(&url)
-            && (self.server_icons.contains_key(&server_id)
-                || self.icons_loading.contains(&server_id))
+        if self.image_failed.contains(&url)
+            || (self.server_icon_urls.get(&server_id) == Some(&url)
+                && (self.server_icons.contains_key(&server_id)
+                    || self.icons_loading.contains(&server_id)))
         {
             return;
         }
@@ -467,19 +674,34 @@ impl LauncherUI {
         self.icons_loading.insert(server_id);
         cx.spawn(async move |this, cx| {
             let expected_url = url.clone();
-            let result = crate::image_loader::load_image_capped(url, 256).await;
+            let result = crate::image_loader::load_render_image_capped(url, 256).await;
             let _ = this.update(cx, |state, cx| {
                 state.icons_loading.remove(&server_id);
                 if state.server_icon_urls.get(&server_id) != Some(&expected_url) {
                     return;
                 }
-                if let Ok(image) = result {
-                    state.server_icons.insert(server_id, image);
-                }
+                match result {
+                    Ok(image) => {
+                        if let Some(stale) = state.server_icons.insert(server_id, image) {
+                            if Arc::strong_count(&stale) == 1 {
+                                cx.drop_image(stale, None);
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        state.image_failed.insert(expected_url);
+                    }
+                };
                 cx.notify();
             });
         })
         .detach();
+    }
+
+    /// Сколько картинок так и не загрузилось. Оверлею — чтобы отличить
+    /// «иконок нет» от «иконки не приходят».
+    pub fn failed_image_count(&self) -> usize {
+        self.optional_mod_icons_failed.len() + self.image_failed.len()
     }
 
     pub fn ensure_optional_mod_icon_loaded(&mut self, url: Option<String>, cx: &mut Context<Self>) {
@@ -488,18 +710,27 @@ impl LauncherUI {
         };
         if self.optional_mod_icons.contains_key(&url)
             || self.optional_mod_icons_loading.contains(&url)
+            || self.optional_mod_icons_failed.contains(&url)
         {
             return;
         }
         self.optional_mod_icons_loading.insert(url.clone());
         cx.spawn(async move |this, cx| {
-            let result = crate::image_loader::load_image_capped(url.clone(), 128).await;
+            let result = crate::image_loader::load_render_image_capped(url.clone(), 128).await;
             let _ = this.update(cx, |state, cx| {
                 state.optional_mod_icons_loading.remove(&url);
-                if let Ok(image) = result {
-                    state.optional_mod_icons.insert(url, image);
+                match result {
+                    Ok(image) => {
+                        state.optional_mod_icons.insert(url, image);
+                        // Перерисовка только когда есть что показать: иначе
+                        // неудача сама вызывает кадр, который её повторит.
+                        cx.notify();
+                    }
+                    Err(e) => {
+                        tracing::debug!(url = %url, error = %e, "icon did not load");
+                        state.optional_mod_icons_failed.insert(url);
+                    }
                 }
-                cx.notify();
             });
         })
         .detach();
@@ -607,6 +838,13 @@ impl LauncherUI {
     pub fn on_message(&mut self, msg: MessageToFrontend, cx: &mut Context<Self>) {
         match msg {
             MessageToFrontend::LoginSuccess { user } => {
+                // Счётчик у колокольчика обязан быть верным до того, как панель
+                // откроют: непрочитанное, пришедшее офлайн, иначе не видно
+                // вовсе.
+                self.backend.send(MessageToBackend::RequestNotifications {
+                    offset: 0,
+                    unread_only: false,
+                });
                 self.user = Some(user);
                 self.load_user_skin(cx);
                 self.logging_in = false;
@@ -697,11 +935,36 @@ impl LauncherUI {
                 server_id,
                 mods,
                 allow_suggestions,
+                allow_personal,
                 installed_files,
             } => {
                 self.optional_mods.insert(server_id, mods);
                 self.allow_mod_suggestions
                     .insert(server_id, allow_suggestions);
+                self.allow_personal_content
+                    .insert(server_id, allow_personal);
+                let mut keys: std::collections::HashSet<String> = self
+                    .optional_mods
+                    .get(&server_id)
+                    .map(|mods| {
+                        mods.iter()
+                            .map(|m| crate::pages::normalized_mod_name(&m.name))
+                            .filter(|k| !k.is_empty())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                keys.extend(
+                    installed_files
+                        .iter()
+                        .filter_map(|f| {
+                            std::path::Path::new(f)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .map(crate::pages::normalized_mod_name)
+                        })
+                        .filter(|k| !k.is_empty()),
+                );
+                self.installed_keys.insert(server_id, keys);
                 self.installed_files.insert(server_id, installed_files);
             }
             MessageToFrontend::ServerClientRecommendation {
@@ -721,8 +984,10 @@ impl LauncherUI {
                 self.mod_catalog_offset = offset;
                 self.mod_catalog_limit = limit;
                 self.mod_catalog_error = None;
+                self.content_searching = false;
             }
             MessageToFrontend::CatalogFailed { message } => {
+                self.content_searching = false;
                 self.mod_catalog_error = Some(message);
             }
             MessageToFrontend::ModProjectLoaded { project } => {
@@ -790,10 +1055,7 @@ impl LauncherUI {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = false;
                 s.failed = Some(reason.clone());
-                self.toast = Some(Toast {
-                    text: reason,
-                    level: NotifLevel::Error,
-                });
+                self.notify_toast(reason, NotifLevel::Error, cx);
             }
             MessageToFrontend::GameStarted { server_id } => {
                 let s = self.sync.entry(server_id).or_default();
@@ -816,10 +1078,7 @@ impl LauncherUI {
                     {
                         self.open_console(server_id, cx);
                     }
-                    self.toast = Some(Toast {
-                        text: i18n::t("error-game-exited"),
-                        level: NotifLevel::Warning,
-                    });
+                    self.notify_toast(i18n::t("error-game-exited"), NotifLevel::Warning, cx);
                 }
             }
             MessageToFrontend::GameLog {
@@ -876,10 +1135,7 @@ impl LauncherUI {
                 self.update_available = Some(version);
             }
             MessageToFrontend::AddNotification { key, args, level } => {
-                self.toast = Some(Toast {
-                    text: translate_notification(&key, &args),
-                    level,
-                });
+                self.notify_toast(translate_notification(&key, &args), level, cx);
             }
             MessageToFrontend::ImpersonatePrompt {
                 grant_id,
@@ -1011,6 +1267,104 @@ impl LauncherUI {
             MessageToFrontend::ConnectionState { online } => {
                 self.online = online;
             }
+            MessageToFrontend::NotificationFeed {
+                items,
+                total,
+                offset,
+                unread,
+            } => {
+                // Offset 0 is a refresh, anything else a further page. Appending
+                // both ways would double the feed every time the panel reopens.
+                if offset == 0 {
+                    self.notifications = items;
+                } else {
+                    self.notifications.extend(items);
+                }
+                self.notifications_total = total;
+                self.unread = unread;
+                self.notifications_loading = false;
+            }
+            MessageToFrontend::NotificationArrived {
+                notification,
+                unread,
+                ..
+            } => {
+                // Newest first, and a repeat of something already listed
+                // replaces it: the master collapses repeats into one row with a
+                // counter, and keeping the old copy would show both.
+                self.notifications.retain(|n| n.id != notification.id);
+                self.notifications.insert(0, *notification);
+                self.unread = unread;
+            }
+            MessageToFrontend::UnreadChanged { unread } => {
+                self.unread = unread;
+            }
+
+            MessageToFrontend::PersonalContent { server_id, items } => {
+                self.personal_content.insert(server_id, items);
+                self.content_busy = false;
+                self.content_error = None;
+            }
+            MessageToFrontend::ContentVersions {
+                provider,
+                project_id,
+                versions,
+            } => {
+                self.content_versions
+                    .insert((provider, project_id), versions);
+                self.content_busy = false;
+            }
+            MessageToFrontend::ContentActionFailed { message } => {
+                self.content_busy = false;
+                self.java_busy = false;
+                self.content_error = Some(message);
+            }
+
+            MessageToFrontend::JavaRuntimes {
+                server_id,
+                options,
+                default_component,
+                selected,
+            } => {
+                self.java_options.insert(server_id, options);
+                self.java_default.insert(server_id, default_component);
+                self.java_selected.insert(server_id, selected);
+                self.java_busy = false;
+            }
+
+            MessageToFrontend::PunishmentsLoaded { items } => self.punishments = items,
+            MessageToFrontend::RulesLoaded { items } => self.rules = items,
+            MessageToFrontend::TicketsLoaded { items } => self.tickets = items,
+            MessageToFrontend::TicketLoaded { id, messages, .. } => {
+                // Тему и статус несёт список: ручка сообщений отдаёт только их
+                // самих, и подставить сюда пустые строки значило бы стереть
+                // заголовок открытого обращения.
+                let (subject, status) = self
+                    .tickets
+                    .iter()
+                    .find(|t| t.id == id)
+                    .map(|t| (t.subject.clone(), t.status.clone()))
+                    .unwrap_or_default();
+                self.ticket_open = Some((id, subject, status, messages));
+                self.compose.clear();
+            }
+            MessageToFrontend::DmThreadsLoaded { items } => self.dm_threads = items,
+            MessageToFrontend::DmThreadLoaded { thread } => {
+                self.dm_open = Some(*thread);
+                self.compose.clear();
+            }
+            MessageToFrontend::DmArrived { peer, message } => {
+                // Only into the conversation that is open. The list of threads
+                // is refetched instead: its previews and unread counts are the
+                // master's arithmetic, not ours.
+                if let Some(open) = self.dm_open.as_mut() {
+                    if open.peer == peer {
+                        open.messages.push(message);
+                    }
+                }
+                self.backend.send(MessageToBackend::RequestDmThreads);
+            }
+
             MessageToFrontend::OpenOrFocusMainWindow => {}
             MessageToFrontend::CloseModal => {
                 self.logging_in = false;
@@ -1022,7 +1376,84 @@ impl LauncherUI {
         cx.notify();
     }
 
+    /// Показать плашку и снять её по таймеру.
+    ///
+    /// Таймер спит в фоне и будит окно один раз — на снятие. Считать оставшееся
+    /// время в самом рендере значило бы держать перерисовку все эти секунды,
+    /// то есть жечь кадры ради затухающей надписи.
+    pub fn notify_toast(&mut self, text: String, level: NotifLevel, cx: &mut Context<Self>) {
+        // Тот же текст, что уже висит, второй плашкой не становится: две
+        // одинаковые строки рядом выглядят как сбой, а не как два события.
+        // Продлеваем ту, что есть, — таймер у неё уже свой.
+        if let Some(existing) = self.toasts.iter().find(|t| t.text == text) {
+            let id = existing.id;
+            let lifetime = existing.lifetime();
+            let executor = cx.background_executor().clone();
+            cx.spawn(async move |this, cx| {
+                executor.timer(lifetime).await;
+                let _ = this.update(cx, |state, cx| {
+                    state.dismiss_toast(id);
+                    cx.notify();
+                });
+            })
+            .detach();
+            return;
+        }
+
+        let id = self.next_toast_id;
+        self.next_toast_id += 1;
+        let toast = Toast { id, text, level };
+        let lifetime = toast.lifetime();
+
+        self.toasts.push(toast);
+        // Больше четырёх на экране — это уже не сообщения, а стена; самое
+        // старое уходит раньше срока.
+        if self.toasts.len() > 4 {
+            self.toasts.remove(0);
+        }
+
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| {
+            executor.timer(lifetime).await;
+            let _ = this.update(cx, |state, cx| {
+                state.dismiss_toast(id);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    pub fn dismiss_toast(&mut self, id: u64) {
+        self.toasts.retain(|t| t.id != id);
+    }
+
     // --- Actions from the UI ---
+
+    /// Search the catalogue with whatever the browser's filters currently say.
+    ///
+    /// One place, because every control on that screen — the text field, the
+    /// provider buttons, the content type, the sort, paging — asks the same
+    /// question with one field changed. Eight copies of the message is eight
+    /// places to forget a new filter in.
+    pub fn search_content(&mut self, server_id: Uuid, offset: u32) {
+        let server = self.server(&server_id);
+        let mc_version = server.map(|s| s.mc_version.clone());
+        let loader = server.map(|s| s.modloader.as_str().to_string());
+
+        self.mod_catalog_offset = offset;
+        self.mod_catalog_error = None;
+        self.content_searching = true;
+        self.content_requested_for = Some(server_id);
+        self.backend.send(MessageToBackend::SearchCatalog {
+            query: self.mod_catalog_query.trim().to_string(),
+            provider: self.mod_catalog_provider.clone(),
+            mc_version,
+            loader,
+            project_type: self.content_kind.project_type().to_string(),
+            sort: self.content_sort.clone(),
+            offset,
+        });
+    }
 
     /// Sign in through the website: every provider we support lives there.
     pub fn start_login(&mut self) {
@@ -1139,15 +1570,15 @@ impl LauncherUI {
     /// Enabling is checked against the build's rules: a conflicting mod, or one
     /// missing a dependency, stays off and the player is told why. The other
     /// side of a conflict is never switched off for them.
-    pub fn toggle_optional(&mut self, server_id: Uuid, name: &str) {
+    pub fn toggle_optional(&mut self, server_id: Uuid, name: &str, cx: &mut Context<Self>) {
         if let Some(mods) = self.optional_mods.get_mut(&server_id) {
             let turning_on = mods
                 .iter()
                 .find(|m| m.name == name)
                 .is_some_and(|m| !m.enabled);
             if turning_on {
-                if let Some(issue) = Self::blocking_issue(mods, name) {
-                    self.toast = Some(issue);
+                if let Some((text, level)) = Self::blocking_issue(mods, name) {
+                    self.notify_toast(text, level, cx);
                     return;
                 }
             }
@@ -1171,7 +1602,7 @@ impl LauncherUI {
     ///
     /// The rules are shared with the master (`schema::optional`); let them drift
     /// apart and the launcher would allow what the master then rejects.
-    fn blocking_issue(mods: &[OptionalModInfo], name: &str) -> Option<Toast> {
+    fn blocking_issue(mods: &[OptionalModInfo], name: &str) -> Option<(String, NotifLevel)> {
         let known: Vec<schema::build::OptionalMod> = mods.iter().map(Self::as_rule).collect();
         let enabled: Vec<String> = mods
             .iter()
@@ -1190,10 +1621,7 @@ impl LauncherUI {
                 "optional-needs-first"
             }
         };
-        Some(Toast {
-            text: i18n::t_args(key, &args),
-            level: NotifLevel::Warning,
-        })
+        Some((i18n::t_args(key, &args), NotifLevel::Warning))
     }
 
     /// Only the name and the links matter to `can_enable`, so the rest of the

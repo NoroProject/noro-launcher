@@ -11,7 +11,14 @@ use gpui::{
 use i18n::t;
 use uuid::Uuid;
 
-pub fn page(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    // Список рантаймов живёт у мастера и стоит запроса к Mojang, поэтому
+    // спрашивается один раз на вход, а не на каждый кадр.
+    if let std::collections::hash_map::Entry::Vacant(slot) = ui.java_options.entry(server_id) {
+        slot.insert(Vec::new());
+        ui.backend
+            .send(bridge::MessageToBackend::RequestJavaRuntimes { server_id });
+    }
     let source = settings_source(ui, server_id);
     let server_name = ui
         .server(&server_id)
@@ -35,6 +42,10 @@ pub fn page(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .child(page_header(server_id, server_name, source, cx))
                 .child(settings_panel(ui, server_id, cx)),
         )
+        // Список рантаймов рисуется здесь, а не внутри своей строки: GPUI
+        // кладёт элементы в порядке дерева, и строка «Папка» ложилась поверх
+        // раскрытого списка.
+        .children(super::java_picker::dialog(ui, server_id, cx))
         .into_any_element()
 }
 
@@ -193,6 +204,13 @@ fn settings_panel(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             t("settings-jvm-flags"),
             t("settings-jvm-hint"),
             flags(ui, server_id),
+            true,
+        ))
+        .child(setting_row(
+            "coffee",
+            t("java-title"),
+            t("java-hint"),
+            super::java_picker::control(ui, server_id, cx),
             true,
         ))
         .child(setting_row(

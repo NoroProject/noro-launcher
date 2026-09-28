@@ -5,7 +5,6 @@
 //! disk to begin with.
 
 use super::common::Cx;
-use crate::components::btn;
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement};
@@ -49,21 +48,22 @@ fn choice(
     // While an upload is in flight the click is dropped rather than the
     // button disabled.
     let busy = ui.skin_uploading;
-    div()
-        .flex_1()
-        .child(btn(
-            if slim {
-                "skin-model-slim"
-            } else {
-                "skin-model-classic"
-            },
-            t(label_key),
-            active,
-            cx.listener(move |this, _, _, cx| {
-                if !busy {
-                    this.set_skin_model(slim, cx);
-                }
-            }),
-        ))
-        .into_any_element()
+    // Тем же сегментом, что и остальные переключатели: это выбор из двух, а не
+    // кнопка действия, и кремовая заливка на нём звучала громче, чем «Загрузить
+    // скин» рядом.
+    crate::components::segment(
+        if slim {
+            "skin-model-slim"
+        } else {
+            "skin-model-classic"
+        },
+        None,
+        t(label_key),
+        active,
+        cx.listener(move |this, _, _, cx| {
+            if !busy {
+                this.set_skin_model(slim, cx);
+            }
+        }),
+    )
 }

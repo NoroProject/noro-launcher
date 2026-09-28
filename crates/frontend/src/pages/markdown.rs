@@ -133,12 +133,16 @@ fn flush(
         return;
     }
 
+    // Основной шрифт, а не пиксельный: описание мода — это абзацы сплошного
+    // текста, и моноширинный пиксель на них читается как распечатка лога.
+    // Пиксельный остаётся заголовкам и подписям, где его и ждут.
     let mut block = div()
-        .font_family(FONT_PIXEL_ALT)
+        .font_family(FONT)
         .child(StyledText::new(text).with_highlights(highlights));
 
     block = match kind {
         Kind::Heading(size) => block
+            .font_family(FONT_PIXEL_ALT)
             .text_size(px(size as f32))
             .font_weight(FontWeight::EXTRA_BOLD)
             .text_color(rgb(TEXT_PRIMARY)),
@@ -149,16 +153,16 @@ fn flush(
             .rounded(px(R_SM))
             .p(px(12.)),
         Kind::Quote => block
-            .text_size(px(16.))
+            .text_size(px(14.))
             .text_color(rgb(TEXT_MUTED))
             .border_l(px(2.))
             .border_color(rgb(BORDER))
             .pl(px(12.)),
         Kind::Item(level) => block
-            .text_size(px(16.))
+            .text_size(px(14.))
             .text_color(rgb(TEXT_SECONDARY))
             .pl(px(12. + 16. * level as f32)),
-        Kind::Paragraph => block.text_size(px(16.)).text_color(rgb(TEXT_SECONDARY)),
+        Kind::Paragraph => block.text_size(px(14.)).text_color(rgb(TEXT_SECONDARY)),
     };
 
     out.push(block.into_any_element());

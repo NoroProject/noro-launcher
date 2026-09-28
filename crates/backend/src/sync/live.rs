@@ -9,6 +9,7 @@
 //! `mods/` and `config/` are read once at startup, so swapping them does
 //! nothing until the next launch anyway.
 
+use crate::directories::safe_join;
 use anyhow::Result;
 use schema::build::{BuildManifest, FileEntry};
 use std::path::Path;
@@ -37,7 +38,12 @@ pub fn live(path: &str) -> bool {
 pub async fn outdated(instance_dir: &Path, manifest: &BuildManifest) -> Vec<FileEntry> {
     let mut out = Vec::new();
     for entry in manifest.verified_files.iter().filter(|f| live(&f.path)) {
-        let path = instance_dir.join(&entry.path);
+        // `live` only matches a prefix, so `resourcepacks/../../x` passes it.
+        // Every other manifest path in the backend goes through `safe_join`;
+        // these two joins did not, and this one is followed by a write.
+        let Some(path) = safe_join(instance_dir, &entry.path) else {
+            continue;
+        };
         if !matches(&path, &entry.sha1).await {
             out.push(entry.clone());
         }
@@ -85,7 +91,10 @@ pub async fn apply(
         if hex::encode(<sha1::Sha1 as sha1::Digest>::digest(&bytes)) != entry.sha1 {
             continue;
         }
-        if replace(&instance_dir.join(&entry.path), &bytes).await? {
+        let Some(dest) = safe_join(instance_dir, &entry.path) else {
+            continue;
+        };
+        if replace(&dest, &bytes).await? {
             if let Some(name) = entry.path.strip_prefix("resourcepacks/") {
                 let _ = enable(instance_dir, name).await;
             }

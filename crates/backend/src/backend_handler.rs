@@ -331,6 +331,8 @@ impl BackendState {
                 provider,
                 mc_version,
                 loader,
+                project_type,
+                sort,
                 offset,
             } => {
                 let ctx = self.ctx.clone();
@@ -340,11 +342,16 @@ impl BackendState {
                     let page = crate::catalog_search::search(
                         &http,
                         &master_url,
-                        &query,
-                        &provider,
-                        mc_version.as_deref(),
-                        loader.as_deref(),
-                        offset,
+                        ctx.ws.token().as_deref(),
+                        &crate::catalog_search::Query {
+                            text: &query,
+                            provider: &provider,
+                            mc_version: mc_version.as_deref(),
+                            loader: loader.as_deref(),
+                            project_type: &project_type,
+                            sort: &sort,
+                            offset,
+                        },
                     )
                     .await;
                     match page {
@@ -649,6 +656,84 @@ impl BackendState {
                 }
             }
 
+            MessageToBackend::RequestNotifications {
+                offset,
+                unread_only,
+            } => crate::notifications::request(&self.ctx, offset, unread_only),
+            MessageToBackend::MarkNotificationRead { id } => {
+                crate::notifications::mark_read(&self.ctx, id)
+            }
+            MessageToBackend::MarkAllNotificationsRead => {
+                crate::notifications::mark_all_read(&self.ctx)
+            }
+
+            MessageToBackend::RequestPersonalContent { server_id } => {
+                crate::personal::request(&self.ctx, server_id)
+            }
+            MessageToBackend::RequestContentVersions {
+                provider,
+                project_id,
+                server_id,
+            } => {
+                // The build decides which versions fit, so its Minecraft
+                // version and loader travel with the request rather than being
+                // guessed from the project.
+                let (mc_version, loader) = self
+                    .servers
+                    .iter()
+                    .find(|s| s.id == server_id)
+                    .map(|s| (s.mc_version.clone(), s.modloader.as_str().to_string()))
+                    .unwrap_or_default();
+                crate::personal::request_versions(
+                    &self.ctx, provider, project_id, mc_version, loader,
+                )
+            }
+            MessageToBackend::InstallPersonalContent {
+                server_id,
+                kind,
+                provider,
+                project_id,
+                version_id,
+                title,
+                icon_url,
+            } => crate::personal::install(
+                &self.ctx, server_id, kind, provider, project_id, version_id, title, icon_url,
+            ),
+            MessageToBackend::RemovePersonalContent { server_id, id } => {
+                crate::personal::remove(&self.ctx, server_id, id)
+            }
+            MessageToBackend::SetPersonalContentEnabled {
+                server_id,
+                id,
+                enabled,
+            } => crate::personal::set_enabled(&self.ctx, server_id, id, enabled),
+
+            MessageToBackend::RequestJavaRuntimes { server_id } => {
+                crate::personal::request_java(&self.ctx, server_id)
+            }
+            MessageToBackend::SetJavaRuntime {
+                server_id,
+                component,
+            } => crate::personal::set_java(&self.ctx, server_id, component),
+
+            MessageToBackend::RequestPunishments => crate::account::punishments(&self.ctx),
+            MessageToBackend::RequestRules => crate::account::rules(&self.ctx),
+            MessageToBackend::RequestTickets => crate::account::tickets(&self.ctx),
+            MessageToBackend::RequestTicket { id } => crate::account::ticket(&self.ctx, id),
+            MessageToBackend::OpenTicket { subject, content } => {
+                crate::account::open_ticket(&self.ctx, subject, content)
+            }
+            MessageToBackend::ReplyTicket { id, content } => {
+                crate::account::reply_ticket(&self.ctx, id, content)
+            }
+            MessageToBackend::RequestDmThreads => crate::account::dm_threads(&self.ctx),
+            MessageToBackend::RequestDmThread { peer } => {
+                crate::account::dm_thread(&self.ctx, peer)
+            }
+            MessageToBackend::SendDm { peer, body } => {
+                crate::account::send_dm(&self.ctx, peer, body)
+            }
+
             MessageToBackend::FocusWindow => {
                 self.ctx.send(MessageToFrontend::OpenOrFocusMainWindow);
             }
@@ -836,6 +921,7 @@ impl BackendState {
             server_id,
             mods,
             allow_suggestions: manifest.allow_optional_mod_suggestions,
+            allow_personal: manifest.allow_personal_content,
             installed_files,
         });
     }
@@ -875,6 +961,31 @@ impl BackendState {
                     });
                 }
             }
+            // Лента и счётчик живут на мастере; здесь остаётся показать.
+            ServerWsMsg::NotificationPush {
+                notification,
+                unread,
+                os_toast,
+            } => crate::notifications::arrived(&self.ctx, notification, unread, os_toast),
+            // Набор мог измениться на другой машине игрока.
+            ServerWsMsg::PersonalContentChanged { server_id } => {
+                crate::personal::request(&self.ctx, server_id)
+            }
+            ServerWsMsg::DirectMessage { message } => {
+                let mine = self.user.as_ref().map(|u| u.id) == Some(message.author_id);
+                self.ctx.send(MessageToFrontend::DmArrived {
+                    // Собеседник — это не автор: своё же сообщение, пришедшее с
+                    // другого клиента, относится к переписке с получателем.
+                    peer: message.author_id,
+                    message: bridge::DmMessageView {
+                        author_name: message.author_name,
+                        body: message.body,
+                        at: message.at.timestamp(),
+                        mine,
+                    },
+                });
+            }
+
             ServerWsMsg::AuthFail { reason } => {
                 tracing::warn!("auth fail: {reason}");
                 let _ = token_store::clear();

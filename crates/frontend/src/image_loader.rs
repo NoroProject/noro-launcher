@@ -1,6 +1,7 @@
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
-use gpui::{Image, ImageFormat};
+use gpui::{Image, ImageFormat, RenderImage};
+use image::Frame;
 use std::sync::Arc;
 
 struct LoadedImage {
@@ -237,4 +238,57 @@ fn image_format_from_url(url: &str) -> Option<ImageFormat> {
         "pnm" | "pbm" | "ppm" | "pgm" => Some(ImageFormat::Pnm),
         _ => None,
     }
+}
+
+/// Like `load_image_capped`, but hands back pixels instead of a compressed
+/// image.
+///
+/// `Image` holds the PNG or WebP bytes and goes through GPUI's asset cache,
+/// which decodes it on a background task the first time it is drawn. That is
+/// fine for one picture and ruinous for a list: the catalogue draws twenty-one
+/// icons, and at sixty frames a second the measured cost was 311 ms a frame —
+/// six fps — against 30 ms on the same screen without them.
+///
+/// `RenderImage` is already decoded, so drawing it is an atlas lookup. The same
+/// reasoning is written down in `skin::preview`, which draws a frame every
+/// 16 ms and could never have used `Image`.
+///
+/// The caller owns the texture: GPUI keeps every `RenderImage` in the sprite
+/// atlas by id and never evicts one on its own, so a picture that is replaced
+/// has to be handed back with `cx.drop_image`.
+pub async fn load_render_image_capped(
+    url: String,
+    max_side: u32,
+) -> Result<Arc<RenderImage>, String> {
+    let bytes = if url.starts_with("data:") {
+        let b64 = url.split(',').nth(1).ok_or("invalid data URL")?;
+        B64.decode(b64).map_err(|e| e.to_string())?
+    } else {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(fetch_image(url).map(|image| image.bytes));
+        });
+        rx.await.map_err(|_| "image loader stopped".to_string())??
+    };
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(decode_to_frame(&bytes, max_side));
+    });
+    rx.await.map_err(|_| "image decoder stopped".to_string())?
+}
+
+/// Decode, shrink and swap to BGRA — the order GPUI uploads textures in.
+fn decode_to_frame(bytes: &[u8], max_side: u32) -> Result<Arc<RenderImage>, String> {
+    let decoded = image::load_from_memory(bytes).map_err(|e| e.to_string())?;
+    let scaled = if decoded.width() > max_side || decoded.height() > max_side {
+        decoded.resize(max_side, max_side, image::imageops::FilterType::Triangle)
+    } else {
+        decoded
+    };
+    let mut rgba = scaled.into_rgba8();
+    for pixel in rgba.chunks_exact_mut(4) {
+        pixel.swap(0, 2);
+    }
+    Ok(Arc::new(RenderImage::new(vec![Frame::new(rgba)])))
 }

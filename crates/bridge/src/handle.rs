@@ -40,6 +40,7 @@ pub fn create_pair() -> (
             sender: backend_send,
             processed_serial: backend_serial,
             next_serial: Default::default(),
+            sent: Default::default(),
         },
         FrontendReceiver {
             receiver: frontend_recv,
@@ -101,16 +102,29 @@ pub struct BackendHandle {
     processed_serial: AtomicSetSerial,
     #[allow(dead_code)]
     next_serial: AtomicSerialProvider,
+    /// How many messages have gone out, ever.
+    ///
+    /// The overlay reads it once a second and shows the difference. A screen
+    /// that asks the master for something while nobody touches it is the
+    /// signature of a request made from `render`, which runs per frame — and
+    /// that is a bug you cannot see by looking at the window.
+    sent: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl BackendHandle {
     /// Called from the GPUI thread, so it must not be an async send. In debug a
     /// full channel blocks that thread, which means a frozen window.
     pub fn send(&self, message: MessageToBackend) {
+        self.sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         #[cfg(debug_assertions)]
         let _ = self.sender.blocking_send((message, None));
         #[cfg(not(debug_assertions))]
         let _ = self.sender.send((message, None));
+    }
+
+    /// Total messages sent since start.
+    pub fn sent_count(&self) -> u64 {
+        self.sent.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 

@@ -7,6 +7,7 @@ mod icons;
 mod image_loader;
 mod login;
 mod pages;
+mod perf;
 mod skin;
 mod skin_loader;
 mod skin_preview;
@@ -29,6 +30,11 @@ const MAIN_WINDOW_MIN_SIZE: (f32, f32) = (1040., 680.);
 
 impl gpui::Render for LauncherUI {
     fn render(&mut self, _window: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        // Первым делом в кадре: счётчик должен видеть и те кадры, которые
+        // ничего не рисуют.
+        let sent = self.backend.sent_count();
+        self.perf.frame(sent);
+
         let body = match self.page.clone() {
             Page::Login => login::render(self, cx),
             Page::Servers
@@ -39,7 +45,9 @@ impl gpui::Render for LauncherUI {
             | Page::News
             | Page::NewsDetail(_)
             | Page::Profile
-            | Page::Settings => pages::launcher_shell(self, cx),
+            | Page::Settings
+            | Page::Account
+            | Page::Messages => pages::launcher_shell(self, cx),
         };
 
         let compact_chrome = self.page != Page::Login;
@@ -53,9 +61,10 @@ impl gpui::Render for LauncherUI {
             .text_sm()
             .child(components::window_chrome(compact_chrome, self, cx))
             .child(div().flex_1().min_h_0().child(body))
-            .when(self.toast.is_some(), |d| {
+            .when(!self.toasts.is_empty(), |d| {
                 d.child(pages::toast_overlay(self, cx))
             })
+            .children(perf::overlay(self))
     }
 }
 

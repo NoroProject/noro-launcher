@@ -122,3 +122,46 @@ pub fn empty_hint() -> AnyElement {
         )
         .into_any_element()
 }
+
+/// A nav button with an unread dot.
+///
+/// A dot and not a number: the sidebar has room for one glyph, and "somebody
+/// wrote" is the whole message — the count is in the list itself.
+pub fn dot_icon(
+    id: &'static str,
+    icon: &'static str,
+    active: bool,
+    unread: bool,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> AnyElement {
+    div()
+        .id(id)
+        .relative()
+        .size(px(36.))
+        .flex_shrink_0()
+        .rounded(px(R_SM))
+        .flex()
+        .items_center()
+        .justify_center()
+        .cursor_pointer()
+        .bg(if active {
+            rgba((CTA << 8) | 0x18)
+        } else {
+            rgba(0x00000000)
+        })
+        .hover(|d| d.bg(rgba(0xffffff10)))
+        .child(ic(icon, 16., if active { CTA } else { TEXT_MUTED }))
+        .when(unread, |d| {
+            d.child(
+                div()
+                    .absolute()
+                    .top(px(6.))
+                    .right(px(6.))
+                    .size(px(7.))
+                    .rounded(px(4.))
+                    .bg(rgb(ACCENT)),
+            )
+        })
+        .on_click(on_click)
+        .into_any_element()
+}

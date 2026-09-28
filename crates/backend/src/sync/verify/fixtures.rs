@@ -54,6 +54,7 @@ pub fn manifest(files: Vec<(FileEntry, (String, ArtifactKind))>) -> BuildManifes
         user_managed_paths: Vec::new(),
         optional_mods: Vec::new(),
         allow_optional_mod_suggestions: false,
+        allow_personal_content: false,
         recommended_client_settings: RecommendedClientSettings {
             memory_min_mb: 512,
             memory_max_mb: 2048,
@@ -61,6 +62,7 @@ pub fn manifest(files: Vec<(FileEntry, (String, ArtifactKind))>) -> BuildManifes
             show_console_on_launch: false,
             fullscreen: false,
         },
+        personal_content: Vec::new(),
         signature: Vec::new(),
     }
 }

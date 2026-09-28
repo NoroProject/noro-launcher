@@ -62,6 +62,7 @@ fn merged_manifest(pattern: &str, server_sha1: &str) -> BuildManifest {
         blocked_files: Vec::new(),
         optional_mods: Vec::new(),
         allow_optional_mod_suggestions: false,
+        allow_personal_content: false,
         recommended_client_settings: RecommendedClientSettings {
             memory_min_mb: 512,
             memory_max_mb: 2048,
@@ -69,6 +70,7 @@ fn merged_manifest(pattern: &str, server_sha1: &str) -> BuildManifest {
             show_console_on_launch: false,
             fullscreen: false,
         },
+        personal_content: Vec::new(),
         signature: Vec::new(),
     }
 }

@@ -1,7 +1,7 @@
 //! MODS tab: the server's optional mods as a full page.
 use super::common::{tabs, Cx};
 use super::mod_icon::{category_color, mod_icon, mod_text};
-use crate::components::{badge, mod_toggle};
+use crate::components::mod_toggle;
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
@@ -68,23 +68,49 @@ fn page_header(
                 .child(t("mods-optional")),
         )
         .child(div().flex_1())
-        .child(
+        .child({
+            let mut args = i18n::FluentArgs::new();
+            args.set("on", enabled.to_string());
+            args.set("total", mods.len().to_string());
             div()
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(12.))
                 .text_color(rgb(TEXT_MUTED))
-                .child(format!("{enabled} / {} active", mods.len())),
-        )
+                .child(i18n::t_args("mods-active-count", &args))
+        })
+        // Не кнопка во всю подпись, а тихое действие рядом со счётчиком:
+        // предложить мод — это редкий шаг, и спорить по весу с самим списком
+        // модов ему незачем.
         .when(allow_suggest, |d| {
-            d.child(crate::components::btn(
-                "mods-suggest-btn",
-                "+ Suggest Mod",
-                false,
-                cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                    this.page = crate::state::Page::ServerModCatalog(server_id);
-                    cx.notify();
-                }),
-            ))
+            d.child(
+                div()
+                    .id("mods-suggest-btn")
+                    .h(px(32.))
+                    .px(px(12.))
+                    .rounded(px(R_SM))
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .cursor_pointer()
+                    .bg(rgba(0xffffff0a))
+                    .border_1()
+                    .border_color(rgb(BORDER))
+                    .hover(|s| s.bg(rgba(0xffffff14)).border_color(rgb(ACCENT)))
+                    .child(ic("send", 13., ACCENT))
+                    .child(
+                        div()
+                            .text_size(px(11.))
+                            .text_color(rgb(TEXT_SECONDARY))
+                            .child(t("content-mode-suggest")),
+                    )
+                    .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                        // Режим определяется входом, а не тумблером на экране:
+                        // отсюда приходят предложить, со вкладки «Моды» — поставить.
+                        this.content_mode = crate::state::ContentMode::Suggest;
+                        this.page = crate::state::Page::ServerModCatalog(server_id);
+                        cx.notify();
+                    })),
+            )
         })
         .into_any_element()
 }
@@ -125,26 +151,51 @@ fn mod_row(ui: &LauncherUI, server_id: Uuid, m: &OptionalModInfo, cx: &mut Cx) -
     let color = category_color(&m.category);
 
     div()
-        .h(px(72.))
-        .px(px(20.))
+        .h(px(60.))
+        .px(px(16.))
         .border_b_1()
         .border_color(rgb(BORDER))
         .flex()
         .items_center()
-        .gap(px(16.))
+        .gap(px(12.))
         .hover(|d| d.bg(rgba(0xffffff0a)))
         .child(mod_icon(ui, m, color))
         .child(mod_text(m, None, 60))
         .child(div().flex_1())
-        // Restricted: only players granted the right can turn it on.
-        .when(m.limited, |d| d.child(badge(t("mods-limited"), WARNING)))
-        .child(badge(m.category.clone(), color))
+        // Категория — подпись, а не плашка. Плашка рядом с плашкой «по праву» и
+        // тумблером превращала правый край строки в набор разноцветных кнопок,
+        // из которых нажимается ровно одна.
+        .child(
+            div()
+                .flex_shrink_0()
+                .text_size(px(11.))
+                .text_color(rgb(color))
+                .child(m.category.clone()),
+        )
+        // Мод под правом: значок вместо слов. Его видят единицы, а место он
+        // занимал у всех.
+        .when(m.limited, |d| {
+            d.child(
+                div()
+                    .flex_shrink_0()
+                    .flex()
+                    .items_center()
+                    .gap(px(4.))
+                    .child(ic("lock", 12., WARNING))
+                    .child(
+                        div()
+                            .text_size(px(10.))
+                            .text_color(rgb(WARNING))
+                            .child(t("mods-limited")),
+                    ),
+            )
+        })
         .child(mod_toggle(
             SharedString::from(format!("mods-tgl-{server_id}-{}", m.name)),
             m.enabled,
             m.allowed,
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                this.toggle_optional(server_id, &name);
+                this.toggle_optional(server_id, &name, cx);
                 cx.notify();
             }),
         ))

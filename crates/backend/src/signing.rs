@@ -111,7 +111,9 @@ mod tests {
             user_managed_paths: Vec::new(),
             optional_mods: Vec::new(),
             allow_optional_mod_suggestions: true,
+            allow_personal_content: false,
             recommended_client_settings: Default::default(),
+            personal_content: Vec::new(),
             signature: Vec::new(),
         }
     }

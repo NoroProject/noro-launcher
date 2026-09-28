@@ -1,5 +1,9 @@
 //! Mod catalog search against the master, launcher side.
 //!
+//! Goes to the player-facing `/api/catalog`, not the admin one: browsing
+//! content is something every player does, and an endpoint under `/api/admin`
+//! only worked because nobody had got round to checking permissions on it.
+//!
 //! Every failure here has to reach the frontend as `CatalogFailed`. The catalog
 //! screen has no timeout of its own — a request that returns nothing leaves it
 //! spinning forever.
@@ -15,32 +19,53 @@ pub struct SearchPage {
     pub limit: u32,
 }
 
+/// What the browser is asking for. A struct rather than eight arguments: half
+/// of them are strings, and at eight positional strings a mistake stops being
+/// catchable by the compiler.
+pub struct Query<'a> {
+    pub text: &'a str,
+    pub provider: &'a str,
+    pub mc_version: Option<&'a str>,
+    pub loader: Option<&'a str>,
+    /// `mod` · `resourcepack` · `shader`.
+    pub project_type: &'a str,
+    /// `relevance` · `downloads` · `follows` · `newest` · `updated`.
+    pub sort: &'a str,
+    pub offset: u32,
+}
+
 pub async fn search(
     http: &reqwest::Client,
     master_url: &str,
-    query: &str,
-    provider: &str,
-    mc_version: Option<&str>,
-    loader: Option<&str>,
-    offset: u32,
+    token: Option<&str>,
+    q: &Query<'_>,
 ) -> Result<SearchPage> {
+    let enc = urlencoding::encode;
     let mut url = format!(
-        "{}/api/admin/catalog/search?q={}&provider={}&offset={offset}&limit=20",
+        "{}/api/catalog/search?q={}&provider={}&project_type={}&sort={}&offset={}&limit=20",
         master_url.trim_end_matches('/'),
-        urlencoding::encode(query),
-        urlencoding::encode(provider),
+        enc(q.text),
+        enc(q.provider),
+        enc(q.project_type),
+        enc(q.sort),
+        q.offset,
     );
-    if let Some(mc) = mc_version {
+    // Resource packs and shaders are published for a game version but not for a
+    // loader, and sending one filters every result away.
+    if let Some(mc) = q.mc_version {
         url.push_str("&mc=");
-        url.push_str(&urlencoding::encode(mc));
+        url.push_str(&enc(mc));
     }
-    if let Some(ldr) = loader {
+    if let (Some(loader), "mod") = (q.loader, q.project_type) {
         url.push_str("&loader=");
-        url.push_str(&urlencoding::encode(ldr));
+        url.push_str(&enc(loader));
     }
 
-    let res = http
-        .get(&url)
+    let mut req = http.get(&url);
+    if let Some(token) = token {
+        req = req.bearer_auth(token);
+    }
+    let res = req
         .send()
         .await
         .context("catalog is not answering")?
@@ -59,7 +84,7 @@ pub async fn search(
     Ok(SearchPage {
         hits,
         total: u32_at(&data, "total").unwrap_or(0),
-        offset: u32_at(&data, "offset").unwrap_or(offset),
+        offset: u32_at(&data, "offset").unwrap_or(q.offset),
         limit: u32_at(&data, "limit").unwrap_or(20),
     })
 }
@@ -79,7 +104,10 @@ fn hit(h: &Value) -> Option<CatalogHitInfo> {
 }
 
 fn str_at(v: &Value, key: &str) -> Option<String> {
-    v.get(key).and_then(Value::as_str).map(str::to_string)
+    v.get(key)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .filter(|s| !s.is_empty())
 }
 
 fn u32_at(v: &Value, key: &str) -> Option<u32> {

@@ -37,6 +37,17 @@ pub async fn sync_server(
     tokio::fs::create_dir_all(instance_dir).await?;
 
     let excluded = excluded_optional_files(manifest, enabled_optional, user);
+    // What this player added themselves. Their files skip the `unmanaged`
+    // filter below: a build marks `resourcepacks/` unmanaged so it never
+    // touches what the player put there by hand, and that rule would otherwise
+    // also refuse to install the pack they just asked for through the launcher.
+    // Keeping them in `effective` is also what stops `clean_extra` deleting
+    // them on the next pass.
+    let personal: std::collections::HashSet<&str> = manifest
+        .personal_content
+        .iter()
+        .map(|c| c.path.as_str())
+        .collect();
     // Unmanaged paths are dropped here, not merely spared from cleanup: a file
     // still in the download set would land on top of the player's edits.
     let effective: Vec<&FileEntry> = manifest
@@ -44,7 +55,10 @@ pub async fn sync_server(
         .iter()
         .filter(|f| f.side.needed_on_client())
         .filter(|f| !excluded.contains(&f.path))
-        .filter(|f| schema::mode_for(&f.path, &manifest.path_rules) != schema::PathMode::Unmanaged)
+        .filter(|f| {
+            personal.contains(f.path.as_str())
+                || schema::mode_for(&f.path, &manifest.path_rules) != schema::PathMode::Unmanaged
+        })
         // The build carries the Java runtime and natives for every platform at
         // once. The other platforms' copies are useless and cost several JREs
         // worth of download.

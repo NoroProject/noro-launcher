@@ -52,6 +52,134 @@ pub struct ModProjectInfo {
     pub license: Option<String>,
 }
 
+/// One version of a catalogue project, as the version picker shows it.
+///
+/// A picker and not "install the newest": the newest build of a mod is
+/// routinely published for a Minecraft version the build is not on yet, and
+/// installing it silently is how a launcher earns a reputation for breaking
+/// games.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentVersionInfo {
+    pub id: String,
+    pub name: String,
+    pub version_number: String,
+    /// `release` · `beta` · `alpha`.
+    pub channel: String,
+    pub game_versions: Vec<String>,
+    pub loaders: Vec<String>,
+    pub downloads: u64,
+    pub filename: String,
+    pub size: u64,
+    /// CurseForge lets an author forbid third-party downloads. Shown, not
+    /// hidden — "why is this one missing" is a worse question than a greyed row.
+    pub downloadable: bool,
+    /// Fits the build this picker was opened for.
+    pub compatible: bool,
+}
+
+/// A punishment on this account, as the player's own page shows it.
+///
+/// Trimmed down from what the master stores: staff ids and revocation
+/// bookkeeping are not something the punished person needs, and "who banned
+/// you" is already a name in `actor`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PunishmentView {
+    pub kind: String,
+    pub reason: String,
+    pub actor: String,
+    /// Unix seconds. Formatting is the frontend's business.
+    pub created_at: i64,
+    /// `None` means permanent, which is different from "no date known".
+    pub expires_at: Option<i64>,
+    pub active: bool,
+    pub rule_code: Option<String>,
+}
+
+/// One rule from the project's rule book.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuleView {
+    pub code: String,
+    pub title: String,
+    pub description: String,
+    pub category: String,
+    /// What breaking it costs. The point of reading the rules for most people,
+    /// and the reason a rule book without them reads as a list of wishes.
+    pub sanctions: Vec<SanctionView>,
+}
+
+/// One punishment a rule allows.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SanctionView {
+    /// `warn` · `mute` · `ban` · `server_ban`.
+    pub kind: String,
+    pub label: String,
+    /// Range in minutes. `None` on either side means "no bound" — and on the
+    /// upper one that reads as permanent.
+    pub min_minutes: Option<i64>,
+    pub max_minutes: Option<i64>,
+}
+
+/// A support ticket in the list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TicketView {
+    pub id: Uuid,
+    /// Short form of the id, e.g. `a1b2c3d4`.
+    ///
+    /// A ticket has no number of its own on the master, and support answers
+    /// with "which one?" to everything else. The first half of the uuid is
+    /// stable, unique in practice and short enough to read out loud.
+    pub number: String,
+    pub subject: String,
+    pub status: String,
+    /// Staff replies the player has not opened.
+    pub unread: i64,
+    pub last_message_at: i64,
+}
+
+/// One message inside a ticket.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TicketMessageView {
+    pub author: String,
+    /// Role the author held when they wrote, e.g. «Хелпер». Staff only.
+    pub role: Option<String>,
+    pub content: String,
+    pub at: i64,
+    /// Written by staff rather than the player.
+    pub staff: bool,
+}
+
+/// A conversation in the list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DmThreadView {
+    pub peer_id: Uuid,
+    pub peer_name: String,
+    /// Where to fetch their head from. A bot has a picture of its own; a player
+    /// gets one rendered from their skin.
+    pub avatar_url: Option<String>,
+    pub preview: String,
+    pub unread: i64,
+    pub last_message_at: i64,
+}
+
+/// One direct message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DmMessageView {
+    pub author_name: String,
+    pub body: String,
+    pub at: i64,
+    /// Written by the player themselves.
+    pub mine: bool,
+}
+
+/// An open conversation, with what the header needs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DmThreadOpen {
+    pub peer: Uuid,
+    pub peer_name: String,
+    pub avatar_url: Option<String>,
+    pub messages: Vec<DmMessageView>,
+}
+
 /// Frontend → Backend.
 #[derive(Debug)]
 pub enum MessageToBackend {
@@ -106,6 +234,10 @@ pub enum MessageToBackend {
         provider: String,
         mc_version: Option<String>,
         loader: Option<String>,
+        /// `mod` · `resourcepack` · `shader`.
+        project_type: String,
+        /// `relevance` · `downloads` · `follows` · `newest` · `updated`.
+        sort: String,
         offset: u32,
     },
     RequestModProject {
@@ -203,6 +335,81 @@ pub enum MessageToBackend {
     RequestSkinPresetsList,
     SelectCape {
         cape_id: Option<Uuid>,
+    },
+
+    // --- Notifications ---
+    /// `offset` of 0 replaces the feed, anything else appends a page.
+    RequestNotifications {
+        offset: u32,
+        unread_only: bool,
+    },
+    MarkNotificationRead {
+        id: Uuid,
+    },
+    MarkAllNotificationsRead,
+
+    // --- Personal content ---
+    RequestPersonalContent {
+        server_id: Uuid,
+    },
+    /// Versions of one project, filtered against the build it will go on.
+    RequestContentVersions {
+        provider: String,
+        project_id: String,
+        server_id: Uuid,
+    },
+    InstallPersonalContent {
+        server_id: Uuid,
+        kind: schema::personal::ContentKind,
+        provider: String,
+        project_id: String,
+        version_id: String,
+        title: String,
+        icon_url: Option<String>,
+    },
+    RemovePersonalContent {
+        server_id: Uuid,
+        id: Uuid,
+    },
+    SetPersonalContentEnabled {
+        server_id: Uuid,
+        id: Uuid,
+        enabled: bool,
+    },
+
+    // --- Java ---
+    /// Which runtimes the master can hand out for this build.
+    RequestJavaRuntimes {
+        server_id: Uuid,
+    },
+    /// `None` goes back to the runtime the build was built against.
+    SetJavaRuntime {
+        server_id: Uuid,
+        component: Option<String>,
+    },
+
+    // --- The player's own pages on the master ---
+    RequestPunishments,
+    RequestRules,
+    RequestTickets,
+    RequestTicket {
+        id: Uuid,
+    },
+    OpenTicket {
+        subject: String,
+        content: String,
+    },
+    ReplyTicket {
+        id: Uuid,
+        content: String,
+    },
+    RequestDmThreads,
+    RequestDmThread {
+        peer: Uuid,
+    },
+    SendDm {
+        peer: Uuid,
+        body: String,
     },
 
     /// A second launcher process started and handed the request over to this one.
@@ -369,6 +576,8 @@ pub enum MessageToFrontend {
         server_id: Uuid,
         mods: Vec<OptionalModInfo>,
         allow_suggestions: bool,
+        /// Разрешает ли сборка ставить своё. Решает оператор, не игрок.
+        allow_personal: bool,
         installed_files: Vec<String>,
     },
     ServerClientRecommendation {
@@ -486,6 +695,77 @@ pub enum MessageToFrontend {
     ImpersonationChanged {
         /// `None` once they're back in their own account.
         as_username: Option<String>,
+    },
+
+    /// A page of the feed. `offset` says whether it replaces or extends what the
+    /// panel already shows.
+    NotificationFeed {
+        items: Vec<schema::notifications::Notification>,
+        total: i64,
+        offset: u32,
+        unread: i64,
+    },
+    /// Arrived while the launcher was open.
+    NotificationArrived {
+        notification: Box<schema::notifications::Notification>,
+        unread: i64,
+        /// The master handed this client the right to raise a system toast.
+        os_toast: bool,
+    },
+    UnreadChanged {
+        unread: i64,
+    },
+
+    PersonalContent {
+        server_id: Uuid,
+        items: Vec<schema::personal::PersonalItem>,
+    },
+    ContentVersions {
+        provider: String,
+        project_id: String,
+        versions: Vec<ContentVersionInfo>,
+    },
+    /// Install, removal or a version list that didn't work. Carries the
+    /// master's own wording: "staff blocked this mod" is not "could not
+    /// install".
+    ContentActionFailed {
+        message: String,
+    },
+
+    JavaRuntimes {
+        server_id: Uuid,
+        options: Vec<schema::java::JavaRuntimeOption>,
+        /// What the build itself was built against.
+        default_component: String,
+        /// What this player picked, if they picked anything.
+        selected: Option<String>,
+    },
+
+    PunishmentsLoaded {
+        items: Vec<PunishmentView>,
+    },
+    RulesLoaded {
+        items: Vec<RuleView>,
+    },
+    TicketsLoaded {
+        items: Vec<TicketView>,
+    },
+    TicketLoaded {
+        id: Uuid,
+        subject: String,
+        status: String,
+        messages: Vec<TicketMessageView>,
+    },
+    DmThreadsLoaded {
+        items: Vec<DmThreadView>,
+    },
+    DmThreadLoaded {
+        thread: Box<DmThreadOpen>,
+    },
+    /// Arrived over the socket while the launcher was open.
+    DmArrived {
+        peer: Uuid,
+        message: DmMessageView,
     },
 
     OpenOrFocusMainWindow,

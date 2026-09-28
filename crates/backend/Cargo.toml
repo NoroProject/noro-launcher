@@ -39,6 +39,7 @@ once_cell = { workspace = true }
 dirs = { workspace = true }
 regex = { workspace = true }
 memchr = { workspace = true }
+notify-rust = { workspace = true }
 open = { workspace = true }
 url = { workspace = true }
 urlencoding = { workspace = true }

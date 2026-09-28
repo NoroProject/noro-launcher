@@ -1,6 +1,7 @@
 use super::{
-    game, impersonate_dialog, log_request_dialog, news, news_detail, profile, remote_action_dialog,
-    server_mod_catalog, server_mods, server_settings, settings, sidebar,
+    account, game, impersonate_dialog, log_request_dialog, messages, news, news_detail,
+    notifications, profile, remote_action_dialog, server_mod_catalog, server_mods, server_settings,
+    settings, sidebar,
 };
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
@@ -18,6 +19,9 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
     let dialog = impersonate_dialog::dialog(ui, cx);
     let log_dialog = log_request_dialog::dialog(ui, cx);
     let remote_dialog = remote_action_dialog::dialog(ui, cx);
+    // Поверх всего окна, а не области контента: панель висит над сайдбаром, из
+    // которого её и открыли.
+    let notifications = notifications::panel(ui, cx);
 
     div()
         .size_full()
@@ -41,6 +45,8 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
                             Page::NewsDetail(id) => news_detail::page(ui, id, cx),
                             Page::Profile => profile::page(ui, cx),
                             Page::Settings => settings::page(ui, cx),
+                            Page::Account => account::page(ui, cx),
+                            Page::Messages => messages::page(ui, cx),
                             Page::ServerMods(id) => server_mods::page(ui, id, cx),
                             Page::ServerModCatalog(id) => server_mod_catalog::page(ui, id, cx),
                             Page::ServerSettings(id) => server_settings::page(ui, id, cx),
@@ -53,5 +59,6 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
                         .children(remote_dialog),
                 ),
         )
+        .children(notifications)
         .into_any_element()
 }

@@ -12,7 +12,7 @@ version as the original.
 - The names **Noro**, **NoroLauncher** and **NoroProject**
 - The Noro logo and launcher icons (`assets/icon.*`)
 - The visual identity of the launcher and website
-- The domain `noro.dalynkaa.dev` and any confusingly similar domain
+- The domain `noro.sidepilot.app` and any confusingly similar domain
 
 These marks belong to the Noro project and are not licensed to you by the AGPL.
 

@@ -43,6 +43,18 @@ fn from_bootstrap(key: &str) -> Option<String> {
 fn verifying_key() -> Result<VerifyingKey> {
     let hex_str = raw_signing_pubkey();
     if hex_str.is_empty() {
+        // The master says this out loud at startup and paints the admin check
+        // red; here it used to be silent. A build that missed the stamping step
+        // then looked exactly like a signed one: the check passes, and all it
+        // proves is that the binary was signed with a seed anyone can read in
+        // the sources.
+        static WARNED: std::sync::Once = std::sync::Once::new();
+        WARNED.call_once(|| {
+            eprintln!(
+                "WARNING: no signing key is configured, falling back to the dev seed \
+                 from the sources. This build cannot tell the real core from a forgery."
+            );
+        });
         let sk = ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED);
         return Ok(sk.verifying_key());
     }
