@@ -76,26 +76,34 @@ fn default_locale() -> String {
 /// stays a dev address on purpose, so a build without one can't quietly talk to
 /// production.
 fn default_master_url() -> String {
+    stamped_master_url().unwrap_or_else(|| {
+        option_env!("NORO_MASTER_URL")
+            .unwrap_or("http://localhost:8080")
+            .to_string()
+    })
+}
+
+/// The address the bootstrapper handed over: in the environment when it starts
+/// core, or in `bootstrap.json`, which it rewrites from its own stamp on every
+/// launch.
+///
+/// `None` means core was started on its own — that happens in development, and
+/// there the saved address is the only one there is.
+fn stamped_master_url() -> Option<String> {
     if let Ok(val) = std::env::var("NORO_MASTER_URL") {
         let trimmed = val.trim();
         if !trimmed.is_empty() {
-            return trimmed.to_string();
+            return Some(trimmed.to_string());
         }
     }
     let boot_path = crate::directories::LauncherDirectories::new().bootstrap_file();
-    if let Ok(raw) = std::fs::read_to_string(&boot_path) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
-            if let Some(url) = v.get("master_url").and_then(|u| u.as_str()) {
-                let trimmed = url.trim();
-                if !trimmed.is_empty() {
-                    return trimmed.to_string();
-                }
-            }
-        }
-    }
-    option_env!("NORO_MASTER_URL")
-        .unwrap_or("http://localhost:8080")
-        .to_string()
+    let raw = std::fs::read_to_string(&boot_path).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    v.get("master_url")?
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
 }
 
 impl LauncherConfig {
@@ -183,6 +191,23 @@ impl LauncherConfig {
             // there while a v4-only master sits waiting.
             .replace("localhost", "127.0.0.1");
         format!("{ws}/ws/launcher")
+    }
+
+    /// Take the address the bootstrapper stamped, replacing the saved one.
+    /// Returns the address left behind, if it changed.
+    ///
+    /// Where the master lives is the build's business, not the player's: there
+    /// is no setting for it, and `config.json` only keeps it because the whole
+    /// config is written out as one file. A launcher installed from a new
+    /// address has to go to that address — before this, it kept knocking on the
+    /// one written down the first time it ever started, and the only cure was
+    /// deleting the config by hand.
+    pub fn adopt_stamped_master(&mut self) -> Option<String> {
+        let stamped = stamped_master_url()?;
+        if stamped == self.master_url {
+            return None;
+        }
+        Some(std::mem::replace(&mut self.master_url, stamped))
     }
 
     /// Same substitution as [`Self::ws_url`], applied to configs written before

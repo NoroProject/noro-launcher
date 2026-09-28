@@ -301,13 +301,17 @@ fn card(n: &Notification, cx: &mut Cx) -> AnyElement {
                 }
             }
             if let Some(href) = &link {
+                // Путь в карточке — это страница сайта, а адреса сайта у
+                // лаунчера нет: впечатан только мастер. Он и переводит на
+                // сайт, как при входе через браузер. Раньше путь клеился к
+                // адресу мастера, и ссылка вела на API вместо страницы.
                 let url = if href.starts_with("http") {
                     href.clone()
                 } else {
                     format!(
-                        "{}/{}",
+                        "{}/go?to={}",
                         this.config.master_url.trim_end_matches('/'),
-                        href.trim_start_matches('/')
+                        urlencoding::encode(href)
                     )
                 };
                 let _ = open::that_detached(url);

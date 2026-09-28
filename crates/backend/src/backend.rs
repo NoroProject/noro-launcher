@@ -125,6 +125,12 @@ async fn run(
 
     let config = Persistent::<LauncherConfig>::load(dirs.config_file());
     config.update(|c| {
+        if let Some(old) = c.adopt_stamped_master() {
+            tracing::info!(
+                "master address from the bootstrapper: {old} -> {}",
+                c.master_url
+            );
+        }
         if c.fix_localhost() {
             tracing::info!("migrated config: localhost -> 127.0.0.1");
         }
