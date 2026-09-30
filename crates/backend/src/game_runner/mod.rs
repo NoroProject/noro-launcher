@@ -1,3 +1,4 @@
+// File exceeds 150 lines: complete JVM startup pipeline, args, classpath, and pack auto-enabling.
 //! Launching the game: classpath, argument substitution, authlib-injector, JVM.
 
 mod args;
@@ -48,6 +49,19 @@ pub async fn launch(
     let instance_dir = dirs.instance(server_id);
     let natives_dir = dirs.natives(server_id);
     tokio::fs::create_dir_all(&natives_dir).await.ok();
+
+    // Ensure prefixes pack and any delivered resourcepacks are activated in options.txt
+    for file in &manifest.verified_files {
+        if let Some(pack) = file.path.strip_prefix("resourcepacks/") {
+            let _ = crate::sync::live::enable(&instance_dir, pack).await;
+        }
+    }
+    if instance_dir
+        .join("resourcepacks/noro-prefixes.zip")
+        .exists()
+    {
+        let _ = crate::sync::live::enable(&instance_dir, "noro-prefixes.zip").await;
+    }
 
     let java = crate::sync::find_java(&instance_dir, manifest)
         .ok_or_else(|| anyhow!("no java in the manifest"))?;

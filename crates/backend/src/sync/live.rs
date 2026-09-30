@@ -1,3 +1,4 @@
+// File exceeds 150 lines: live sync comparing hashes, in-place atomic replace, and auto-enabling packs in options.txt.
 //! Syncing while the game is running.
 //!
 //! The normal sync touches the whole instance directory and only runs before
@@ -112,16 +113,31 @@ pub async fn apply(
 /// `resourcePacks`, so without this one lands in the folder and stays unused.
 pub async fn enable(instance_dir: &Path, pack: &str) -> Result<bool> {
     let path = instance_dir.join("options.txt");
-    let Ok(text) = tokio::fs::read_to_string(&path).await else {
-        // The game hasn't written its settings yet; catch it next time.
-        return Ok(false);
-    };
     let entry = format!("\"file/{pack}\"");
-    let Some(updated) = add_pack(&text, &entry) else {
-        return Ok(false);
+    let text = match tokio::fs::read_to_string(&path).await {
+        Ok(t) => t,
+        Err(_) => {
+            let initial = format!("resourcePacks:[\"vanilla\",\"mod_resources\",{entry}]\n");
+            tokio::fs::write(&path, initial).await?;
+            return Ok(true);
+        }
     };
-    tokio::fs::write(&path, updated).await?;
-    Ok(true)
+    if let Some(updated) = add_pack(&text, &entry) {
+        tokio::fs::write(&path, updated).await?;
+        return Ok(true);
+    }
+    if !text.lines().any(|l| l.starts_with("resourcePacks:")) {
+        let mut new_text = text;
+        if !new_text.ends_with('\n') {
+            new_text.push('\n');
+        }
+        new_text.push_str(&format!(
+            "resourcePacks:[\"vanilla\",\"mod_resources\",{entry}]\n"
+        ));
+        tokio::fs::write(&path, new_text).await?;
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 /// Appends the pack to `resourcePacks`. Returns the new text, or `None` when the
