@@ -15,13 +15,18 @@ pub struct Substitution<'a> {
 }
 
 pub fn push_jvm_args(cmd: &mut Command, ctx: &Substitution<'_>, loader_client_name: Option<&str>) {
-    if ctx.manifest.jvm_args.is_empty() {
+    let has_classpath = ctx
+        .manifest
+        .jvm_args
+        .iter()
+        .flat_map(|arg| arg_values(arg))
+        .any(|arg| matches!(arg.as_str(), "-cp" | "-classpath" | "--class-path"));
+    if !has_classpath {
         cmd.arg("-cp").arg(ctx.classpath);
         cmd.arg(format!(
             "-Djava.library.path={}",
             ctx.natives_dir.to_string_lossy()
         ));
-        return;
     }
 
     for arg in &ctx.manifest.jvm_args {
