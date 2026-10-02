@@ -6,7 +6,7 @@ independently, and the master is what players actually download from.
 | Workflow | Trigger | Result |
 |---|---|---|
 | `ci.yml` | every PR and push to `master` | fmt, clippy, tests |
-| `release-launcher.yml` | tag `launcher-v*` | launcher binaries on a GitHub Release |
+| `release-launcher.yml` | tag `v*` | launcher binaries on a GitHub Release |
 
 The master **does not compile the launcher**. Its `launcher_builder` pulls the
 finished release assets by tag, signs them with ed25519 and puts them in the
@@ -14,7 +14,7 @@ file store. Without Actions there is no other way to ship a launcher version.
 
 ## Order
 
-1. Tag `launcher-v<version>` and push the tag. `release-launcher.yml` builds
+1. Tag `v<version>` and push the tag. `release-launcher.yml` builds
    core and the bootstrapper for all five targets and attaches them to the
    release.
 2. In the admin panel, start a launcher build for that tag: the master

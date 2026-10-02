@@ -429,11 +429,15 @@ impl BackendState {
             if let Ok(v) = r.json::<serde_json::Value>().await {
                 if !v.is_null() {
                     if let Some(version) = v["version"].as_str() {
-                        // The master reports a git tag, "launcher-v1.2.0", and
+                        // The master reports a git tag, "v1.2.0" (or the legacy
+                        // "launcher-v1.2.0"), while the crate exposes "1.2.0".
                         // what we have is the crate version, "1.2.0". Without
                         // stripping the prefix they never match and the update
                         // banner is always up.
-                        if version.trim_start_matches("launcher-v") != env!("CARGO_PKG_VERSION") {
+                        let reported_version = version
+                            .trim_start_matches("launcher-")
+                            .trim_start_matches('v');
+                        if reported_version != env!("CARGO_PKG_VERSION") {
                             if let Ok(lv) = serde_json::from_value::<schema::LauncherVersion>(
                                 build_launcher_version(&v),
                             ) {

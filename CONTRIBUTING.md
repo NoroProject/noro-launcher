@@ -85,11 +85,10 @@ master serves it.
 
 ## Releasing
 
-Tag and push:
+The monorepo helper updates the manifest, commits, tags and pushes the release:
 
 ```bash
-git tag launcher-v2.0.2
-git push origin launcher-v2.0.2
+../scripts/release.sh --launcher 2.0.6
 ```
 
 `release-launcher.yml` builds five targets — Linux x86_64 and aarch64, macOS
