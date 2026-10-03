@@ -11,6 +11,7 @@ pub mod config;
 pub mod diagnostics;
 pub mod directories;
 pub mod discord_rpc;
+pub mod failure;
 pub mod fsutil;
 pub mod game_runner;
 pub mod http;

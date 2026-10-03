@@ -684,10 +684,11 @@ impl BackendState {
 
     async fn launch_server(&mut self, server_id: Uuid, modal: bridge::ModalAction) {
         if self.login_info().is_none() {
-            modal.fail("Sign in required");
+            modal.fail(crate::failure::NOT_SIGNED_IN);
             self.ctx.send(MessageToFrontend::SyncFailed {
                 server_id,
-                reason: "not signed in".into(),
+                reason: crate::failure::NOT_SIGNED_IN.into(),
+                detail: String::new(),
             });
             return;
         }
@@ -731,10 +732,11 @@ impl BackendState {
             return; // nobody asked for a launch
         };
         let (Some(login), Some(user)) = (self.login_info(), self.user.clone()) else {
-            modal.fail("Sign in required");
+            modal.fail(crate::failure::NOT_SIGNED_IN);
             self.ctx.send(MessageToFrontend::SyncFailed {
                 server_id,
-                reason: "not signed in".into(),
+                reason: crate::failure::NOT_SIGNED_IN.into(),
+                detail: String::new(),
             });
             return;
         };

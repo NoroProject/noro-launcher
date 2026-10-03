@@ -1,4 +1,3 @@
-use crate::console_model::filtered_logs;
 use crate::console_toolbar::toolbar;
 use crate::state::{ConsoleWindow, LogEntry};
 use crate::theme::*;
@@ -10,30 +9,21 @@ pub fn console_window_body(
     view: &ConsoleWindow,
     cx: &mut gpui::Context<ConsoleWindow>,
 ) -> AnyElement {
-    let filtered = filtered_logs(
-        &view.logs,
-        view.show_info,
-        view.show_warn,
-        view.show_error,
-        &view.search_query,
-    );
-
+    // Rows are read from the view when the list asks for them: copying the
+    // filtered log for every frame cost more than drawing it.
+    let entity = cx.entity();
     div()
         .size_full()
         .bg(rgb(BG_WINDOW))
         .flex()
         .flex_col()
-        .child(toolbar(view, &filtered, cx))
+        .child(toolbar(view, cx))
         .child(
             div().flex_1().bg(rgb(0x050a12)).p(px(8.)).child(
-                list(view.list_state.clone(), {
-                    let filtered = filtered.clone();
-                    move |i, _, _| {
-                        if let Some(entry) = filtered.get(i) {
-                            log_row(entry).into_any_element()
-                        } else {
-                            div().into_any_element()
-                        }
+                list(view.list_state.clone(), move |i, _, cx| {
+                    match entity.read(cx).buffer.visible(i) {
+                        Some(entry) => log_row(entry).into_any_element(),
+                        None => div().into_any_element(),
                     }
                 })
                 .size_full(),

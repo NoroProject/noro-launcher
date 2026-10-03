@@ -99,8 +99,20 @@ fn play_button(
     if locked {
         return disabled(t("game-locked"));
     }
+    if sync.cancellable() {
+        return cta_button(
+            "cancel-launch",
+            Some("x"),
+            t("common-cancel"),
+            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                this.cancel_launch(server_id);
+                cx.notify();
+            }),
+        )
+        .into_any_element();
+    }
     if sync.syncing {
-        return disabled(t("game-preparing"));
+        return disabled(sync.heading_text());
     }
     if sync.running {
         return stop_button(server_id, cx);

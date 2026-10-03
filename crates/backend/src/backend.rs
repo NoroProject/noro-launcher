@@ -686,10 +686,10 @@ pub fn spawn_sync_and_launch(req: Launch) {
                     g.values()
                         .fold((0u64, 0u64), |(d, t), (sd, st)| (d + sd, t + st))
                 };
-                modal_clone.set_stage("Downloading...");
+                modal_clone.set_stage("downloading");
                 modal_clone.set_progress(sum_done, sum_total);
             } else {
-                modal_clone.set_stage(stage.label());
+                modal_clone.set_stage(format!("{stage:?}"));
                 modal_clone.set_progress(done, total);
             }
             if !file.is_empty() {
@@ -721,10 +721,14 @@ pub fn spawn_sync_and_launch(req: Launch) {
             }
             // `{:#}` keeps the cause chain: "download of X failed: SHA1
             // mismatch" rather than only the outermost context.
-            let reason = format!("{e:#}");
-            tracing::error!(%server_id, error = %reason, "sync failed");
-            modal.fail(reason.clone());
-            ctx.send(MessageToFrontend::SyncFailed { server_id, reason });
+            let detail = format!("{e:#}");
+            tracing::error!(%server_id, error = %detail, "sync failed");
+            modal.fail(detail.clone());
+            ctx.send(MessageToFrontend::SyncFailed {
+                server_id,
+                reason: crate::failure::sync_failure_key(&e).into(),
+                detail,
+            });
             return;
         }
         ctx.send(MessageToFrontend::SyncComplete { server_id });
@@ -768,7 +772,8 @@ pub fn spawn_sync_and_launch(req: Launch) {
             });
             ctx.send(MessageToFrontend::SyncFailed {
                 server_id,
-                reason: "launch blocked: a forbidden file was found".into(),
+                reason: crate::failure::LAUNCH_BLOCKED.into(),
+                detail: String::new(),
             });
             return;
         }
@@ -839,9 +844,14 @@ pub fn spawn_sync_and_launch(req: Launch) {
             Err(e) => {
                 ctx.mod_link.stop().await;
                 tracing::error!(%server_id, error = %format!("{e:#}"), "launch failed");
+                let key = match crate::failure::sync_failure_key(&e) {
+                    "sync-error-unknown" => crate::failure::LAUNCH_FAILED,
+                    key => key,
+                };
                 ctx.send(MessageToFrontend::SyncFailed {
                     server_id,
-                    reason: format!("launch failed: {e:#}"),
+                    reason: key.into(),
+                    detail: format!("{e:#}"),
                 });
             }
         }

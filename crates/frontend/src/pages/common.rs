@@ -165,16 +165,16 @@ pub fn parse_hex(c: &str) -> u32 {
     u32::from_str_radix(c.trim_start_matches('#'), 16).unwrap_or(ACCENT)
 }
 
+/// "120 / 340 MB · 4.2 MB/s · 0:52 left" — the speed once it is known.
 pub fn progress_label(s: &crate::state::SyncUiState) -> String {
     let total = s.total();
     if total == 0 {
-        String::new()
-    } else {
-        format!(
-            "{:.0} / {:.0} MB",
-            s.done() as f64 / 1_048_576.0,
-            total as f64 / 1_048_576.0
-        )
+        return String::new();
+    }
+    let size = crate::sync_text::megabytes(s.done(), total);
+    match crate::sync_text::rate_label(&s.rate, s.done(), total) {
+        Some(rate) => format!("{size} · {rate}"),
+        None => size,
     }
 }
 

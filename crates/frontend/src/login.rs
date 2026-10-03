@@ -95,7 +95,7 @@ fn auth_content(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
 /// turns another one on.
 fn login_buttons(logging_in: bool, cx: &mut Cx) -> AnyElement {
     if logging_in {
-        return waiting_box();
+        return waiting_box(cx);
     }
 
     div()
@@ -142,21 +142,50 @@ fn login_buttons(logging_in: bool, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-fn waiting_box() -> AnyElement {
+/// Waiting on the browser. Closing the tab used to leave this up for the
+/// whole five-minute timeout, with no way back.
+fn waiting_box(cx: &mut Cx) -> AnyElement {
     div()
-        .h(px(48.))
         .w_full()
         .flex()
-        .items_center()
-        .justify_center()
-        .bg(rgb(BG_CARD))
-        .border_1()
-        .border_color(rgb(BORDER))
-        .rounded(px(R_MD))
-        .font_family(FONT_PIXEL_ALT)
-        .text_size(px(14.))
-        .text_color(rgb(TEXT_SECONDARY))
-        .child(t("login-waiting"))
+        .flex_col()
+        .gap(px(8.))
+        .child(
+            div()
+                .h(px(48.))
+                .w_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(rgb(BG_CARD))
+                .border_1()
+                .border_color(rgb(BORDER))
+                .rounded(px(R_MD))
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(14.))
+                .text_color(rgb(TEXT_SECONDARY))
+                .child(t("login-waiting")),
+        )
+        .child(
+            div()
+                .id("login-cancel")
+                .w_full()
+                .h(px(32.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .rounded(px(R_MD))
+                .cursor_pointer()
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(12.))
+                .text_color(rgb(TEXT_MUTED))
+                .hover(|d| d.text_color(rgb(TEXT_PRIMARY)).bg(rgb(BG_CARD_HOV)))
+                .child(t("common-cancel"))
+                .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                    this.cancel_login();
+                    cx.notify();
+                })),
+        )
         .into_any_element()
 }
 

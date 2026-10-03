@@ -4,6 +4,7 @@ mod account;
 mod account_rules;
 mod account_thread;
 mod build_picker;
+pub mod close_dialog;
 mod common;
 mod compose;
 mod content_card;

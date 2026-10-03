@@ -57,20 +57,66 @@ pub enum AccountTab {
     Rules,
 }
 
+/// What the sync panel's heading says. Kept as a state rather than as text so
+/// the words follow the language.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SyncHeading {
+    Preparing,
+    Stage(SyncStage),
+    /// Several download stages at once; no single one is the heading.
+    Downloading,
+    /// Files are in place; the check and the JVM start take a few seconds.
+    Launching,
+    Cancelling,
+}
+
+/// Why the last sync or launch failed.
+#[derive(Clone, Debug)]
+pub struct SyncFailure {
+    /// A translation key.
+    pub reason: String,
+    /// The technical chain, for whoever reads the console or a support report.
+    pub detail: String,
+}
+
 /// Sync and run state for one server.
 #[derive(Default, Clone)]
 pub struct SyncUiState {
-    pub stage: String,
+    pub heading: Option<SyncHeading>,
     pub detail: String,
     /// Bytes per download stage — they run in parallel and each gets its own
     /// bar. BTreeMap so the row order doesn't depend on who reported first.
     pub stages: std::collections::BTreeMap<SyncStage, (u64, u64)>,
     pub syncing: bool,
-    pub failed: Option<String>,
+    pub failed: Option<SyncFailure>,
     pub running: bool,
+    /// The launch in flight. Kept so it can be cancelled: the backend has
+    /// always honoured a cancel, but nothing in the window could ask for one.
+    pub launch: Option<bridge::ModalAction>,
+    pub rate: crate::sync_text::Rate,
 }
 
 impl SyncUiState {
+    pub fn heading_text(&self) -> String {
+        match &self.heading {
+            None | Some(SyncHeading::Preparing) => i18n::t("game-preparing"),
+            Some(SyncHeading::Stage(stage)) => crate::sync_text::stage_label(*stage),
+            Some(SyncHeading::Downloading) => i18n::t("sync-downloading"),
+            Some(SyncHeading::Launching) => i18n::t("sync-launching"),
+            Some(SyncHeading::Cancelling) => i18n::t("sync-cancelling"),
+        }
+    }
+
+    /// The launch can still be called off: it hasn't reached the JVM yet.
+    pub fn cancellable(&self) -> bool {
+        self.syncing
+            && self.launch.is_some()
+            && !matches!(
+                self.heading,
+                Some(SyncHeading::Launching | SyncHeading::Cancelling)
+            )
+    }
+
     pub fn done(&self) -> u64 {
         self.stages.values().map(|(d, _)| d).sum()
     }
@@ -208,6 +254,9 @@ pub struct LauncherUI {
     /// UI language. The catalog itself lives in i18n's global state.
     pub locale: i18n::Locale,
     pub online: bool,
+    /// The socket to the master went down and hasn't come back. Separate from
+    /// `online`, which is also false for the moment before the first connect.
+    pub connection_lost: bool,
     pub logging_in: bool,
     pub sidebar_collapsed: bool,
     pub mod_catalog_hits: Vec<bridge::CatalogHitInfo>,
@@ -229,6 +278,8 @@ pub struct LauncherUI {
     pub rename_focus: Option<gpui::FocusHandle>,
     pub startup_checking: bool,
     pub login_error: Option<String>,
+    /// The web sign-in in flight, so it can be cancelled.
+    pub login_modal: Option<bridge::ModalAction>,
     pub login_mode_key: bool,
     pub login_key_input: String,
     pub login_key_focus: Option<gpui::FocusHandle>,
@@ -239,7 +290,7 @@ pub struct LauncherUI {
     pub news: Vec<NewsItem>,
     pub sync: HashMap<Uuid, SyncUiState>,
     pub build_state: HashMap<Uuid, bridge::BuildState>,
-    pub logs: HashMap<Uuid, Vec<LogEntry>>,
+    pub logs: HashMap<Uuid, std::collections::VecDeque<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
     pub installed_files: HashMap<Uuid, Vec<String>>,
     /// Имена того, что сборка уже везёт, приведённые к виду для сравнения.
@@ -278,6 +329,8 @@ pub struct LauncherUI {
 
     pub update_available: Option<LauncherVersion>,
     pub updating: bool,
+    /// The update download in flight; its progress is read from here.
+    pub update_modal: Option<bridge::ModalAction>,
     /// Стопка плашек, старые сверху. Одна на всё окно теряла предыдущую:
     /// синхронизация умеет сообщить о трёх вещах подряд, и видно было третью.
     pub toasts: Vec<Toast>,
@@ -286,6 +339,10 @@ pub struct LauncherUI {
     pub server_settings: HashMap<Uuid, ClientSettingsState>,
     pub server_recommendations: HashMap<Uuid, ClientSettingsState>,
     pub console_window: Option<gpui::WindowHandle<ConsoleWindow>>,
+    /// The main window, to raise it when the launcher is started again.
+    pub main_window: Option<gpui::AnyWindowHandle>,
+    /// Closing would stop a running game or download; the window is asking.
+    pub close_prompt: bool,
     pub impersonate_prompt: Option<ImpersonatePrompt>,
     /// Username the launcher is currently acting as.
     pub impersonating_as: Option<String>,
@@ -399,14 +456,61 @@ pub struct ImpersonatePrompt {
 }
 pub struct ConsoleWindow {
     pub server_id: Uuid,
-    pub logs: Vec<LogEntry>,
+    pub buffer: crate::console_model::ConsoleBuffer,
     pub list_state: ListState,
-    pub show_info: bool,
-    pub show_warn: bool,
-    pub show_error: bool,
-    pub search_query: String,
     pub status_message: String,
     pub copy_success: bool,
+}
+
+impl ConsoleWindow {
+    fn new(server_id: Uuid, lines: impl IntoIterator<Item = LogEntry>) -> Self {
+        let buffer = crate::console_model::ConsoleBuffer::from_lines(lines, Default::default());
+        let list_state = ListState::new(buffer.visible_len(), ListAlignment::Top, px(100.));
+        // Follows new lines while the reader is at the bottom; scrolling up
+        // stops it, and scrolling back down picks it up again. Recreating the
+        // list for every batch used to throw the reader back to the bottom.
+        list_state.set_follow_mode(gpui::FollowMode::Tail);
+        Self {
+            server_id,
+            buffer,
+            list_state,
+            status_message: String::new(),
+            copy_success: false,
+        }
+    }
+
+    /// New lines go in as a splice at the end (and one at the front for what
+    /// fell off), so the reader's position holds.
+    pub fn push(&mut self, lines: Vec<LogEntry>) {
+        let before = self.buffer.visible_len();
+        let change = self.buffer.append(lines);
+        if change.removed_front > 0 {
+            self.list_state.splice(0..change.removed_front, 0);
+        }
+        let end = before - change.removed_front;
+        if change.added_back > 0 {
+            self.list_state.splice(end..end, change.added_back);
+        }
+    }
+
+    pub fn set_filters(&mut self, filters: crate::console_model::Filters) {
+        self.buffer.set_filters(filters);
+        self.list_state.reset(self.buffer.visible_len());
+        self.list_state.set_follow_mode(gpui::FollowMode::Tail);
+    }
+
+    /// The console follows the server the player is looking at.
+    pub fn show_server(&mut self, server_id: Uuid, lines: impl IntoIterator<Item = LogEntry>) {
+        let filters = self.buffer.filters().clone();
+        self.server_id = server_id;
+        self.buffer = crate::console_model::ConsoleBuffer::from_lines(lines, filters);
+        self.list_state.reset(self.buffer.visible_len());
+        self.list_state.set_follow_mode(gpui::FollowMode::Tail);
+    }
+
+    pub fn follow(&mut self) {
+        self.list_state.set_follow_mode(gpui::FollowMode::Tail);
+    }
 }
 
 pub struct GlobalLauncherUI(pub Entity<LauncherUI>);
@@ -419,7 +523,7 @@ impl gpui::Render for ConsoleWindow {
     }
 }
 
-const MAX_LOG_LINES: usize = 500;
+use crate::console_model::MAX_LOG_LINES;
 const CONSOLE_WINDOW_SIZE: (f32, f32) = (800., 500.);
 const CONSOLE_WINDOW_MIN_SIZE: (f32, f32) = (720., 440.);
 
@@ -458,6 +562,7 @@ impl LauncherUI {
             perf: Default::default(),
             locale: i18n::Locale::default(),
             online: false,
+            connection_lost: false,
             logging_in: false,
             sidebar_collapsed: false,
             mod_catalog_hits: Vec::new(),
@@ -475,6 +580,7 @@ impl LauncherUI {
             rename_focus: None,
             startup_checking: true,
             login_error: None,
+            login_modal: None,
             login_mode_key: false,
             login_key_input: String::new(),
             login_key_focus: None,
@@ -509,12 +615,15 @@ impl LauncherUI {
             remote_action_prompt: None,
             impersonating_as: None,
             updating: false,
+            update_modal: None,
             toasts: Vec::new(),
             next_toast_id: 0,
             config: UiConfig::default(),
             server_settings: HashMap::new(),
             server_recommendations: HashMap::new(),
             console_window: None,
+            main_window: None,
+            close_prompt: false,
 
             notifications: Vec::new(),
             notifications_total: 0,
@@ -859,6 +968,7 @@ impl LauncherUI {
                 self.user = Some(user);
                 self.load_user_skin(cx);
                 self.logging_in = false;
+                self.login_modal = None;
                 self.startup_checking = false;
                 self.login_error = None;
                 self.backend.send(MessageToBackend::RequestCapesList);
@@ -869,15 +979,21 @@ impl LauncherUI {
             }
             MessageToFrontend::LoginFailed { kind } => {
                 self.logging_in = false;
+                self.login_modal = None;
                 self.startup_checking = false;
                 self.login_error = Some(match kind {
                     LoginErrorKind::Cancelled => i18n::t("error-sign-in-cancelled"),
                     // `r` is a translation key from the master, not text.
                     LoginErrorKind::Rejected(r) => i18n::t(&r),
-                    LoginErrorKind::Network(e) => format!("Network: {e}"),
+                    LoginErrorKind::Network(e) => {
+                        let mut args = i18n::FluentArgs::new();
+                        args.set("reason", e);
+                        i18n::t_args("error-network", &args)
+                    }
                 });
             }
             MessageToFrontend::LoggedOut => {
+                self.clear_account_data();
                 self.user = None;
                 self.reset_skin_preview();
                 self.skin_url = None;
@@ -1020,18 +1136,23 @@ impl LauncherUI {
             } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = stage != SyncStage::Done;
+                let cancelling = s.heading == Some(SyncHeading::Cancelling);
                 if stage.is_download() {
                     s.stages.insert(stage, (done, total));
-                    // Several stages run at once, so no single one of them gets
-                    // to be the heading.
-                    s.stage = "Downloading...".into();
+                    s.rate.record(s.done());
+                    if !cancelling {
+                        s.heading = Some(SyncHeading::Downloading);
+                    }
                 } else {
                     // Checking files opens a new pass; the bars from the last
                     // run don't belong to it.
                     if stage == SyncStage::CheckingFiles && done == 0 {
                         s.stages.clear();
+                        s.rate.clear();
                     }
-                    s.stage = stage.label().to_string();
+                    if !cancelling {
+                        s.heading = Some(SyncHeading::Stage(stage));
+                    }
                 }
                 if !file.is_empty() {
                     s.detail = file;
@@ -1044,42 +1165,66 @@ impl LauncherUI {
                 // until GameStarted or SyncFailed — a second click here started
                 // a second game in the same folder.
                 let s = self.sync.entry(server_id).or_default();
-                s.stage = "Launching...".into();
+                s.heading = Some(SyncHeading::Launching);
             }
             MessageToFrontend::LaunchCancelled { server_id } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = false;
                 s.failed = None;
+                s.launch = None;
+                s.heading = None;
+                s.stages.clear();
+                s.rate.clear();
             }
             MessageToFrontend::LiveSynced {
-                server_id,
+                server_id: _,
                 updated,
                 locked,
             } => {
                 // New packs arrived while the game is running. Nothing shows
                 // until the client reloads its resources, and that's the
-                // player's call: mid-fight it isn't welcome.
-                let s = self.sync.entry(server_id).or_default();
-                s.stage = if locked.is_empty() {
-                    format!("{} pack(s) updated. Press F3+T to apply", updated.len())
+                // player's call: mid-fight it isn't welcome. Said in a toast:
+                // the sync panel this used to go to is hidden while playing.
+                let text = if locked.is_empty() {
+                    i18n::t_count("sync-live-updated", updated.len() as i64)
                 } else {
-                    format!(
-                        "{} pack(s) updated, {} more will land on next launch",
-                        updated.len(),
-                        locked.len()
-                    )
+                    let mut args = i18n::FluentArgs::new();
+                    args.set("count", updated.len() as i64);
+                    args.set("locked", locked.len() as i64);
+                    i18n::t_args("sync-live-partial", &args)
                 };
+                self.notify_toast(text, NotifLevel::Info, cx);
             }
-            MessageToFrontend::SyncFailed { server_id, reason } => {
+            MessageToFrontend::SyncFailed {
+                server_id,
+                reason,
+                detail,
+            } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = false;
-                s.failed = Some(reason.clone());
-                self.notify_toast(reason, NotifLevel::Error, cx);
+                s.launch = None;
+                s.heading = None;
+                s.rate.clear();
+                self.notify_toast(i18n::t(&reason), NotifLevel::Error, cx);
+                // The technical chain goes where people look when a toast isn't
+                // enough: the console, and from there a support report.
+                if !detail.is_empty() {
+                    let logs = self.logs.entry(server_id).or_default();
+                    logs.push_back(LogEntry {
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                        level: bridge::GameLogLevel::Error,
+                        text: format!("[launcher] {detail}"),
+                    });
+                }
+                self.sync.entry(server_id).or_default().failed =
+                    Some(SyncFailure { reason, detail });
             }
             MessageToFrontend::GameStarted { server_id } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.running = true;
                 s.syncing = false;
+                s.launch = None;
+                s.heading = None;
                 if self
                     .server_client_settings(server_id)
                     .show_console_on_launch
@@ -1103,38 +1248,22 @@ impl LauncherUI {
             MessageToFrontend::GameLog { server_id, lines } => {
                 let logs = self.logs.entry(server_id).or_default();
                 logs.extend(lines.iter().cloned());
-                if logs.len() > MAX_LOG_LINES {
-                    let drain = logs.len() - MAX_LOG_LINES;
-                    logs.drain(0..drain);
+                while logs.len() > MAX_LOG_LINES {
+                    logs.pop_front();
                 }
 
-                // Once per batch: the filter runs over the whole buffer, and per
-                // line it was the frontend that fell behind the game.
                 if let Some(handle) = &self.console_window {
                     let _ = handle.update(cx, |view, _, cx| {
                         if view.server_id == server_id {
-                            view.logs.extend(lines);
-                            if view.logs.len() > MAX_LOG_LINES {
-                                let drain = view.logs.len() - MAX_LOG_LINES;
-                                view.logs.drain(0..drain);
-                            }
-
-                            use crate::console_model::filtered_logs;
-                            let visible_count = filtered_logs(
-                                &view.logs,
-                                view.show_info,
-                                view.show_warn,
-                                view.show_error,
-                                &view.search_query,
-                            )
-                            .len();
-
-                            view.list_state =
-                                ListState::new(visible_count, ListAlignment::Bottom, px(100.));
+                            view.push(lines);
                             cx.notify();
                         }
                     });
                 }
+                // Nothing in the main window shows the log; redrawing it for
+                // every batch kept the launcher busy for as long as the game
+                // was writing.
+                return;
             }
             MessageToFrontend::BuildStateChanged { server_id, state } => {
                 self.build_state.insert(server_id, state);
@@ -1191,6 +1320,8 @@ impl LauncherUI {
             MessageToFrontend::ImpersonationChanged { as_username } => {
                 self.impersonate_prompt = None;
                 self.impersonating_as = as_username;
+                // Another account now: what was loaded belongs to the last one.
+                self.clear_account_data();
             }
             MessageToFrontend::SkinUploadFailed => {
                 self.skin_uploading = false;
@@ -1273,7 +1404,16 @@ impl LauncherUI {
                 }
             }
             MessageToFrontend::ConnectionState { online } => {
+                let was_lost = self.connection_lost;
                 self.online = online;
+                self.connection_lost = !online;
+                // Images that failed while offline are worth one more try:
+                // started without a network, the launcher otherwise showed no
+                // icons or backgrounds for the whole session.
+                if online && was_lost {
+                    self.image_failed.clear();
+                    self.optional_mod_icons_failed.clear();
+                }
             }
             MessageToFrontend::NotificationFeed {
                 items,
@@ -1373,7 +1513,16 @@ impl LauncherUI {
                 self.backend.send(MessageToBackend::RequestDmThreads);
             }
 
-            MessageToFrontend::OpenOrFocusMainWindow => {}
+            MessageToFrontend::OpenOrFocusMainWindow => {
+                // A second launch hands over to this one. Deferred: raising the
+                // window updates it, and this runs inside an update of its view.
+                if let Some(handle) = self.main_window {
+                    cx.defer(move |cx| {
+                        let _ = handle.update(cx, |_, window, _| window.activate_window());
+                        cx.activate(true);
+                    });
+                }
+            }
             MessageToFrontend::CloseModal => {
                 self.logging_in = false;
             }
@@ -1468,9 +1617,54 @@ impl LauncherUI {
         self.logging_in = true;
         self.login_error = None;
         let modal = bridge::ModalAction::new("Website sign in");
+        self.login_modal = Some(modal.clone());
         self.backend.send(MessageToBackend::StartWebLogin {
             modal_action: modal,
         });
+    }
+
+    /// Everything that belongs to the signed-in account. Left in place, the
+    /// next account — another player on the same computer, or an admin
+    /// entering someone's account — saw the previous one's tickets, messages
+    /// and punishments, and the "already loaded" flags kept them from being
+    /// fetched again.
+    fn clear_account_data(&mut self) {
+        self.account_requested.clear();
+        self.punishments.clear();
+        self.tickets.clear();
+        self.ticket_open = None;
+        self.dm_threads.clear();
+        self.dm_open = None;
+        self.dm_requested = false;
+        self.compose.clear();
+        self.notifications.clear();
+        self.notifications_total = 0;
+        self.unread = 0;
+        self.capes.clear();
+        self.cape_images.clear();
+        let custom: HashSet<String> = self.custom_presets.iter().map(|p| p.id.clone()).collect();
+        self.preset_images.retain(|id, _| !custom.contains(id));
+        self.custom_presets.clear();
+        self.personal_content.clear();
+        self.suggested_mods.clear();
+    }
+
+    /// Whether the window may close now. With a game running or a download in
+    /// flight it may not: closing would stop them, so the window asks first.
+    pub fn request_close(&mut self) -> bool {
+        let busy = self.sync.values().any(|s| s.running || s.syncing);
+        if busy {
+            self.close_prompt = true;
+        }
+        !busy
+    }
+
+    /// The sign-in task polls the flag and answers with a cancelled login.
+    pub fn cancel_login(&mut self) {
+        if let Some(modal) = self.login_modal.take() {
+            modal.cancel();
+        }
+        self.logging_in = false;
     }
 
     pub fn start_key_login(&mut self, key: String) {
@@ -1559,15 +1753,28 @@ impl LauncherUI {
     }
 
     pub fn launch(&mut self, id: Uuid) {
+        let modal = bridge::ModalAction::new("Launch");
         let s = self.sync.entry(id).or_default();
         s.syncing = true;
         s.failed = None;
-        s.stage = "Preparing...".into();
-        let modal = bridge::ModalAction::new("Launch");
+        s.heading = Some(SyncHeading::Preparing);
+        s.launch = Some(modal.clone());
         self.backend.send(MessageToBackend::LaunchServer {
             server_id: id,
             modal_action: modal,
         });
+    }
+
+    /// Asks the running sync to stop. It stops between chunks and reports back
+    /// with `LaunchCancelled`; the button says "cancelling" until then, so a
+    /// new launch can't start under the old one.
+    pub fn cancel_launch(&mut self, id: Uuid) {
+        if let Some(s) = self.sync.get_mut(&id) {
+            if let Some(modal) = &s.launch {
+                modal.cancel();
+                s.heading = Some(SyncHeading::Cancelling);
+            }
+        }
     }
 
     pub fn kill(&mut self, id: Uuid) {
@@ -1795,15 +2002,40 @@ impl LauncherUI {
         });
     }
 
-    pub fn install_update(&mut self) {
-        if let Some(v) = self.update_available.clone() {
-            self.updating = true;
-            let modal = bridge::ModalAction::new("Update");
-            self.backend.send(MessageToBackend::InstallUpdate {
-                version: v,
-                modal_action: modal,
-            });
+    pub fn install_update(&mut self, cx: &mut Context<Self>) {
+        if self.updating {
+            return;
         }
+        let Some(v) = self.update_available.clone() else {
+            return;
+        };
+        self.updating = true;
+        let modal = bridge::ModalAction::new("Update");
+        self.update_modal = Some(modal.clone());
+        self.backend.send(MessageToBackend::InstallUpdate {
+            version: v,
+            modal_action: modal.clone(),
+        });
+        // The download reports into the modal, not through messages: redraw a
+        // few times a second while it runs, and stand down if it fails. On
+        // success the launcher restarts into the new version.
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| loop {
+            executor.timer(std::time::Duration::from_millis(250)).await;
+            let progress = modal.snapshot();
+            let done = progress.error.is_some() || progress.finished;
+            let alive = this.update(cx, |ui, cx| {
+                if progress.error.is_some() {
+                    ui.updating = false;
+                    ui.update_modal = None;
+                }
+                cx.notify();
+            });
+            if done || alive.is_err() {
+                break;
+            }
+        })
+        .detach();
     }
 
     pub fn toggle_console(&mut self, cx: &mut Context<Self>) {
@@ -1814,7 +2046,16 @@ impl LauncherUI {
 
     pub fn open_console(&mut self, server_id: Uuid, cx: &mut Context<Self>) {
         if let Some(handle) = &self.console_window {
-            let _ = handle.update(cx, |_, _, cx| {
+            let lines: Vec<LogEntry> = self
+                .logs
+                .get(&server_id)
+                .map(|l| l.iter().cloned().collect())
+                .unwrap_or_default();
+            let _ = handle.update(cx, |view, window, cx| {
+                if view.server_id != server_id {
+                    view.show_server(server_id, lines);
+                }
+                window.activate_window();
                 cx.notify();
             });
             return;
@@ -1825,7 +2066,11 @@ impl LauncherUI {
             gpui::size(px(CONSOLE_WINDOW_SIZE.0), px(CONSOLE_WINDOW_SIZE.1)),
             cx,
         );
-        let logs = self.logs.get(&server_id).cloned().unwrap_or_default();
+        let logs: Vec<LogEntry> = self
+            .logs
+            .get(&server_id)
+            .map(|l| l.iter().cloned().collect())
+            .unwrap_or_default();
         let handle = cx.open_window(
             gpui::WindowOptions {
                 window_bounds: Some(gpui::WindowBounds::Windowed(bounds)),
@@ -1834,7 +2079,7 @@ impl LauncherUI {
                     px(CONSOLE_WINDOW_MIN_SIZE.1),
                 )),
                 titlebar: Some(gpui::TitlebarOptions {
-                    title: Some(gpui::SharedString::new_static("Noro Game Console")),
+                    title: Some(i18n::t("console-title").into()),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -1851,23 +2096,14 @@ impl LauncherUI {
                         }
                     })
                     .detach();
-                    ConsoleWindow {
-                        server_id,
-                        logs: logs.clone(),
-                        list_state: ListState::new(logs.len(), ListAlignment::Bottom, px(100.)),
-                        show_info: true,
-                        show_warn: true,
-                        show_error: true,
-                        search_query: String::new(),
-                        status_message: String::new(),
-                        copy_success: false,
-                    }
+                    ConsoleWindow::new(server_id, logs)
                 })
             },
         );
 
-        if let Ok(h) = handle {
-            self.console_window = Some(h);
+        match handle {
+            Ok(h) => self.console_window = Some(h),
+            Err(e) => tracing::warn!(error = %e, "console window did not open"),
         }
     }
 }

@@ -435,35 +435,6 @@ pub enum SyncStage {
 }
 
 impl SyncStage {
-    pub fn label(&self) -> &'static str {
-        match self {
-            SyncStage::CheckingFiles => "Checking files...",
-            SyncStage::DownloadingJava => "Downloading Java...",
-            SyncStage::DownloadingMinecraft => "Downloading Minecraft...",
-            SyncStage::DownloadingLibraries => "Downloading libraries...",
-            SyncStage::DownloadingAssets => "Downloading assets...",
-            SyncStage::DownloadingMods => "Downloading mods...",
-            SyncStage::ApplyingForgePatches => "Applying Forge patches...",
-            SyncStage::Cleaning => "Cleaning extra files...",
-            SyncStage::Done => "Done",
-        }
-    }
-
-    /// There is very little room next to the bar.
-    pub fn short_label(&self) -> &'static str {
-        match self {
-            SyncStage::CheckingFiles => "Checking",
-            SyncStage::DownloadingJava => "Java",
-            SyncStage::DownloadingMinecraft => "Minecraft",
-            SyncStage::DownloadingLibraries => "Libraries",
-            SyncStage::DownloadingAssets => "Assets",
-            SyncStage::DownloadingMods => "Mods",
-            SyncStage::ApplyingForgePatches => "Forge",
-            SyncStage::Cleaning => "Cleaning",
-            SyncStage::Done => "Done",
-        }
-    }
-
     /// Download stages count bytes, the rest count files — the two can't be
     /// added up into a single total.
     pub fn is_download(&self) -> bool {
@@ -632,7 +603,10 @@ pub enum MessageToFrontend {
     },
     SyncFailed {
         server_id: Uuid,
+        /// A translation key naming the cause.
         reason: String,
+        /// The technical chain, for the console and support. May be empty.
+        detail: String,
     },
     /// The launch was called off before it started, and whoever called it off
     /// has already told the player why: the button just goes back to normal.
