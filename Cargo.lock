@@ -2188,6 +2188,8 @@ dependencies = [
  "reqwest",
  "rust-embed",
  "schema",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
  "urlencoding",

@@ -415,6 +415,15 @@ pub enum MessageToBackend {
     Quit,
 }
 
+/// A step between the finished sync and the game window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LaunchStep {
+    /// Checking the instance against the manifest.
+    Verifying,
+    /// Preparing sign-in and starting the JVM.
+    Starting,
+}
+
 /// Variant order is also the order of the bars in the UI: download stages run in
 /// parallel, and `Ord` keeps the list stable instead of letting it shuffle as
 /// progress arrives. Reordering these reorders the screen.
@@ -595,6 +604,12 @@ pub enum MessageToFrontend {
     },
     SyncComplete {
         server_id: Uuid,
+    },
+    /// Between "files are in place" and the game window: these take seconds
+    /// on a big build, and the bar used to sit on "done" through them.
+    LaunchStep {
+        server_id: Uuid,
+        step: LaunchStep,
     },
     /// Packs and shaders that changed while the game was running; a resource
     /// reload picks them up. Anything the game held open is in `locked` and only

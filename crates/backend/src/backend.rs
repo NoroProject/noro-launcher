@@ -832,6 +832,10 @@ pub fn spawn_sync_and_launch(req: Launch) {
         // check it against the manifest here. Extra files go, mismatches go to
         // the master, and the player keeps launching: a finding is something to
         // look into later, not a refusal.
+        ctx.send(MessageToFrontend::LaunchStep {
+            server_id,
+            step: bridge::LaunchStep::Verifying,
+        });
         let report =
             crate::sync::verify_before_launch(&instance_dir, &manifest, &enabled_optional, &user)
                 .await;
@@ -909,6 +913,11 @@ pub fn spawn_sync_and_launch(req: Launch) {
             ctx.send(MessageToFrontend::LaunchCancelled { server_id });
             return;
         }
+
+        ctx.send(MessageToFrontend::LaunchStep {
+            server_id,
+            step: bridge::LaunchStep::Starting,
+        });
 
         // The channel to the case mod has to be up before the game starts: the
         // mod reads the handshake file once, at startup, and being late here

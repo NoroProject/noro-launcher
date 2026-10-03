@@ -447,6 +447,11 @@ pub struct LauncherUI {
     pub account_loaded: HashSet<&'static str>,
     pub dm_loaded: bool,
     pub news_loaded: bool,
+    /// Window placement and the last open server, written on quit.
+    pub ui_state: crate::ui_state::UiState,
+    /// The saved server has been reopened once; after that the player's own
+    /// clicks decide.
+    last_server_restored: bool,
     pub punishments: Vec<bridge::PunishmentView>,
     pub rules: Vec<bridge::RuleView>,
     pub rules_query: String,
@@ -725,6 +730,8 @@ impl LauncherUI {
             account_loaded: HashSet::new(),
             dm_loaded: false,
             news_loaded: false,
+            ui_state: crate::ui_state::load(),
+            last_server_restored: false,
             punishments: Vec::new(),
             rules: Vec::new(),
             rules_query: String::new(),
@@ -979,6 +986,32 @@ impl LauncherUI {
         // the new one replaces it.
 
         self.servers = servers;
+
+        // Back where the player left off, once, on the first list.
+        if !self.last_server_restored {
+            self.last_server_restored = true;
+            let saved = self.ui_state.last_server;
+            if self.page == Page::Servers {
+                if let Some(id) = saved.filter(|id| self.servers.iter().any(|s| &s.id == id)) {
+                    self.page = Page::ServerDetail(id);
+                }
+            }
+        }
+    }
+
+    /// Remembers the open server for the next start. Cheap enough for every
+    /// frame: it only compares.
+    pub fn note_open_server(&mut self) {
+        let open = match self.page {
+            Page::ServerDetail(id)
+            | Page::ServerMods(id)
+            | Page::ServerModCatalog(id)
+            | Page::ServerSettings(id) => Some(id),
+            _ => None,
+        };
+        if open.is_some() && open != self.ui_state.last_server {
+            self.ui_state.last_server = open;
+        }
     }
 
     /// Every removal hands the texture back to GPUI, whose atlas never evicts
@@ -1252,6 +1285,18 @@ impl LauncherUI {
                 // a second game in the same folder.
                 let s = self.sync.entry(server_id).or_default();
                 s.heading = Some(SyncHeading::Launching);
+            }
+            MessageToFrontend::LaunchStep { server_id, step } => {
+                let s = self.sync.entry(server_id).or_default();
+                // A cancel already under way keeps its heading.
+                if s.heading != Some(SyncHeading::Cancelling) {
+                    s.heading = Some(match step {
+                        bridge::LaunchStep::Verifying => {
+                            SyncHeading::Stage(SyncStage::CheckingFiles)
+                        }
+                        bridge::LaunchStep::Starting => SyncHeading::Launching,
+                    });
+                }
             }
             MessageToFrontend::LaunchCancelled { server_id } => {
                 let s = self.sync.entry(server_id).or_default();
