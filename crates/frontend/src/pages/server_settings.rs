@@ -12,8 +12,8 @@ use i18n::t;
 use uuid::Uuid;
 
 pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
-    // Список рантаймов живёт у мастера и стоит запроса к Mojang, поэтому
-    // спрашивается один раз на вход, а не на каждый кадр.
+    // The runtime list lives on the master and costs it a request to Mojang, so
+    // it is asked for once per visit, not every frame.
     if let std::collections::hash_map::Entry::Vacant(slot) = ui.java_options.entry(server_id) {
         slot.insert(Vec::new());
         ui.backend
@@ -48,9 +48,9 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 ))
                 .child(settings_panel(ui, server_id, cx)),
         )
-        // Список рантаймов рисуется здесь, а не внутри своей строки: GPUI
-        // кладёт элементы в порядке дерева, и строка «Папка» ложилась поверх
-        // раскрытого списка.
+        // The runtime list is drawn here rather than inside its own row: GPUI
+        // lays elements out in tree order, and the "Folder" row landed on top of
+        // the open list.
         .children(super::java_picker::dialog(ui, server_id, cx))
         .children(super::jvm_flags::dialog(ui, server_id, cx))
         .into_any_element()

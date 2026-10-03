@@ -209,7 +209,7 @@ fn badge(unread: i64) -> AnyElement {
 }
 
 fn thread(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    // По ссылке: клон переписки копировал каждое сообщение на каждом кадре.
+    // By reference: cloning the conversation copied every message on every frame.
     let Some(open) = ui.dm_open.as_ref() else {
         return panel()
             .flex_1()

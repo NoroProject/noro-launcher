@@ -66,9 +66,9 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     d.child(empty_hint())
                 }),
         )
-        // Иконки и карточка профиля разными строками. В одну они не помещались:
-        // на пять кнопок и имя в сайдбаре 280 px, и имя схлопывалось в две
-        // точки — единственное, что человек там ищет.
+        // Icons and the profile card on separate rows. They didn't fit on one: five
+        // buttons and a name in a 280 px sidebar squeezed the name down to two dots,
+        // which is the one thing people look for there.
         .child(
             div()
                 .border_t_1()
@@ -78,8 +78,8 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .flex()
                 .flex_col()
                 .gap(px(4.))
-                // Свёрнутый сайдбар: колокольчик остаётся, иначе уведомления
-                // из него недостижимы вовсе.
+                // Collapsed sidebar: the bell stays, or notifications can't be reached
+                // from it at all.
                 .child(nav_row(ui, collapsed, cx))
                 .when(!collapsed, |d| d.child(user_card(ui, cx)))
                 .when(collapsed, |d| {

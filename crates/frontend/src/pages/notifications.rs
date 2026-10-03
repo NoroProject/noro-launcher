@@ -126,8 +126,8 @@ pub fn panel(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                     .absolute()
                     .left(px(16.))
                     .bottom(px(16.))
-                    // Высота по содержимому: фиксированная растягивала панель
-                    // от колокольчика до верха окна ради одной строки «пусто».
+                    // Height by content: a fixed one stretched the panel from the bell to
+                    // the top of the window for a single "empty" line.
                     .w(px(420.))
                     .max_h(px(520.))
                     .flex()
@@ -301,10 +301,10 @@ fn card(n: &Notification, cx: &mut Cx) -> AnyElement {
                 }
             }
             if let Some(href) = &link {
-                // Путь в карточке — это страница сайта, а адреса сайта у
-                // лаунчера нет: впечатан только мастер. Он и переводит на
-                // сайт, как при входе через браузер. Раньше путь клеился к
-                // адресу мастера, и ссылка вела на API вместо страницы.
+                // The path in a card is a website page, and the launcher has no website
+                // address: only the master is baked in. The master redirects to the site,
+                // as it does for signing in through the browser. The path used to be glued
+                // to the master address, and the link led to the API instead of the page.
                 let url = if href.starts_with("http") {
                     href.clone()
                 } else {

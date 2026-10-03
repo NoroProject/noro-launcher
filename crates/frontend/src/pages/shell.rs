@@ -19,8 +19,8 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
     let dialog = impersonate_dialog::dialog(ui, cx);
     let log_dialog = log_request_dialog::dialog(ui, cx);
     let remote_dialog = remote_action_dialog::dialog(ui, cx);
-    // Поверх всего окна, а не области контента: панель висит над сайдбаром, из
-    // которого её и открыли.
+    // Over the whole window, not the content area: the panel hangs over the
+    // sidebar it was opened from.
     let notifications = notifications::panel(ui, cx);
 
     div()

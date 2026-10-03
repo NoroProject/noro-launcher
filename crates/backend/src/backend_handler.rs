@@ -925,21 +925,21 @@ impl BackendState {
                 // twice per login and again on every reconnect.
                 self.ctx.send(MessageToFrontend::LoginSuccess { user });
             }
-            // Лента и счётчик живут на мастере; здесь остаётся показать.
+            // The feed and the counter live on the master; all that is left is to show them.
             ServerWsMsg::NotificationPush {
                 notification,
                 unread,
                 os_toast,
             } => crate::notifications::arrived(&self.ctx, notification, unread, os_toast),
-            // Набор мог измениться на другой машине игрока.
+            // The set may have changed on another of the player's machines.
             ServerWsMsg::PersonalContentChanged { server_id } => {
                 crate::personal::request(&self.ctx, server_id)
             }
             ServerWsMsg::DirectMessage { message } => {
                 let mine = self.user.as_ref().map(|u| u.id) == Some(message.author_id);
                 self.ctx.send(MessageToFrontend::DmArrived {
-                    // Собеседник — это не автор: своё же сообщение, пришедшее с
-                    // другого клиента, относится к переписке с получателем.
+                    // The peer is not the author: your own message arriving from another
+                    // client belongs to the conversation with its recipient.
                     peer: message.author_id,
                     message: bridge::DmMessageView {
                         author_name: message.author_name,

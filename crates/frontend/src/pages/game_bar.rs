@@ -64,8 +64,8 @@ fn console_button(active: bool, cx: &mut Cx) -> AnyElement {
         .flex_none()
         .rounded(px(R_SM))
         .cursor_pointer()
-        // Включённая иконка-кнопка подсвечивается кремовым, как в сайдбаре:
-        // магента здесь была третьим значением «включено» на один интерфейс.
+        // An active icon button lights up cream, as in the sidebar: magenta here was
+        // a third way of saying "on" in a single interface.
         .bg(if active {
             rgba((CTA << 8) | 0x18)
         } else {

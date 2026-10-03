@@ -17,8 +17,9 @@ concurrency:
 
 env:
   CARGO_INCREMENTAL: 0
-  # GPUI links against these on Linux for its X11 and Wayland backends.
-  LINUX_DEPS: libxkbcommon-dev libxkbcommon-x11-dev
+  # GPUI links against these on Linux: xkbcommon for its X11 and Wayland
+  # backends, fontconfig and freetype for text.
+  LINUX_DEPS: libxkbcommon-dev libxkbcommon-x11-dev libfontconfig-dev libfreetype-dev
 
 jobs:
   rust:

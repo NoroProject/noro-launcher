@@ -78,9 +78,9 @@ fn page_header(
                 .text_color(rgb(TEXT_MUTED))
                 .child(i18n::t_args("mods-active-count", &args))
         })
-        // Не кнопка во всю подпись, а тихое действие рядом со счётчиком:
-        // предложить мод — это редкий шаг, и спорить по весу с самим списком
-        // модов ему незачем.
+        // Not a button across the caption but a quiet action next to the counter:
+        // suggesting a mod is a rare step and has no business competing with the
+        // list of mods itself.
         .when(allow_suggest, |d| {
             d.child(
                 div()
@@ -104,8 +104,8 @@ fn page_header(
                             .child(t("content-mode-suggest")),
                     )
                     .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                        // Режим определяется входом, а не тумблером на экране:
-                        // отсюда приходят предложить, со вкладки «Моды» — поставить.
+                        // The mode comes from the way in, not a toggle on screen: people come
+                        // from here to suggest, and from the "Mods" tab to install.
                         this.content_mode = crate::state::ContentMode::Suggest;
                         this.page = crate::state::Page::ServerModCatalog(server_id);
                         cx.notify();
@@ -162,9 +162,9 @@ fn mod_row(ui: &LauncherUI, server_id: Uuid, m: &OptionalModInfo, cx: &mut Cx) -
         .child(mod_icon(ui, m, color))
         .child(mod_text(m, None, 60))
         .child(div().flex_1())
-        // Категория — подпись, а не плашка. Плашка рядом с плашкой «по праву» и
-        // тумблером превращала правый край строки в набор разноцветных кнопок,
-        // из которых нажимается ровно одна.
+        // The category is a caption, not a badge. A badge next to the "by right"
+        // badge and the toggle turned the right edge of the row into a set of
+        // coloured buttons of which exactly one can be pressed.
         .child(
             div()
                 .flex_shrink_0()
@@ -172,8 +172,8 @@ fn mod_row(ui: &LauncherUI, server_id: Uuid, m: &OptionalModInfo, cx: &mut Cx) -
                 .text_color(rgb(color))
                 .child(m.category.clone()),
         )
-        // Мод под правом: значок вместо слов. Его видят единицы, а место он
-        // занимал у всех.
+        // A mod granted by a role: an icon instead of words. Few people see it, yet
+        // it took room from everyone.
         .when(m.limited, |d| {
             d.child(
                 div()

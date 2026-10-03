@@ -108,11 +108,11 @@ pub fn overlay(ui: &LauncherUI) -> Option<AnyElement> {
         return None;
     }
     let (avg, worst) = ui.perf.timings();
-    // Ниже десяти кадров в секунду окно просто стоит: GPUI рисует по событию, и
-    // в покое кадров нет вовсе. Цифра «2 fps» там пугает на ровном месте, а
-    // смотреть надо на время кадра.
+    // Below ten frames a second the window is simply idle: GPUI draws on events,
+    // and at rest there are no frames at all. A "2 fps" reading there alarms for
+    // nothing; the frame time is what to look at.
     let idle = ui.perf.fps < 10;
-    // Тревожно другое: экран, который перерисовывается сам по себе.
+    // What is alarming is a screen that keeps redrawing on its own.
     let busy = ui.perf.msgs_per_sec > 2 || (ui.perf.fps > 50 && avg > 16.0);
 
     Some(

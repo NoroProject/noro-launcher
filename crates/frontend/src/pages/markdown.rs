@@ -142,9 +142,9 @@ fn flush(
         return;
     }
 
-    // Основной шрифт, а не пиксельный: описание мода — это абзацы сплошного
-    // текста, и моноширинный пиксель на них читается как распечатка лога.
-    // Пиксельный остаётся заголовкам и подписям, где его и ждут.
+    // The body font, not the pixel one: a mod description is paragraphs of running
+    // text, and monospaced pixels make it read like a printed log. The pixel font
+    // stays with headings and captions, where it is expected.
     let mut block = div()
         .font_family(FONT)
         .child(StyledText::new(text).with_highlights(highlights));

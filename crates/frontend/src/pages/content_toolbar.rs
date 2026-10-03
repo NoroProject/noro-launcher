@@ -20,8 +20,8 @@ use uuid::Uuid;
 
 /// Browse / Installed, content type, and the mode switch.
 pub fn toolbar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
-    // Одна строка, а не три: раньше вкладки, типы контента и подпись про режим
-    // занимали треть экрана над списком, ради которого сюда и заходят.
+    // One row, not three: tabs, content types and the mode caption used to take
+    // a third of the screen above the list people come here for.
     div()
         .flex()
         .items_center()

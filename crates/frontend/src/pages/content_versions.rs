@@ -37,7 +37,7 @@ pub fn dialog(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> Option<AnyElemen
         .get(&(provider.clone(), project_id.clone()))
         .cloned();
 
-    // Подходящие вперёд и, если не попросили обратного, только они.
+    // Fitting versions first and, unless asked otherwise, only those.
     let usable: Vec<&ContentVersionInfo> = versions
         .as_ref()
         .map(|list| {
@@ -151,10 +151,10 @@ fn header(title: &str, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// Строка под шапкой: сколько версий скрыто и как их показать.
+/// The line under the header: how many versions are hidden and how to show them.
 ///
-/// Без неё фильтр был бы обманом — список выглядел бы полным, а мода «под
-/// другие версии» в нём просто нет.
+/// Without it the filter would be a lie: the list would look complete, and a
+/// mod "for other versions" simply wouldn't be in it.
 fn filter_note(ui: &LauncherUI, hidden: usize, cx: &mut Cx) -> Option<AnyElement> {
     if hidden == 0 && !ui.content_versions_all {
         return None;

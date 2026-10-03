@@ -35,8 +35,8 @@ const MAX_UPDATE_BATCH: usize = 256;
 
 impl gpui::Render for LauncherUI {
     fn render(&mut self, _window: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
-        // Первым делом в кадре: счётчик должен видеть и те кадры, которые
-        // ничего не рисуют.
+        // First thing in the frame: the counter has to see frames that draw
+        // nothing as well.
         let sent = self.backend.sent_count();
         self.perf.frame(sent);
 

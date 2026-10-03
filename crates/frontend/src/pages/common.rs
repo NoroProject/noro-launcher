@@ -84,10 +84,10 @@ pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             },
             cx,
         ))
-        // Свой контент — отдельная вкладка, и только там, где сборка его
-        // разрешает. Раньше в каталог попадали кнопкой «предложить мод» на
-        // чужом экране: место для того, чтобы поставить себе шейдер, человек
-        // там не ищет.
+        // Your own content is a separate tab, and only where the build allows it.
+        // The catalog used to be reached through a "suggest a mod" button on another
+        // screen: that is not where anyone looks for a place to install a shader for
+        // themselves.
         .when(
             sid.is_some_and(|id| ui.allow_personal_content.get(&id).copied().unwrap_or(false)),
             |d| {

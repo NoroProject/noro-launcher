@@ -7,9 +7,10 @@
 [build.env]
 passthrough = ["NORO_MASTER_URL", "NORO_SIGNING_PUBKEY", "NORO_SENTRY_DSN", "NORO_RELEASE"]
 
-# GPUI links against xkbcommon for its X11 and Wayland backends.
+# GPUI links against xkbcommon for its X11 and Wayland backends and against
+# fontconfig and freetype for text.
 [target.aarch64-unknown-linux-gnu]
 pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
-    "apt-get update && apt-get install --assume-yes libxkbcommon-dev:$CROSS_DEB_ARCH libxkbcommon-x11-dev:$CROSS_DEB_ARCH",
+    "apt-get update && apt-get install --assume-yes libxkbcommon-dev:$CROSS_DEB_ARCH libxkbcommon-x11-dev:$CROSS_DEB_ARCH libfontconfig-dev:$CROSS_DEB_ARCH libfreetype-dev:$CROSS_DEB_ARCH",
 ]

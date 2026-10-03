@@ -23,19 +23,12 @@ i18n = { workspace = true }
 sys-locale = { workspace = true }
 
 # The splash is drawn with the same GPUI as the launcher: while core downloads,
-# that window is everything the player sees. Keep the revision identical to the
-# one frontend pins, or the build ends up with two incompatible copies.
-# `x11` and `wayland` have to be named: Zed's workspace pulls gpui_linux in
-# with default features off, and without them GPUI on Linux has no window
-# backend and panics on start. Linking needs libxkbcommon-dev and
-# libxkbcommon-x11-dev.
-gpui = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1", features = ["font-kit", "runtime_shaders", "x11", "wayland"] }
+# that window is everything the player sees.
+gpui = { workspace = true }
+gpui_platform = { workspace = true }
 rust-embed = "8"
-parking_lot = "0.12"
+parking_lot = { workspace = true }
 
 [build-dependencies]
 winres = "0.1"
 
-[target."cfg(windows)".dependencies]
-windows-sys = { version = "0.60", features = ["Win32_System_Console"] }

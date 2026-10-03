@@ -45,8 +45,8 @@ fn load_once(ui: &mut LauncherUI) {
         AccountTab::Tickets => ("tickets", MessageToBackend::RequestTickets),
         AccountTab::Rules => ("rules", MessageToBackend::RequestRules),
     };
-    // По флагу, а не по пустоте списка: пустой ответ — тоже ответ, и
-    // отличить его от «ещё не спрашивали» содержимое не позволяет.
+    // By the flag, not by an empty list: an empty answer is an answer too, and
+    // the contents can't tell it apart from "not asked yet".
     if ui.account_requested.insert(key) {
         ui.backend.send(message);
     }

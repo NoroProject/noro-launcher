@@ -140,7 +140,7 @@ pub struct TicketView {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TicketMessageView {
     pub author: String,
-    /// Role the author held when they wrote, e.g. «Хелпер». Staff only.
+    /// Role the author held when they wrote, e.g. «Helper». Staff only.
     pub role: Option<String>,
     pub content: String,
     pub at: i64,
@@ -567,7 +567,7 @@ pub enum MessageToFrontend {
         server_id: Uuid,
         mods: Vec<OptionalModInfo>,
         allow_suggestions: bool,
-        /// Разрешает ли сборка ставить своё. Решает оператор, не игрок.
+        /// Whether the build allows adding your own content. The operator decides, not the player.
         allow_personal: bool,
         installed_files: Vec<String>,
     },

@@ -498,7 +498,6 @@ dependencies = [
  "keyring",
  "libc",
  "mc_mod_utils",
- "memchr",
  "mod_link",
  "notify-rust",
  "once_cell",
@@ -514,13 +513,10 @@ dependencies = [
  "sha1",
  "sha2 0.10.9",
  "sys-locale",
- "thiserror 2.0.20",
  "tokio",
  "tokio-tungstenite",
- "tokio-util",
  "tracing",
  "tracing-subscriber",
- "url",
  "urlencoding",
  "uuid 1.25.0",
  "walkdir",
@@ -2186,7 +2182,6 @@ dependencies = [
  "i18n",
  "image",
  "open",
- "parking_lot",
  "pulldown-cmark",
  "reqwest",
  "rust-embed",
@@ -4093,7 +4088,6 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 name = "noro_core"
 version = "2.0.10"
 dependencies = [
- "anyhow",
  "backend",
  "bridge",
  "dirs 5.0.1",
@@ -4103,7 +4097,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
- "tracing-subscriber",
  "winres",
 ]
 
@@ -4127,7 +4120,6 @@ dependencies = [
  "sha2 0.10.9",
  "sys-locale",
  "tokio",
- "windows-sys 0.60.2",
  "winres",
 ]
 

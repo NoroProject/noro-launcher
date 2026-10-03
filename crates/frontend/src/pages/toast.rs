@@ -61,10 +61,10 @@ fn card(toast: &Toast, cx: &mut Cx) -> AnyElement {
         .border_1()
         .border_color(rgb(BORDER))
         .flex()
-        // Уровень читается по значку и заголовку. Цветная полоса слева, которая
-        // была здесь до этого, вылезала за скруглённый угол карточки: GPUI
-        // обрезает содержимое по радиусу не всегда, и держаться за украшение,
-        // которое иногда торчит, незачем.
+        // The level reads from the icon and the title. The coloured strip on the
+        // left that used to be here stuck out past the card's rounded corner:
+        // GPUI doesn't always clip content to the radius, and an ornament that
+        // sometimes pokes out isn't worth keeping.
         .child(
             div()
                 .flex_1()

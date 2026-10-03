@@ -34,6 +34,14 @@ translation strings, so a new UI key is added there, not here.
 
 ## Running locally
 
+On Linux, GPUI links against a few system libraries. On Debian or Ubuntu:
+
+```bash
+sudo apt-get install libxkbcommon-dev libxkbcommon-x11-dev libfontconfig-dev libfreetype-dev
+```
+
+Then:
+
 ```bash
 cargo run -p noro_core
 ```
@@ -88,11 +96,14 @@ master serves it.
 
 ## Releasing
 
-The monorepo helper updates the manifest, commits, tags and pushes the release:
+Bump `version` in the root `Cargo.toml`, commit, then tag and push:
 
 ```bash
-../scripts/release.sh --launcher 2.0.6
+git tag launcher-v2.0.6
+git push origin launcher-v2.0.6
 ```
+
+Both `launcher-v2.0.6` and `v2.0.6` work as tag names.
 
 `release-launcher.yml` builds five targets — Linux x86_64 and aarch64, macOS
 Intel and Apple Silicon, Windows x86_64 — and attaches them to a GitHub Release.
@@ -133,7 +144,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI runs exactly these three, and clippy warnings are errors there.
+CI runs the same three on Linux, with clippy warnings as errors, and runs
+clippy on Windows and macOS as well, so platform-specific code compiles before
+a release does. Pull requests from forks run on GitHub-hosted runners.
 
 The toolchain is pinned in `rust-toolchain.toml`. It only takes effect through
 rustup — if `rustc` comes from Homebrew, the file is ignored and you will drift

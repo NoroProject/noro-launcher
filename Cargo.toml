@@ -25,6 +25,18 @@ bridge = { path = "crates/bridge" }
 mod_link = { path = "crates/mod_link" }
 backend = { path = "crates/backend" }
 
+# GPUI from the Zed repository, one pin for the launcher and the bootstrapper's
+# splash: two revisions would build two incompatible copies. Pinned to a commit
+# that builds on the stable toolchain (main uses the unstable cold_path).
+#
+# font-kit + runtime_shaders is what makes the bundled fonts load through the
+# AssetSource. `x11` and `wayland` have to be named: Zed's workspace pulls
+# gpui_linux in with default features off, and without them GPUI on Linux has
+# no window backend and panics on start. Linking needs libxkbcommon-dev,
+# libxkbcommon-x11-dev, libfontconfig-dev and libfreetype-dev.
+gpui = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1", features = ["font-kit", "runtime_shaders", "x11", "wayland"] }
+
 # Async
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["io"] }
@@ -41,7 +53,6 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Errors and logging
 anyhow = "1"
-thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sentry = { version = "0.34", default-features = false, features = [
@@ -96,29 +107,27 @@ dirs = "5"
 # The platform backend is selected per target in crates/backend. Without one,
 # keyring 3 quietly falls back to an in-memory mock.
 keyring = { version = "3", default-features = false }
-url = "2"
 urlencoding = "2"
-# Системные плашки. `z` — zbus, чистый Rust: фича `d` притащила бы libdbus и
-# сломала cross-сборку под aarch64. На macOS и Windows бэкенд свой, и выбор
-# здесь их не касается.
+# System notifications. `z` is zbus, pure Rust: the `d` feature would pull in
+# libdbus and break the cross build for aarch64. macOS and Windows have their
+# own backends, and the choice here doesn't affect them.
 notify-rust = { version = "4", default-features = false, features = ["z"] }
 open = "5"
 discord-rich-presence = "0.2.4"
-memchr = "2"
 regex = "1"
 # The OS language on every platform. `LANG` alone is unset on Windows, so
 # Russian-speaking Windows players started in English.
 sys-locale = "0.3"
 
-# Отладочная сборка: свой код без оптимизаций, чужой — с ними.
+# Debug build: our own code without optimisations, dependencies with them.
 #
-# GPUI, разбор картинок и раскладка текста в debug работают в разы медленнее
-# оптимизированных, и цена видна прямо в окне: список модов с двумя десятками
-# иконок выдавал 6 fps при 311 мс на кадр, хотя тот же экран без картинок —
-# 30 мс. Это не свойство интерфейса, это отсутствие оптимизаций у зависимостей.
+# GPUI, image decoding and text layout run many times slower in debug, and the
+# cost shows right in the window: a mod list with a couple of dozen icons ran
+# at 6 fps, 311 ms a frame, while the same screen without images took 30 ms.
+# That isn't the interface, it's unoptimised dependencies.
 #
-# Зависимости собираются один раз и потом лежат в кеше, так что на скорость
-# правок это не влияет: перекомпилируется только код лаунчера.
+# Dependencies are built once and then cached, so this doesn't slow down
+# edits: only the launcher's own code is recompiled.
 [profile.dev]
 opt-level = 1
 

@@ -161,10 +161,10 @@ pub struct Toast {
 }
 
 impl Toast {
-    /// Сколько плашка живёт.
+    /// How long the toast stays.
     ///
-    /// Чем хуже новость, тем дольше: «скин загружен» читается краем глаза, а
-    /// причину, по которой не запустилась игра, человек ещё и перечитывает.
+    /// The worse the news, the longer: "skin uploaded" is read at a glance, while
+    /// the reason the game didn't start is something people read twice.
     pub fn lifetime(&self) -> std::time::Duration {
         let secs = match self.level {
             NotifLevel::Error => 9,
@@ -310,15 +310,15 @@ pub struct LauncherUI {
     pub logs: HashMap<Uuid, std::collections::VecDeque<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
     pub installed_files: HashMap<Uuid, Vec<String>>,
-    /// Имена того, что сборка уже везёт, приведённые к виду для сравнения.
+    /// Names of what the build already ships, normalised for comparison.
     ///
-    /// Считается один раз на приход манифеста: карточка каталога спрашивает
-    /// «это уже стоит?» на каждом кадре, и приводить к общему виду сотни имён
-    /// каждый раз — это и есть тормоза списка.
+    /// Computed once per manifest: a catalog card asks "is this installed?" every
+    /// frame, and normalising hundreds of names each time is exactly what made the
+    /// list slow.
     pub installed_keys: HashMap<Uuid, std::collections::HashSet<String>>,
     pub allow_mod_suggestions: HashMap<Uuid, bool>,
-    /// Разрешает ли сборка свой контент. Вкладки «Моды» без этого нет вовсе:
-    /// кнопка, ведущая к отказу, хуже её отсутствия.
+    /// Whether the build allows content of your own. Without it there is no
+    /// "Mods" tab at all: a button that leads to a refusal is worse than none.
     pub allow_personal_content: HashMap<Uuid, bool>,
     pub suggested_mods: HashSet<String>,
     pub background_images: HashMap<Uuid, Arc<RenderImage>>,
@@ -328,31 +328,31 @@ pub struct LauncherUI {
     pub news_excerpts: HashMap<Uuid, gpui::SharedString>,
     news_images_loading: HashSet<Uuid>,
     pub server_icons: HashMap<Uuid, Arc<RenderImage>>,
-    /// Уже разобранные пиксели, а не сжатый файл: `Image` уходит в кеш ассетов
-    /// GPUI и разбирается там при отрисовке, и на списке из двадцати иконок это
-    /// стоило 311 мс на кадр против 30 мс на том же экране без картинок.
+    /// Decoded pixels rather than the compressed file: an `Image` goes to GPUI's
+    /// asset cache and is decoded there while drawing, and on a list of twenty
+    /// icons that cost 311 ms a frame against 30 ms on the same screen without them.
     pub optional_mod_icons: HashMap<String, Arc<RenderImage>>,
     background_image_urls: HashMap<Uuid, String>,
     server_icon_urls: HashMap<Uuid, String>,
     background_loading: HashSet<Uuid>,
     icons_loading: HashSet<Uuid>,
     optional_mod_icons_loading: HashSet<String>,
-    /// Картинки, которых нет: 404, оборванная ссылка, отказ провайдера.
+    /// Images that aren't there: a 404, a dead link, a provider refusing.
     ///
-    /// Без этого списка неудача ничем не отличалась от «ещё не пробовали»:
-    /// запрос уходил заново на каждом кадре, а завершение каждой попытки
-    /// дёргало перерисовку — то есть следующий кадр, то есть следующую попытку.
-    /// Десяток битых иконок в выдаче каталога так укладывал весь интерфейс.
+    /// Without this list a failure looked just like "not tried yet": the request
+    /// went out again every frame, and each finished attempt triggered a redraw,
+    /// which meant the next frame and the next attempt. A dozen broken icons in
+    /// the catalog brought the whole interface down that way.
     optional_mod_icons_failed: HashSet<String>,
-    /// То же для фонов и значков сборок, по адресу картинки.
+    /// The same for build backgrounds and icons, by image URL.
     image_failed: HashSet<String>,
 
     pub update_available: Option<LauncherVersion>,
     pub updating: bool,
     /// The update download in flight; its progress is read from here.
     pub update_modal: Option<bridge::ModalAction>,
-    /// Стопка плашек, старые сверху. Одна на всё окно теряла предыдущую:
-    /// синхронизация умеет сообщить о трёх вещах подряд, и видно было третью.
+    /// A stack of toasts, oldest on top. A single one for the whole window lost
+    /// the previous message: sync can report three things in a row, and only the third showed.
     pub toasts: Vec<Toast>,
     next_toast_id: u64,
     pub config: UiConfig,
@@ -387,12 +387,12 @@ pub struct LauncherUI {
     pub content_versions: HashMap<(String, String), Vec<bridge::ContentVersionInfo>>,
     /// Which project's version list is open, if any.
     pub content_picker: Option<(String, String)>,
-    /// Показывать в списке версий и те, что сборке не подходят.
+    /// Also list versions that don't fit the build.
     ///
-    /// По умолчанию выключено: у популярного мода полсотни версий, из них
-    /// подходит одна-две, и искать их глазами среди строк «не выпущена под эту
-    /// сборку» — не выбор, а поиск. Но список не прячется совсем: увидеть, что
-    /// мод вообще существует под другие версии, бывает важно.
+    /// Off by default: a popular mod has fifty versions, one or two of which fit,
+    /// and finding them among rows of "not released for this build" is a search,
+    /// not a choice. The list isn't hidden entirely though: seeing that the mod
+    /// exists for other versions at all can matter.
     pub content_versions_all: bool,
     pub content_kind: schema::personal::ContentKind,
     pub content_mode: ContentMode,
@@ -403,12 +403,12 @@ pub struct LauncherUI {
     pub content_show_installed: bool,
     /// `relevance` · `downloads` · `follows` · `newest` · `updated`.
     pub content_sort: String,
-    /// Сборка, для которой каталог уже спрашивали, и висит ли запрос сейчас.
+    /// The build the catalog was already requested for, and whether a request is in flight.
     ///
-    /// Без этих двух полей условие «список пуст — спроси» срабатывало на
-    /// каждом кадре: пустая выдача или ещё не пришедший ответ давали шестьдесят
-    /// запросов в секунду, и лагал от этого не только лаунчер, но и мастер, —
-    /// он на каждый из них ходил в Modrinth.
+    /// Without these two fields "the list is empty, ask" fired every frame: an
+    /// empty result or an answer still on its way meant sixty requests a second,
+    /// which lagged not only the launcher but the master too, since it went to
+    /// Modrinth for each one.
     pub content_requested_for: Option<Uuid>,
     pub content_searching: bool,
 
@@ -427,12 +427,12 @@ pub struct LauncherUI {
 
     // ── The player's own pages ──────────────────────────────────────────────
     pub account_tab: AccountTab,
-    /// Какие списки аккаунта уже спрашивали.
+    /// Which account lists were already requested.
     ///
-    /// Проверка «список пуст — спроси» стоит в рендере, то есть срабатывает на
-    /// каждом кадре. У игрока без наказаний, без обращений или до ответа
-    /// мастера это давало запрос на кадр — шестьдесят в секунду, каждый со
-    /// своей перерисовкой по ответу. Отсюда и «лагают все списки».
+    /// The "list is empty, ask" check sits in render, so it runs every frame. For
+    /// a player with no punishments or tickets, or before the master answered,
+    /// that was a request per frame, sixty a second, each with its own redraw on
+    /// the reply. Hence "every list lags".
     pub account_requested: HashSet<&'static str>,
     pub punishments: Vec<bridge::PunishmentView>,
     pub rules: Vec<bridge::RuleView>,
@@ -442,8 +442,8 @@ pub struct LauncherUI {
     /// The ticket that is open, with its thread.
     pub ticket_open: Option<(Uuid, String, String, Vec<bridge::TicketMessageView>)>,
     pub dm_threads: Vec<bridge::DmThreadView>,
-    /// Список переписок уже спрашивали. Проверка по пустому списку не годится:
-    /// она стоит в рендере и у аккаунта без переписок давала запрос на кадр.
+    /// The conversation list was already requested. Checking for an empty list
+    /// won't do: it sits in render and asked every frame for an account with none.
     pub dm_requested: bool,
     /// The conversation that is open.
     pub dm_open: Option<bridge::DmThreadOpen>,
@@ -784,9 +784,9 @@ impl LauncherUI {
                 }
                 match result {
                     Ok(image) => {
-                        // Старую текстуру возвращаем GPUI: атлас держит каждый
-                        // `RenderImage` по id и сам ничего не вытесняет, так что
-                        // смена фона иначе оставляла бы за собой мегабайты.
+                        // Hand the old texture back to GPUI: the atlas keeps every
+                        // `RenderImage` by id and never evicts one on its own, so
+                        // changing the background would leave megabytes behind.
                         if let Some(stale) = state.background_images.insert(server_id, image) {
                             if Arc::strong_count(&stale) == 1 {
                                 cx.drop_image(stale, None);
@@ -794,9 +794,9 @@ impl LauncherUI {
                         }
                     }
                     Err(err) => {
-                        // Один раз на адрес. Раньше неудача не запоминалась, и
-                        // следующий кадр качал снова — вместе с новым тостом
-                        // об ошибке на каждую попытку.
+                        // Once per URL. A failure used not to be remembered, and
+                        // the next frame downloaded again, with a new error toast
+                        // for every attempt.
                         state.image_failed.insert(expected_url);
                         let mut args = i18n::FluentArgs::new();
                         args.set("reason", err.to_string());
@@ -857,8 +857,8 @@ impl LauncherUI {
         .detach();
     }
 
-    /// Сколько картинок так и не загрузилось. Оверлею — чтобы отличить
-    /// «иконок нет» от «иконки не приходят».
+    /// How many images never loaded. For the overlay, to tell "no icons"
+    /// from "icons aren't arriving".
     pub fn failed_image_count(&self) -> usize {
         self.optional_mod_icons_failed.len() + self.image_failed.len()
     }
@@ -904,8 +904,8 @@ impl LauncherUI {
                             }
                         }
                         state.optional_mod_icons.insert(url, image);
-                        // Перерисовка только когда есть что показать: иначе
-                        // неудача сама вызывает кадр, который её повторит.
+                        // Redraw only when there is something to show: otherwise
+                        // a failure triggers the very frame that repeats it.
                         cx.notify();
                     }
                     Err(e) => {
@@ -992,9 +992,9 @@ impl LauncherUI {
     pub fn on_message(&mut self, msg: MessageToFrontend, cx: &mut Context<Self>) {
         match msg {
             MessageToFrontend::LoginSuccess { user } => {
-                // Счётчик у колокольчика обязан быть верным до того, как панель
-                // откроют: непрочитанное, пришедшее офлайн, иначе не видно
-                // вовсе.
+                // The bell counter has to be right before the panel is opened:
+                // otherwise anything unread that arrived while offline would
+                // never show.
                 self.backend.send(MessageToBackend::RequestNotifications {
                     offset: 0,
                     unread_only: false,
@@ -1526,9 +1526,9 @@ impl LauncherUI {
             MessageToFrontend::RulesLoaded { items } => self.rules = items,
             MessageToFrontend::TicketsLoaded { items } => self.tickets = items,
             MessageToFrontend::TicketLoaded { id, messages, .. } => {
-                // Тему и статус несёт список: ручка сообщений отдаёт только их
-                // самих, и подставить сюда пустые строки значило бы стереть
-                // заголовок открытого обращения.
+                // Subject and status come from the list: the messages endpoint returns
+                // only the messages, and putting empty strings here would erase the
+                // title of the open ticket.
                 let (subject, status) = self
                     .tickets
                     .iter()
@@ -1575,11 +1575,11 @@ impl LauncherUI {
         cx.notify();
     }
 
-    /// Показать плашку и снять её по таймеру.
+    /// Show a toast and remove it on a timer.
     ///
-    /// Таймер спит в фоне и будит окно один раз — на снятие. Считать оставшееся
-    /// время в самом рендере значило бы держать перерисовку все эти секунды,
-    /// то есть жечь кадры ради затухающей надписи.
+    /// The timer sleeps in the background and wakes the window once, to remove it.
+    /// Counting the time left in render would mean redrawing for all those seconds,
+    /// burning frames on a fading label.
     pub fn notify_toast(&mut self, text: String, level: NotifLevel, cx: &mut Context<Self>) {
         // The same text again doesn't become a second toast: two identical
         // lines side by side look like a glitch. The one up stays longer.
