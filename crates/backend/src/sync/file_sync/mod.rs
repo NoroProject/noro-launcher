@@ -17,9 +17,48 @@ mod state;
 mod tasks;
 
 use clean::clean_extra;
-pub use clean::{excluded_optional_files, is_protected};
+pub use clean::{excluded_optional_files, is_protected, resolve_enabled};
 use stages::STAGE_GROUPS;
 pub use state::{build_state, find_java, installed_state, marker_contents, version_marker};
+
+/// The manifest's files this player should have on disk: client-side, for
+/// this platform, not belonging to an optional mod that is off, and not under
+/// a path the build leaves to the player. Shared by the full sync and the live
+/// one, which must never disagree about what belongs to the instance.
+pub fn effective_files<'a>(
+    manifest: &'a BuildManifest,
+    enabled_optional: &[String],
+    user: &UserProfile,
+) -> Vec<&'a FileEntry> {
+    let excluded = excluded_optional_files(manifest, enabled_optional, user);
+    // What this player added themselves. Their files skip the `unmanaged`
+    // filter below: a build marks `resourcepacks/` unmanaged so it never
+    // touches what the player put there by hand, and that rule would otherwise
+    // also refuse to install the pack they just asked for through the launcher.
+    // Keeping them in `effective` is also what stops `clean_extra` deleting
+    // them on the next pass.
+    let personal: std::collections::HashSet<&str> = manifest
+        .personal_content
+        .iter()
+        .map(|c| c.path.as_str())
+        .collect();
+    // Unmanaged paths are dropped here, not merely spared from cleanup: a file
+    // still in the download set would land on top of the player's edits.
+    manifest
+        .verified_files
+        .iter()
+        .filter(|f| f.side.needed_on_client())
+        .filter(|f| !excluded.contains(&f.path))
+        .filter(|f| {
+            personal.contains(f.path.as_str())
+                || schema::mode_for(&f.path, &manifest.path_rules) != schema::PathMode::Unmanaged
+        })
+        // The build carries the Java runtime and natives for every platform at
+        // once. The other platforms' copies are useless and cost several JREs
+        // worth of download.
+        .filter(|f| f.matches_platform())
+        .collect()
+}
 
 pub async fn sync_server(
     client: &reqwest::Client,
@@ -36,39 +75,16 @@ pub async fn sync_server(
 
     tokio::fs::create_dir_all(instance_dir).await?;
 
-    let excluded = excluded_optional_files(manifest, enabled_optional, user);
-    // What this player added themselves. Their files skip the `unmanaged`
-    // filter below: a build marks `resourcepacks/` unmanaged so it never
-    // touches what the player put there by hand, and that rule would otherwise
-    // also refuse to install the pack they just asked for through the launcher.
-    // Keeping them in `effective` is also what stops `clean_extra` deleting
-    // them on the next pass.
-    let personal: std::collections::HashSet<&str> = manifest
-        .personal_content
-        .iter()
-        .map(|c| c.path.as_str())
-        .collect();
-    // Unmanaged paths are dropped here, not merely spared from cleanup: a file
-    // still in the download set would land on top of the player's edits.
-    let effective: Vec<&FileEntry> = manifest
-        .verified_files
-        .iter()
-        .filter(|f| f.side.needed_on_client())
-        .filter(|f| !excluded.contains(&f.path))
-        .filter(|f| {
-            personal.contains(f.path.as_str())
-                || schema::mode_for(&f.path, &manifest.path_rules) != schema::PathMode::Unmanaged
-        })
-        // The build carries the Java runtime and natives for every platform at
-        // once. The other platforms' copies are useless and cost several JREs
-        // worth of download.
-        .filter(|f| f.matches_platform())
-        .collect();
+    let effective = effective_files(manifest, enabled_optional, user);
 
     let base = super::merge::BaseHashes::load(instance_dir).await;
     let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
 
-    let (tasks, base) = tasks::collect(
+    let tasks::Collected {
+        tasks,
+        base,
+        fetched,
+    } = tasks::collect(
         client,
         instance_dir,
         manifest,
@@ -121,8 +137,8 @@ pub async fn sync_server(
     // Both of these have to happen after the downloads: before them the
     // server's version isn't on disk yet, and recording its hash would lie to
     // the next pass.
-    for f in &effective {
-        crate::sync::keymerge::remember_base(instance_dir, &f.path).await;
+    for rel in &fetched {
+        crate::sync::keymerge::remember_base(instance_dir, rel).await;
     }
     base.save(instance_dir).await;
 

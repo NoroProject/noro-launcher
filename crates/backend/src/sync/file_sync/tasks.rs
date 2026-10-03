@@ -11,7 +11,16 @@ use schema::{ArtifactKind, BuildManifest, FileEntry};
 use std::path::Path;
 use std::sync::Arc;
 
-/// The download list, plus the base hashes the next pass will compare against.
+/// What one pass decided.
+pub(super) struct Collected {
+    pub tasks: Vec<(ArtifactKind, DownloadTask)>,
+    /// The base hashes the next pass will compare against.
+    pub base: BaseHashes,
+    /// Paths that get the server's copy this pass. Only these may become the
+    /// key-merge base once the downloads are on disk.
+    pub fetched: Vec<String>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn collect(
     client: &reqwest::Client,
@@ -22,7 +31,7 @@ pub(super) async fn collect(
     stamp: &str,
     progress: &ProgressFn,
     cancelled: &Arc<dyn Fn() -> bool + Send + Sync>,
-) -> Result<(Vec<(ArtifactKind, DownloadTask)>, BaseHashes)> {
+) -> Result<Collected> {
     progress(
         SyncStage::CheckingFiles,
         0,
@@ -30,6 +39,7 @@ pub(super) async fn collect(
         String::new(),
     );
     let mut tasks: Vec<(ArtifactKind, DownloadTask)> = Vec::new();
+    let mut fetched = Vec::new();
     for (i, f) in effective.iter().enumerate() {
         if cancelled() {
             bail!("cancelled");
@@ -51,11 +61,21 @@ pub(super) async fn collect(
             // Try a key merge before involving a human: edits to different
             // lines of the same config aren't really in conflict.
             plan::Action::Conflict(_)
-                if crate::sync::keymerge::try_merge(client, instance_dir, &f.path, &f.url)
-                    .await
-                    .is_some() =>
+                if crate::sync::keymerge::try_merge(
+                    client,
+                    instance_dir,
+                    &f.path,
+                    &f.url,
+                    &f.sha1,
+                )
+                .await
+                .is_some() =>
             {
                 tracing::info!(path = %f.path, "conflict resolved by key merge");
+                // The server's version is now accounted for. Without moving the
+                // base forward, the next pass sees the same conflict and
+                // fetches the file again, every launch.
+                base.set(&f.path, &f.sha1);
                 false
             }
             plan::Action::Conflict(policy) => match policy {
@@ -78,8 +98,7 @@ pub(super) async fn collect(
         // it to work out which side changed the file.
         if wanted {
             base.set(&f.path, &f.sha1);
-        }
-        if wanted {
+            fetched.push(f.path.clone());
             tasks.push((
                 kind,
                 DownloadTask {
@@ -101,5 +120,9 @@ pub(super) async fn collect(
         }
     }
 
-    Ok((tasks, base))
+    Ok(Collected {
+        tasks,
+        base,
+        fetched,
+    })
 }

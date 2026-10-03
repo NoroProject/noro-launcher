@@ -269,8 +269,11 @@ pub struct OptionalModsSelection {
 }
 
 impl OptionalModsSelection {
-    pub fn for_server(&self, server_id: &Uuid) -> Vec<String> {
-        self.enabled.get(server_id).cloned().unwrap_or_default()
+    /// `None` until the player has toggled something for this server. An empty
+    /// list is a real choice — every optional mod off — and must not fall back
+    /// to the build's defaults.
+    pub fn for_server(&self, server_id: &Uuid) -> Option<Vec<String>> {
+        self.enabled.get(server_id).cloned()
     }
 }
 

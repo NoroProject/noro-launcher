@@ -6,8 +6,22 @@ use schema::{BuildManifest, FileEntry, UserProfile};
 use std::collections::HashSet;
 use std::path::Path;
 
+/// The optional mods that are on, given what the player saved. `None` means
+/// they never chose, so the build's defaults apply; limited mods are never on
+/// by default, the player has to ask for them.
+pub fn resolve_enabled(manifest: &BuildManifest, choice: Option<Vec<String>>) -> Vec<String> {
+    choice.unwrap_or_else(|| {
+        manifest
+            .optional_mods
+            .iter()
+            .filter(|m| m.enabled_by_default && !m.limited)
+            .map(|m| m.name.clone())
+            .collect()
+    })
+}
+
 /// Files belonging to optional mods that are off, or that the player has no
-/// permission for.
+/// permission for. `enabled` is the resolved list from [`resolve_enabled`].
 pub fn excluded_optional_files(
     manifest: &BuildManifest,
     enabled: &[String],
@@ -17,14 +31,7 @@ pub fn excluded_optional_files(
     for m in &manifest.optional_mods {
         let user_enabled = enabled.iter().any(|n| n == &m.name);
         let allowed = user.can_use_optional(&manifest.server_id, &m.name, m.limited);
-        let active = if m.limited {
-            user_enabled && allowed
-        } else if enabled.is_empty() {
-            // Unrestricted mod, player never chose: fall back to the default.
-            m.enabled_by_default
-        } else {
-            user_enabled
-        };
+        let active = user_enabled && (!m.limited || allowed);
         if !active {
             for f in &m.files {
                 excluded.insert(f.clone());

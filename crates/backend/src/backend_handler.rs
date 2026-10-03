@@ -793,7 +793,10 @@ impl BackendState {
             });
             return;
         };
-        let enabled = self.ctx.optional.get().for_server(&server_id);
+        let enabled = crate::sync::file_sync::resolve_enabled(
+            &manifest,
+            self.ctx.optional.get().for_server(&server_id),
+        );
         let connect = self.server_connect(&server_id);
         spawn_sync_and_launch(crate::backend::Launch {
             ctx: self.ctx.clone(),
@@ -845,11 +848,20 @@ impl BackendState {
     /// Silent when there is nothing to update: a "synced" toast for every
     /// little thing teaches the player to ignore it.
     fn live_sync(&self, server_id: uuid::Uuid, manifest: schema::BuildManifest) {
+        // Without a profile there is no telling which limited packs are this
+        // player's to have.
+        let Some(user) = self.user.clone() else {
+            return;
+        };
+        let enabled = crate::sync::file_sync::resolve_enabled(
+            &manifest,
+            self.ctx.optional.get().for_server(&server_id),
+        );
         let dir = self.ctx.dirs.instance(&server_id);
         let client = self.ctx.http.clone();
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
-            match crate::sync::live::apply(&client, &dir, &manifest).await {
+            match crate::sync::live::apply(&client, &dir, &manifest, &enabled, &user).await {
                 Ok(done) if done.nothing() => {}
                 Ok(done) => {
                     // The files on disk changed, but the game still holds the
@@ -881,7 +893,10 @@ impl BackendState {
 
     fn send_optional_mods(&self, server_id: Uuid, manifest: &schema::BuildManifest) {
         use crate::directories::safe_join;
-        let enabled = self.ctx.optional.get().for_server(&server_id);
+        let enabled = crate::sync::file_sync::resolve_enabled(
+            manifest,
+            self.ctx.optional.get().for_server(&server_id),
+        );
         let instance_dir = self.ctx.dirs.instance(&server_id);
         let mods = manifest
             .optional_mods
@@ -893,11 +908,7 @@ impl BackendState {
                     .as_ref()
                     .map(|u| u.can_use_optional(&server_id, &m.name, m.limited))
                     .unwrap_or(!m.limited);
-                let is_enabled = if enabled.is_empty() {
-                    m.enabled_by_default
-                } else {
-                    enabled.contains(&m.name)
-                };
+                let is_enabled = enabled.contains(&m.name);
                 let icon_url = m.icon_url.clone().or_else(|| {
                     m.files
                         .iter()

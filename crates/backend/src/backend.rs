@@ -620,6 +620,22 @@ pub fn spawn_sync_and_launch(req: Launch) {
             return;
         }
 
+        // Delivered packs are switched on the first time they arrive; the
+        // network's prefix pack every time, chat is unreadable without it.
+        crate::sync::live::enable_delivered_packs(
+            &instance_dir,
+            &manifest,
+            &enabled_optional,
+            &user,
+        )
+        .await;
+        if instance_dir
+            .join("resourcepacks/noro-prefixes.zip")
+            .exists()
+        {
+            let _ = crate::sync::live::enable(&instance_dir, "noro-prefixes.zip").await;
+        }
+
         // After the sync but before the launch: the game reads servers.dat at
         // start and rewrites it on exit. A broken server list is no reason to
         // keep the player out, so failures are only logged.

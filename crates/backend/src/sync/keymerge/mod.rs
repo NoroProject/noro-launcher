@@ -104,12 +104,14 @@ pub fn is_mergeable(rel_path: &str) -> bool {
 /// configs, which are kilobytes, and only on a real conflict.
 ///
 /// `None` means the conflict policy decides instead: wrong format, no base
-/// copy, or one key changed differently on both sides.
+/// copy, a download that didn't match the manifest, or one key changed
+/// differently on both sides.
 pub async fn try_merge(
     client: &reqwest::Client,
     instance_dir: &Path,
     rel: &str,
     url: &str,
+    expected_sha1: &str,
 ) -> Option<String> {
     if !is_mergeable(rel) {
         return None;
@@ -120,20 +122,43 @@ pub async fn try_merge(
     let mine = tokio::fs::read_to_string(instance_dir.join(rel))
         .await
         .ok()?;
-    let theirs = client.get(url).send().await.ok()?.text().await.ok()?;
+    let theirs = fetch_verified(client, url, expected_sha1).await?;
 
     let merged = merge_properties(&mine, &base, &theirs)?;
-    tokio::fs::write(instance_dir.join(rel), &merged)
+    crate::fsutil::write_atomic(instance_dir.join(rel), &merged)
         .await
         .ok()?;
     // The new base is the server's text, not the merged result: next time we
     // want to know what changed relative to what they sent.
-    let base_path = base_copy_path(instance_dir, rel);
-    if let Some(parent) = base_path.parent() {
-        let _ = tokio::fs::create_dir_all(parent).await;
-    }
-    let _ = tokio::fs::write(base_path, &theirs).await;
+    let _ = crate::fsutil::write_atomic(base_copy_path(instance_dir, rel), &theirs).await;
     Some(merged)
+}
+
+/// The server's copy, only if it is what the signed manifest promised. An
+/// error page or a tampered body merged into `options.txt` would be worse than
+/// falling back to the conflict policy.
+async fn fetch_verified(
+    client: &reqwest::Client,
+    url: &str,
+    expected_sha1: &str,
+) -> Option<String> {
+    use sha1::{Digest, Sha1};
+    let bytes = client
+        .get(url)
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?
+        .bytes()
+        .await
+        .ok()?;
+    let actual = hex::encode(Sha1::digest(&bytes));
+    if !actual.eq_ignore_ascii_case(expected_sha1) {
+        tracing::warn!(%url, expected = expected_sha1, %actual, "merge source does not match the manifest");
+        return None;
+    }
+    String::from_utf8(bytes.to_vec()).ok()
 }
 
 #[cfg(test)]
