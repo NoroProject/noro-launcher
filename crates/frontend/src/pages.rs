@@ -27,6 +27,7 @@ mod log_request_dialog;
 mod markdown;
 mod messages;
 mod mod_detail;
+mod mod_detail_action;
 mod mod_detail_body;
 mod mod_detail_parts;
 mod mod_icon;
