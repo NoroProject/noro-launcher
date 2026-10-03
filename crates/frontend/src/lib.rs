@@ -26,6 +26,8 @@ use std::sync::Arc;
 pub use state::{GlobalLauncherUI, LauncherUI, Page};
 use theme::*;
 
+gpui::actions!(launcher, [CloseOverlay]);
+
 const MAIN_WINDOW_SIZE: (f32, f32) = (1100., 720.);
 const MAIN_WINDOW_MIN_SIZE: (f32, f32) = (1040., 680.);
 /// Updates taken into the window in one go.
@@ -70,6 +72,14 @@ impl gpui::Render for LauncherUI {
             })
             .children(pages::close_dialog::dialog(self, cx))
             .children(perf::overlay(self))
+            // Esc closes the topmost panel or picker. Prompts that need an
+            // answer (an admin's request, impersonation) are left to buttons:
+            // dismissing those by a stray key would answer for the player.
+            .on_action(cx.listener(|this, _: &CloseOverlay, _w, cx| {
+                if this.close_top_overlay() {
+                    cx.notify();
+                }
+            }))
     }
 }
 
@@ -219,6 +229,7 @@ pub fn start(backend_handle: BackendHandle, frontend_recv: FrontendReceiver) {
         .with_assets(assets::AppAssets)
         .run(move |cx: &mut App| {
             let _ = cx.text_system().add_fonts(assets::fonts());
+            cx.bind_keys([gpui::KeyBinding::new("escape", CloseOverlay, None)]);
             open_window(cx, backend_handle.clone(), frontend_recv.clone());
             cx.activate(true);
         });

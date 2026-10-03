@@ -88,6 +88,11 @@ fn search(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
             cx.notify();
         }))
         .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, _w, cx| {
+            if let Some(text) = super::common::pasted(event, cx) {
+                this.rules_query.push_str(&text);
+                cx.notify();
+                return;
+            }
             match event.keystroke.key.as_str() {
                 "backspace" => {
                     this.rules_query.pop();

@@ -500,6 +500,7 @@ dependencies = [
  "urlencoding",
  "uuid 1.25.0",
  "walkdir",
+ "windows-sys 0.60.2",
  "zip",
 ]
 

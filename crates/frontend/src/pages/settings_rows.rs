@@ -109,7 +109,7 @@ pub fn stepper(
 }
 
 /// A path or a set of flags. Empty falls back to the placeholder, dimmed.
-pub fn mono_value(value: &str, placeholder: &'static str) -> AnyElement {
+pub fn mono_value(value: &str, placeholder: &str) -> AnyElement {
     let empty = value.trim().is_empty();
     div()
         .max_w(px(320.))
@@ -122,5 +122,16 @@ pub fn mono_value(value: &str, placeholder: &'static str) -> AnyElement {
         } else {
             value.to_string()
         })
+        .into_any_element()
+}
+
+/// A short caution under a setting.
+pub fn warning_line(text: String) -> AnyElement {
+    div()
+        .max_w(px(320.))
+        .font_family(FONT_PIXEL_ALT)
+        .text_size(px(11.))
+        .text_color(rgb(WARNING))
+        .child(text)
         .into_any_element()
 }

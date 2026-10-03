@@ -23,7 +23,7 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let server_name = ui
         .server(&server_id)
         .map(|s| s.name.clone())
-        .unwrap_or_else(|| "Server".into());
+        .unwrap_or_else(|| t("server-unnamed"));
     div()
         .size_full()
         .relative()
@@ -39,7 +39,13 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .flex()
                 .flex_col()
                 .gap(px(16.))
-                .child(page_header(server_id, server_name, source, cx))
+                .child(page_header(
+                    server_id,
+                    server_name,
+                    source,
+                    ui.is_armed(&format!("reset-{server_id}")),
+                    cx,
+                ))
                 .child(settings_panel(ui, server_id, cx)),
         )
         // Список рантаймов рисуется здесь, а не внутри своей строки: GPUI
@@ -66,6 +72,7 @@ fn page_header(
     server_id: Uuid,
     server_name: String,
     source: &'static str,
+    reset_armed: bool,
     cx: &mut Cx,
 ) -> AnyElement {
     div()
@@ -94,7 +101,7 @@ fn page_header(
         .child(source_pill(source))
         .child(div().flex_1())
         .when(source == "settings-source-override", |d| {
-            d.child(reset_button(server_id, cx))
+            d.child(reset_button(server_id, reset_armed, cx))
         })
         .into_any_element()
 }
@@ -121,14 +128,15 @@ fn source_pill(source: &'static str) -> AnyElement {
         .into_any_element()
 }
 
-fn reset_button(server_id: Uuid, cx: &mut Cx) -> AnyElement {
+/// Resetting drops every per-server setting at once, so it takes two clicks.
+fn reset_button(server_id: Uuid, armed: bool, cx: &mut Cx) -> AnyElement {
     div()
         .id(SharedString::from(format!("settings-reset-{server_id}")))
         .h(px(36.))
         .px(px(12.))
         .rounded(px(R_SM))
         .border_1()
-        .border_color(rgb(BORDER))
+        .border_color(rgb(if armed { ERROR } else { BORDER }))
         .bg(rgb(BG_CARD))
         .hover(|d| d.bg(rgb(BG_CARD_HOV)))
         .cursor_pointer()
@@ -141,10 +149,16 @@ fn reset_button(server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(12.))
                 .text_color(rgb(TEXT_SECONDARY))
-                .child(t("settings-reset")),
+                .child(if armed {
+                    t("common-click-again")
+                } else {
+                    t("settings-reset")
+                }),
         )
         .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-            this.reset_server_client_settings(server_id);
+            if this.confirm_or_arm(format!("reset-{server_id}"), cx) {
+                this.reset_server_client_settings(server_id);
+            }
             cx.notify();
         }))
         .into_any_element()
@@ -292,6 +306,7 @@ fn row_label(
 
 fn memory(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     let settings = ui.server_client_settings(server_id);
+    let warning = ui.memory_warning(settings.memory_max_mb);
     div()
         .max_w(px(260.))
         .flex()
@@ -301,7 +316,7 @@ fn memory(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .gap(px(8.))
         .child(mem_group(
             "min",
-            "MIN",
+            t("settings-memory-min"),
             settings.memory_min_mb,
             true,
             server_id,
@@ -309,12 +324,13 @@ fn memory(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         ))
         .child(mem_group(
             "max",
-            "MAX",
+            t("settings-memory-max"),
             settings.memory_max_mb,
             false,
             server_id,
             cx,
         ))
+        .children(warning.map(super::settings_rows::warning_line))
         .into_any_element()
 }
 
@@ -461,13 +477,14 @@ fn folder(_ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
 }
 
 fn adjust(ui: &mut LauncherUI, server_id: Uuid, is_min: bool, delta: i32) {
+    let ceiling = ui.memory_ceiling_mb() as i32;
     let settings = ui.server_client_settings(server_id);
     let mut min = settings.memory_min_mb as i32;
     let mut max = settings.memory_max_mb as i32;
     if is_min {
-        min = (min + delta).clamp(512, 65536);
+        min = (min + delta).clamp(512, ceiling);
     } else {
-        max = (max + delta).clamp(512, 65536);
+        max = (max + delta).clamp(512, ceiling);
     }
     if max < min {
         max = min;

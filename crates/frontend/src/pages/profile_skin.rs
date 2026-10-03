@@ -552,9 +552,15 @@ fn rename_key(
     _w: &mut gpui::Window,
     cx: &mut gpui::Context<LauncherUI>,
 ) {
+    let pasted = super::common::pasted(event, cx);
     let Some((id, draft)) = this.renaming_preset.as_mut() else {
         return;
     };
+    if let Some(text) = pasted {
+        draft.push_str(&text);
+        cx.notify();
+        return;
+    }
     match event.keystroke.key.as_str() {
         "escape" => this.renaming_preset = None,
         "backspace" => {

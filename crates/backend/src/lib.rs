@@ -28,6 +28,7 @@ pub mod servers_dat;
 pub mod signing;
 pub mod support;
 pub mod sync;
+pub mod system;
 pub mod telemetry;
 #[cfg(test)]
 pub(crate) mod test_http;

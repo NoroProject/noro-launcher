@@ -48,7 +48,7 @@ pub fn mod_icon(ui: &LauncherUI, m: &OptionalModInfo, color: u32) -> AnyElement 
 
 pub fn mod_text(m: &OptionalModInfo, width: Option<f32>, desc_chars: usize) -> AnyElement {
     let sub: SharedString = match &m.author {
-        Some(a) if !a.is_empty() => format!("by {a}").into(),
+        Some(a) if !a.is_empty() => format!("{} {a}", i18n::t("mods-by")).into(),
         _ if !m.description.is_empty() => m
             .description
             .chars()

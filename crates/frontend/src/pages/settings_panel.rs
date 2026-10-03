@@ -33,10 +33,27 @@ pub fn settings_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             true,
         ))
         .child(row(
+            "user",
+            t("settings-discord-rpc"),
+            t("settings-discord-rpc-hint"),
+            checkbox_row(
+                SharedString::new_static("g-discord-rpc"),
+                ui.config.discord_rpc,
+                true,
+                cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                    let v = this.config.discord_rpc;
+                    this.set_discord_rpc(!v);
+                    cx.notify();
+                }),
+            )
+            .into_any_element(),
+            true,
+        ))
+        .child(row(
             "code",
             t("settings-jvm-flags"),
             t("settings-jvm-hint"),
-            mono_value(&ui.config.jvm_flags, "not set"),
+            mono_value(&ui.config.jvm_flags, &t("settings-jvm-not-set")),
             ui.config.crash_reports_available,
         ))
         // Hidden when no DSN is baked into the build: the toggle would flip
@@ -89,24 +106,32 @@ fn crash_reports_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 }
 
 fn memory_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    div()
+    let warning = ui.memory_warning(ui.config.memory_max_mb);
+    let steppers = div()
         .flex()
         .items_center()
         .gap(px(16.))
         .child(stepper(
             "g-mem-min",
-            "MIN",
+            t("settings-memory-min"),
             ui.config.memory_min_mb,
             |ui, d| adjust(ui, true, d),
             cx,
         ))
         .child(stepper(
             "g-mem-max",
-            "MAX",
+            t("settings-memory-max"),
             ui.config.memory_max_mb,
             |ui, d| adjust(ui, false, d),
             cx,
-        ))
+        ));
+    div()
+        .flex()
+        .flex_col()
+        .items_end()
+        .gap(px(6.))
+        .child(steppers)
+        .children(warning.map(super::settings_rows::warning_line))
         .into_any_element()
 }
 
@@ -141,12 +166,13 @@ fn fullscreen_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 /// Keeps the max at or above the min by raising the max, never by lowering the
 /// min the player just set.
 fn adjust(ui: &mut LauncherUI, is_min: bool, delta: i32) {
+    let ceiling = ui.memory_ceiling_mb() as i32;
     let mut min = ui.config.memory_min_mb as i32;
     let mut max = ui.config.memory_max_mb as i32;
     if is_min {
-        min = (min + delta).clamp(512, 65536);
+        min = (min + delta).clamp(512, ceiling);
     } else {
-        max = (max + delta).clamp(512, 65536);
+        max = (max + delta).clamp(512, ceiling);
     }
     if max < min {
         max = min;

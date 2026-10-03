@@ -182,7 +182,7 @@ fn ctx_for(master: &str, token: &str) -> Ctx {
         config,
         running: Default::default(),
         internal,
-        rpc: crate::discord_rpc::spawn_discord_rpc(),
+        rpc: crate::discord_rpc::spawn_discord_rpc(false),
         mod_link: ModLink::default(),
         profile: Default::default(),
     }

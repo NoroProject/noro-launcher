@@ -399,6 +399,11 @@ impl BackendState {
                 self.send_config_state();
             }
 
+            MessageToBackend::SetDiscordRpc { enabled } => {
+                self.ctx.config.update(|c| c.discord_rpc = enabled);
+                self.ctx.rpc.set_enabled(enabled);
+            }
+
             MessageToBackend::SetServerMemory {
                 server_id,
                 min_mb,
@@ -785,8 +790,10 @@ impl BackendState {
             fullscreen: c.fullscreen,
             crash_reports: c.crash_reports,
             crash_reports_available: crate::telemetry::is_available(),
+            discord_rpc: c.discord_rpc,
             master_url: c.master_url,
             server_settings,
+            system_memory_mb: crate::system::total_memory_mb(),
         });
     }
 

@@ -179,7 +179,10 @@ fn mod_catalog_grid(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyEle
                             args.set("reason", e.clone());
                             (i18n::t_args("content-unavailable", &args), ERROR)
                         }
-                        None => (t("content-searching"), TEXT_MUTED),
+                        None if ui.content_searching => (t("content-searching"), TEXT_MUTED),
+                        // A finished search with nothing in it used to keep
+                        // saying "searching" forever.
+                        None => (t("content-no-results"), TEXT_MUTED),
                     };
                     div()
                         .size_full()

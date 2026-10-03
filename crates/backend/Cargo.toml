@@ -54,6 +54,9 @@ sys-locale = { workspace = true }
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_System_SystemInformation"] }
+
 # Each OS gets its own system vault. A single line with only apple-native left
 # Windows and Linux on the in-memory mock store: `save` reported success, the
 # session was gone after a restart, and the launcher asked to sign in again.

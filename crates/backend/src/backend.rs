@@ -192,7 +192,7 @@ async fn run(
 
     tracing::info!("using master server: {}", config.get().master_url);
 
-    let rpc = crate::discord_rpc::spawn_discord_rpc();
+    let rpc = crate::discord_rpc::spawn_discord_rpc(config.get().discord_rpc);
     rpc.update(crate::discord_rpc::DiscordRpcState::Launcher { server_name: None });
 
     let ctx = Ctx {

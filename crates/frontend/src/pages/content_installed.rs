@@ -126,7 +126,13 @@ fn row(ui: &LauncherUI, server_id: Uuid, item: &PersonalItem, cx: &mut Cx) -> An
                 )
                 .child(state_line(item)),
         )
-        .child(actions(server_id, id, enabled, cx))
+        .child(actions(
+            server_id,
+            id,
+            enabled,
+            ui.is_armed(&format!("remove-{id}")),
+            cx,
+        ))
         .into_any_element()
 }
 
@@ -161,7 +167,7 @@ fn state_line(item: &PersonalItem) -> AnyElement {
         .into_any_element()
 }
 
-fn actions(server_id: Uuid, id: Uuid, enabled: bool, cx: &mut Cx) -> AnyElement {
+fn actions(server_id: Uuid, id: Uuid, enabled: bool, armed: bool, cx: &mut Cx) -> AnyElement {
     div()
         .flex()
         .items_center()
@@ -181,17 +187,41 @@ fn actions(server_id: Uuid, id: Uuid, enabled: bool, cx: &mut Cx) -> AnyElement 
                 cx.notify();
             }),
         ))
-        .child(icon_action(
-            format!("remove-{id}"),
-            "trash-2",
-            ERROR,
-            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                this.content_busy = true;
-                this.backend
-                    .send(MessageToBackend::RemovePersonalContent { server_id, id });
-                cx.notify();
-            }),
-        ))
+        // Removing takes two clicks: the second says what it will do.
+        .child(if armed {
+            div()
+                .id(SharedString::from(format!("remove-{id}")))
+                .h(px(30.))
+                .px(px(10.))
+                .rounded(px(R_SM))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .bg(rgb(ERROR))
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(11.))
+                .text_color(rgb(TEXT_PRIMARY))
+                .child(t("common-delete"))
+                .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    if this.confirm_or_arm(format!("remove-{id}"), cx) {
+                        this.content_busy = true;
+                        this.backend
+                            .send(MessageToBackend::RemovePersonalContent { server_id, id });
+                    }
+                    cx.notify();
+                }))
+                .into_any_element()
+        } else {
+            icon_action(
+                format!("remove-{id}"),
+                "trash-2",
+                ERROR,
+                cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.confirm_or_arm(format!("remove-{id}"), cx);
+                    cx.notify();
+                }),
+            )
+        })
         .into_any_element()
 }
 

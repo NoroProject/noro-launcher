@@ -94,6 +94,8 @@ pub struct SyncUiState {
     /// always honoured a cancel, but nothing in the window could ask for one.
     pub launch: Option<bridge::ModalAction>,
     pub rate: crate::sync_text::Rate,
+    /// The stop button was clicked once and waits for the confirming click.
+    pub stop_armed: bool,
 }
 
 impl SyncUiState {
@@ -148,11 +150,14 @@ fn translate_notification(key: &str, args: &std::collections::BTreeMap<String, S
 
 #[derive(Clone)]
 pub struct Toast {
-    /// Растёт на каждую плашку. Нужен, чтобы таймер снял именно свою: пока он
-    /// спит, стопка успевает смениться целиком.
+    /// Grows with every toast. The timer has to remove its own: while it
+    /// sleeps, the stack can turn over completely.
     pub id: u64,
     pub text: String,
     pub level: NotifLevel,
+    /// Bumped when the same text comes again. Only the newest timer may
+    /// remove the toast, which is what makes a repeat actually extend it.
+    pub generation: u64,
 }
 
 impl Toast {
@@ -181,7 +186,9 @@ pub struct UiConfig {
     /// Whether a DSN is baked into this build. Without one the settings row is
     /// hidden — the toggle would flip but there is nowhere to send.
     pub crash_reports_available: bool,
+    pub discord_rpc: bool,
     pub master_url: String,
+    pub system_memory_mb: Option<u32>,
 }
 
 impl Default for UiConfig {
@@ -194,7 +201,9 @@ impl Default for UiConfig {
             fullscreen: false,
             crash_reports: true,
             crash_reports_available: false,
+            discord_rpc: true,
             master_url: String::new(),
+            system_memory_mb: None,
         }
     }
 }
@@ -240,6 +249,8 @@ pub struct LauncherUI {
     pub skin_sway: f32,
     pub skin_loading: bool,
     pub skin_uploading: bool,
+    /// The skin before an upload, to go back to if the upload is refused.
+    pub skin_before_upload: Option<Vec<u8>>,
     pub skin_dragging: bool,
     /// Cursor x at the last drag sample, in window px.
     pub skin_drag_x: f32,
@@ -352,6 +363,8 @@ pub struct LauncherUI {
     pub main_window: Option<gpui::AnyWindowHandle>,
     /// Closing would stop a running game or download; the window is asking.
     pub close_prompt: bool,
+    /// A destructive button clicked once, waiting for the confirming click.
+    pub armed_action: Option<String>,
     pub impersonate_prompt: Option<ImpersonatePrompt>,
     /// Username the launcher is currently acting as.
     pub impersonating_as: Option<String>,
@@ -565,6 +578,7 @@ impl LauncherUI {
             skin_sway: 0.0,
             skin_loading: false,
             skin_uploading: false,
+            skin_before_upload: None,
             skin_dragging: false,
             skin_drag_x: 0.0,
             skin_anim_running: false,
@@ -647,6 +661,7 @@ impl LauncherUI {
             console_window: None,
             main_window: None,
             close_prompt: false,
+            armed_action: None,
 
             notifications: Vec::new(),
             notifications_total: 0,
@@ -1047,9 +1062,11 @@ impl LauncherUI {
                 fullscreen,
                 crash_reports,
                 crash_reports_available,
+                discord_rpc,
                 master_url,
                 locale,
                 server_settings,
+                system_memory_mb,
             } => {
                 if let Some(loc) = i18n::Locale::from_code(&locale) {
                     self.locale = loc;
@@ -1063,7 +1080,9 @@ impl LauncherUI {
                     fullscreen,
                     crash_reports,
                     crash_reports_available,
+                    discord_rpc,
                     master_url,
+                    system_memory_mb,
                 };
                 self.server_settings = server_settings.into_iter().collect();
                 self.load_preset_renders(cx);
@@ -1348,6 +1367,7 @@ impl LauncherUI {
             }
             MessageToFrontend::SkinUploadFailed => {
                 self.skin_uploading = false;
+                self.skin_bytes = self.skin_before_upload.take();
             }
             MessageToFrontend::PermissionsUpdated { user } => {
                 self.user = Some(user);
@@ -1561,42 +1581,45 @@ impl LauncherUI {
     /// время в самом рендере значило бы держать перерисовку все эти секунды,
     /// то есть жечь кадры ради затухающей надписи.
     pub fn notify_toast(&mut self, text: String, level: NotifLevel, cx: &mut Context<Self>) {
-        // Тот же текст, что уже висит, второй плашкой не становится: две
-        // одинаковые строки рядом выглядят как сбой, а не как два события.
-        // Продлеваем ту, что есть, — таймер у неё уже свой.
-        if let Some(existing) = self.toasts.iter().find(|t| t.text == text) {
-            let id = existing.id;
-            let lifetime = existing.lifetime();
-            let executor = cx.background_executor().clone();
-            cx.spawn(async move |this, cx| {
-                executor.timer(lifetime).await;
-                let _ = this.update(cx, |state, cx| {
-                    state.dismiss_toast(id);
-                    cx.notify();
-                });
-            })
-            .detach();
-            return;
-        }
+        // The same text again doesn't become a second toast: two identical
+        // lines side by side look like a glitch. The one up stays longer.
+        let (id, generation, lifetime) =
+            if let Some(existing) = self.toasts.iter_mut().find(|t| t.text == text) {
+                existing.generation += 1;
+                (existing.id, existing.generation, existing.lifetime())
+            } else {
+                let id = self.next_toast_id;
+                self.next_toast_id += 1;
+                let toast = Toast {
+                    id,
+                    text,
+                    level,
+                    generation: 0,
+                };
+                let lifetime = toast.lifetime();
+                self.toasts.push(toast);
+                // More than four is a wall, not messages; the oldest goes early.
+                if self.toasts.len() > 4 {
+                    self.toasts.remove(0);
+                }
+                (id, 0, lifetime)
+            };
 
-        let id = self.next_toast_id;
-        self.next_toast_id += 1;
-        let toast = Toast { id, text, level };
-        let lifetime = toast.lifetime();
-
-        self.toasts.push(toast);
-        // Больше четырёх на экране — это уже не сообщения, а стена; самое
-        // старое уходит раньше срока.
-        if self.toasts.len() > 4 {
-            self.toasts.remove(0);
-        }
-
+        // The timer sleeps in the background and wakes the window once, to
+        // remove the toast. Counting down in render would redraw every frame
+        // for a fading line of text.
         let executor = cx.background_executor().clone();
         cx.spawn(async move |this, cx| {
             executor.timer(lifetime).await;
             let _ = this.update(cx, |state, cx| {
-                state.dismiss_toast(id);
-                cx.notify();
+                let current = state
+                    .toasts
+                    .iter()
+                    .any(|t| t.id == id && t.generation == generation);
+                if current {
+                    state.dismiss_toast(id);
+                    cx.notify();
+                }
             });
         })
         .detach();
@@ -1671,6 +1694,59 @@ impl LauncherUI {
         self.suggested_mods.clear();
     }
 
+    /// The most the memory steppers go to: this computer's RAM less a gigabyte
+    /// for the system, or the old fixed cap where the RAM isn't known. The
+    /// steppers used to go to 64 GB on any machine.
+    pub fn memory_ceiling_mb(&self) -> u32 {
+        self.config
+            .system_memory_mb
+            .map(|m| m.saturating_sub(1024).max(1024))
+            .unwrap_or(65536)
+            .min(65536)
+    }
+
+    /// The game's share past three quarters of the RAM leaves the system and
+    /// the launcher swapping, which looks like the game lagging.
+    pub fn memory_warning(&self, max_mb: u32) -> Option<String> {
+        let total = self.config.system_memory_mb?;
+        if (max_mb as u64) * 4 <= (total as u64) * 3 {
+            return None;
+        }
+        let mut args = i18n::FluentArgs::new();
+        args.set("total", format!("{:.0}", total as f64 / 1024.0));
+        Some(i18n::t_args("settings-memory-too-much", &args))
+    }
+
+    /// Closes whatever sits on top; false when nothing was open.
+    pub fn close_top_overlay(&mut self) -> bool {
+        if std::mem::take(&mut self.close_prompt) {
+            return true;
+        }
+        if std::mem::take(&mut self.jvm_flags_open) {
+            return true;
+        }
+        if std::mem::take(&mut self.java_picker_open) {
+            return true;
+        }
+        if self.content_picker.take().is_some() {
+            return true;
+        }
+        if std::mem::take(&mut self.build_picker_open) {
+            return true;
+        }
+        if std::mem::take(&mut self.notifications_open) {
+            return true;
+        }
+        if std::mem::take(&mut self.log_request_preview_open) {
+            return true;
+        }
+        if self.mod_catalog_selected.take().is_some() {
+            self.mod_project = None;
+            return true;
+        }
+        false
+    }
+
     /// Whether the window may close now. With a game running or a download in
     /// flight it may not: closing would stop them, so the window asks first.
     pub fn request_close(&mut self) -> bool {
@@ -1719,7 +1795,9 @@ impl LauncherUI {
         if self.skin_uploading {
             return;
         }
-        self.skin_bytes = Some(bytes.clone());
+        // Shown right away; put back if the master turns it down, or the
+        // preview went on showing a skin that was never accepted.
+        self.skin_before_upload = self.skin_bytes.replace(bytes.clone());
         self.skin_uploading = true;
         self.backend.send(MessageToBackend::UploadSkin { bytes });
     }
@@ -1797,6 +1875,54 @@ impl LauncherUI {
                 s.heading = Some(SyncHeading::Cancelling);
             }
         }
+    }
+
+    /// Two clicks for anything that can't be undone: the first arms the button
+    /// for a few seconds, the second goes through. True on the second.
+    pub fn confirm_or_arm(&mut self, key: String, cx: &mut Context<Self>) -> bool {
+        if self.armed_action.as_deref() == Some(key.as_str()) {
+            self.armed_action = None;
+            return true;
+        }
+        self.armed_action = Some(key.clone());
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| {
+            executor.timer(std::time::Duration::from_secs(4)).await;
+            let _ = this.update(cx, |ui, cx| {
+                if ui.armed_action.as_deref() == Some(key.as_str()) {
+                    ui.armed_action = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        false
+    }
+
+    pub fn is_armed(&self, key: &str) -> bool {
+        self.armed_action.as_deref() == Some(key)
+    }
+
+    /// First click arms, second click stops; the arming wears off on its own.
+    pub fn stop_clicked(&mut self, id: Uuid, cx: &mut Context<Self>) {
+        let s = self.sync.entry(id).or_default();
+        if s.stop_armed {
+            s.stop_armed = false;
+            self.kill(id);
+            return;
+        }
+        s.stop_armed = true;
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| {
+            executor.timer(std::time::Duration::from_secs(4)).await;
+            let _ = this.update(cx, |ui, cx| {
+                if let Some(s) = ui.sync.get_mut(&id) {
+                    s.stop_armed = false;
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     pub fn kill(&mut self, id: Uuid) {
@@ -1925,6 +2051,12 @@ impl LauncherUI {
 
     /// Takes effect on the next launch: Sentry comes up before GPUI, and its
     /// panic hook can't be removed while the process runs.
+    pub fn set_discord_rpc(&mut self, enabled: bool) {
+        self.config.discord_rpc = enabled;
+        self.backend
+            .send(MessageToBackend::SetDiscordRpc { enabled });
+    }
+
     pub fn set_crash_reports(&mut self, enabled: bool) {
         self.config.crash_reports = enabled;
         self.backend

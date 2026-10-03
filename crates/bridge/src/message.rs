@@ -262,6 +262,10 @@ pub enum MessageToBackend {
     SetCrashReports {
         enabled: bool,
     },
+    /// Whether friends on Discord see what the player is doing.
+    SetDiscordRpc {
+        enabled: bool,
+    },
     SetServerMemory {
         server_id: Uuid,
         min_mb: u32,
@@ -546,9 +550,13 @@ pub enum MessageToFrontend {
         /// Whether a DSN was baked into this build; without one the toggle has
         /// nowhere to send and isn't worth showing.
         crash_reports_available: bool,
+        discord_rpc: bool,
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,
+        /// Physical memory of this computer, to keep the memory setting
+        /// within it. `None` where it can't be read.
+        system_memory_mb: Option<u32>,
     },
     /// Translation catalog, from the master or from the local cache.
     LocaleCatalog {

@@ -23,6 +23,9 @@ pub struct LauncherConfig {
     pub fullscreen: bool,
     #[serde(default = "default_crash_reports")]
     pub crash_reports: bool,
+    /// Rich Presence: the server and what the player is doing, shown to their
+    /// Discord friends. On by default, as it has always been.
+    pub discord_rpc: bool,
     /// Per-server overrides for the fields above.
     #[serde(default)]
     pub server_settings: BTreeMap<Uuid, ServerClientSettings>,
@@ -72,6 +75,7 @@ impl Default for LauncherConfig {
             show_console_on_launch: true,
             fullscreen: false,
             crash_reports: default_crash_reports(),
+            discord_rpc: true,
             server_settings: BTreeMap::new(),
             selected_build: BTreeMap::new(),
         }

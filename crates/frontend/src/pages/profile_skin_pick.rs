@@ -20,7 +20,7 @@ pub fn on_upload_click(
         files: true,
         directories: false,
         multiple: false,
-        prompt: Some("Select skin".into()),
+        prompt: Some(i18n::t("profile-skin-pick-title").into()),
     });
 
     cx.spawn(async move |this, cx| {

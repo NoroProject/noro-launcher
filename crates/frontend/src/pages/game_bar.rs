@@ -115,7 +115,7 @@ fn play_button(
         return disabled(sync.heading_text());
     }
     if sync.running {
-        return stop_button(server_id, cx);
+        return stop_button(server_id, sync.stop_armed, cx);
     }
     if sync.failed.is_some() {
         return cta_button(
@@ -168,28 +168,34 @@ fn disabled(label: impl Into<gpui::SharedString>) -> AnyElement {
         .into_any_element()
 }
 
-fn stop_button(server_id: Uuid, cx: &mut Cx) -> AnyElement {
+/// Stopping the game loses whatever wasn't saved, so it takes two clicks: the
+/// first arms the button for a few seconds, the second stops the game.
+fn stop_button(server_id: Uuid, armed: bool, cx: &mut Cx) -> AnyElement {
     div()
         .id("stop-game")
         .w(px(216.))
         .h(px(56.))
         .rounded(px(R_SM))
         .cursor_pointer()
-        .bg(rgb(BG_CARD))
+        .bg(rgb(if armed { ERROR } else { BG_CARD }))
         .border_1()
-        .border_color(rgb(BORDER))
-        .hover(|d| d.bg(rgb(BG_CARD_HOV)))
+        .border_color(rgb(if armed { ERROR } else { BORDER }))
+        .hover(move |d| d.bg(rgb(if armed { ERROR } else { BG_CARD_HOV })))
         .flex()
         .items_center()
         .justify_center()
         .gap(px(8.))
         .font_family(FONT_PIXEL_ALT)
-        .text_size(px(18.))
+        .text_size(px(if armed { 14. } else { 18. }))
         .font_weight(FontWeight::EXTRA_BOLD)
         .child(ic("square", 16., TEXT_PRIMARY))
-        .child(t("game-stop"))
+        .child(if armed {
+            t("game-stop-confirm")
+        } else {
+            t("game-stop")
+        })
         .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-            this.kill(server_id);
+            this.stop_clicked(server_id, cx);
             cx.notify();
         }))
         .into_any_element()

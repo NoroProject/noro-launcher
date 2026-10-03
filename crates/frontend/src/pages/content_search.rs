@@ -143,6 +143,11 @@ pub(super) fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> A
                 }))
                 .on_key_down(
                     cx.listener(move |this, event: &gpui::KeyDownEvent, _w, cx| {
+                        if let Some(text) = super::common::pasted(event, cx) {
+                            this.mod_catalog_query.push_str(&text);
+                            cx.notify();
+                            return;
+                        }
                         match event.keystroke.key.as_str() {
                             "backspace" => {
                                 this.mod_catalog_query.pop();

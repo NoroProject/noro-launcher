@@ -219,3 +219,15 @@ fn stamp(unix_seconds: i64, format: &str) -> String {
         })
         .unwrap_or_else(|| "—".to_string())
 }
+
+/// Ctrl+V (Cmd+V on macOS) in one of the hand-made text fields: the clipboard
+/// text, on one line. GPUI has no text input, so every field handles its own
+/// keys — and only the JVM flags field had learned to paste.
+pub fn pasted(event: &gpui::KeyDownEvent, cx: &mut gpui::App) -> Option<String> {
+    let keystroke = &event.keystroke;
+    if !(keystroke.modifiers.secondary() && keystroke.key == "v") {
+        return None;
+    }
+    let text = cx.read_from_clipboard()?.text()?;
+    Some(text.split_whitespace().collect::<Vec<_>>().join(" "))
+}
