@@ -60,6 +60,10 @@ pub enum InternalEvent {
         server_id: Uuid,
         seq: u64,
     },
+    /// Jar icons for a build's optional mods have been read in the background.
+    JarIconsReady {
+        server_id: Uuid,
+    },
 }
 
 /// What a background task gets: everything shared, nothing owned by the loop.
@@ -118,6 +122,8 @@ pub struct BackendState {
     pub cached_manifests: HashMap<Uuid, BuildManifest>,
     /// Whether the socket to the master is up.
     pub online: bool,
+    /// The build whose file list the window already has, per server.
+    pub files_sent_for: HashMap<Uuid, Uuid>,
     /// Launches waiting on a manifest to arrive.
     pub pending_launch: HashMap<Uuid, bridge::ModalAction>,
     /// Builds whose state the window already has. A guess from the disk is
@@ -228,6 +234,7 @@ async fn run(
         manifests: HashMap::new(),
         cached_manifests: HashMap::new(),
         online: false,
+        files_sent_for: HashMap::new(),
         pending_launch: HashMap::new(),
         build_state_known: HashSet::new(),
         last_launched: None,
@@ -379,6 +386,11 @@ impl BackendState {
                         self.ctx.send(MessageToFrontend::LoginSuccess { user });
                     }
                     _ => self.ctx.send(MessageToFrontend::SessionCheckDone),
+                }
+            }
+            InternalEvent::JarIconsReady { server_id } => {
+                if let Some(manifest) = self.manifests.get(&server_id).cloned() {
+                    self.send_optional_mods(server_id, &manifest);
                 }
             }
             InternalEvent::ManifestTimeout { server_id, seq } => {
@@ -590,10 +602,14 @@ enum MeError {
 }
 
 async fn fetch_me(ctx: &Ctx, token: &str) -> Result<UserProfile, MeError> {
-    let resp = ctx
-        .http
-        .get(format!("{}/api/me", master_base(ctx)))
-        .bearer_auth(token)
+    let api = crate::master_api::MasterApi::new(
+        ctx.http.clone(),
+        &ctx.config.get().master_url,
+        Some(token.to_string()),
+    )
+    .ok_or(MeError::Unreachable)?;
+    let resp = api
+        .request(reqwest::Method::GET, "/api/me")
         .timeout(STARTUP_REQUEST_TIMEOUT)
         .send()
         .await
@@ -820,6 +836,10 @@ pub fn spawn_sync_and_launch(req: Launch) {
         // check it against the manifest here. Extra files go, mismatches go to
         // the master, and the player keeps launching: a finding is something to
         // look into later, not a refusal.
+        ctx.send(MessageToFrontend::LaunchStep {
+            server_id,
+            step: bridge::LaunchStep::Verifying,
+        });
         let report =
             crate::sync::verify_before_launch(&instance_dir, &manifest, &enabled_optional, &user)
                 .await;
@@ -897,6 +917,11 @@ pub fn spawn_sync_and_launch(req: Launch) {
             ctx.send(MessageToFrontend::LaunchCancelled { server_id });
             return;
         }
+
+        ctx.send(MessageToFrontend::LaunchStep {
+            server_id,
+            step: bridge::LaunchStep::Starting,
+        });
 
         // The channel to the case mod has to be up before the game starts: the
         // mod reads the handshake file once, at startup, and being late here

@@ -3,7 +3,7 @@
 Desktop Minecraft launcher: bootstrapper, core daemon, GPUI interface. Public repository, AGPL-3.0.
 
 Detailed repository instructions: **[./INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
-Root project ideology and universal rules: **[../INSTRUCTIONS.md](../INSTRUCTIONS.md)**.
+Root project ideology and universal rules: **`../INSTRUCTIONS.md`** (only in the monorepo checkout; this repository stands on its own without it).
 
 ## Quick Summary
 - **Two Binaries:** `noro-launcher` (bootstrapper, never updates itself for SmartScreen reputation) and `noro-launcher-core` (daemon + GPUI).

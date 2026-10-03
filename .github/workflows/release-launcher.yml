@@ -36,8 +36,9 @@ env:
   # filed against the previous release.
   NORO_RELEASE: ${{ inputs.tag || github.ref_name }}
   # Both are implied by the org token; spelled out so it's visible where symbols
-  # go without decoding it.
-  SENTRY_ORG: dalynkaa
+  # go without decoding it. The organisation is a repository variable rather
+  # than a literal, so a fork uploads to its own.
+  SENTRY_ORG: ${{ vars.SENTRY_ORG }}
   SENTRY_PROJECT: noro-launcher
   SENTRY_URL: https://de.sentry.io
   # On a tag push inputs are empty and the tag comes from the ref.
@@ -52,6 +53,9 @@ jobs:
         run: |
           set -euo pipefail
           [ -n "${NORO_SENTRY_DSN:-}" ] || echo "::notice::NORO_SENTRY_DSN is unset — building without crash reporting"
+          if [ -n "${NORO_SENTRY_DSN:-}" ] && [ -z "${SENTRY_ORG:-}" ]; then
+            echo "::warning::the SENTRY_ORG repository variable is unset — symbols and the release won't be uploaded to Sentry"
+          fi
 
       # The launcher compares its own CARGO_PKG_VERSION against the tag the
       # master hands out. If they drift, the "update available" banner never
@@ -119,7 +123,9 @@ jobs:
 
       - name: Install cross
         if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        # Pinned to a commit: a build tool that changes under a release is a
+        # release that can't be reproduced. Bump on purpose.
+        run: cargo install cross --git https://github.com/cross-rs/cross --rev 74e99b2223de06166f8cdcc1af7f1308ec52baf4 --locked
 
       # GPUI links against xkbcommon for its X11 and Wayland backends and
       # against fontconfig and freetype for text. The aarch64 build gets the
@@ -145,7 +151,7 @@ jobs:
       # Skipped quietly without a token: forks and outside runs should build,
       # not fail on our telemetry.
       - name: Upload debug files to Sentry
-        if: env.SENTRY_AUTH_TOKEN != '' && env.NORO_SENTRY_DSN != ''
+        if: env.SENTRY_AUTH_TOKEN != '' && env.NORO_SENTRY_DSN != '' && env.SENTRY_ORG != ''
         shell: bash
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -153,7 +159,7 @@ jobs:
           set -euo pipefail
           # npm rather than `curl | bash` — this step also runs on the Windows
           # runner, where the get-cli installer doesn't work.
-          npm install -g @sentry/cli@2
+          npm install -g @sentry/cli@2.58.6
           DIR="target/${{ matrix.target }}/release-symbols"
 
           # On macOS debug info stays in the .o files by default and the binary
@@ -279,7 +285,7 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     # A build without telemetry is still a complete build.
-    if: vars.NORO_SENTRY_DSN != ''
+    if: vars.NORO_SENTRY_DSN != '' && vars.SENTRY_ORG != ''
     steps:
       # Full history: set-commits has nothing to associate without it, and
       # Sentry can't show which change introduced a crash.
@@ -295,7 +301,7 @@ jobs:
         run: |
           set -euo pipefail
           [ -n "${SENTRY_AUTH_TOKEN:-}" ] || { echo "::error::SENTRY_AUTH_TOKEN is not set in secrets"; exit 1; }
-          npm install -g @sentry/cli@2
+          npm install -g @sentry/cli@2.58.6
           # The release name has to match what NORO_RELEASE baked into the
           # binary, or crashes hang off a release that doesn't exist.
           sentry-cli releases new "$NORO_RELEASE"

@@ -135,7 +135,7 @@ fn punishment(p: &bridge::PunishmentView) -> AnyElement {
                                 .text_size(px(13.))
                                 .font_weight(FontWeight::BOLD)
                                 .text_color(rgb(colour))
-                                .child(p.kind.to_uppercase()),
+                                .child(punishment_kind(&p.kind)),
                         )
                         .children(p.rule_code.clone().map(|code| {
                             div()
@@ -314,8 +314,29 @@ fn ticket_row(ticket: &bridge::TicketView, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-/// The master's own words — `open`, `answered`, `closed` — coloured so the one
-/// state that wants something from the player stands out.
+/// The master sends its own identifiers (`ban`, `server_ban`); the catalog
+/// has a word for each. One it doesn't know yet still shows, as it came.
+fn punishment_kind(kind: &str) -> String {
+    let key = format!("punishment-kind-{}", kind.replace('_', "-"));
+    if i18n::has_key(&key) {
+        t(&key)
+    } else {
+        kind.to_uppercase()
+    }
+}
+
+/// `open`, `answered`, `closed` in the player's language, for the list and
+/// the open ticket alike.
+pub(super) fn ticket_status_label(status: &str) -> String {
+    let key = format!("tickets-status-{status}");
+    if i18n::has_key(&key) {
+        t(&key)
+    } else {
+        status.to_string()
+    }
+}
+
+/// Coloured so the one state that wants something from the player stands out.
 fn ticket_status(status: &str) -> AnyElement {
     let colour = match status {
         "answered" => SUCCESS,
@@ -333,7 +354,7 @@ fn ticket_status(status: &str) -> AnyElement {
             div()
                 .text_size(px(10.))
                 .text_color(rgb(colour))
-                .child(status.to_string()),
+                .child(ticket_status_label(status)),
         )
         .into_any_element()
 }

@@ -152,3 +152,7 @@ pub async fn needs_download(
         false
     }
 }
+
+#[cfg(test)]
+#[path = "downloader_tests.rs"]
+mod tests;

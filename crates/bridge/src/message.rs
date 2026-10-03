@@ -415,6 +415,15 @@ pub enum MessageToBackend {
     Quit,
 }
 
+/// A step between the finished sync and the game window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LaunchStep {
+    /// Checking the instance against the manifest.
+    Verifying,
+    /// Preparing sign-in and starting the JVM.
+    Starting,
+}
+
 /// Variant order is also the order of the bars in the UI: download stages run in
 /// parallel, and `Ord` keeps the list stable instead of letting it shuffle as
 /// progress arrives. Reordering these reorders the screen.
@@ -562,7 +571,10 @@ pub enum MessageToFrontend {
         allow_suggestions: bool,
         /// Whether the build allows adding your own content. The operator decides, not the player.
         allow_personal: bool,
-        installed_files: Vec<String>,
+        /// The build's file paths, for telling "already installed" in the
+        /// catalog. `None` when they haven't changed since the last message:
+        /// thousands of paths used to cross over on every server open.
+        installed_files: Option<Vec<String>>,
     },
     ServerClientRecommendation {
         server_id: Uuid,
@@ -592,6 +604,12 @@ pub enum MessageToFrontend {
     },
     SyncComplete {
         server_id: Uuid,
+    },
+    /// Between "files are in place" and the game window: these take seconds
+    /// on a big build, and the bar used to sit on "done" through them.
+    LaunchStep {
+        server_id: Uuid,
+        step: LaunchStep,
     },
     /// Packs and shaders that changed while the game was running; a resource
     /// reload picks them up. Anything the game held open is in `locked` and only

@@ -105,6 +105,10 @@ git push origin launcher-v2.0.6
 
 Both `launcher-v2.0.6` and `v2.0.6` work as tag names.
 
+Crash reporting is optional. Builds embed it when the repository variable
+`NORO_SENTRY_DSN` is set; debug symbols and the release are uploaded when the
+`SENTRY_ORG` variable and the `SENTRY_AUTH_TOKEN` secret are set as well.
+
 `release-launcher.yml` builds five targets — Linux x86_64 and aarch64, macOS
 Intel and Apple Silicon, Windows x86_64 — and attaches them to a GitHub Release.
 

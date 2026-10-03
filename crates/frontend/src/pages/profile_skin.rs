@@ -198,6 +198,9 @@ fn custom_preset_card(
     };
 
     let edit_preset_id_del = id.clone();
+    // Deleting can't be undone and the cross sits right next to the rename
+    // button: the first click asks, the second deletes.
+    let delete_armed = ui.is_armed(&format!("preset-del-{id}"));
 
     div()
         .id(SharedString::from(id.clone()))
@@ -255,15 +258,26 @@ fn custom_preset_card(
                         .px(px(4.))
                         .py(px(2.))
                         .rounded(px(R_SM))
-                        .bg(rgb(BG_INPUT))
+                        .bg(rgb(if delete_armed { ERROR } else { BG_INPUT }))
                         .hover(|s| s.bg(rgb(BG_CARD)))
                         .font_family(FONT_PIXEL_ALT)
                         .text_size(px(9.))
                         .font_weight(gpui::FontWeight::BOLD)
-                        .text_color(rgb(TEXT_MUTED))
-                        .child("✕")
+                        .text_color(rgb(if delete_armed {
+                            TEXT_PRIMARY
+                        } else {
+                            TEXT_MUTED
+                        }))
+                        .tooltip(crate::components::hint(t(if delete_armed {
+                            "common-click-again"
+                        } else {
+                            "common-delete"
+                        })))
+                        .child(if delete_armed { "?" } else { "✕" })
                         .on_click(cx.listener(move |this, _, _, cx| {
-                            this.custom_presets.retain(|p| p.id != edit_preset_id_del);
+                            if this.confirm_or_arm(format!("preset-del-{edit_preset_id_del}"), cx) {
+                                this.custom_presets.retain(|p| p.id != edit_preset_id_del);
+                            }
                             cx.notify();
                         })),
                 ),

@@ -5,16 +5,16 @@ use bridge::CatalogHitInfo;
 use gpui::{div, prelude::*, px, AnyElement};
 
 pub fn description(hit: &CatalogHitInfo, project: Option<&bridge::ModProjectInfo>) -> AnyElement {
-    let body = project.map(|p| p.body.clone()).unwrap_or_default();
+    let body = project.map(|p| p.body.as_str()).unwrap_or_default();
     let blocks = if body.trim().is_empty() {
         // Full page hasn't arrived yet; stand in with the search result line.
         vec![super::markdown::render(&hit.description)]
     } else if hit.provider == "curseforge" {
         // CurseForge serves rendered HTML; the markdown parser would let the
         // tags through as text.
-        vec![super::markdown::render(&html_to_text(&body))]
+        vec![super::markdown::render_converted(body, html_to_text)]
     } else {
-        vec![super::markdown::render(&body)]
+        vec![super::markdown::render(body)]
     };
 
     div()
