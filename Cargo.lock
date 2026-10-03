@@ -2974,7 +2974,7 @@ dependencies = [
 [[package]]
 name = "i18n"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#16b70c7ccd5a61d4f22bdcd79b7bff48a77a8a8f"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#8b270403b243f466b5a0c66a99f200e974c925f0"
 dependencies = [
  "fluent-bundle",
  "parking_lot",
@@ -3669,7 +3669,7 @@ dependencies = [
 [[package]]
 name = "mc_mod_utils"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#16b70c7ccd5a61d4f22bdcd79b7bff48a77a8a8f"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#8b270403b243f466b5a0c66a99f200e974c925f0"
 dependencies = [
  "base64",
  "serde",
@@ -5548,7 +5548,7 @@ dependencies = [
 [[package]]
 name = "schema"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#16b70c7ccd5a61d4f22bdcd79b7bff48a77a8a8f"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#8b270403b243f466b5a0c66a99f200e974c925f0"
 dependencies = [
  "chrono",
  "once_cell",
