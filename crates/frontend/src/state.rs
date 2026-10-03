@@ -1,8 +1,8 @@
 //! UI state, and the handling of messages from the backend.
 
 use bridge::{
-    BackendHandle, ClientSettingsState, GameLogLevel, LoginErrorKind, MessageToBackend,
-    MessageToFrontend, OptionalModInfo, SyncStage,
+    BackendHandle, ClientSettingsState, LoginErrorKind, MessageToBackend, MessageToFrontend,
+    OptionalModInfo, SyncStage,
 };
 use gpui::{
     px, AppContext, Context, Entity, Image, IntoElement, ListAlignment, ListState, RenderImage,
@@ -153,12 +153,7 @@ impl Default for UiConfig {
     }
 }
 
-#[derive(Clone)]
-pub struct LogEntry {
-    pub timestamp: i64,
-    pub level: GameLogLevel,
-    pub text: String,
-}
+pub use bridge::GameLogLine as LogEntry;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum ProfileTab {
@@ -1044,9 +1039,17 @@ impl LauncherUI {
                 s.failed = None;
             }
             MessageToFrontend::SyncComplete { server_id } => {
+                // Not playable yet: the files get checked and the JVM started,
+                // which for a big build takes seconds. The button stays busy
+                // until GameStarted or SyncFailed — a second click here started
+                // a second game in the same folder.
+                let s = self.sync.entry(server_id).or_default();
+                s.stage = "Launching...".into();
+            }
+            MessageToFrontend::LaunchCancelled { server_id } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = false;
-                s.stage = "Launching...".into();
+                s.failed = None;
             }
             MessageToFrontend::LiveSynced {
                 server_id,
@@ -1097,31 +1100,20 @@ impl LauncherUI {
                     self.notify_toast(i18n::t("error-game-exited"), NotifLevel::Warning, cx);
                 }
             }
-            MessageToFrontend::GameLog {
-                server_id,
-                line,
-                level,
-                timestamp,
-            } => {
+            MessageToFrontend::GameLog { server_id, lines } => {
                 let logs = self.logs.entry(server_id).or_default();
-                logs.push(LogEntry {
-                    timestamp,
-                    level,
-                    text: line.clone(),
-                });
+                logs.extend(lines.iter().cloned());
                 if logs.len() > MAX_LOG_LINES {
                     let drain = logs.len() - MAX_LOG_LINES;
                     logs.drain(0..drain);
                 }
 
+                // Once per batch: the filter runs over the whole buffer, and per
+                // line it was the frontend that fell behind the game.
                 if let Some(handle) = &self.console_window {
                     let _ = handle.update(cx, |view, _, cx| {
                         if view.server_id == server_id {
-                            view.logs.push(LogEntry {
-                                timestamp,
-                                level,
-                                text: line,
-                            });
+                            view.logs.extend(lines);
                             if view.logs.len() > MAX_LOG_LINES {
                                 let drain = view.logs.len() - MAX_LOG_LINES;
                                 view.logs.drain(0..drain);

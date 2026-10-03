@@ -485,6 +485,14 @@ pub enum GameLogLevel {
     Error,
 }
 
+/// One line of the game's output, already classified.
+#[derive(Debug, Clone)]
+pub struct GameLogLine {
+    pub timestamp: i64,
+    pub level: GameLogLevel,
+    pub text: String,
+}
+
 /// An optional mod as the UI sees it, with the player's permissions already
 /// resolved.
 #[derive(Debug, Clone)]
@@ -622,6 +630,11 @@ pub enum MessageToFrontend {
         server_id: Uuid,
         reason: String,
     },
+    /// The launch was called off before it started, and whoever called it off
+    /// has already told the player why: the button just goes back to normal.
+    LaunchCancelled {
+        server_id: Uuid,
+    },
 
     GameStarted {
         server_id: Uuid,
@@ -630,11 +643,13 @@ pub enum MessageToFrontend {
         server_id: Uuid,
         exit_ok: bool,
     },
+    /// What the game printed since the last batch, in order. A batch rather
+    /// than a line: a modded client prints thousands of lines a second at
+    /// startup and at a crash, and a message per line buried the ones that say
+    /// the game has exited.
     GameLog {
         server_id: Uuid,
-        line: String,
-        level: GameLogLevel,
-        timestamp: i64,
+        lines: Vec<GameLogLine>,
     },
 
     LauncherUpdateAvailable {

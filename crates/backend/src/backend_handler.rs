@@ -764,6 +764,9 @@ impl BackendState {
                 args: Default::default(),
                 level: schema::NotifLevel::Warning,
             });
+            // The window thought the game was down, or it wouldn't have offered
+            // a launch. Tell it otherwise, or the button sits on «Preparing».
+            self.ctx.send(MessageToFrontend::GameStarted { server_id });
             return;
         }
 
@@ -783,6 +786,11 @@ impl BackendState {
             return; // nobody asked for a launch
         };
         let (Some(login), Some(user)) = (self.login_info(), self.user.clone()) else {
+            modal.fail("Sign in required");
+            self.ctx.send(MessageToFrontend::SyncFailed {
+                server_id,
+                reason: "not signed in".into(),
+            });
             return;
         };
         let enabled = self.ctx.optional.get().for_server(&server_id);
@@ -862,7 +870,8 @@ impl BackendState {
     }
 
     /// Tells the frontend what can be done with the build right now.
-    fn send_build_state(&self, server_id: uuid::Uuid, manifest: &schema::BuildManifest) {
+    fn send_build_state(&mut self, server_id: uuid::Uuid, manifest: &schema::BuildManifest) {
+        self.build_state_known.insert(server_id);
         let dir = self.ctx.dirs.instance(&server_id);
         self.ctx.send(bridge::MessageToFrontend::BuildStateChanged {
             server_id,
@@ -996,6 +1005,19 @@ impl BackendState {
                 self.ctx.send(MessageToFrontend::LoggedOut);
             }
             ServerWsMsg::ServerList { servers } => {
+                // Until the manifest comes, the disk still tells whether a build
+                // is installed at all. Without this every installed build
+                // offered «Install» until the master answered.
+                for server in &servers {
+                    if self.build_state_known.insert(server.id) {
+                        self.ctx.send(MessageToFrontend::BuildStateChanged {
+                            server_id: server.id,
+                            state: crate::sync::installed_state(
+                                &self.ctx.dirs.instance(&server.id),
+                            ),
+                        });
+                    }
+                }
                 self.servers = servers.clone();
                 self.ctx.send(MessageToFrontend::ServerList { servers });
             }
@@ -1022,6 +1044,19 @@ impl BackendState {
                     .send(MessageToFrontend::LauncherUpdateAvailable { version });
             }
             ServerWsMsg::Notification { key, args, level } => {
+                // The master's answer to a manifest request it won't serve. It
+                // names no server, but a launch waiting on a manifest waits on
+                // exactly this, and left pending it kept «Preparing» up for good.
+                if matches!(
+                    key.as_str(),
+                    "notif-no-published-build" | "notif-build-pending-import"
+                ) {
+                    for (server_id, modal) in self.pending_launch.drain() {
+                        modal.fail(&key);
+                        self.ctx
+                            .send(MessageToFrontend::LaunchCancelled { server_id });
+                    }
+                }
                 self.ctx
                     .send(MessageToFrontend::AddNotification { key, args, level });
             }

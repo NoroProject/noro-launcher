@@ -9,7 +9,7 @@ use crate::ws_client::{self, WsClient};
 use bridge::{BackendReceiver, FrontendHandle, MessageToBackend, MessageToFrontend, QuitHandler};
 use parking_lot::Mutex;
 use schema::{BuildManifest, ClientWsMsg, ServerEntry, ServerWsMsg, UserProfile};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -97,6 +97,9 @@ pub struct BackendState {
     pub manifests: HashMap<Uuid, BuildManifest>,
     /// Launches waiting on a manifest to arrive.
     pub pending_launch: HashMap<Uuid, bridge::ModalAction>,
+    /// Builds whose state the window already has. A guess from the disk is
+    /// only for the rest: it must never replace what a manifest established.
+    pub build_state_known: HashSet<Uuid>,
 }
 
 const STARTUP_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
@@ -190,6 +193,7 @@ async fn run(
         servers: Vec::new(),
         manifests: HashMap::new(),
         pending_launch: HashMap::new(),
+        build_state_known: HashSet::new(),
     };
 
     // Over REST rather than waiting for the socket: the login screen would
@@ -467,6 +471,8 @@ fn build_launcher_version(v: &serde_json::Value) -> serde_json::Value {
     })
 }
 
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
+
 /// Everything needed to sync a build and start the game.
 pub struct Launch {
     pub ctx: Ctx,
@@ -503,14 +509,34 @@ pub fn spawn_sync_and_launch(req: Launch) {
         // and forth with whichever stage reported last.
         let totals: Arc<Mutex<BTreeMap<bridge::SyncStage, (u64, u64)>>> =
             Arc::new(Mutex::new(BTreeMap::new()));
+        // The window hears from each stage every 50ms at most, plus its first
+        // and last report. A sync reports every file, and the 13 000 messages
+        // of one GTNH install buried the one saying the sync was over.
+        let last_sent: Arc<Mutex<BTreeMap<bridge::SyncStage, Instant>>> =
+            Arc::new(Mutex::new(BTreeMap::new()));
         let progress: crate::sync::ProgressFn = Arc::new(move |stage, done, total, file| {
-            to_fe.send(MessageToFrontend::SyncProgress {
-                server_id,
-                stage,
-                done,
-                total,
-                file: file.clone(),
-            });
+            let due = {
+                let mut last = last_sent.lock();
+                let now = Instant::now();
+                let due = done == 0
+                    || done >= total
+                    || last
+                        .get(&stage)
+                        .is_none_or(|at| now.duration_since(*at) >= PROGRESS_INTERVAL);
+                if due {
+                    last.insert(stage, now);
+                }
+                due
+            };
+            if due {
+                to_fe.send(MessageToFrontend::SyncProgress {
+                    server_id,
+                    stage,
+                    done,
+                    total,
+                    file: file.clone(),
+                });
+            }
             if stage.is_download() {
                 let (sum_done, sum_total) = {
                     let mut g = totals.lock();

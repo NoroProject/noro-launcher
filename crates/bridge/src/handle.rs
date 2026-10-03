@@ -1,12 +1,13 @@
 //! Both ends of the channel: commands travel frontend → backend, updates come
 //! back the other way. The handles clone freely, the receivers do not.
 //!
-//! Debug builds cap both channels at 256 messages so a backlog is visible during
-//! development; release builds are unbounded.
+//! Debug builds cap the command channel at 256 messages so a backlog is visible
+//! during development. Updates are never capped or dropped, debug or not: a
+//! lost update is state the window never learns — a game that has exited but
+//! still offers «Stop», a build that is installed but still offers «Install».
 
 #[cfg(debug_assertions)]
 use tokio::sync::mpsc::{Receiver, Sender};
-#[cfg(not(debug_assertions))]
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::message::{MessageToBackend, MessageToFrontend};
@@ -18,13 +19,9 @@ pub fn create_pair() -> (
     FrontendReceiver,
     FrontendHandle,
 ) {
-    #[cfg(debug_assertions)]
-    let (frontend_send, frontend_recv) = tokio::sync::mpsc::channel(256);
+    let (frontend_send, frontend_recv) = tokio::sync::mpsc::unbounded_channel();
     #[cfg(debug_assertions)]
     let (backend_send, backend_recv) = tokio::sync::mpsc::channel(256);
-
-    #[cfg(not(debug_assertions))]
-    let (frontend_send, frontend_recv) = tokio::sync::mpsc::unbounded_channel();
     #[cfg(not(debug_assertions))]
     let (backend_send, backend_recv) = tokio::sync::mpsc::unbounded_channel();
 
@@ -75,9 +72,6 @@ impl BackendReceiver {
 
 #[derive(Debug)]
 pub struct FrontendReceiver {
-    #[cfg(debug_assertions)]
-    receiver: Receiver<(MessageToFrontend, Option<Serial>)>,
-    #[cfg(not(debug_assertions))]
     receiver: UnboundedReceiver<(MessageToFrontend, Option<Serial>)>,
     processed_serial: AtomicSetSerial,
 }
@@ -89,6 +83,21 @@ impl FrontendReceiver {
             self.processed_serial.set(serial);
         }
         Some(message)
+    }
+
+    /// The next update if one is already queued. Lets the window take a burst
+    /// in one go instead of waking up once per message.
+    pub fn try_recv(&mut self) -> Option<MessageToFrontend> {
+        let (message, serial) = self.receiver.try_recv().ok()?;
+        if let Some(serial) = serial {
+            self.processed_serial.set(serial);
+        }
+        Some(message)
+    }
+
+    /// How many updates are waiting.
+    pub fn backlog(&self) -> usize {
+        self.receiver.len()
     }
 }
 
@@ -130,9 +139,6 @@ impl BackendHandle {
 
 #[derive(Clone, Debug)]
 pub struct FrontendHandle {
-    #[cfg(debug_assertions)]
-    sender: Sender<(MessageToFrontend, Option<Serial>)>,
-    #[cfg(not(debug_assertions))]
     sender: UnboundedSender<(MessageToFrontend, Option<Serial>)>,
     #[allow(dead_code)]
     processed_serial: AtomicSetSerial,
@@ -141,12 +147,10 @@ pub struct FrontendHandle {
 }
 
 impl FrontendHandle {
-    /// Never blocks the runtime: in debug an update sent while the frontend is
-    /// 256 messages behind is dropped, not queued.
+    /// Never blocks the runtime and never drops: a sync reports every file and
+    /// a game can print thousands of lines in a second, and the update that
+    /// says it exited comes right after them.
     pub fn send(&self, message: MessageToFrontend) {
-        #[cfg(debug_assertions)]
-        let _ = self.sender.try_send((message, None));
-        #[cfg(not(debug_assertions))]
         let _ = self.sender.send((message, None));
     }
 }

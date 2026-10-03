@@ -27,6 +27,8 @@ use theme::*;
 
 const MAIN_WINDOW_SIZE: (f32, f32) = (1100., 720.);
 const MAIN_WINDOW_MIN_SIZE: (f32, f32) = (1040., 680.);
+/// Updates taken into the window in one go.
+const MAX_UPDATE_BATCH: usize = 256;
 
 impl gpui::Render for LauncherUI {
     fn render(&mut self, _window: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
@@ -105,10 +107,37 @@ fn open_window(
                     let mut async_app = async_app.clone();
                     async move {
                         let mut recv = frontend_recv.lock().await;
+                        #[cfg(debug_assertions)]
+                        let mut lagging = false;
                         loop {
-                            let Some(msg) = recv.recv().await else { break };
+                            let Some(first) = recv.recv().await else {
+                                break;
+                            };
+                            // Whatever is already queued goes in the same
+                            // update: one trip into the app per message made a
+                            // burst slower to take in than to send.
+                            let mut batch = vec![first];
+                            while batch.len() < MAX_UPDATE_BATCH {
+                                let Some(msg) = recv.try_recv() else { break };
+                                batch.push(msg);
+                            }
+                            // The channel no longer drops anything, so falling
+                            // behind shows up as a delay; say so while developing.
+                            #[cfg(debug_assertions)]
+                            {
+                                let behind = recv.backlog() > MAX_UPDATE_BATCH;
+                                if behind && !lagging {
+                                    tracing::warn!(
+                                        backlog = recv.backlog(),
+                                        "the window is falling behind the backend"
+                                    );
+                                }
+                                lagging = behind;
+                            }
                             let updated = view_weak.update(&mut async_app, |state, cx| {
-                                state.on_message(msg, cx);
+                                for msg in batch {
+                                    state.on_message(msg, cx);
+                                }
                             });
                             if updated.is_err() {
                                 break;

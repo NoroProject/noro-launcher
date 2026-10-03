@@ -13,5 +13,5 @@ pub mod merge;
 pub mod plan;
 pub mod verify;
 
-pub use file_sync::{build_state, find_java, sync_server, ProgressFn};
+pub use file_sync::{build_state, find_java, installed_state, sync_server, ProgressFn};
 pub use verify::verify_before_launch;

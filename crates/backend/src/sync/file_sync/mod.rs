@@ -19,7 +19,7 @@ mod tasks;
 use clean::clean_extra;
 pub use clean::{excluded_optional_files, is_protected};
 use stages::STAGE_GROUPS;
-pub use state::{build_state, find_java, version_marker};
+pub use state::{build_state, find_java, installed_state, marker_contents, version_marker};
 
 pub async fn sync_server(
     client: &reqwest::Client,
@@ -131,7 +131,7 @@ pub async fn sync_server(
 
     // Which build is installed. The files on disk don't say by themselves, so
     // without this there's no telling "install" and "update" from "launch".
-    let _ = tokio::fs::write(version_marker(instance_dir), &manifest.version).await;
+    let _ = tokio::fs::write(version_marker(instance_dir), marker_contents(manifest)).await;
 
     progress(SyncStage::Done, 1, 1, String::new());
     Ok(())

@@ -108,11 +108,12 @@ async fn instances(dirs: &LauncherDirectories) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for e in entries.flatten() {
         let name = e.file_name().to_string_lossy().into_owned();
+        // The version is the marker's first line; the second is a fingerprint.
         let version = tokio::fs::read_to_string(e.path().join(".noro-build"))
             .await
-            .unwrap_or_else(|_| "?".into())
-            .trim()
-            .to_string();
+            .ok()
+            .and_then(|marker| marker.lines().next().map(|l| l.trim().to_string()))
+            .unwrap_or_else(|| "?".into());
         out.push((name, version));
     }
     out

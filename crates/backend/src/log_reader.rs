@@ -4,7 +4,7 @@
 //! [`schema::redact`], not here — log files need the same rules as the live
 //! stream.
 
-use bridge::{GameLogLevel, MessageToFrontend};
+use bridge::{GameLogLevel, GameLogLine, MessageToFrontend};
 use schema::redact;
 use std::borrow::Cow;
 use tokio::io::AsyncRead;
@@ -31,16 +31,23 @@ pub async fn spawn_log_reader<R>(
     R: AsyncRead + Unpin + Send + 'static,
 {
     let mut buffer = Vec::new();
+    // Big enough that a burst comes out in a few reads, and every read goes to
+    // the window as one message however many lines it holds.
+    let mut chunk = vec![0u8; 64 * 1024];
 
     loop {
-        let mut chunk = [0u8; 4096];
         match reader.read(&mut chunk).await {
             Ok(0) => break, // EOF
             Ok(n) => {
                 buffer.extend_from_slice(&chunk[..n]);
-                while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
-                    let line_bytes = buffer.drain(..pos + 1).collect::<Vec<_>>();
-                    let line = String::from_utf8_lossy(&line_bytes);
+                let mut lines = Vec::new();
+                // Walked by offset and trimmed once at the end: draining line by
+                // line moved the rest of the buffer every time.
+                let mut start = 0;
+                while let Some(len) = buffer[start..].iter().position(|&b| b == b'\n') {
+                    let line_bytes = &buffer[start..start + len];
+                    start += len + 1;
+                    let line = String::from_utf8_lossy(line_bytes);
                     let line = line.trim_end();
                     if line.is_empty() {
                         continue;
@@ -70,12 +77,15 @@ pub async fn spawn_log_reader<R>(
                         }
                     }
 
-                    frontend.send(MessageToFrontend::GameLog {
-                        server_id,
-                        line: clean_text.into_owned(),
-                        level,
+                    lines.push(GameLogLine {
                         timestamp: chrono::Utc::now().timestamp_millis(),
+                        level,
+                        text: clean_text.into_owned(),
                     });
+                }
+                buffer.drain(..start);
+                if !lines.is_empty() {
+                    frontend.send(MessageToFrontend::GameLog { server_id, lines });
                 }
             }
             Err(_) => break,
