@@ -37,6 +37,8 @@ pub fn page(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
             d.child(game_sync::sync_overlay(server.id, &sync, cx))
         })
         .child(game_bar::bottom_bar(ui, &server, &sync, locked, cx))
+        // Last, so nothing on the page paints over the open list.
+        .children(super::build_picker::build_menu(ui, &server, cx))
         .into_any_element()
 }
 
