@@ -279,6 +279,11 @@ fn row(
         .child(channel_chip(&v.channel))
         .when(usable, |d| {
             d.on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                // One change at a time: a second click while the first is on its
+                // way used to send it twice.
+                if this.content_busy {
+                    return;
+                }
                 this.content_busy = true;
                 this.content_picker = None;
                 this.content_error = None;

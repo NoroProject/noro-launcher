@@ -46,7 +46,11 @@ fn cards(ui: &LauncherUI, cx: &mut Cx) -> Vec<AnyElement> {
             .font_family(FONT_PIXEL_ALT)
             .text_size(px(16.))
             .text_color(rgb(TEXT_MUTED))
-            .child(t("news-empty"))
+            .child(if ui.news_loaded {
+                t("news-empty")
+            } else {
+                t("launcher-loading")
+            })
             .into_any_element()];
     }
     items

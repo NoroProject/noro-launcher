@@ -59,6 +59,7 @@ pub fn bottom_bar(
 fn console_button(active: bool, cx: &mut Cx) -> AnyElement {
     div()
         .id("toggle-console")
+        .tooltip(crate::components::hint(i18n::t("hint-console")))
         // Matches the play button beside it.
         .size(px(56.))
         .flex_none()

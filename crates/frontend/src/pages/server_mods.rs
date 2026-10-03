@@ -11,14 +11,22 @@ use i18n::t;
 use uuid::Uuid;
 
 pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
-    let mods = ui
+    let icons: Vec<String> = ui
         .optional_mods
         .get(&server_id)
-        .cloned()
+        .map(|mods| mods.iter().filter_map(|m| m.icon_url.clone()).collect())
         .unwrap_or_default();
-    for icon_url in mods.iter().filter_map(|m| m.icon_url.clone()) {
+    for icon_url in icons {
         ui.ensure_optional_mod_icon_loaded(Some(icon_url), cx);
     }
+    // Borrowed for the rest of the frame: the list used to be cloned whole,
+    // descriptions and all, on every redraw.
+    let ui = &*ui;
+    let mods: &[OptionalModInfo] = ui
+        .optional_mods
+        .get(&server_id)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
 
     div()
         .size_full()
@@ -35,8 +43,8 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .flex()
                 .flex_col()
                 .gap(px(16.))
-                .child(page_header(ui, server_id, &mods, cx))
-                .child(mod_list(ui, server_id, &mods, cx)),
+                .child(page_header(ui, server_id, mods, cx))
+                .child(mod_list(ui, server_id, mods, cx)),
         )
         .into_any_element()
 }
@@ -129,7 +137,13 @@ fn mod_list(ui: &LauncherUI, server_id: Uuid, mods: &[OptionalModInfo], cx: &mut
             .font_family(FONT_PIXEL_ALT)
             .text_size(px(14.))
             .text_color(rgb(TEXT_MUTED))
-            .child(t("mods-empty"))
+            // No list yet means the build's manifest hasn't arrived, which is
+            // not the same as a build with no optional mods.
+            .child(if ui.optional_mods.contains_key(&server_id) {
+                t("mods-empty")
+            } else {
+                t("launcher-loading")
+            })
             .into_any_element();
     }
 

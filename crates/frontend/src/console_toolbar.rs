@@ -127,10 +127,23 @@ pub fn toolbar(view: &ConsoleWindow, cx: &mut Cx) -> AnyElement {
             },
             cx,
         ))
+        .child(action("console-save", t("console-save"), save, cx))
         .child(action(
             "console-clear",
-            t("console-clear"),
+            if view.clear_armed {
+                t("console-clear-confirm")
+            } else {
+                t("console-clear")
+            },
             |v, cx| {
+                // Clearing can't be undone and the line that mattered is
+                // usually the one just scrolled past: ask once.
+                if !v.clear_armed {
+                    v.clear_armed = true;
+                    disarm_later(cx);
+                    return;
+                }
+                v.clear_armed = false;
                 let count = v.buffer.total();
                 let server_id = v.server_id;
                 v.show_server(server_id, Vec::new());
@@ -146,6 +159,59 @@ pub fn toolbar(view: &ConsoleWindow, cx: &mut Cx) -> AnyElement {
             cx,
         ))
         .into_any_element()
+}
+
+fn disarm_later(cx: &mut Cx) {
+    cx.spawn(|view: WeakEntity<ConsoleWindow>, cx: &mut AsyncApp| {
+        let mut cx = cx.clone();
+        async move {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(3))
+                .await;
+            let _ = view.update(&mut cx, |v, cx| {
+                v.clear_armed = false;
+                cx.notify();
+            });
+        }
+    })
+    .detach();
+}
+
+/// The visible lines to a file the player picks. Copying thousands of lines
+/// through the clipboard into a chat is how logs used to reach support.
+fn save(v: &mut ConsoleWindow, cx: &mut Cx) {
+    let text = v.buffer.copy_text();
+    if text.is_empty() {
+        return;
+    }
+    let name = format!(
+        "noro-console-{}.log",
+        chrono::Local::now().format("%Y-%m-%d_%H-%M-%S")
+    );
+    let dir = dirs::download_dir()
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(std::env::temp_dir);
+    let picked = cx.prompt_for_new_path(&dir, Some(&name));
+    cx.spawn(|view: WeakEntity<ConsoleWindow>, cx: &mut AsyncApp| {
+        let mut cx = cx.clone();
+        async move {
+            let Ok(Ok(Some(path))) = picked.await else {
+                return; // cancelled
+            };
+            let written = cx
+                .background_executor()
+                .spawn(async move { std::fs::write(&path, text) })
+                .await;
+            let _ = view.update(&mut cx, |v, cx| {
+                v.status_message = match written {
+                    Ok(()) => t("console-saved"),
+                    Err(e) => format!("{}: {e}", t("console-save-failed")),
+                };
+                cx.notify();
+            });
+        }
+    })
+    .detach();
 }
 
 fn title(visible: usize, total: usize, query: &str, status: &str) -> AnyElement {

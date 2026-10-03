@@ -49,6 +49,20 @@ pub fn toolbar(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             }),
         ))
         .child(div().flex_1())
+        // An install or removal is on its way: say so, since the list only
+        // changes once the master answers.
+        .when(ui.content_busy, |d| {
+            d.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.))
+                    .text_size(px(11.))
+                    .text_color(gpui::rgb(crate::theme::TEXT_MUTED))
+                    .child(crate::icons::ic("hourglass", 14., crate::theme::TEXT_MUTED))
+                    .child(t("content-working")),
+            )
+        })
         .when(!ui.content_show_installed, |d| {
             d.child(kind_row(ui, server_id, cx))
         })

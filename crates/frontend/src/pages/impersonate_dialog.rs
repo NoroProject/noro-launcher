@@ -70,7 +70,7 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                         div()
                             .text_size(px(11.))
                             .text_color(rgb(TEXT_MUTED))
-                            .child(i18n::t_count("common-seconds", prompt.expires_in_secs)),
+                            .child(i18n::t_count("common-seconds", prompt.seconds_left())),
                     )
                     .child(
                         div()

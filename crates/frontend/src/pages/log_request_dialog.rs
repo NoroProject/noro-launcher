@@ -110,8 +110,9 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                             .when(is_open, |d| {
                                 d.child(
                                     div()
+                                        .id("logreq-preview")
                                         .h(px(180.))
-                                        .overflow_hidden()
+                                        .overflow_y_scroll()
                                         .p(px(8.))
                                         .border_t_1()
                                         .border_color(rgb(BORDER))

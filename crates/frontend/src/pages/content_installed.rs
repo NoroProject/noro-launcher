@@ -176,7 +176,17 @@ fn actions(server_id: Uuid, id: Uuid, enabled: bool, armed: bool, cx: &mut Cx) -
             format!("toggle-{id}"),
             if enabled { "eye" } else { "eye-off" },
             if enabled { TEXT_MUTED } else { WARNING },
+            t(if enabled {
+                "hint-content-off"
+            } else {
+                "hint-content-on"
+            }),
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                // One change at a time: a second click while the first is on its
+                // way used to send it twice.
+                if this.content_busy {
+                    return;
+                }
                 this.content_busy = true;
                 this.backend
                     .send(MessageToBackend::SetPersonalContentEnabled {
@@ -204,6 +214,11 @@ fn actions(server_id: Uuid, id: Uuid, enabled: bool, armed: bool, cx: &mut Cx) -
                 .child(t("common-delete"))
                 .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                     if this.confirm_or_arm(format!("remove-{id}"), cx) {
+                        // One change at a time: a second click while the first is on its
+                        // way used to send it twice.
+                        if this.content_busy {
+                            return;
+                        }
                         this.content_busy = true;
                         this.backend
                             .send(MessageToBackend::RemovePersonalContent { server_id, id });
@@ -216,6 +231,7 @@ fn actions(server_id: Uuid, id: Uuid, enabled: bool, armed: bool, cx: &mut Cx) -
                 format!("remove-{id}"),
                 "trash-2",
                 ERROR,
+                t("common-delete"),
                 cx.listener(move |this, _e: &ClickEvent, _w, cx| {
                     this.confirm_or_arm(format!("remove-{id}"), cx);
                     cx.notify();
@@ -229,10 +245,12 @@ fn icon_action(
     id: String,
     icon: &'static str,
     colour: u32,
+    hint: String,
     on_click: impl Fn(&ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static,
 ) -> AnyElement {
     div()
         .id(SharedString::from(id))
+        .tooltip(crate::components::hint(hint))
         .size(px(30.))
         .rounded(px(R_SM))
         .flex()

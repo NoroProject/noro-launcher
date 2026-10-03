@@ -6,6 +6,7 @@ use super::sidebar_user::user_card;
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent};
+use i18n::t;
 
 pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let collapsed = ui.sidebar_collapsed;
@@ -39,6 +40,7 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     d.child(logo(cx)).child(nav_icon(
                         "sidebar-toggle-btn",
                         "panel-left-close",
+                        t("hint-collapse-sidebar"),
                         false,
                         cx.listener(|this, _e, _w, cx| {
                             this.sidebar_collapsed = true;
@@ -101,6 +103,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .child(dot_icon(
             "messages-bottom",
             "mail",
+            t("hint-messages"),
             ui.page == Page::Messages,
             super::messages::unread_total(ui) > 0,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
@@ -111,6 +114,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .child(nav_icon(
             "account-bottom",
             "shield",
+            t("hint-account"),
             ui.page == Page::Account,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
                 this.page = Page::Account;
@@ -120,6 +124,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .child(nav_icon(
             "news-bottom",
             "newspaper",
+            t("hint-news"),
             ui.page == Page::News,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
                 this.page = Page::News;
@@ -129,6 +134,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .child(nav_icon(
             "settings-bottom",
             "settings",
+            t("hint-settings"),
             ui.page == Page::Settings,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
                 this.page = Page::Settings;

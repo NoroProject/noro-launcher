@@ -434,6 +434,12 @@ pub struct LauncherUI {
     /// that was a request per frame, sixty a second, each with its own redraw on
     /// the reply. Hence "every list lags".
     pub account_requested: HashSet<&'static str>,
+    /// Which of them have answered. Asked but not answered is "loading", not
+    /// "nothing here": a player with punishments used to see "none" for the
+    /// second it took the master to reply.
+    pub account_loaded: HashSet<&'static str>,
+    pub dm_loaded: bool,
+    pub news_loaded: bool,
     pub punishments: Vec<bridge::PunishmentView>,
     pub rules: Vec<bridge::RuleView>,
     pub rules_query: String,
@@ -447,6 +453,10 @@ pub struct LauncherUI {
     pub dm_requested: bool,
     /// The conversation that is open.
     pub dm_open: Option<bridge::DmThreadOpen>,
+    /// Conversations open on their newest message, like any chat; without a
+    /// handle they opened at the top, on the oldest one.
+    pub dm_scroll: gpui::ScrollHandle,
+    pub ticket_scroll: gpui::ScrollHandle,
     /// What is being typed, in whichever of the two is open.
     pub compose: String,
     pub compose_focus: Option<gpui::FocusHandle>,
@@ -474,7 +484,15 @@ pub struct ImpersonatePrompt {
     pub grant_id: Uuid,
     pub target_username: String,
     pub reason: String,
-    pub expires_in_secs: i64,
+    pub expires_at: std::time::Instant,
+}
+
+impl ImpersonatePrompt {
+    pub fn seconds_left(&self) -> i64 {
+        self.expires_at
+            .saturating_duration_since(std::time::Instant::now())
+            .as_secs() as i64
+    }
 }
 pub struct ConsoleWindow {
     pub server_id: Uuid,
@@ -482,6 +500,8 @@ pub struct ConsoleWindow {
     pub list_state: ListState,
     pub status_message: String,
     pub copy_success: bool,
+    /// The first click on "clear" asks; a second within a few seconds clears.
+    pub clear_armed: bool,
 }
 
 impl ConsoleWindow {
@@ -498,6 +518,7 @@ impl ConsoleWindow {
             list_state,
             status_message: String::new(),
             copy_success: false,
+            clear_armed: false,
         }
     }
 
@@ -694,6 +715,9 @@ impl LauncherUI {
 
             account_tab: AccountTab::default(),
             account_requested: HashSet::new(),
+            account_loaded: HashSet::new(),
+            dm_loaded: false,
+            news_loaded: false,
             punishments: Vec::new(),
             rules: Vec::new(),
             rules_query: String::new(),
@@ -703,6 +727,8 @@ impl LauncherUI {
             dm_threads: Vec::new(),
             dm_requested: false,
             dm_open: None,
+            dm_scroll: gpui::ScrollHandle::new(),
+            ticket_scroll: gpui::ScrollHandle::new(),
             compose: String::new(),
             compose_focus: None,
         }
@@ -1053,6 +1079,7 @@ impl LauncherUI {
                     .map(|n| (n.id, crate::pages::plain_excerpt(&n.body, 240).into()))
                     .collect();
                 self.news = items;
+                self.news_loaded = true;
             }
             MessageToFrontend::ConfigState {
                 memory_min_mb,
@@ -1327,8 +1354,10 @@ impl LauncherUI {
                     grant_id,
                     target_username,
                     reason,
-                    expires_in_secs,
+                    expires_at: std::time::Instant::now()
+                        + std::time::Duration::from_secs(expires_in_secs.max(0) as u64),
                 });
+                self.tick_impersonate_prompt(grant_id, cx);
             }
             MessageToFrontend::LogRequestPrompt {
                 request_id,
@@ -1522,9 +1551,18 @@ impl LauncherUI {
                 self.java_busy = false;
             }
 
-            MessageToFrontend::PunishmentsLoaded { items } => self.punishments = items,
-            MessageToFrontend::RulesLoaded { items } => self.rules = items,
-            MessageToFrontend::TicketsLoaded { items } => self.tickets = items,
+            MessageToFrontend::PunishmentsLoaded { items } => {
+                self.punishments = items;
+                self.account_loaded.insert("punishments");
+            }
+            MessageToFrontend::RulesLoaded { items } => {
+                self.rules = items;
+                self.account_loaded.insert("rules");
+            }
+            MessageToFrontend::TicketsLoaded { items } => {
+                self.tickets = items;
+                self.account_loaded.insert("tickets");
+            }
             MessageToFrontend::TicketLoaded { id, messages, .. } => {
                 // Subject and status come from the list: the messages endpoint returns
                 // only the messages, and putting empty strings here would erase the
@@ -1536,11 +1574,16 @@ impl LauncherUI {
                     .map(|t| (t.subject.clone(), t.status.clone()))
                     .unwrap_or_default();
                 self.ticket_open = Some((id, subject, status, messages));
+                self.ticket_scroll.scroll_to_bottom();
                 self.compose.clear();
             }
-            MessageToFrontend::DmThreadsLoaded { items } => self.dm_threads = items,
+            MessageToFrontend::DmThreadsLoaded { items } => {
+                self.dm_threads = items;
+                self.dm_loaded = true;
+            }
             MessageToFrontend::DmThreadLoaded { thread } => {
                 self.dm_open = Some(*thread);
+                self.dm_scroll.scroll_to_bottom();
                 self.compose.clear();
             }
             MessageToFrontend::DmArrived { peer, message } => {
@@ -1550,6 +1593,7 @@ impl LauncherUI {
                 if let Some(open) = self.dm_open.as_mut() {
                     if open.peer == peer {
                         open.messages.push(message);
+                        self.dm_scroll.scroll_to_bottom();
                     }
                 }
                 self.backend.send(MessageToBackend::RequestDmThreads);
@@ -1675,6 +1719,8 @@ impl LauncherUI {
     /// fetched again.
     fn clear_account_data(&mut self) {
         self.account_requested.clear();
+        self.account_loaded.clear();
+        self.dm_loaded = false;
         self.punishments.clear();
         self.tickets.clear();
         self.ticket_open = None;
@@ -2065,6 +2111,33 @@ impl LauncherUI {
     /// Close the forced-collection modal; there is nothing to answer there.
     pub fn dismiss_log_request(&mut self) {
         self.log_request_prompt = None;
+    }
+
+    /// Counts the seconds down once a second while the request is up, and
+    /// takes it away when it runs out: the number used to stay where it
+    /// started, and an expired request could still be "allowed".
+    fn tick_impersonate_prompt(&mut self, grant_id: Uuid, cx: &mut Context<Self>) {
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| loop {
+            executor.timer(std::time::Duration::from_secs(1)).await;
+            let still_up = this.update(cx, |ui, cx| {
+                let Some(prompt) = &ui.impersonate_prompt else {
+                    return false;
+                };
+                if prompt.grant_id != grant_id {
+                    return false;
+                }
+                if prompt.seconds_left() <= 0 {
+                    ui.impersonate_prompt = None;
+                }
+                cx.notify();
+                ui.impersonate_prompt.is_some()
+            });
+            if !matches!(still_up, Ok(true)) {
+                break;
+            }
+        })
+        .detach();
     }
 
     pub fn answer_impersonate(&mut self, accepted: bool) {

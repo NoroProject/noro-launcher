@@ -36,6 +36,7 @@ pub fn ticket(
         .child(
             panel()
                 .id("ticket-thread")
+                .track_scroll(&ui.ticket_scroll)
                 .flex_1()
                 .min_h_0()
                 .overflow_y_scroll()

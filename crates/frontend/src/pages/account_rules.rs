@@ -53,7 +53,9 @@ pub fn view(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
         .flex_col()
         .gap(px(12.))
         .child(search(ui, cx))
-        .child(if empty {
+        .child(if empty && !ui.account_loaded.contains("rules") {
+            super::account::loading()
+        } else if empty {
             super::account::empty("info", t("account-rules-none"))
         } else {
             super::account::scroll("account-rules-scroll", blocks)

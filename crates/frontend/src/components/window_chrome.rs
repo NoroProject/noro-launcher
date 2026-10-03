@@ -142,6 +142,11 @@ fn control(
 ) -> AnyElement {
     div()
         .id(id)
+        .tooltip(crate::components::hint(i18n::t(if is_close {
+            "hint-close"
+        } else {
+            "hint-minimize"
+        })))
         .size(px(26.))
         .flex()
         .items_center()

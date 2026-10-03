@@ -86,7 +86,11 @@ fn header(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 
 fn punishments(ui: &LauncherUI) -> AnyElement {
     if ui.punishments.is_empty() {
-        return empty("circle-check", t("account-punishments-none"));
+        return if ui.account_loaded.contains("punishments") {
+            empty("circle-check", t("account-punishments-none"))
+        } else {
+            loading()
+        };
     }
 
     let rows: Vec<AnyElement> = ui.punishments.iter().map(punishment).collect();
@@ -210,11 +214,15 @@ fn tickets(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .flex_col()
         .gap(px(12.))
         .child(new_ticket_button(cx))
-        .child(if rows.is_empty() {
-            empty("inbox", t("account-tickets-none"))
-        } else {
-            scroll("account-tickets-scroll", rows)
-        })
+        .child(
+            if rows.is_empty() && !ui.account_loaded.contains("tickets") {
+                loading()
+            } else if rows.is_empty() {
+                empty("inbox", t("account-tickets-none"))
+            } else {
+                scroll("account-tickets-scroll", rows)
+            },
+        )
         .into_any_element()
 }
 
@@ -375,6 +383,10 @@ pub(super) fn scroll(id: &'static str, rows: Vec<AnyElement>) -> AnyElement {
         .gap(px(8.))
         .children(rows)
         .into_any_element()
+}
+
+pub(super) fn loading() -> AnyElement {
+    empty("hourglass", t("launcher-loading"))
 }
 
 pub(super) fn empty(icon: &'static str, text: String) -> AnyElement {
