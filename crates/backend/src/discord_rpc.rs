@@ -153,25 +153,32 @@ fn update_activity(
         .large_image("logo")
         .large_text("NORO Launcher");
 
+    // In the player's language: friends reading the status mostly share it.
+    // The catalog is the process-wide one the window switches.
+    let named = |key: &str, name: &str| {
+        let mut args = i18n::FluentArgs::new();
+        args.set("name", name.to_string());
+        i18n::t_args(key, &args)
+    };
     let (details, state_str, start_ts) = match state {
         DiscordRpcState::Launcher { server_name } => {
-            let details = "In the NORO launcher".to_string();
+            let details = i18n::t("rpc-in-launcher");
             let state_str = match server_name {
-                Some(name) => format!("Server: {name}"),
-                None => "Picking a server".to_string(),
+                Some(name) => named("rpc-server", name),
+                None => i18n::t("rpc-picking-server"),
             };
             (details, state_str, launcher_start_time)
         }
         DiscordRpcState::GameLoading { server_name } => (
-            format!("Starting: {server_name}"),
-            "Loading resources...".to_string(),
+            named("rpc-starting", server_name),
+            i18n::t("rpc-loading"),
             launcher_start_time,
         ),
         DiscordRpcState::GameMenu {
             server_name,
             start_timestamp,
         } => (
-            "In the main menu".to_string(),
+            i18n::t("rpc-main-menu"),
             server_name.clone(),
             *start_timestamp as i64,
         ),
@@ -181,10 +188,15 @@ fn update_activity(
             online_max,
             start_timestamp,
         } => {
-            let details = format!("Playing on {server_name}");
+            let details = named("rpc-playing", server_name);
             let state_str = match (online_current, online_max) {
-                (Some(cur), Some(max)) => format!("Online: {cur}/{max}"),
-                _ => "On the server".to_string(),
+                (Some(cur), Some(max)) => {
+                    let mut args = i18n::FluentArgs::new();
+                    args.set("current", cur.to_string());
+                    args.set("max", max.to_string());
+                    i18n::t_args("rpc-online", &args)
+                }
+                _ => i18n::t("rpc-on-server"),
             };
             (details, state_str, *start_timestamp as i64)
         }
