@@ -107,6 +107,21 @@ fn classify_log(line: &str, is_stderr: bool) -> (GameLogLevel, Cow<'_, str>) {
     }
 
     let upper = line.to_uppercase();
+    // log4j names the level next to the thread: `[Client thread/WARN]`. That
+    // one is authoritative — a message that merely says "severe" or
+    // "exception" is not an error, and a WARN line is not INFO.
+    for (tag, level) in [
+        ("/FATAL]", GameLogLevel::Error),
+        ("/ERROR]", GameLogLevel::Error),
+        ("/WARN]", GameLogLevel::Warn),
+        ("/INFO]", GameLogLevel::Info),
+        ("/DEBUG]", GameLogLevel::Info),
+        ("/TRACE]", GameLogLevel::Info),
+    ] {
+        if upper.contains(tag) {
+            return (level, Cow::Borrowed(line));
+        }
+    }
     if upper.contains("[ERROR]")
         || upper.contains("[FATAL]")
         || upper.contains("SEVERE")
@@ -134,5 +149,21 @@ fn classify_log(line: &str, is_stderr: bool) -> (GameLogLevel, Cow<'_, str>) {
         }
     } else {
         (GameLogLevel::Info, Cow::Borrowed(line))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_thread_level_decides() {
+        let warn = "[06:18:18] [Client thread/WARN] [AssetDirector]: Ignoring mod etfuturum";
+        assert_eq!(classify_log(warn, false).0, GameLogLevel::Warn);
+        // "severe" in the text of an INFO line used to make it an error.
+        let info = "[06:18:08] [Client thread/INFO] [FML]: could severe stability issues";
+        assert_eq!(classify_log(info, false).0, GameLogLevel::Info);
+        let error = "[06:18:09] [Client thread/ERROR] [IC2]: expecting signature";
+        assert_eq!(classify_log(error, false).0, GameLogLevel::Error);
     }
 }
