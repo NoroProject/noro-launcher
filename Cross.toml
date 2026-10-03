@@ -2,5 +2,14 @@
 # told about. Without this NORO_MASTER_URL and NORO_SIGNING_PUBKEY never reach
 # rustc, and the release build fails the check in verify.rs — which is what
 # happened on aarch64-unknown-linux-gnu, the one target that goes through cross.
+# The Sentry pair is read the same way: without it the aarch64 build ships with
+# no crash reporting and an empty release name.
 [build.env]
-passthrough = ["NORO_MASTER_URL", "NORO_SIGNING_PUBKEY"]
+passthrough = ["NORO_MASTER_URL", "NORO_SIGNING_PUBKEY", "NORO_SENTRY_DSN", "NORO_RELEASE"]
+
+# GPUI links against xkbcommon for its X11 and Wayland backends.
+[target.aarch64-unknown-linux-gnu]
+pre-build = [
+    "dpkg --add-architecture $CROSS_DEB_ARCH",
+    "apt-get update && apt-get install --assume-yes libxkbcommon-dev:$CROSS_DEB_ARCH libxkbcommon-x11-dev:$CROSS_DEB_ARCH",
+]

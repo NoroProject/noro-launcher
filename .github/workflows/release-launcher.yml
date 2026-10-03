@@ -121,6 +121,13 @@ jobs:
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: cargo install cross --git https://github.com/cross-rs/cross
 
+      # GPUI links against xkbcommon for its X11 and Wayland backends. The
+      # aarch64 build gets the same libraries from the pre-build step in
+      # Cross.toml.
+      - name: Linux system libraries
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libxkbcommon-dev libxkbcommon-x11-dev
+
       - name: Build
         shell: bash
         run: |
@@ -128,11 +135,11 @@ jobs:
           # release-symbols, not release: same optimised code plus the string
           # tables Sentry needs. See [profile.release-symbols] in Cargo.toml.
           if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-            cross build --profile release-symbols -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
-            cross build --profile release-symbols -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
+            cross build --locked --profile release-symbols -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cross build --locked --profile release-symbols -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
           else
-            cargo build --profile release-symbols -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
-            cargo build --profile release-symbols -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
+            cargo build --locked --profile release-symbols -p noro_launcher --bin noro-launcher --target ${{ matrix.target }}
+            cargo build --locked --profile release-symbols -p noro_core --bin noro-launcher-core --target ${{ matrix.target }}
           fi
 
       # Skipped quietly without a token: forks and outside runs should build,
@@ -214,7 +221,10 @@ jobs:
                 codesign --force --sign "$IDENTITY" --options runtime --timestamp "dist/noro-launcher-${{ matrix.target }}"
                 codesign --force --sign "$IDENTITY" --options runtime --timestamp "dist/noro-launcher-core-${{ matrix.target }}"
               fi
-              bash .github/scripts/make-app.sh "$OUT/noro-launcher" NoroLauncher.app "${TAG#v}"
+              # Both tag shapes, v1.2.3 and launcher-v1.2.3, give 1.2.3.
+              VERSION="${TAG#launcher-}"
+              VERSION="${VERSION#v}"
+              bash .github/scripts/make-app.sh "$OUT/noro-launcher" NoroLauncher.app "$VERSION"
               tar -czf "dist/noro-launcher-${{ matrix.target }}.app.tar.gz" NoroLauncher.app
               bash .github/scripts/make-dmg.sh NoroLauncher.app dist/noro-launcher-${{ matrix.target }}.dmg
               bash .github/scripts/notarize.sh dist/noro-launcher-${{ matrix.target }}.dmg

@@ -15,10 +15,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_INCREMENTAL: 0
+  # GPUI links against these on Linux for its X11 and Wayland backends.
+  LINUX_DEPS: libxkbcommon-dev libxkbcommon-x11-dev
+
 jobs:
   rust:
     name: rust fmt + clippy + test
-    runs-on: [self-hosted, Linux]
+    # The self-hosted runner only takes code from this repository. A pull
+    # request from a fork runs whatever its author wrote, so it goes to a
+    # throwaway GitHub runner instead of our machine.
+    runs-on: ${{ fromJSON((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && '"ubuntu-latest"' || '["self-hosted", "Linux"]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,15 +43,15 @@ jobs:
 
       - name: clippy
         run: |
-          cargo clippy --all-targets \
+          cargo clippy --locked --all-targets \
             -p bridge -p mod_link -p backend \
             -- -D warnings
 
       - name: test
-        run: cargo test -p bridge -p mod_link -p backend
+        run: cargo test --locked -p bridge -p mod_link -p backend
 
   launcher:
-    name: launcher clippy
+    name: launcher clippy + test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,8 +64,38 @@ jobs:
         with:
           key: ci-launcher
 
+      - name: system libraries
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq $LINUX_DEPS
+
       - name: clippy
         run: |
-          cargo clippy --all-targets \
+          cargo clippy --locked --all-targets \
             -p frontend -p noro_launcher -p noro_core \
             -- -D warnings
+
+      - name: test
+        run: cargo test --locked -p frontend -p noro_launcher -p noro_core
+
+  # Windows and macOS code (named pipes, keyring backends, the console window,
+  # biometrics) otherwise first compiles in the release workflow.
+  platforms:
+    name: check ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ci-${{ matrix.os }}
+
+      - name: clippy
+        shell: bash
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
