@@ -175,7 +175,9 @@ impl MasterApi {
 
     pub async fn catalog_versions(&self, provider: &str, id: &str, query: &str) -> Result<Value> {
         self.get(&format!(
-            "/api/catalog/{provider}/project/{id}/versions?{query}"
+            "/api/catalog/{}/project/{}/versions?{query}",
+            urlencoding::encode(provider),
+            urlencoding::encode(id)
         ))
         .await
     }
