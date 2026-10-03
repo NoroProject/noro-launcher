@@ -19,6 +19,7 @@ mod game_status;
 mod game_sync;
 mod impersonate_dialog;
 mod java_picker;
+mod jvm_flags;
 mod log_request_dialog;
 mod markdown;
 mod messages;

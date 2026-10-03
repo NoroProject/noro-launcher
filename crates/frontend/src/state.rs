@@ -345,6 +345,11 @@ pub struct LauncherUI {
     /// A pick is downloading a runtime on the master; it takes a while.
     pub java_busy: bool,
     pub java_picker_open: bool,
+    /// The flags dialog edits a draft: the saved flags change on «Save», not
+    /// on every key, and «Cancel» leaves them as they were.
+    pub jvm_flags_open: bool,
+    pub jvm_flags_draft: String,
+    pub jvm_flags_focus: Option<gpui::FocusHandle>,
 
     // ── The player's own pages ──────────────────────────────────────────────
     pub account_tab: AccountTab,
@@ -541,6 +546,9 @@ impl LauncherUI {
             java_default: HashMap::new(),
             java_busy: false,
             java_picker_open: false,
+            jvm_flags_open: false,
+            jvm_flags_draft: String::new(),
+            jvm_flags_focus: None,
 
             account_tab: AccountTab::default(),
             account_requested: HashSet::new(),
@@ -576,18 +584,26 @@ impl LauncherUI {
         }
     }
 
+    /// What the player has for the server. `jvm_flags` here are always the
+    /// player's own; the build's stay in `server_recommendations` and are added
+    /// at launch whatever this says.
     pub fn server_client_settings(&self, server_id: Uuid) -> ClientSettingsState {
-        self.server_settings
+        if let Some(saved) = self.server_settings.get(&server_id) {
+            return saved.clone();
+        }
+        let mut settings = self
+            .server_recommendations
             .get(&server_id)
             .cloned()
-            .or_else(|| self.server_recommendations.get(&server_id).cloned())
             .unwrap_or_else(|| ClientSettingsState {
                 memory_min_mb: self.config.memory_min_mb,
                 memory_max_mb: self.config.memory_max_mb,
-                jvm_flags: self.config.jvm_flags.clone(),
+                jvm_flags: String::new(),
                 show_console_on_launch: self.config.show_console_on_launch,
                 fullscreen: self.config.fullscreen,
-            })
+            });
+        settings.jvm_flags = self.config.jvm_flags.clone();
+        settings
     }
 
     pub fn has_server_client_override(&self, server_id: Uuid) -> bool {

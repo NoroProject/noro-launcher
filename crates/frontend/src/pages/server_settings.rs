@@ -46,6 +46,7 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         // кладёт элементы в порядке дерева, и строка «Папка» ложилась поверх
         // раскрытого списка.
         .children(super::java_picker::dialog(ui, server_id, cx))
+        .children(super::jvm_flags::dialog(ui, server_id, cx))
         .into_any_element()
 }
 
@@ -203,7 +204,7 @@ fn settings_panel(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             "code",
             t("settings-jvm-flags"),
             t("settings-jvm-hint"),
-            flags(ui, server_id),
+            super::jvm_flags::control(ui, server_id, cx),
             true,
         ))
         .child(setting_row(
@@ -453,21 +454,6 @@ fn folder(_ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .items_center()
         .gap(px(10.))
         .child(open_folder_button(server_id, cx))
-        .into_any_element()
-}
-
-fn flags(ui: &LauncherUI, server_id: Uuid) -> AnyElement {
-    let settings = ui.server_client_settings(server_id);
-    let (color, text) = if settings.jvm_flags.is_empty() {
-        (TEXT_MUTED, "not set".to_string())
-    } else {
-        (TEXT_SECONDARY, settings.jvm_flags)
-    };
-    div()
-        .font_family("Courier New")
-        .text_size(px(12.))
-        .text_color(rgb(color))
-        .child(text)
         .into_any_element()
 }
 
