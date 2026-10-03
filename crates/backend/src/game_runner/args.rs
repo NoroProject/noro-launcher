@@ -7,11 +7,37 @@ use tokio::process::Command;
 
 pub struct Substitution<'a> {
     pub instance_dir: &'a Path,
-    pub natives_dir: &'a Path,
-    pub classpath: &'a str,
     pub manifest: &'a BuildManifest,
     pub login: &'a LoginInfo,
-    pub primary_game_artifact: &'a str,
+    /// `${…}` → value, built once. Rebuilding it per argument cloned the whole
+    /// classpath and searched the manifest for the client jar thirty times.
+    table: Vec<(&'static str, String)>,
+}
+
+impl<'a> Substitution<'a> {
+    pub fn new(
+        instance_dir: &'a Path,
+        natives_dir: &Path,
+        classpath: &str,
+        manifest: &'a BuildManifest,
+        login: &'a LoginInfo,
+        primary_game_artifact: &str,
+    ) -> Self {
+        let table = table(
+            instance_dir,
+            natives_dir,
+            classpath,
+            manifest,
+            login,
+            primary_game_artifact,
+        );
+        Self {
+            instance_dir,
+            manifest,
+            login,
+            table,
+        }
+    }
 }
 
 pub fn push_jvm_args(cmd: &mut Command, ctx: &Substitution<'_>, loader_client_name: Option<&str>) {
@@ -21,12 +47,10 @@ pub fn push_jvm_args(cmd: &mut Command, ctx: &Substitution<'_>, loader_client_na
         .iter()
         .flat_map(arg_values)
         .any(|arg| matches!(arg.as_str(), "-cp" | "-classpath" | "--class-path"));
+    // `-Djava.library.path` is already among the base arguments; passing it a
+    // second time here only made the command line longer.
     if !has_classpath {
-        cmd.arg("-cp").arg(ctx.classpath);
-        cmd.arg(format!(
-            "-Djava.library.path={}",
-            ctx.natives_dir.to_string_lossy()
-        ));
+        cmd.arg("-cp").arg(lookup(ctx, "${classpath}"));
     }
 
     for arg in &ctx.manifest.jvm_args {
@@ -59,8 +83,17 @@ pub fn push_game_args(
     }
 
     if let Some(server) = connect {
-        cmd.arg("--quickPlayMultiplayer")
-            .arg(format!("{}:{}", server.host, server.port));
+        if supports_quick_play(&ctx.manifest.mc_version) {
+            cmd.arg("--quickPlayMultiplayer")
+                .arg(format!("{}:{}", server.host, server.port));
+        } else {
+            // Before 1.20 the client ignores quick play and silently opens
+            // the main menu instead of joining.
+            cmd.arg("--server")
+                .arg(&server.host)
+                .arg("--port")
+                .arg(server.port.to_string());
+        }
     }
 
     if fullscreen {
@@ -68,34 +101,71 @@ pub fn push_game_args(
     }
 }
 
+/// `--quickPlayMultiplayer` arrived in 1.20 (23w14a). Snapshot ids and
+/// anything unparsable are taken as new.
+pub fn supports_quick_play(mc_version: &str) -> bool {
+    let mut parts = mc_version.split('.');
+    match (
+        parts.next(),
+        parts.next().and_then(|m| m.parse::<u32>().ok()),
+    ) {
+        (Some("1"), Some(minor)) => minor >= 20,
+        _ => true,
+    }
+}
+
+fn lookup(ctx: &Substitution<'_>, key: &str) -> String {
+    ctx.table
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, v)| v.clone())
+        .unwrap_or_default()
+}
+
 fn substitute(arg: &str, ctx: &Substitution<'_>) -> String {
-    let assets_root = ctx.instance_dir.join("assets");
-    let library_dir = ctx.instance_dir.join("libraries");
-    let game_jar = ctx
-        .manifest
+    if !arg.contains("${") {
+        return arg.to_string();
+    }
+    let mut out = arg.to_string();
+    for (key, value) in &ctx.table {
+        if out.contains(key) {
+            out = out.replace(key, value);
+        }
+    }
+    out
+}
+
+fn table(
+    instance_dir: &Path,
+    natives_dir: &Path,
+    classpath: &str,
+    manifest: &BuildManifest,
+    login: &LoginInfo,
+    primary_game_artifact: &str,
+) -> Vec<(&'static str, String)> {
+    let assets_root = instance_dir.join("assets");
+    let library_dir = instance_dir.join("libraries");
+    let game_jar = manifest
         .verified_files
         .iter()
-        .find(|f| ctx.manifest.kind_of(&f.path) == ArtifactKind::ClientJar)
-        .and_then(|f| safe_join(ctx.instance_dir, &f.path))
+        .find(|f| manifest.kind_of(&f.path) == ArtifactKind::ClientJar)
+        .and_then(|f| safe_join(instance_dir, &f.path))
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default();
 
-    let replacements: &[(&str, String)] = &[
-        ("${auth_player_name}", ctx.login.username.clone()),
-        ("${version_name}", ctx.manifest.version.clone()),
+    vec![
+        ("${auth_player_name}", login.username.clone()),
+        ("${version_name}", manifest.version.clone()),
         (
             "${game_directory}",
-            ctx.instance_dir.to_string_lossy().into_owned(),
+            instance_dir.to_string_lossy().into_owned(),
         ),
         ("${assets_root}", assets_root.to_string_lossy().into_owned()),
         ("${game_assets}", assets_root.to_string_lossy().into_owned()),
-        (
-            "${assets_index_name}",
-            ctx.manifest.assets_index_name.clone(),
-        ),
-        ("${auth_uuid}", ctx.login.uuid.clone()),
-        ("${auth_access_token}", ctx.login.access_token.clone()),
-        ("${auth_session}", ctx.login.access_token.clone()),
+        ("${assets_index_name}", manifest.assets_index_name.clone()),
+        ("${auth_uuid}", login.uuid.clone()),
+        ("${auth_access_token}", login.access_token.clone()),
+        ("${auth_session}", login.access_token.clone()),
         ("${clientid}", String::new()),
         ("${auth_xuid}", String::new()),
         ("${user_type}", "msa".to_string()),
@@ -103,15 +173,15 @@ fn substitute(arg: &str, ctx: &Substitution<'_>) -> String {
         ("${version_type}", "release".to_string()),
         (
             "${natives_directory}",
-            ctx.natives_dir.to_string_lossy().into_owned(),
+            natives_dir.to_string_lossy().into_owned(),
         ),
         ("${launcher_name}", "noro".to_string()),
         ("${launcher_version}", env!("CARGO_PKG_VERSION").to_string()),
-        ("${classpath}", ctx.classpath.to_string()),
+        ("${classpath}", classpath.to_string()),
         ("${game_jar}", game_jar),
         (
             "${primary_game_artifact}",
-            ctx.primary_game_artifact.to_string(),
+            primary_game_artifact.to_string(),
         ),
         (
             "${library_directory}",
@@ -121,11 +191,40 @@ fn substitute(arg: &str, ctx: &Substitution<'_>) -> String {
             "${classpath_separator}",
             classpath::classpath_separator().to_string(),
         ),
-    ];
+    ]
+}
 
-    let mut out = arg.to_string();
-    for (key, value) in replacements {
-        out = out.replace(key, value);
+/// Splits the player's JVM flags the way a shell would for the simple cases:
+/// whitespace separates, and single or double quotes keep a value with spaces
+/// in one argument (`-XX:OnOutOfMemoryError="kill -9 %p"`). The quotes
+/// themselves are dropped.
+pub fn split_flags(flags: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+    let mut started = false;
+    for c in flags.chars() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), c) => current.push(c),
+            (None, '"' | '\'') => {
+                quote = Some(c);
+                started = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if started {
+                    out.push(std::mem::take(&mut current));
+                    started = false;
+                }
+            }
+            (None, c) => {
+                current.push(c);
+                started = true;
+            }
+        }
+    }
+    if started {
+        out.push(current);
     }
     out
 }
@@ -148,4 +247,33 @@ fn default_game_args(ctx: &Substitution<'_>) -> Vec<(&'static str, String)> {
         ("--userType", "msa".to_string()),
         ("--versionType", "release".to_string()),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quoted_flags_stay_one_argument() {
+        assert_eq!(
+            split_flags(r#"-Xss2m -XX:OnOutOfMemoryError="kill -9 %p"  -Dname='a b'"#),
+            vec![
+                "-Xss2m".to_string(),
+                "-XX:OnOutOfMemoryError=kill -9 %p".to_string(),
+                "-Dname=a b".to_string(),
+            ]
+        );
+        assert!(split_flags("   ").is_empty());
+        assert_eq!(split_flags("-Da=\"\""), vec!["-Da=".to_string()]);
+    }
+
+    #[test]
+    fn quick_play_only_where_the_client_knows_it() {
+        assert!(supports_quick_play("1.20.1"));
+        assert!(supports_quick_play("1.21"));
+        assert!(supports_quick_play("23w14a"));
+        assert!(!supports_quick_play("1.19.4"));
+        assert!(!supports_quick_play("1.12.2"));
+        assert!(!supports_quick_play("1.7.10"));
+    }
 }

@@ -48,7 +48,7 @@ pub fn mod_icon(ui: &LauncherUI, m: &OptionalModInfo, color: u32) -> AnyElement 
 
 pub fn mod_text(m: &OptionalModInfo, width: Option<f32>, desc_chars: usize) -> AnyElement {
     let sub: SharedString = match &m.author {
-        Some(a) if !a.is_empty() => format!("by {a}").into(),
+        Some(a) if !a.is_empty() => format!("{} {a}", i18n::t("mods-by")).into(),
         _ if !m.description.is_empty() => m
             .description
             .chars()
@@ -116,8 +116,8 @@ fn has_any(text: &str, words: &[&str]) -> bool {
     words.iter().any(|word| text.contains(word))
 }
 
-/// Имя без знаков препинания и в нижнем регистре — им сравниваются мод из
-/// каталога и то, что уже лежит в сборке.
+/// The name lowercased and without punctuation: this is what a catalog mod
+/// and what already sits in the build are compared by.
 pub fn normalized(name: &str) -> String {
     name.chars()
         .filter(|c| c.is_alphanumeric())
@@ -125,12 +125,12 @@ pub fn normalized(name: &str) -> String {
         .to_lowercase()
 }
 
-/// Есть ли этот мод в самой сборке.
+/// Whether this mod is part of the build itself.
 ///
-/// Считает только ключ заголовка и смотрит в готовое множество. Раньше функция
-/// перебирала все файлы сборки и для каждого собирала новую строку — на каждую
-/// карточку и на каждый кадр. Двадцать карточек по паре сотен файлов давали
-/// сотни тысяч аллокаций в секунду и 145 мс на кадр.
+/// Computes only the title key and looks it up in a ready set. This used to
+/// walk every file in the build and build a new string for each, for every
+/// card on every frame. Twenty cards over a couple of hundred files meant
+/// hundreds of thousands of allocations a second and 145 ms a frame.
 pub fn is_mod_installed(ui: &LauncherUI, server_id: uuid::Uuid, hit_title: &str) -> bool {
     let key = normalized(hit_title);
     if key.is_empty() {

@@ -17,7 +17,11 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     let files = prompt
         .files
         .iter()
-        .map(|(name, size)| format!("{name} — {} KB", size / 1024))
+        .map(|(name, size)| {
+            let mut args = i18n::FluentArgs::new();
+            args.set("size", (size / 1024) as i64);
+            format!("{name} — {}", i18n::t_args("common-kilobytes", &args))
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -27,6 +31,10 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
 
     Some(
         div()
+            // Takes the clicks: without it they went through to the Play
+            // button and the sidebar under the dialog.
+            .id("log-request-dialog")
+            .occlude()
             .absolute()
             .inset_0()
             .flex()
@@ -102,8 +110,9 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                             .when(is_open, |d| {
                                 d.child(
                                     div()
+                                        .id("logreq-preview")
                                         .h(px(180.))
-                                        .overflow_hidden()
+                                        .overflow_y_scroll()
                                         .p(px(8.))
                                         .border_t_1()
                                         .border_color(rgb(BORDER))

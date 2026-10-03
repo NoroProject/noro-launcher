@@ -28,6 +28,10 @@ pub struct ConsoleWindow {
     pub settings_open: bool,
     /// The copy button says so for a moment.
     pub copied: bool,
+    /// The save button says how it went for a moment.
+    pub saved: Option<bool>,
+    /// The first click on "clear" asks; a second within a few seconds clears.
+    pub clear_armed: bool,
     backend: BackendHandle,
 }
 
@@ -54,6 +58,8 @@ impl ConsoleWindow {
             search_focus: None,
             settings_open: false,
             copied: false,
+            saved: None,
+            clear_armed: false,
             backend,
         };
         view.refilter();
@@ -115,6 +121,16 @@ impl ConsoleWindow {
         let kept = shown_before - dropped;
         self.list_state
             .splice(kept..kept, self.visible.len() - kept);
+    }
+
+    /// The console follows the server the player is looking at.
+    pub fn show_server(&mut self, server_id: Uuid, server_name: String, logs: Vec<LogEntry>) {
+        self.server_id = server_id;
+        self.server_name = server_name;
+        self.logs = logs;
+        self.clear_armed = false;
+        self.refilter();
+        self.follow();
     }
 
     pub fn clear(&mut self) {

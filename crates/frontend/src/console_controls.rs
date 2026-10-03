@@ -16,12 +16,14 @@ type Cx<'a> = Context<'a, ConsoleWindow>;
 pub fn icon_button(
     id: &'static str,
     icon: &'static str,
+    hint: String,
     active: bool,
     on_click: impl Fn(&mut ConsoleWindow, &mut Cx) + 'static,
     cx: &mut Cx,
 ) -> AnyElement {
     div()
         .id(id)
+        .tooltip(crate::components::hint(hint))
         .size(px(32.))
         .flex_none()
         .flex()

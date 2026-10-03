@@ -4,6 +4,7 @@ mod account;
 mod account_rules;
 mod account_thread;
 mod build_picker;
+pub mod close_dialog;
 mod common;
 mod compose;
 mod content_card;
@@ -51,6 +52,7 @@ mod sidebar_user;
 mod skin_drag;
 mod toast;
 
+pub use markdown::plain_excerpt;
 pub use mod_icon::normalized as normalized_mod_name;
 pub use shell::launcher_shell;
 pub use toast::toast_overlay;

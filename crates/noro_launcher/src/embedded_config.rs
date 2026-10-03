@@ -74,11 +74,11 @@ mod tests {
 
     #[test]
     fn parses_stamped_payload() {
-        let stamped = b"NORO_CFG_START:{\"master_url\":\"https://test.noro.dev\",\"pubkey\":\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\"}                :NORO_CFG_END\0";
+        let stamped = b"NORO_CFG_START:{\"master_url\":\"https://test.example.com\",\"pubkey\":\"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\"}                :NORO_CFG_END\0";
         let mut buf = [b' '; EMBEDDED_CONFIG_LEN];
         buf[..stamped.len()].copy_from_slice(stamped);
         let cfg = parse_embedded_config_slice(&buf).expect("should parse");
-        assert_eq!(cfg.master_url, "https://test.noro.dev");
+        assert_eq!(cfg.master_url, "https://test.example.com");
         assert_eq!(
             cfg.pubkey,
             "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"

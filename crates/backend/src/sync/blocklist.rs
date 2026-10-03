@@ -18,14 +18,34 @@ pub struct Report {
     pub block_launch: bool,
 }
 
-pub async fn enforce(instance_dir: &Path, rules: &[BlockedFile]) -> Report {
+pub async fn enforce(
+    instance_dir: &Path,
+    rules: &[BlockedFile],
+    cache: &crate::sync::hash_cache::HashCache,
+) -> Report {
     let mut report = Report::default();
     if rules.is_empty() {
         return report;
     }
+    // The name half of every rule that has one. A file no rule can match by
+    // name can't match at all, so it never needs hashing; with only name rules
+    // in play, the bundled JRE and the screenshots aren't read every launch.
+    // A hash-only rule can match any file, and then everything is hashed.
+    let hash_only = rules.iter().any(|r| r.pattern.is_none());
+    let by_name: Vec<BlockedFile> = rules
+        .iter()
+        .filter(|r| r.pattern.is_some())
+        .map(|r| BlockedFile {
+            sha1: None,
+            ..r.clone()
+        })
+        .collect();
 
     for (rel, path) in candidates(instance_dir).await {
-        let Ok(sha1) = super::integrity::sha1_file(&path).await else {
+        if !hash_only && !by_name.iter().any(|r| r.matches(&rel, "")) {
+            continue;
+        }
+        let Some(sha1) = cache.sha1_of(&path).await else {
             continue;
         };
         let Some(rule) = schema::first_match(rules, &rel, &sha1) else {

@@ -14,9 +14,9 @@ use gpui::{
 use i18n::t;
 use uuid::Uuid;
 
-/// Высота строки списка вместе с просветом под ней. Виртуальный список меряет
-/// первую строку и раскладывает остальные по ней, поэтому карточки обязаны быть
-/// одной высоты.
+/// Height of a list row including the gap below it. The virtual list measures
+/// the first row and lays the rest out by it, so cards must all be the same
+/// height.
 pub(super) const ROW_HEIGHT: f32 = 88.0;
 
 pub(super) fn mod_card(
@@ -31,15 +31,15 @@ pub(super) fn mod_card(
 
     let action_btn = card_action(ui, server_id, &hit, hit_for_req, cx);
 
-    // Обёртка нужна виртуальному списку: он считает высоту строки по первой и
-    // отступов между элементами не знает, поэтому просвет живёт внутри строки.
+    // The wrapper is for the virtual list: it takes the row height from the first
+    // row and knows nothing of gaps between items, so the gap lives inside the row.
     div()
         .h(px(ROW_HEIGHT))
         .pb(px(8.))
         .child(
-            // Кликабельна вся карточка, а не колонка внутри неё: попасть в
-            // строку легче, чем в её половину, и вложенный кликабельный блок
-            // был лишним слоем в списке, который рисуется по многу раз.
+            // The whole card is clickable, not a column inside it: a row is easier
+            // to hit than half of one, and a nested clickable block was an extra layer
+            // in a list that is drawn many times over.
             div()
                 .id(SharedString::from(format!("mod-card-{project_id_str}")))
                 .size_full()
@@ -89,10 +89,10 @@ pub(super) fn mod_card(
                                             .text_color(rgb(TEXT_PRIMARY))
                                             .truncate()
                                             .child(hit.title.clone()),
-                                    ), // Значок провайдера убран: он выбран
-                                       // переключателем выше и одинаков у всей
-                                       // выдачи — двадцать одинаковых плашек
-                                       // не сообщали ничего.
+                                    ), // No provider badge: the switch above
+                                       // picks the provider and it is the same
+                                       // for every result, so twenty identical
+                                       // badges said nothing.
                                 )
                                 .child(
                                     div()
@@ -136,7 +136,7 @@ pub(super) fn mod_card(
 /// The action on a catalogue card.
 ///
 /// An icon, not a label. The word was the widest thing in the row — twenty
-/// copies of «Предложить персоналу» read as a column of buttons with a list
+/// copies of «Suggest to staff» read as a column of buttons with a list
 /// hidden behind it, and which of the two things the button does was already
 /// decided once, by the tab this screen was opened from.
 fn card_action(
@@ -218,8 +218,8 @@ fn action_button(
 ) -> AnyElement {
     div()
         .id(SharedString::from(id))
-        // Клик по кнопке не должен открывать страницу мода: она лежит внутри
-        // карточки, а та кликабельна целиком.
+        // Clicking the button must not open the mod page: the button sits inside
+        // the card, and the card is clickable as a whole.
         .occlude()
         .size(px(36.))
         .flex_shrink_0()
@@ -233,10 +233,10 @@ fn action_button(
         .border_1()
         .border_color(rgb(BORDER))
         .hover(|d| d.bg(rgb(CTA)).border_color(rgb(CTA_HOV)))
-        // Цвет значка приходится задавать самому значку: `text_color`
-        // родителя svg не наследует, и попытка перекрасить кнопку целиком
-        // оставляла на ней пустой квадрат. `group_hover` смотрит на наведение
-        // родителя — на кремовом фоне значок становится тёмным.
+        // The icon's colour has to be set on the icon itself: an svg doesn't
+        // inherit its parent's `text_color`, and recolouring the whole button
+        // left an empty square on it. `group_hover` watches the parent's hover,
+        // so on the cream background the icon turns dark.
         .child(
             gpui::svg()
                 .path(format!("icons/{icon}.svg"))

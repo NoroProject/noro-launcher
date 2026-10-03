@@ -27,6 +27,7 @@ pub fn bell(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 
     div()
         .id("notifications-bell")
+        .tooltip(crate::components::hint(t("hint-notifications")))
         .relative()
         .size(px(36.))
         .flex_shrink_0()
@@ -105,6 +106,7 @@ pub fn panel(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     }
 
     let cards: Vec<AnyElement> = ui.notifications.iter().map(|n| card(n, cx)).collect();
+    let more = (ui.notifications.len() as i64) < ui.notifications_total;
 
     Some(
         // A backdrop that closes on click: without one, the only way out is the
@@ -126,8 +128,8 @@ pub fn panel(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                     .absolute()
                     .left(px(16.))
                     .bottom(px(16.))
-                    // Высота по содержимому: фиксированная растягивала панель
-                    // от колокольчика до верха окна ради одной строки «пусто».
+                    // Height by content: a fixed one stretched the panel from the bell to
+                    // the top of the window for a single "empty" line.
                     .w(px(420.))
                     .max_h(px(520.))
                     .flex()
@@ -148,6 +150,7 @@ pub fn panel(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                             .flex_col()
                             .gap(px(4.))
                             .children(cards)
+                            .when(more, |d| d.child(load_more(ui, cx)))
                             .when(ui.notifications.is_empty(), |d| d.child(empty(ui))),
                     ),
             )
@@ -179,6 +182,7 @@ fn header(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(
             div()
                 .id("notifications-read-all")
+                .tooltip(crate::components::hint(t("hint-read-all")))
                 .size(px(28.))
                 .rounded(px(R_SM))
                 .flex()
@@ -212,6 +216,43 @@ fn filter_toggle(unread_only: bool, cx: &mut Cx) -> AnyElement {
             cx.notify();
         }),
     )
+}
+
+/// The next page of the feed. Only the first page was ever requested, so
+/// anything older than it couldn't be reached at all.
+fn load_more(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+    let loading = ui.notifications_loading;
+    div()
+        .id("notifications-more")
+        .h(px(32.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(R_SM))
+        .font_family(FONT_PIXEL_ALT)
+        .text_size(px(11.))
+        .text_color(rgb(TEXT_SECONDARY))
+        .when(!loading, |d| {
+            d.cursor_pointer()
+                .hover(|d| d.bg(rgba(0xffffff10)).text_color(rgb(TEXT_PRIMARY)))
+        })
+        .child(if loading {
+            t("launcher-loading")
+        } else {
+            t("launcher-notifications-more")
+        })
+        .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
+            if this.notifications_loading {
+                return;
+            }
+            this.notifications_loading = true;
+            this.backend.send(MessageToBackend::RequestNotifications {
+                offset: this.notifications.len() as u32,
+                unread_only: this.notifications_unread_only,
+            });
+            cx.notify();
+        }))
+        .into_any_element()
 }
 
 fn empty(ui: &LauncherUI) -> AnyElement {
@@ -301,10 +342,10 @@ fn card(n: &Notification, cx: &mut Cx) -> AnyElement {
                 }
             }
             if let Some(href) = &link {
-                // Путь в карточке — это страница сайта, а адреса сайта у
-                // лаунчера нет: впечатан только мастер. Он и переводит на
-                // сайт, как при входе через браузер. Раньше путь клеился к
-                // адресу мастера, и ссылка вела на API вместо страницы.
+                // The path in a card is a website page, and the launcher has no website
+                // address: only the master is baked in. The master redirects to the site,
+                // as it does for signing in through the browser. The path used to be glued
+                // to the master address, and the link led to the API instead of the page.
                 let url = if href.starts_with("http") {
                     href.clone()
                 } else {

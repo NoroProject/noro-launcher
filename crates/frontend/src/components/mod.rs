@@ -12,6 +12,7 @@ mod pixel_title;
 mod progress;
 mod segment;
 mod stage_row;
+mod tooltip;
 mod version_badge;
 mod window_chrome;
 
@@ -26,5 +27,6 @@ pub use pixel_title::{pixel_label, pixel_title};
 pub use progress::{progress_bar, slim_progress_bar};
 pub use segment::segment;
 pub use stage_row::stage_row;
+pub use tooltip::hint;
 pub use version_badge::version_badge;
 pub use window_chrome::{chrome_control, in_resize_edge, window_chrome};

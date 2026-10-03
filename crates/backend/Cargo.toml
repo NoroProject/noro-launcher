@@ -11,7 +11,6 @@ mod_link = { workspace = true }
 mc_mod_utils = { workspace = true }
 
 tokio = { workspace = true }
-tokio-util = { workspace = true }
 futures-util = { workspace = true }
 tokio-tungstenite = { workspace = true }
 reqwest = { workspace = true }
@@ -22,7 +21,6 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 
 anyhow = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 sentry = { workspace = true }
@@ -38,10 +36,8 @@ parking_lot = { workspace = true }
 once_cell = { workspace = true }
 dirs = { workspace = true }
 regex = { workspace = true }
-memchr = { workspace = true }
 notify-rust = { workspace = true }
 open = { workspace = true }
-url = { workspace = true }
 urlencoding = { workspace = true }
 walkdir = { workspace = true }
 zip = { workspace = true }
@@ -49,20 +45,28 @@ flate2 = { workspace = true }
 fastnbt = { workspace = true }
 discord-rich-presence = { workspace = true }
 futures = { workspace = true }
+sys-locale = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
 
-# Каждой ОС — свой системный сейф. Общая строка с одним лишь apple-native
-# оставляла Windows и Linux на mock-хранилище: save отчитывался об успехе, а
-# после перезапуска сессии не было, и лаунчер снова просил вход.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_System_SystemInformation"] }
+
+# Each OS gets its own system vault. A single line with only apple-native left
+# Windows and Linux on the in-memory mock store: `save` reported success, the
+# session was gone after a restart, and the launcher asked to sign in again.
+# `workspace = true` keeps the root entry's `default-features = false`.
 [target.'cfg(target_os = "macos")'.dependencies]
-keyring = { version = "3", features = ["apple-native"] }
+keyring = { workspace = true, features = ["apple-native"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-keyring = { version = "3", features = ["windows-native"] }
+keyring = { workspace = true, features = ["windows-native"] }
 
-# linux-native — keyutils ядра, без dbus: Secret Service утащил бы C-зависимости
-# в cross-сборку aarch64.
+# Kernel keyutils alone forgets everything on reboot, so Linux players had to
+# sign in after every restart. The persistent variant backs keyutils with the
+# Secret Service over zbus — pure Rust with `crypto-rust` and `async-io`, so the
+# aarch64 cross build still needs no C libraries. Without a Secret Service the
+# token store falls back to keyutils alone (see `auth/token_store.rs`).
 [target.'cfg(target_os = "linux")'.dependencies]
-keyring = { version = "3", features = ["linux-native"] }
+keyring = { workspace = true, features = ["linux-native-async-persistent", "async-io", "crypto-rust"] }

@@ -39,19 +39,19 @@ impl Inventory {
     }
 
     pub async fn save(&self, instance_dir: &Path) {
-        let path = instance_dir.join(INVENTORY_PATH);
-        if let Some(parent) = path.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
         if let Ok(bytes) = serde_json::to_vec(self) {
-            let _ = tokio::fs::write(path, bytes).await;
+            let _ = crate::fsutil::write_atomic(instance_dir.join(INVENTORY_PATH), bytes).await;
         }
     }
 }
 
 /// Walk the watched paths and diff against last time. Findings are new or
 /// changed files that aren't in the manifest.
-pub async fn scan(instance_dir: &Path, known: &[String]) -> (Vec<IntegrityFinding>, Inventory) {
+pub async fn scan(
+    instance_dir: &Path,
+    known: &std::collections::HashSet<&str>,
+    cache: &crate::sync::hash_cache::HashCache,
+) -> (Vec<IntegrityFinding>, Inventory) {
     let inventory = Inventory::load(instance_dir).await;
     let mut fresh = Inventory {
         files: BTreeMap::new(),
@@ -61,13 +61,13 @@ pub async fn scan(instance_dir: &Path, known: &[String]) -> (Vec<IntegrityFindin
 
     for (rel, path) in candidates(instance_dir).await {
         // Build files have their own integrity check; no point flagging twice.
-        if known.iter().any(|k| k == &rel) {
+        if known.contains(rel.as_str()) {
             continue;
         }
         let Ok(meta) = tokio::fs::metadata(&path).await else {
             continue;
         };
-        let Ok(sha1) = super::integrity::sha1_file(&path).await else {
+        let Some(sha1) = cache.sha1_of(&path).await else {
             continue;
         };
         let entry = Entry {

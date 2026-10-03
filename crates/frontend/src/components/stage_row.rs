@@ -25,7 +25,7 @@ pub fn stage_row(stage: SyncStage, done: u64, total: u64) -> AnyElement {
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(11.))
                 .text_color(rgb(if complete { TEXT_MUTED } else { TEXT_PRIMARY }))
-                .child(stage.short_label()),
+                .child(crate::sync_text::stage_short(stage)),
         )
         .child(div().flex_1().min_w_0().child(slim_progress_bar(fraction)))
         .child(
@@ -44,11 +44,7 @@ pub fn stage_row(stage: SyncStage, done: u64, total: u64) -> AnyElement {
 /// left to compare.
 fn size_label(done: u64, total: u64, complete: bool) -> String {
     if complete {
-        return "done".into();
+        return i18n::t("sync-done");
     }
-    format!(
-        "{:.0} / {:.0} MB",
-        done as f64 / 1_048_576.0,
-        total as f64 / 1_048_576.0
-    )
+    crate::sync_text::megabytes(done, total)
 }

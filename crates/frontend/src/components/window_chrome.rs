@@ -44,7 +44,18 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
         .child(chrome_control("win-min", "minus", false, |window, _| {
             window.minimize_window()
         }))
-        .child(chrome_control("win-close", "x", true, |_, cx| cx.quit()))
+        .child(chrome_control("win-close", "x", true, {
+            let ui = cx.entity();
+            move |_, cx| {
+                ui.update(cx, |ui, cx| {
+                    if ui.request_close() {
+                        cx.quit();
+                    } else {
+                        cx.notify();
+                    }
+                })
+            }
+        }))
         .into_any_element()
 }
 
@@ -146,6 +157,11 @@ pub fn chrome_control(
 ) -> AnyElement {
     div()
         .id(id)
+        .tooltip(crate::components::hint(i18n::t(if danger {
+            "hint-close"
+        } else {
+            "hint-minimize"
+        })))
         .size(px(26.))
         .flex()
         .items_center()

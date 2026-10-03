@@ -97,7 +97,9 @@ fn status(server: &ServerEntry) -> (String, u32) {
                 .max_online
                 .map(|m| format!("/{m}"))
                 .unwrap_or_default();
-            (format!("{online}{max} online"), SUCCESS)
+            let mut args = i18n::FluentArgs::new();
+            args.set("count", format!("{online}{max}"));
+            (i18n::t_args("game-online-count", &args), SUCCESS)
         }
         // No agent reported in. With no game servers configured at all the
         // count is unknown rather than zero, so don't claim offline.

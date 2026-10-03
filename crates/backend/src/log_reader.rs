@@ -43,11 +43,22 @@ pub async fn spawn_log_reader<R>(
             Ok(0) => break, // EOF
             Ok(n) => {
                 buffer.extend_from_slice(&chunk[..n]);
+                // A "line" this long with no break in it — progress output that
+                // only ever returns the carriage — would grow the buffer without
+                // bound. Cut it here and show what there is.
+                if buffer.len() > MAX_LINE && !buffer.iter().any(|&b| b == b'\n' || b == b'\r') {
+                    buffer.push(b'\n');
+                }
                 let mut lines = Vec::new();
                 // Walked by offset and trimmed once at the end: draining line by
                 // line moved the rest of the buffer every time.
                 let mut start = 0;
-                while let Some(len) = buffer[start..].iter().position(|&b| b == b'\n') {
+                // `\r` ends a line too: progress bars redraw with it alone, and
+                // `\r\n` just leaves an empty line, which is skipped.
+                while let Some(len) = buffer[start..]
+                    .iter()
+                    .position(|&b| b == b'\n' || b == b'\r')
+                {
                     let line_bytes = &buffer[start..start + len];
                     start += len + 1;
                     let line = String::from_utf8_lossy(line_bytes);
@@ -107,10 +118,20 @@ pub async fn spawn_log_reader<R>(
                     frontend.send(MessageToFrontend::GameLog { server_id, lines });
                 }
             }
-            Err(_) => break,
+            Err(e) => {
+                // Keep draining even though nothing more can be shown. A pipe
+                // nobody reads fills up, and the game then blocks on its next
+                // write to stdout and freezes.
+                tracing::warn!(error = %format!("{e:#}"), "game output stopped being readable");
+                let _ = tokio::io::copy(&mut reader, &mut tokio::io::sink()).await;
+                break;
+            }
         }
     }
 }
+
+/// Longest stretch of output kept waiting for a line break.
+const MAX_LINE: usize = 64 * 1024;
 
 fn classify_log(line: &str, is_stderr: bool) -> (GameLogLevel, Cow<'_, str>) {
     // Substring matching rather than parsing: a line can be a fragment of the
@@ -184,5 +205,29 @@ mod tests {
         assert_eq!(classify_log(info, false).0, GameLogLevel::Info);
         let error = "[06:18:09] [Client thread/ERROR] [IC2]: expecting signature";
         assert_eq!(classify_log(error, false).0, GameLogLevel::Error);
+    }
+}
+
+#[cfg(test)]
+mod reader_tests {
+    use super::*;
+
+    async fn read_all(input: &'static [u8]) -> Vec<String> {
+        let (handle, mut recv) = {
+            let (_brx, _bh, frx, fh) = bridge::create_pair();
+            (fh, frx)
+        };
+        spawn_log_reader(input, Uuid::nil(), handle, false, None).await;
+        let mut out = Vec::new();
+        while let Some(MessageToFrontend::GameLog { lines, .. }) = recv.try_recv() {
+            out.extend(lines.into_iter().map(|l| l.text));
+        }
+        out
+    }
+
+    #[tokio::test]
+    async fn carriage_returns_split_lines_too() {
+        let lines = read_all(b"10%\r20%\r30%\r\ndone\n").await;
+        assert_eq!(lines, ["10%", "20%", "30%", "done"]);
     }
 }

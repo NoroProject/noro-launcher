@@ -84,10 +84,10 @@ pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             },
             cx,
         ))
-        // Свой контент — отдельная вкладка, и только там, где сборка его
-        // разрешает. Раньше в каталог попадали кнопкой «предложить мод» на
-        // чужом экране: место для того, чтобы поставить себе шейдер, человек
-        // там не ищет.
+        // Your own content is a separate tab, and only where the build allows it.
+        // The catalog used to be reached through a "suggest a mod" button on another
+        // screen: that is not where anyone looks for a place to install a shader for
+        // themselves.
         .when(
             sid.is_some_and(|id| ui.allow_personal_content.get(&id).copied().unwrap_or(false)),
             |d| {
@@ -165,16 +165,16 @@ pub fn parse_hex(c: &str) -> u32 {
     u32::from_str_radix(c.trim_start_matches('#'), 16).unwrap_or(ACCENT)
 }
 
+/// "120 / 340 MB · 4.2 MB/s · 0:52 left" — the speed once it is known.
 pub fn progress_label(s: &crate::state::SyncUiState) -> String {
     let total = s.total();
     if total == 0 {
-        String::new()
-    } else {
-        format!(
-            "{:.0} / {:.0} MB",
-            s.done() as f64 / 1_048_576.0,
-            total as f64 / 1_048_576.0
-        )
+        return String::new();
+    }
+    let size = crate::sync_text::megabytes(s.done(), total);
+    match crate::sync_text::rate_label(&s.rate, s.done(), total) {
+        Some(rate) => format!("{size} · {rate}"),
+        None => size,
     }
 }
 
@@ -218,4 +218,16 @@ fn stamp(unix_seconds: i64, format: &str) -> String {
                 .to_string()
         })
         .unwrap_or_else(|| "—".to_string())
+}
+
+/// Ctrl+V (Cmd+V on macOS) in one of the hand-made text fields: the clipboard
+/// text, on one line. GPUI has no text input, so every field handles its own
+/// keys — and only the JVM flags field had learned to paste.
+pub fn pasted(event: &gpui::KeyDownEvent, cx: &mut gpui::App) -> Option<String> {
+    let keystroke = &event.keystroke;
+    if !(keystroke.modifiers.secondary() && keystroke.key == "v") {
+        return None;
+    }
+    let text = cx.read_from_clipboard()?.text()?;
+    Some(text.split_whitespace().collect::<Vec<_>>().join(" "))
 }

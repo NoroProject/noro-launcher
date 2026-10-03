@@ -16,12 +16,29 @@ fn entry() -> Result<keyring::Entry> {
     keyring::Entry::new(SERVICE, ACCOUNT).context("keyring entry init failed")
 }
 
+/// On Linux the default store is keyutils backed by the Secret Service, so the
+/// session survives a reboot. Some desktops have no Secret Service at all — a
+/// bare window manager, a keyring that was never set up — and there the write
+/// fails as a whole; the kernel keyring alone still keeps the session until the
+/// next reboot, which beats asking for a login on every start.
+#[cfg(target_os = "linux")]
+fn session_only_entry() -> Result<keyring::Entry> {
+    let credential = keyring::keyutils::KeyutilsCredential::new_with_target(None, SERVICE, ACCOUNT)
+        .context("keyutils entry init failed")?;
+    Ok(keyring::Entry::new_with_credential(Box::new(credential)))
+}
+
 pub fn save(auth: &StoredAuth) -> Result<()> {
     let json = serde_json::to_string(auth)?;
-    entry()?
-        .set_password(&json)
-        .context("keyring write failed")?;
-    Ok(())
+    let saved = entry()?.set_password(&json);
+    #[cfg(target_os = "linux")]
+    if let Err(e) = &saved {
+        tracing::warn!("keyring: no persistent store ({e}), keeping the session until reboot");
+        return session_only_entry()?
+            .set_password(&json)
+            .context("keyring write failed");
+    }
+    saved.context("keyring write failed")
 }
 
 /// Every failure here is `None` — a keyring the launcher can't reach is
@@ -56,6 +73,12 @@ pub fn load() -> Option<StoredAuth> {
 
 /// Logging out. A missing entry counts as success.
 pub fn clear() -> Result<()> {
+    // The kernel-only copy a missing Secret Service left behind goes too,
+    // or the next start would sign the player back in.
+    #[cfg(target_os = "linux")]
+    if let Ok(e) = session_only_entry() {
+        let _ = e.delete_credential();
+    }
     match entry()?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(err) => Err(err).context("keyring delete failed"),

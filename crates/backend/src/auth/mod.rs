@@ -1,4 +1,3 @@
-pub mod biometrics;
 pub mod token_store;
 pub mod web_login;
 

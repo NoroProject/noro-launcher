@@ -81,3 +81,35 @@ fn matching_ignores_case() {
 fn empty_pattern_list_protects_nothing() {
     assert!(!is_protected("saves/world/level.dat", &[]));
 }
+
+mod optional_choice {
+    use super::super::{excluded_optional_files, resolve_enabled};
+    use crate::sync::verify::fixtures::{entry, manifest, optional, player};
+    use schema::ArtifactKind;
+
+    fn build() -> schema::BuildManifest {
+        let (f, k) = entry("mods/minimap.jar", "x", ArtifactKind::Mod);
+        let mut m = manifest(vec![(f, k)]);
+        let mut minimap = optional("Minimap", false, &["mods/minimap.jar"]);
+        minimap.enabled_by_default = true;
+        m.optional_mods = vec![minimap];
+        m
+    }
+
+    #[test]
+    fn never_choosing_means_the_defaults() {
+        let m = build();
+        assert_eq!(resolve_enabled(&m, None), vec!["Minimap".to_string()]);
+        assert!(excluded_optional_files(&m, &resolve_enabled(&m, None), &player()).is_empty());
+    }
+
+    #[test]
+    fn switching_everything_off_is_respected() {
+        // An empty saved list used to read as "never chose" and brought the
+        // default-on mods back on the next launch.
+        let m = build();
+        let enabled = resolve_enabled(&m, Some(Vec::new()));
+        assert!(enabled.is_empty());
+        assert!(excluded_optional_files(&m, &enabled, &player()).contains("mods/minimap.jar"));
+    }
+}

@@ -10,6 +10,10 @@ pub const SIG_SUFFIX: &str = ".sig";
 use crate::embedded_config;
 
 /// Hex from the stamped config, falling back to env var, bootstrap.json, or build-time.
+///
+/// `bootstrap.json` is skipped in release builds. The bootstrapper writes that
+/// file itself, into a folder anything running as the player can write to, so
+/// trusting it would let whoever edits it decide which binary gets executed.
 pub fn raw_signing_pubkey() -> String {
     if let Some(cfg) = embedded_config::get_embedded_config() {
         if !cfg.pubkey.is_empty() && !cfg.pubkey.contains("__NORO_PUBKEY_PLACEHOLDER__") {
@@ -21,7 +25,12 @@ pub fn raw_signing_pubkey() -> String {
             return val.trim().to_string();
         }
     }
-    from_bootstrap("signing_pubkey").unwrap_or_else(|| {
+    let saved = if cfg!(debug_assertions) {
+        from_bootstrap("signing_pubkey")
+    } else {
+        None
+    };
+    saved.unwrap_or_else(|| {
         option_env!("NORO_SIGNING_PUBKEY")
             .unwrap_or_default()
             .to_string()
@@ -42,6 +51,11 @@ fn from_bootstrap(key: &str) -> Option<String> {
 
 fn verifying_key() -> Result<VerifyingKey> {
     let hex_str = raw_signing_pubkey();
+    // A release build with no key can't tell the real core from a forgery.
+    // Accepting the dev seed there would run anything signed with it.
+    if hex_str.is_empty() && !cfg!(debug_assertions) {
+        return Err(anyhow!("no signing key is configured in this build"));
+    }
     if hex_str.is_empty() {
         // The master says this out loud at startup and paints the admin check
         // red; here it used to be silent. A build that missed the stamping step
@@ -98,13 +112,6 @@ pub fn verify_bytes(data: &[u8], signature_b64: &str) -> Result<()> {
         .map_err(|_| anyhow!("signature does not match the built-in key"))
 }
 
-/// Kept next to the binary so it can be checked again with no network.
-pub fn store(core_path: &Path, signature_b64: &str) -> Result<()> {
-    let path = sig_path(core_path);
-    std::fs::write(&path, signature_b64.trim().as_bytes())
-        .map_err(|e| anyhow!("could not write {}: {e}", path.display()))
-}
-
 /// Runs on every launch, not just after a download.
 pub fn verify_installed(core_path: &Path) -> Result<()> {
     let sig_file = sig_path(core_path);
@@ -122,7 +129,9 @@ pub fn discard(core_path: &Path) {
     let _ = std::fs::remove_file(sig_path(core_path));
 }
 
-fn sig_path(core_path: &Path) -> std::path::PathBuf {
+/// The signature is kept next to the binary so it can be checked again with no
+/// network.
+pub fn sig_path(core_path: &Path) -> std::path::PathBuf {
     let mut name = core_path.as_os_str().to_os_string();
     name.push(SIG_SUFFIX);
     std::path::PathBuf::from(name)
@@ -159,7 +168,7 @@ mod tests {
 
         let sk = ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED);
         let sig = base64::engine::general_purpose::STANDARD.encode(sk.sign(body).to_bytes());
-        store(&core, &sig).unwrap();
+        std::fs::write(sig_path(&core), &sig).unwrap();
         verify_installed(&core).expect("a freshly installed core verifies");
 
         // A binary swapped on disk has to be rejected.

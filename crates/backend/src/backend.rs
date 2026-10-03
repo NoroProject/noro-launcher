@@ -42,6 +42,24 @@ pub enum InternalEvent {
         access_token: String,
         username: String,
     },
+    /// The stored session checked out at startup.
+    SessionRestored {
+        user: UserProfile,
+    },
+    /// A refresh traded the old tokens for new ones.
+    TokensRefreshed {
+        auth: token_store::StoredAuth,
+    },
+    /// The master turned the session down and the refresh token with it.
+    SessionRejected,
+    /// The master couldn't be reached to say either way. The session is kept:
+    /// unreachable is not the same as rejected.
+    SessionUnverified,
+    /// A launch has waited too long for its manifest.
+    ManifestTimeout {
+        server_id: Uuid,
+        seq: u64,
+    },
 }
 
 /// What a background task gets: everything shared, nothing owned by the loop.
@@ -95,14 +113,32 @@ pub struct BackendState {
     pub own_token: Option<String>,
     pub servers: Vec<ServerEntry>,
     pub manifests: HashMap<Uuid, BuildManifest>,
+    /// Installed builds' manifests from the disk. Only for when the master
+    /// doesn't answer: online, a launch always asks for the current one.
+    pub cached_manifests: HashMap<Uuid, BuildManifest>,
+    /// Whether the socket to the master is up.
+    pub online: bool,
     /// Launches waiting on a manifest to arrive.
     pub pending_launch: HashMap<Uuid, bridge::ModalAction>,
     /// Builds whose state the window already has. A guess from the disk is
     /// only for the rest: it must never replace what a manifest established.
     pub build_state_known: HashSet<Uuid>,
+    /// The server the player last pressed Play for. Logs for "report a
+    /// problem" come from there: the game writes them into that instance.
+    pub last_launched: Option<Uuid>,
+    /// Bumped per launch request, so a stale timeout can't fail a newer launch
+    /// of the same server.
+    pub launch_seq: HashMap<Uuid, u64>,
+    /// A token refresh is on its way; further auth failures wait for it.
+    pub refresh_in_flight: bool,
+    /// When the last refresh succeeded. Failing again right after one means
+    /// the new token is no good either, and refreshing again would loop.
+    pub last_refresh: Option<Instant>,
 }
 
 const STARTUP_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// The update check is a nicety; it must not hold anything up.
+const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Spawns the main loop onto `runtime` and returns immediately.
 pub fn start(
@@ -139,9 +175,7 @@ async fn run(
         }
     });
     let optional = Persistent::<OptionalModsSelection>::load(dirs.optional_mods_file());
-    let http = reqwest::Client::builder()
-        .user_agent(format!("noro-launcher/{}", env!("CARGO_PKG_VERSION")))
-        .build()?;
+    let http = crate::http::client()?;
 
     let stored = token_store::load();
     if stored.is_some() {
@@ -163,7 +197,7 @@ async fn run(
 
     tracing::info!("using master server: {}", config.get().master_url);
 
-    let rpc = crate::discord_rpc::spawn_discord_rpc();
+    let rpc = crate::discord_rpc::spawn_discord_rpc(config.get().discord_rpc);
     rpc.update(crate::discord_rpc::DiscordRpcState::Launcher { server_name: None });
 
     let ctx = Ctx {
@@ -192,19 +226,33 @@ async fn run(
         own_token: None,
         servers: Vec::new(),
         manifests: HashMap::new(),
+        cached_manifests: HashMap::new(),
+        online: false,
         pending_launch: HashMap::new(),
         build_state_known: HashSet::new(),
+        last_launched: None,
+        launch_seq: HashMap::new(),
+        refresh_in_flight: false,
+        last_refresh: None,
     };
 
-    // Over REST rather than waiting for the socket: the login screen would
-    // otherwise flash by on every start.
-    if state.access_token.is_some() {
-        state.restore_session().await;
-    }
-
+    // Settings and the cached catalog first: they need no network, and the
+    // window should be in the player's language from the first frame rather
+    // than after the master answers.
     state.send_config_state();
     crate::translations::refresh(&state.ctx, state.ctx.config.get().locale);
-    state.check_launcher_update().await;
+    state.load_offline_cache();
+
+    // Over REST rather than waiting for the socket: the login screen would
+    // otherwise flash by on every start. In the background, so the loop below
+    // takes the window's requests meanwhile.
+    match state.access_token.clone() {
+        Some(token) => {
+            tokio::spawn(restore_session(state.ctx.clone(), token));
+        }
+        None => state.ctx.send(MessageToFrontend::SessionCheckDone),
+    }
+    tokio::spawn(check_launcher_update(state.ctx.clone()));
 
     state.main_loop().await;
     Ok(())
@@ -225,6 +273,7 @@ impl BackendState {
                     self.handle_from_master(msg).await;
                 }
                 Some(online) = self.conn_rx.recv() => {
+                    self.online = online;
                     self.ctx.send(MessageToFrontend::ConnectionState { online });
                     if online {
                         // Both lists may have moved on while we were offline.
@@ -239,7 +288,8 @@ impl BackendState {
             }
         }
         tracing::info!("backend: main loop finished");
-        self.quit.clone().quit();
+        // Checking in with the coordinator happens when `self.quit` is
+        // dropped together with the state — on an error or a panic as well.
     }
 
     fn handle_internal(&mut self, event: InternalEvent) {
@@ -251,7 +301,7 @@ impl BackendState {
                     tracing::info!("session saved to the keyring");
                 }
                 self.access_token = Some(auth.access_token.clone());
-                self.user = Some(user.clone());
+                self.set_user(user.clone());
                 self.ctx.ws.set_token(Some(auth.access_token));
                 self.ctx.send(MessageToFrontend::LoginSuccess { user });
                 self.ctx.send(MessageToFrontend::CloseModal);
@@ -261,11 +311,21 @@ impl BackendState {
                 self.ctx.send(MessageToFrontend::CloseModal);
             }
             InternalEvent::RestartInto(exe) => {
-                self.ctx.send(MessageToFrontend::Quit);
+                // Returns only if the new binary didn't start; the old one
+                // keeps running rather than leaving nothing.
                 crate::updater::restart(&exe);
+                self.ctx.send(MessageToFrontend::AddNotification {
+                    key: "notif-update-failed".into(),
+                    args: [(
+                        "reason".to_string(),
+                        format!("could not start {}", exe.display()),
+                    )]
+                    .into(),
+                    level: schema::NotifLevel::Error,
+                });
             }
             InternalEvent::ProfileUpdated { user } => {
-                self.user = Some(user.clone());
+                self.set_user(user.clone());
                 self.ctx
                     .send(MessageToFrontend::PermissionsUpdated { user });
             }
@@ -281,7 +341,165 @@ impl BackendState {
                     as_username: Some(username),
                 });
             }
+            InternalEvent::SessionRestored { user } => {
+                self.set_user(user.clone());
+                self.ctx.send(MessageToFrontend::LoginSuccess { user });
+            }
+            InternalEvent::TokensRefreshed { auth } => {
+                self.refresh_in_flight = false;
+                self.last_refresh = Some(Instant::now());
+                if let Err(e) = token_store::save(&auth) {
+                    // Rotated refresh tokens make the old one useless, so the
+                    // next start will ask for a login; say why in the log.
+                    tracing::error!("refreshed session not saved to the keyring: {e:#}");
+                }
+                self.access_token = Some(auth.access_token.clone());
+                self.ctx.ws.set_token(Some(auth.access_token));
+            }
+            InternalEvent::SessionRejected => {
+                self.refresh_in_flight = false;
+                self.sign_out();
+            }
+            InternalEvent::SessionUnverified => {
+                self.refresh_in_flight = false;
+                if self.user.is_some() {
+                    return;
+                }
+                // The master can't be reached, which says nothing against the
+                // session. Carry on as the player from last time, so installed
+                // builds can still be started; the socket checks the token
+                // properly once the master is back.
+                match (
+                    &self.access_token,
+                    crate::offline_cache::load_profile(&self.ctx.dirs),
+                ) {
+                    (Some(_), Some(user)) => {
+                        tracing::info!("master unreachable, continuing with the cached profile");
+                        self.set_user(user.clone());
+                        self.ctx.send(MessageToFrontend::LoginSuccess { user });
+                    }
+                    _ => self.ctx.send(MessageToFrontend::SessionCheckDone),
+                }
+            }
+            InternalEvent::ManifestTimeout { server_id, seq } => {
+                if self.launch_seq.get(&server_id) != Some(&seq) {
+                    return;
+                }
+                // The master went quiet; an installed build can still start
+                // from what it sent last time.
+                if let Some(manifest) = self.cached_manifests.get(&server_id).cloned() {
+                    if self.pending_launch.contains_key(&server_id) {
+                        tracing::info!(%server_id, "no manifest from the master, launching the installed build");
+                        self.begin_launch(server_id, manifest);
+                        return;
+                    }
+                }
+                if let Some(modal) = self.pending_launch.remove(&server_id) {
+                    modal.fail("notif-manifest-timeout");
+                    self.ctx
+                        .send(MessageToFrontend::LaunchCancelled { server_id });
+                    self.ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-manifest-timeout".into(),
+                        args: BTreeMap::new(),
+                        level: schema::NotifLevel::Error,
+                    });
+                }
+            }
         }
+    }
+
+    /// Forget the session everywhere: keyring, socket, window. A borrowed
+    /// session goes with it, and so does the banner that announced it.
+    pub fn sign_out(&mut self) {
+        if let Err(e) = token_store::clear() {
+            tracing::error!("could not remove the stored session: {e:#}");
+        }
+        if self.own_token.take().is_some() {
+            self.ctx
+                .send(MessageToFrontend::ImpersonationChanged { as_username: None });
+        }
+        self.access_token = None;
+        self.user = None;
+        self.ctx.set_profile(None);
+        crate::offline_cache::forget_account(&self.ctx.dirs);
+        self.ctx.ws.set_token(None);
+        self.ctx.send(MessageToFrontend::LoggedOut);
+    }
+
+    /// The socket refused our token. A borrowed session simply ran out; ours
+    /// gets one refresh before the player is signed out.
+    pub fn on_auth_failed(&mut self) {
+        if self.own_token.is_some() {
+            self.exit_impersonation();
+            self.ctx.send(MessageToFrontend::AddNotification {
+                key: "notif-impersonate-ended".into(),
+                args: BTreeMap::new(),
+                level: schema::NotifLevel::Warning,
+            });
+            return;
+        }
+        if self.refresh_in_flight {
+            return;
+        }
+        if self
+            .last_refresh
+            .is_some_and(|at| at.elapsed() < Duration::from_secs(30))
+        {
+            self.sign_out();
+            return;
+        }
+        self.refresh_in_flight = true;
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            let event = match refresh_tokens(&ctx).await {
+                Ok(auth) => InternalEvent::TokensRefreshed { auth },
+                Err(RefreshError::Unreachable) => InternalEvent::SessionUnverified,
+                Err(RefreshError::Rejected) => InternalEvent::SessionRejected,
+            };
+            let _ = ctx.internal.send(event);
+        });
+    }
+
+    /// Our own profile is also kept on disk for starting without the master; a
+    /// borrowed one isn't, like the borrowed token.
+    pub fn set_user(&mut self, user: UserProfile) {
+        if self.own_token.is_none() {
+            crate::offline_cache::save_profile(&self.ctx.dirs, &user);
+        }
+        self.ctx.set_profile(Some(user.clone()));
+        self.user = Some(user);
+    }
+
+    /// The disk tells whether a build is installed until its manifest comes.
+    /// Without this every installed build offered «Install» until the master
+    /// answered.
+    pub fn announce_installed_states(&mut self, servers: &[ServerEntry]) {
+        for server in servers {
+            if self.build_state_known.insert(server.id) {
+                self.ctx.send(MessageToFrontend::BuildStateChanged {
+                    server_id: server.id,
+                    state: crate::sync::installed_state(&self.ctx.dirs.instance(&server.id)),
+                });
+            }
+        }
+    }
+
+    /// The last server list and installed builds' manifests, before the
+    /// master answers or in case it never does.
+    fn load_offline_cache(&mut self) {
+        let servers = crate::offline_cache::load_servers(&self.ctx.dirs);
+        if servers.is_empty() {
+            return;
+        }
+        for server in &servers {
+            if let Some(manifest) = crate::offline_cache::load_manifest(&self.ctx.dirs, &server.id)
+            {
+                self.cached_manifests.insert(server.id, manifest);
+            }
+        }
+        self.announce_installed_states(&servers);
+        self.servers = servers.clone();
+        self.ctx.send(MessageToFrontend::ServerList { servers });
     }
 
     /// `None` until both the profile and the token are in hand — the game can't
@@ -304,156 +522,155 @@ impl BackendState {
             .and_then(|s| Some((s.mc_host.clone()?, s.mc_port?)))
             .map(|(host, port)| ServerConnect { host, port })
     }
+}
 
-    async fn restore_session(&mut self) {
-        let url = format!(
-            "{}/api/me",
-            self.ctx.config.get().master_url.trim_end_matches('/')
-        );
-        let Some(token) = &self.access_token else {
-            tracing::info!("restore_session: no token");
-            return;
-        };
-        tracing::info!("restore_session: trying {url}");
-        let resp = self
-            .ctx
-            .http
-            .get(&url)
-            .bearer_auth(token)
-            .timeout(STARTUP_REQUEST_TIMEOUT)
-            .send()
-            .await;
-        match resp {
-            Ok(r) if r.status().is_success() => {
-                if let Ok(profile) = r.json::<UserProfile>().await {
-                    tracing::info!("restore_session: restored for {}", profile.username);
-                    self.user = Some(profile.clone());
-                    self.ctx
-                        .send(MessageToFrontend::LoginSuccess { user: profile });
-                } else {
-                    tracing::warn!("restore_session: UserProfile did not parse");
-                }
-            }
-            Ok(r) if r.status().as_u16() == 401 || r.status().as_u16() == 403 => {
-                tracing::info!(
-                    "restore_session: token expired ({}), refreshing",
-                    r.status()
-                );
-                self.try_refresh().await;
-            }
-            Ok(r) => {
-                tracing::warn!("restore_session: master returned {}", r.status());
-            }
-            // Unreachable is not the same as rejected: keep the session and
-            // wait for the network rather than logging the player out.
-            Err(e) if e.is_connect() || e.is_timeout() => {
-                tracing::error!("restore_session: master unreachable: {e}, session kept");
-            }
-            Err(e) => {
-                tracing::error!("restore_session: request failed: {e}");
-            }
+/// Why a refresh didn't produce new tokens.
+pub enum RefreshError {
+    /// No refresh token, or the master refused it: the session is over.
+    Rejected,
+    /// The master couldn't be reached; try again later.
+    Unreachable,
+}
+
+fn master_base(ctx: &Ctx) -> String {
+    ctx.config
+        .get()
+        .master_url
+        .trim_end_matches('/')
+        .to_string()
+}
+
+/// Trade the stored refresh token for a new pair.
+pub async fn refresh_tokens(ctx: &Ctx) -> Result<token_store::StoredAuth, RefreshError> {
+    let Some(stored) = token_store::load().filter(|s| !s.refresh_token.is_empty()) else {
+        tracing::info!("no refresh token in the keyring");
+        return Err(RefreshError::Rejected);
+    };
+    let resp = ctx
+        .http
+        .post(format!("{}/auth/refresh", master_base(ctx)))
+        .json(&serde_json::json!({ "refresh_token": stored.refresh_token }))
+        .timeout(STARTUP_REQUEST_TIMEOUT)
+        .send()
+        .await;
+    let resp = match resp {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!("token refresh: master unreachable: {e}");
+            return Err(RefreshError::Unreachable);
+        }
+    };
+    if resp.status().is_server_error() {
+        tracing::warn!("token refresh: master returned {}", resp.status());
+        return Err(RefreshError::Unreachable);
+    }
+    if !resp.status().is_success() {
+        tracing::info!("token refresh refused: {}", resp.status());
+        return Err(RefreshError::Rejected);
+    }
+    let v: serde_json::Value = resp.json().await.map_err(|_| RefreshError::Unreachable)?;
+    match (v["access_token"].as_str(), v["refresh_token"].as_str()) {
+        (Some(at), Some(rt)) => {
+            tracing::info!("token refreshed");
+            Ok(token_store::StoredAuth {
+                access_token: at.to_string(),
+                refresh_token: rt.to_string(),
+            })
+        }
+        _ => {
+            tracing::warn!("token refresh: response had no tokens in it");
+            Err(RefreshError::Unreachable)
         }
     }
+}
 
-    async fn try_refresh(&mut self) {
-        let Some(stored) = token_store::load() else {
-            tracing::info!("try_refresh: no refresh_token in the keyring");
-            return;
-        };
-        tracing::info!("try_refresh: refreshing the token");
-        let url = format!(
-            "{}/auth/refresh",
-            self.ctx.config.get().master_url.trim_end_matches('/')
-        );
-        let resp = self
-            .ctx
-            .http
-            .post(&url)
-            .json(&serde_json::json!({ "refresh_token": stored.refresh_token }))
-            .timeout(STARTUP_REQUEST_TIMEOUT)
-            .send()
-            .await;
-        if let Ok(r) = resp {
-            if r.status().is_success() {
-                if let Ok(v) = r.json::<serde_json::Value>().await {
-                    if let (Some(at), Some(rt)) =
-                        (v["access_token"].as_str(), v["refresh_token"].as_str())
-                    {
-                        tracing::info!("try_refresh: token refreshed");
-                        let _ = token_store::save(&token_store::StoredAuth {
-                            access_token: at.to_string(),
-                            refresh_token: rt.to_string(),
-                        });
-                        self.access_token = Some(at.to_string());
-                        self.ctx.ws.set_token(Some(at.to_string()));
-                        self.restore_session_no_refresh().await;
-                        return;
-                    }
-                }
-                tracing::warn!("try_refresh: response had no tokens in it");
-            } else {
-                tracing::warn!("try_refresh: master returned {}", r.status());
-            }
-        } else if let Err(e) = resp {
-            tracing::error!("try_refresh: request failed: {e}");
+enum MeError {
+    Rejected,
+    Unreachable,
+}
+
+async fn fetch_me(ctx: &Ctx, token: &str) -> Result<UserProfile, MeError> {
+    let resp = ctx
+        .http
+        .get(format!("{}/api/me", master_base(ctx)))
+        .bearer_auth(token)
+        .timeout(STARTUP_REQUEST_TIMEOUT)
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::warn!("restore_session: master unreachable: {e}");
+            MeError::Unreachable
+        })?;
+    match resp.status().as_u16() {
+        401 | 403 => Err(MeError::Rejected),
+        s if !(200..300).contains(&s) => {
+            tracing::warn!("restore_session: master returned {s}");
+            Err(MeError::Unreachable)
         }
+        _ => resp.json::<UserProfile>().await.map_err(|e| {
+            tracing::warn!("restore_session: profile did not parse: {e}");
+            MeError::Unreachable
+        }),
     }
+}
 
-    async fn restore_session_no_refresh(&mut self) {
-        let url = format!(
-            "{}/api/me",
-            self.ctx.config.get().master_url.trim_end_matches('/')
-        );
-        if let Some(token) = self.access_token.clone() {
-            if let Ok(r) = self
-                .ctx
-                .http
-                .get(&url)
-                .bearer_auth(&token)
-                .timeout(STARTUP_REQUEST_TIMEOUT)
-                .send()
-                .await
-            {
-                if let Ok(profile) = r.json::<UserProfile>().await {
-                    self.user = Some(profile.clone());
-                    self.ctx
-                        .send(MessageToFrontend::LoginSuccess { user: profile });
+/// Check the stored session at startup, refreshing it once if it expired.
+/// Reports back through `InternalEvent`s; never logs the player out over a
+/// network problem.
+async fn restore_session(ctx: Ctx, token: String) {
+    let event = match fetch_me(&ctx, &token).await {
+        Ok(user) => {
+            // No name here: this log goes out with "report a problem".
+            tracing::info!("restore_session: session restored");
+            InternalEvent::SessionRestored { user }
+        }
+        Err(MeError::Unreachable) => InternalEvent::SessionUnverified,
+        Err(MeError::Rejected) => match refresh_tokens(&ctx).await {
+            Ok(auth) => {
+                let access = auth.access_token.clone();
+                let _ = ctx.internal.send(InternalEvent::TokensRefreshed { auth });
+                match fetch_me(&ctx, &access).await {
+                    Ok(user) => InternalEvent::SessionRestored { user },
+                    Err(MeError::Rejected) => InternalEvent::SessionRejected,
+                    Err(MeError::Unreachable) => InternalEvent::SessionUnverified,
                 }
             }
-        }
+            Err(RefreshError::Rejected) => InternalEvent::SessionRejected,
+            Err(RefreshError::Unreachable) => InternalEvent::SessionUnverified,
+        },
+    };
+    let _ = ctx.internal.send(event);
+}
+
+/// Background check for a newer launcher. Silent on any failure: being offline
+/// is no reason to bother the player, and the bootstrapper checks too.
+async fn check_launcher_update(ctx: Ctx) {
+    let url = format!(
+        "{}/api/launcher/version?platform={}",
+        master_base(&ctx),
+        schema::current_platform()
+    );
+    let Ok(Ok(r)) = tokio::time::timeout(UPDATE_CHECK_TIMEOUT, ctx.http.get(&url).send()).await
+    else {
+        return;
+    };
+    let Ok(v) = r.json::<serde_json::Value>().await else {
+        return;
+    };
+    let Some(version) = v["version"].as_str() else {
+        return;
+    };
+    // The master reports a git tag, "v1.2.0" (or the legacy "launcher-v1.2.0"),
+    // while the crate exposes "1.2.0". Without stripping the prefix they never
+    // match and the update banner is always up.
+    let reported = version
+        .trim_start_matches("launcher-")
+        .trim_start_matches('v');
+    if reported == env!("CARGO_PKG_VERSION") {
+        return;
     }
-
-    async fn check_launcher_update(&self) {
-        let url = format!(
-            "{}/api/launcher/version?platform={}",
-            self.ctx.config.get().master_url.trim_end_matches('/'),
-            schema::current_platform()
-        );
-        if let Ok(r) = self.ctx.http.get(&url).send().await {
-            if let Ok(v) = r.json::<serde_json::Value>().await {
-                if !v.is_null() {
-                    if let Some(version) = v["version"].as_str() {
-                        // The master reports a git tag, "v1.2.0" (or the legacy
-                        // "launcher-v1.2.0"), while the crate exposes "1.2.0".
-                        // what we have is the crate version, "1.2.0". Without
-                        // stripping the prefix they never match and the update
-                        // banner is always up.
-                        let reported_version = version
-                            .trim_start_matches("launcher-")
-                            .trim_start_matches('v');
-                        if reported_version != env!("CARGO_PKG_VERSION") {
-                            if let Ok(lv) = serde_json::from_value::<schema::LauncherVersion>(
-                                build_launcher_version(&v),
-                            ) {
-                                self.ctx.send(MessageToFrontend::LauncherUpdateAvailable {
-                                    version: lv,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if let Ok(lv) = serde_json::from_value::<schema::LauncherVersion>(build_launcher_version(&v)) {
+        ctx.send(MessageToFrontend::LauncherUpdateAvailable { version: lv });
     }
 }
 
@@ -544,10 +761,10 @@ pub fn spawn_sync_and_launch(req: Launch) {
                     g.values()
                         .fold((0u64, 0u64), |(d, t), (sd, st)| (d + sd, t + st))
                 };
-                modal_clone.set_stage("Downloading...");
+                modal_clone.set_stage("downloading");
                 modal_clone.set_progress(sum_done, sum_total);
             } else {
-                modal_clone.set_stage(stage.label());
+                modal_clone.set_stage(format!("{stage:?}"));
                 modal_clone.set_progress(done, total);
             }
             if !file.is_empty() {
@@ -571,10 +788,21 @@ pub fn spawn_sync_and_launch(req: Launch) {
         .await;
 
         if let Err(e) = sync_result {
-            modal.fail(e.to_string());
+            // A cancel surfaces as an error from deep inside the download; it
+            // is the player's choice, not a failure to report.
+            if modal.is_cancelled() {
+                ctx.send(MessageToFrontend::LaunchCancelled { server_id });
+                return;
+            }
+            // `{:#}` keeps the cause chain: "download of X failed: SHA1
+            // mismatch" rather than only the outermost context.
+            let detail = format!("{e:#}");
+            tracing::error!(%server_id, error = %detail, "sync failed");
+            modal.fail(detail.clone());
             ctx.send(MessageToFrontend::SyncFailed {
                 server_id,
-                reason: e.to_string(),
+                reason: crate::failure::sync_failure_key(&e).into(),
+                detail,
             });
             return;
         }
@@ -586,6 +814,7 @@ pub fn spawn_sync_and_launch(req: Launch) {
             state: crate::sync::build_state(&instance_dir, &manifest),
         });
         modal.finish();
+        crate::offline_cache::save_manifest(&ctx.dirs, &manifest);
 
         // Nothing looks at the directory between the sync and the launch, so
         // check it against the manifest here. Extra files go, mismatches go to
@@ -596,6 +825,10 @@ pub fn spawn_sync_and_launch(req: Launch) {
                 .await;
         if !report.findings.is_empty() {
             tracing::warn!(findings = report.findings.len(), "found mismatched files");
+        }
+        // Only when something was actually put right. A new pack the player
+        // added is a finding for the master, not a repair to announce.
+        if report.findings.iter().any(|f| f.repaired) {
             ctx.send(MessageToFrontend::AddNotification {
                 key: "notif-build-files-restored".into(),
                 args: std::collections::BTreeMap::new(),
@@ -615,9 +848,26 @@ pub fn spawn_sync_and_launch(req: Launch) {
             });
             ctx.send(MessageToFrontend::SyncFailed {
                 server_id,
-                reason: "launch blocked: a forbidden file was found".into(),
+                reason: crate::failure::LAUNCH_BLOCKED.into(),
+                detail: String::new(),
             });
             return;
+        }
+
+        // Delivered packs are switched on the first time they arrive; the
+        // network's prefix pack every time, chat is unreadable without it.
+        crate::sync::live::enable_delivered_packs(
+            &instance_dir,
+            &manifest,
+            &enabled_optional,
+            &user,
+        )
+        .await;
+        if instance_dir
+            .join("resourcepacks/noro-prefixes.zip")
+            .exists()
+        {
+            let _ = crate::sync::live::enable(&instance_dir, "noro-prefixes.zip").await;
         }
 
         // After the sync but before the launch: the game reads servers.dat at
@@ -642,6 +892,12 @@ pub fn spawn_sync_and_launch(req: Launch) {
         let online = server.as_ref().and_then(|s| s.online);
         let max_online = server.as_ref().and_then(|s| s.max_online);
 
+        // Cancelled while the files were being checked: stop before the game.
+        if modal.is_cancelled() {
+            ctx.send(MessageToFrontend::LaunchCancelled { server_id });
+            return;
+        }
+
         // The channel to the case mod has to be up before the game starts: the
         // mod reads the handshake file once, at startup, and being late here
         // means no panel until the next login.
@@ -663,9 +919,15 @@ pub fn spawn_sync_and_launch(req: Launch) {
             }
             Err(e) => {
                 ctx.mod_link.stop().await;
+                tracing::error!(%server_id, error = %format!("{e:#}"), "launch failed");
+                let key = match crate::failure::sync_failure_key(&e) {
+                    "sync-error-unknown" => crate::failure::LAUNCH_FAILED,
+                    key => key,
+                };
                 ctx.send(MessageToFrontend::SyncFailed {
                     server_id,
-                    reason: format!("launch failed: {e}"),
+                    reason: key.into(),
+                    detail: format!("{e:#}"),
                 });
             }
         }

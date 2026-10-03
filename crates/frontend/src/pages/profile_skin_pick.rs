@@ -20,7 +20,7 @@ pub fn on_upload_click(
         files: true,
         directories: false,
         multiple: false,
-        prompt: Some("Select skin".into()),
+        prompt: Some(i18n::t("profile-skin-pick-title").into()),
     });
 
     cx.spawn(async move |this, cx| {
@@ -52,8 +52,7 @@ pub fn on_upload_click(
                     this.custom_presets.push(SavedSkinPreset {
                         id: uuid::Uuid::new_v4().to_string(),
                         name: skin.name,
-                        bytes: skin.bytes,
-                        preview: this.skin_preview.clone(),
+                        bytes: std::sync::Arc::new(skin.bytes),
                     });
                     cx.notify();
                 });

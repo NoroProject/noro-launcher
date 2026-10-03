@@ -11,11 +11,13 @@ use i18n::t;
 pub fn nav_icon(
     id: &'static str,
     icon: &'static str,
+    hint: String,
     active: bool,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> AnyElement {
     div()
         .id(id)
+        .tooltip(crate::components::hint(hint))
         .size(px(36.))
         .flex_shrink_0()
         .rounded(px(R_SM))
@@ -60,6 +62,7 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
 pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
     div()
         .id("collapsed-logo-toggle")
+        .tooltip(crate::components::hint(t("hint-expand-sidebar")))
         .group("collapsed-logo")
         .size(px(40.))
         .rounded(px(R_SM))
@@ -130,12 +133,14 @@ pub fn empty_hint() -> AnyElement {
 pub fn dot_icon(
     id: &'static str,
     icon: &'static str,
+    hint: String,
     active: bool,
     unread: bool,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> AnyElement {
     div()
         .id(id)
+        .tooltip(crate::components::hint(hint))
         .relative()
         .size(px(36.))
         .flex_shrink_0()

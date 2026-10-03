@@ -1,6 +1,6 @@
-// File exceeds 150 lines: complete JVM startup pipeline, args, classpath, and pack auto-enabling.
 //! Launching the game: classpath, argument substitution, authlib-injector, JVM.
 
+mod argfile;
 mod args;
 mod authlib;
 mod classpath;
@@ -50,19 +50,6 @@ pub async fn launch(
     let natives_dir = dirs.natives(server_id);
     tokio::fs::create_dir_all(&natives_dir).await.ok();
 
-    // Ensure prefixes pack and any delivered resourcepacks are activated in options.txt
-    for file in &manifest.verified_files {
-        if let Some(pack) = file.path.strip_prefix("resourcepacks/") {
-            let _ = crate::sync::live::enable(&instance_dir, pack).await;
-        }
-    }
-    if instance_dir
-        .join("resourcepacks/noro-prefixes.zip")
-        .exists()
-    {
-        let _ = crate::sync::live::enable(&instance_dir, "noro-prefixes.zip").await;
-    }
-
     let java = crate::sync::find_java(&instance_dir, manifest)
         .ok_or_else(|| anyhow!("no java in the manifest"))?;
     #[cfg(unix)]
@@ -84,27 +71,42 @@ pub async fn launch(
     ));
     cmd.arg(classpath::standard_ignore_list());
 
-    add_authlib(client, config, dirs, &mut cmd).await;
-    for flag in config.jvm_flags.split_whitespace() {
+    add_authlib(client, config, dirs, &mut cmd).await?;
+    for flag in args::split_flags(&config.jvm_flags) {
         cmd.arg(flag);
     }
 
-    let ctx = args::Substitution {
-        instance_dir: &instance_dir,
-        natives_dir: &natives_dir,
-        classpath: &classpath,
+    let ctx = args::Substitution::new(
+        &instance_dir,
+        &natives_dir,
+        &classpath,
         manifest,
         login,
-        primary_game_artifact: &primary_game_artifact,
-    };
+        &primary_game_artifact,
+    );
     args::push_jvm_args(
         &mut cmd,
         &ctx,
         classpath::loader_client_name(manifest).as_deref(),
     );
 
+    let jvm_count = cmd.as_std().get_args().count();
     cmd.arg(&manifest.main_class);
     args::push_game_args(&mut cmd, &ctx, connect, config.fullscreen);
+
+    if argfile::too_long(argfile::command_line_len(&cmd)) {
+        if argfile::java_major(&java).is_some_and(|v| v >= 9) {
+            let file = instance_dir.join(".noro").join("jvm-args.txt");
+            cmd = argfile::split_into_file(&cmd, jvm_count, &file)
+                .await
+                .with_context(|| format!("writing {}", file.display()))?;
+        } else {
+            tracing::warn!(
+                "the command line is longer than Windows allows and this Java is too old \
+                 for an argument file; the game may not start"
+            );
+        }
+    }
 
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
@@ -151,27 +153,32 @@ async fn write_legacy_classpath(
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("\n");
-    tokio::fs::write(&legacy_cp_path, content)
+    crate::fsutil::write_atomic(&legacy_cp_path, content)
         .await
         .with_context(|| format!("writing {}", legacy_cp_path.display()))?;
     Ok(legacy_cp_path)
 }
 
+/// Without the agent the game starts, then fails to join any server with a
+/// session error that points nowhere near the launcher — so a missing agent
+/// stops the launch here, with the reason.
 async fn add_authlib(
     client: &reqwest::Client,
     config: &LauncherConfig,
     dirs: &LauncherDirectories,
     cmd: &mut Command,
-) {
-    if let Ok(authlib) = ensure_authlib_injector(client, config, dirs).await {
-        // authlib-injector wants the Yggdrasil API root, not the master's root:
-        // it fetches the ALI metadata from there and derives the authserver and
-        // sessionserver paths from it.
-        let master_url = config.master_url.replace("localhost", "127.0.0.1");
-        cmd.arg(format!(
-            "-javaagent:{}={}/api/yggdrasil",
-            authlib.to_string_lossy(),
-            master_url.trim_end_matches('/')
-        ));
-    }
+) -> Result<()> {
+    let authlib = ensure_authlib_injector(client, config, dirs)
+        .await
+        .context("authlib-injector is not available")?;
+    // authlib-injector wants the Yggdrasil API root, not the master's root:
+    // it fetches the ALI metadata from there and derives the authserver and
+    // sessionserver paths from it.
+    let master_url = config.master_url.replace("localhost", "127.0.0.1");
+    cmd.arg(format!(
+        "-javaagent:{}={}/api/yggdrasil",
+        authlib.to_string_lossy(),
+        master_url.trim_end_matches('/')
+    ));
+    Ok(())
 }

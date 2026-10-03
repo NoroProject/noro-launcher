@@ -18,28 +18,32 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     let (title, desc) = match prompt.action {
         RemoteAction::VerifyIntegrity => (
             t("remote-action-verify_integrity"),
-            "The admin asked for an automatic file integrity check.",
+            t("remote-action-desc-verify_integrity"),
         ),
         RemoteAction::ClearAssetCache => (
             t("remote-action-clear_asset_cache"),
-            "The admin asks to clear the asset cache to sort out possible glitches.",
+            t("remote-action-desc-clear_asset_cache"),
         ),
         RemoteAction::ReinstallBuild => (
             t("remote-action-reinstall_build"),
-            "The admin asks to reinstall the current build from scratch.",
+            t("remote-action-desc-reinstall_build"),
         ),
         RemoteAction::RestartLauncher => (
             t("remote-action-restart_launcher"),
-            "The admin asked to restart the launcher.",
+            t("remote-action-desc-restart_launcher"),
         ),
         RemoteAction::KillGame => (
-            "Stop the game process".to_string(),
-            "The admin asks to force-close the running Minecraft process.",
+            t("remote-action-kill_game"),
+            t("remote-action-desc-kill_game"),
         ),
     };
 
     Some(
         div()
+            // Takes the clicks: without it they went through to the Play
+            // button and the sidebar under the dialog.
+            .id("remote-action-dialog")
+            .occlude()
             .absolute()
             .inset_0()
             .flex()
@@ -70,7 +74,11 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
                         div()
                             .text_size(px(12.))
                             .text_color(rgb(TEXT_PRIMARY))
-                            .child(format!("Requested by {}", prompt.actor_username)),
+                            .child({
+                                let mut args = i18n::FluentArgs::new();
+                                args.set("name", prompt.actor_username.clone());
+                                i18n::t_args("remote-action-requested-by", &args)
+                            }),
                     )
                     .child(
                         div()

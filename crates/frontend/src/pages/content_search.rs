@@ -30,8 +30,8 @@ pub(super) fn pagination_controls(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx)
     let has_prev = offset >= limit;
     let has_next = offset + limit < total;
 
-    // Одной группой по центру, а не тремя блоками по краям экрана: две подписи
-    // в разных углах и число между ними читались как три разных элемента.
+    // One group in the middle, not three blocks at the edges of the screen: two
+    // labels in different corners with a number between them read as three things.
     div()
         .flex()
         .justify_center()
@@ -143,6 +143,11 @@ pub(super) fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> A
                 }))
                 .on_key_down(
                     cx.listener(move |this, event: &gpui::KeyDownEvent, _w, cx| {
+                        if let Some(text) = super::common::pasted(event, cx) {
+                            this.mod_catalog_query.push_str(&text);
+                            cx.notify();
+                            return;
+                        }
                         match event.keystroke.key.as_str() {
                             "backspace" => {
                                 this.mod_catalog_query.pop();
@@ -194,8 +199,8 @@ pub(super) fn search_bar(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> A
         )
         .child(sort_button(ui, server_id, cx))
         .child(
-            // Два переключателя подряд, без общей подложки: подложка добавляла
-            // третью рамку вокруг того, что и так обведено.
+            // Two switches in a row with no shared backing: the backing added a third
+            // frame around things that are already outlined.
             div()
                 .h(px(40.))
                 .flex()
