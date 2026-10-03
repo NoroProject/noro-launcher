@@ -602,10 +602,14 @@ enum MeError {
 }
 
 async fn fetch_me(ctx: &Ctx, token: &str) -> Result<UserProfile, MeError> {
-    let resp = ctx
-        .http
-        .get(format!("{}/api/me", master_base(ctx)))
-        .bearer_auth(token)
+    let api = crate::master_api::MasterApi::new(
+        ctx.http.clone(),
+        &ctx.config.get().master_url,
+        Some(token.to_string()),
+    )
+    .ok_or(MeError::Unreachable)?;
+    let resp = api
+        .request(reqwest::Method::GET, "/api/me")
         .timeout(STARTUP_REQUEST_TIMEOUT)
         .send()
         .await

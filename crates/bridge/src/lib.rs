@@ -8,7 +8,6 @@ pub mod handle;
 pub mod message;
 pub mod modal_action;
 pub mod quit;
-pub mod serial;
 
 pub use handle::{create_pair, BackendHandle, BackendReceiver, FrontendHandle, FrontendReceiver};
 pub use message::{
@@ -19,4 +18,3 @@ pub use message::{
 };
 pub use modal_action::{ModalAction, ModalProgress};
 pub use quit::{QuitCoordinator, QuitHandler};
-pub use serial::{AtomicSerialProvider, AtomicSetSerial, Serial};

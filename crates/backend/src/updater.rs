@@ -148,3 +148,7 @@ pub fn restart(exe: &std::path::Path) {
         Err(e) => tracing::error!("could not start {}: {e}", exe.display()),
     }
 }
+
+#[cfg(test)]
+#[path = "updater_tests.rs"]
+mod tests;

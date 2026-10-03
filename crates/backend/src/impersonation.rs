@@ -4,7 +4,7 @@
 //! through the browser, not in a URL, and not as a process argument that shows
 //! up in `ps`.
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, Result};
 use uuid::Uuid;
 
 pub struct Claimed {
@@ -18,26 +18,13 @@ pub async fn claim(
     access_token: &str,
     grant_id: Uuid,
 ) -> Result<Claimed> {
-    let url = format!(
-        "{}/api/launcher/impersonate/claim",
-        master_url.trim_end_matches('/')
-    );
-    let resp = http
-        .post(&url)
-        .bearer_auth(access_token)
-        .json(&serde_json::json!({ "grant_id": grant_id }))
-        .send()
-        .await?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        bail!(
-            "master refused the grant ({status}): {}",
-            resp.text().await.unwrap_or_default()
-        );
-    }
-
-    let value: serde_json::Value = resp.json().await?;
+    let api =
+        crate::master_api::MasterApi::new(http.clone(), master_url, Some(access_token.to_string()))
+            .ok_or_else(|| anyhow!("not signed in"))?;
+    let value = api
+        .claim_impersonation(grant_id)
+        .await
+        .map_err(|e| e.context("master refused the grant"))?;
     let token = value
         .get("access_token")
         .and_then(|v| v.as_str())

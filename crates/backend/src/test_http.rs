@@ -11,6 +11,7 @@ use tokio::net::TcpListener;
 pub struct Server {
     pub base: String,
     hits: Arc<AtomicUsize>,
+    requests: Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 impl Server {
@@ -20,6 +21,11 @@ impl Server {
 
     pub fn hits(&self) -> usize {
         self.hits.load(Ordering::SeqCst)
+    }
+
+    /// The request line and headers of every request so far, oldest first.
+    pub fn requests(&self) -> Vec<String> {
+        self.requests.lock().unwrap().clone()
     }
 }
 
@@ -35,6 +41,8 @@ pub async fn serve(routes: Vec<(&str, u16, Vec<u8>)>) -> Server {
     let addr = listener.local_addr().unwrap();
     let hits = Arc::new(AtomicUsize::new(0));
     let counter = hits.clone();
+    let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = requests.clone();
     tokio::spawn(async move {
         loop {
             let Ok((mut sock, _)) = listener.accept().await else {
@@ -42,6 +50,7 @@ pub async fn serve(routes: Vec<(&str, u16, Vec<u8>)>) -> Server {
             };
             counter.fetch_add(1, Ordering::SeqCst);
             let routes = routes.clone();
+            let seen = seen.clone();
             tokio::spawn(async move {
                 let mut req = Vec::new();
                 let mut tmp = [0u8; 1024];
@@ -55,6 +64,8 @@ pub async fn serve(routes: Vec<(&str, u16, Vec<u8>)>) -> Server {
                     }
                 }
                 let line = String::from_utf8_lossy(&req);
+                let head_end = line.find("\r\n\r\n").unwrap_or(line.len());
+                seen.lock().unwrap().push(line[..head_end].to_string());
                 let path = line.split_whitespace().nth(1).unwrap_or("/").to_string();
                 let (status, body) = routes
                     .get(&path)
@@ -73,6 +84,7 @@ pub async fn serve(routes: Vec<(&str, u16, Vec<u8>)>) -> Server {
     Server {
         base: format!("http://{addr}"),
         hits,
+        requests,
     }
 }
 
