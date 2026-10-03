@@ -1,3 +1,5 @@
+// Over 150 lines: one handler for every content message; split, the match would
+// only move.
 //! Backend messages about news, the content catalogue, skins and capes.
 
 use super::*;

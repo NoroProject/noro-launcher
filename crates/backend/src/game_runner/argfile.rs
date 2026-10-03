@@ -1,3 +1,4 @@
+// Over 150 lines: a third of it is tests; the code alone is about a hundred.
 //! Moving JVM arguments into an `@argfile` when the command line gets too long.
 //!
 //! Windows caps a command line at 32 767 characters. A big modpack installed

@@ -1,3 +1,4 @@
+// Over 150 lines: one enum, a variant for each request, each documented.
 //! What the window asks the backend for.
 
 use super::*;

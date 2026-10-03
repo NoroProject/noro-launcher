@@ -1,3 +1,5 @@
+// Over 150 lines: the bar and the pills in it; each pill is short, and the bar
+// decides which show.
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;

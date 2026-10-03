@@ -1,3 +1,5 @@
+// Over 150 lines: the backend's own calls to the master at start-up: the token
+// refresh, the profile and the update check.
 //! The session with the master: refreshing tokens, checking the stored one
 //! at startup, and asking whether a newer launcher is out.
 

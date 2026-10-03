@@ -1,3 +1,5 @@
+// Over 150 lines: the sync in order, stage by stage. The steps live in the
+// submodules; this is the sequence that calls them.
 //! The pre-launch sync: verify the manifest signature, download what differs,
 //! remove what doesn't belong, and honour the optional-mod selection.
 

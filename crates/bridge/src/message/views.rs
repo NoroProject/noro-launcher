@@ -1,3 +1,5 @@
+// Over 150 lines: plain data, one struct for each kind of thing the window
+// lists.
 //! What the window shows, as plain data: catalogue hits, punishments, rules,
 //! tickets, conversations.
 

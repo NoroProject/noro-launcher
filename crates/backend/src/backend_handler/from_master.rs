@@ -1,3 +1,5 @@
+// Over 150 lines: one match over everything the master pushes. Split, a new
+// message could end up handled twice or not at all.
 //! What the master pushes over the socket.
 
 use super::*;

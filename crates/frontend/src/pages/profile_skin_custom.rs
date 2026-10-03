@@ -1,3 +1,5 @@
+// Over 150 lines: one card with its rename field and delete button, which share
+// the card's state.
 //! A preset the player saved: its card, renaming it and deleting it.
 
 use super::common::Cx;

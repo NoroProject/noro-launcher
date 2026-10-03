@@ -1,3 +1,4 @@
+// Over 150 lines: one constructor that sets every field of the window state.
 //! The window state as it is before the backend has said anything.
 
 use super::*;

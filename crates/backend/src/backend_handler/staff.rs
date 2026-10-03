@@ -1,3 +1,6 @@
+// Over 150 lines: everything staff can ask of a player's launcher, and the
+// player's own support bundle; the log requests and the bundle collect the same
+// files.
 //! Requests from staff: remote actions, log requests, impersonation, and the
 //! player's own support bundle.
 

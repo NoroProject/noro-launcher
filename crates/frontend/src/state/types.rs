@@ -1,3 +1,5 @@
+// Over 150 lines: the window's small types; each is short, and they are read
+// together.
 //! The window's smaller types: pages, sync state, toasts, prompts.
 
 use super::*;

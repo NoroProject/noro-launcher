@@ -1,3 +1,5 @@
+// Over 150 lines: the install, guarded against a second click, and the restart
+// that follows it.
 //! Launcher self-update: download, check sha256 and the ed25519 signature,
 //! install into the data root.
 //!

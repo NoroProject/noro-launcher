@@ -1,3 +1,6 @@
+// Over 150 lines: the launch and what the window shows beside the play button
+// (build state, optional mods, recommended settings) come from the same
+// manifest.
 //! Launching a build and telling the window about builds: state, optional
 //! mods, recommended settings.
 

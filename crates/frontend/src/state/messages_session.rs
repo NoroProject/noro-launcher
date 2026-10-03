@@ -1,3 +1,5 @@
+// Over 150 lines: one handler for every session message; split, the match would
+// only move.
 //! Backend messages about sign-in, settings, connection and requests from staff.
 
 use super::*;

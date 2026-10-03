@@ -1,3 +1,5 @@
+// Over 150 lines: the page and its rows; each row is short and the panel lists
+// them.
 //! Per-server client settings: JVM, console, flags.
 use super::common::{panel, tabs, Cx};
 use super::server_settings_header::{open_folder_button, page_header};

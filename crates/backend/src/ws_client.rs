@@ -1,3 +1,5 @@
+// Over 150 lines: the connection loop with its keepalive and backoff, then
+// tests for them.
 //! WebSocket client for the master, with reconnect and backoff.
 
 use futures_util::{SinkExt, StreamExt};

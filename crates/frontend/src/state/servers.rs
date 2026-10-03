@@ -1,3 +1,5 @@
+// Over 150 lines: everything the player does to a server: open, launch, stop,
+// pick mods and builds.
 //! The server list, launching and stopping games, optional mods and builds.
 
 use super::*;

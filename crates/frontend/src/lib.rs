@@ -1,3 +1,5 @@
+// Over 150 lines: the root view and opening the window: sizes, saved bounds,
+// fonts and the quit hook all have to be in place before the first frame.
 mod assets;
 mod components;
 mod console_controls;

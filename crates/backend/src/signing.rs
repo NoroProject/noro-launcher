@@ -1,3 +1,5 @@
+// Over 150 lines: the checks are under a hundred; the rest is tests that tamper
+// with a signed manifest.
 //! ed25519 signature checks on the build manifest.
 //!
 //! The public key comes from the bootstrapper (`NORO_SIGNING_PUBKEY` in the

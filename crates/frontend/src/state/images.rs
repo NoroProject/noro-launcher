@@ -1,3 +1,5 @@
+// Over 150 lines: every picture the window loads, with the same caps and the
+// same texture clean-up.
 //! Pictures from the network: server backgrounds and icons, catalogue icons,
 //! screenshots, skin preset renders and news images.
 

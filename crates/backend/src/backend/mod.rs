@@ -1,3 +1,5 @@
+// Over 150 lines: the types every backend file shares, and the start-up that
+// wires them together.
 //! Backend core: state, the main event loop, launching the game.
 
 use crate::auth::token_store;

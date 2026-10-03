@@ -1,3 +1,4 @@
+// Over 150 lines: a setter for each setting; each is a few lines.
 //! Launcher and per-server settings, the language and the self-update.
 
 use super::*;

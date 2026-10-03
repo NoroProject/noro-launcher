@@ -1,3 +1,5 @@
+// Over 150 lines: the client thread and the activity it sends; Discord may come
+// and go, and each update reconnects first when it has to.
 //! Discord Rich Presence.
 //!
 //! Discord may not be running, so every connection failure is non-fatal and the

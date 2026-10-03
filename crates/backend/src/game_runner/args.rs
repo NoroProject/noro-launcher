@@ -1,3 +1,5 @@
+// Over 150 lines: the argument table and the substitution that reads it, then
+// tests.
 use super::rules::arg_values;
 use super::{classpath, LoginInfo, ServerConnect};
 use crate::directories::safe_join;

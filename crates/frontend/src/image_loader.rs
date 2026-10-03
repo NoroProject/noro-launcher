@@ -1,3 +1,5 @@
+// Over 150 lines: fetching, decoding and downscaling are one pipeline, and each
+// step hands the next its bytes.
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use gpui::{Image, ImageFormat, RenderImage};

@@ -1,3 +1,5 @@
+// Over 150 lines: the pool, its retries and the up-to-date check that decides
+// what the pool gets.
 //! Parallel download pool: retries with backoff, byte-level progress.
 
 use super::fetch::fetch_to_file;

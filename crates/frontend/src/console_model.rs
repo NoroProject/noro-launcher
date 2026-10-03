@@ -1,3 +1,5 @@
+// Over 150 lines: the buffer and its filters, then tests. The code alone is
+// under two hundred.
 use crate::state::LogEntry;
 use bridge::GameLogLevel;
 use chrono::{DateTime, Local, TimeZone};

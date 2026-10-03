@@ -1,3 +1,5 @@
+// Over 150 lines: the grid, the built-in preset cards and the add tile; the
+// cards and the tile only appear in the grid.
 //! The preset grid next to the skin preview: the built-in skins and the
 //! add-a-preset tile.
 

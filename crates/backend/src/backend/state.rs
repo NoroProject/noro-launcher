@@ -1,3 +1,5 @@
+// Over 150 lines: the main loop and the internal events it handles; each event
+// changes the state this file owns.
 //! The backend's main loop and the state it owns: the session, the
 //! servers, internal events.
 

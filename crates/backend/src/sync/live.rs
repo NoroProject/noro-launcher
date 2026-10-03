@@ -1,3 +1,5 @@
+// Over 150 lines: fetching packs while the game runs and switching them on in
+// options.txt are one feature with one set of rules about what counts as live.
 // File exceeds 150 lines: live sync comparing hashes, in-place atomic replace, and auto-enabling packs in options.txt.
 //! Syncing while the game is running.
 //!

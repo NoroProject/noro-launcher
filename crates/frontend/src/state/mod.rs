@@ -1,3 +1,4 @@
+// Over 150 lines: the window state struct; its fields are listed once, here.
 //! UI state, and the handling of messages from the backend.
 
 use bridge::{

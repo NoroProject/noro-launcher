@@ -1,3 +1,5 @@
+// Over 150 lines: one handler for every sync message; split, the match would
+// only move.
 //! Backend messages about servers, builds, downloads and running games.
 
 use super::*;

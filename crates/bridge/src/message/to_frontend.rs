@@ -1,3 +1,4 @@
+// Over 150 lines: one enum, a variant for each message, each documented.
 //! What the backend tells the window.
 
 use super::*;

@@ -1,3 +1,5 @@
+// Over 150 lines: the player's own actions outside a server: sign-in, overlays,
+// skins and answers to staff.
 //! Toasts, sign-in and sign-out, closing overlays, skins, and the answers to
 //! requests from staff.
 

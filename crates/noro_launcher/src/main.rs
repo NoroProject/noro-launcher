@@ -1,3 +1,5 @@
+// Over 150 lines: the start-up sequence, then the splash preview used while
+// working on the window.
 //! Bootstrapper: check for a newer build, fetch the core binary, hand over.
 //!
 //! This binary is never updated after the first install, which is what lets it

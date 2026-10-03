@@ -1,3 +1,5 @@
+// Over 150 lines: one toolbar; its filters, search, copy, find and save act on
+// the same buffer.
 use crate::console_controls::{action, clipboard_text, toggle};
 use crate::console_model::Filters;
 use crate::state::{ConsoleWindow, GlobalLauncherUI};

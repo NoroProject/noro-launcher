@@ -1,3 +1,5 @@
+// Over 150 lines: deciding about a file and resolving a conflict on it read the
+// same hashes and the same paths.
 //! The per-file decision, and what to do when both sides changed a file.
 
 use super::ProgressFn;

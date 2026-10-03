@@ -1,3 +1,4 @@
+// Over 150 lines: the console window and the calls that open it and feed it.
 //! The game console window and the log lines it shows.
 
 use super::*;

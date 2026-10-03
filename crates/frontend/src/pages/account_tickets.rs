@@ -1,3 +1,5 @@
+// Over 150 lines: the list, one row and the status chip in it; the row has no
+// other use.
 //! The tickets tab: the player's support tickets and the button that opens one.
 
 use super::account::{empty, loading, row, scroll};

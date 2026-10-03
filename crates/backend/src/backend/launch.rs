@@ -1,3 +1,5 @@
+// Over 150 lines: syncing and launching are one task with one cancel handle;
+// apart, the hand-off between them would need state of its own.
 //! Syncing a build and running the game.
 
 use super::*;
