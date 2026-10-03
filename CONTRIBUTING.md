@@ -48,6 +48,9 @@ By default core talks to `http://localhost:8080`. To point it elsewhere:
 NORO_MASTER_URL=https://master.example.com cargo run -p noro_core
 ```
 
+Debug builds ignore a stale `bootstrap.json` from an installed production
+launcher and use `http://127.0.0.1:8080` unless `NORO_MASTER_URL` is set.
+
 You need an account on whichever master you point at — the launcher signs in
 through it.
 
@@ -64,7 +67,7 @@ export them yourself or put them in front of the command.
 
 ## Where the master address actually comes from
 
-Both the address and the public key are resolved in the same order, most
+Release builds resolve the address and public key in the same order, most
 specific first:
 
 1. **Stamped into the binary** — see below

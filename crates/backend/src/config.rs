@@ -96,6 +96,9 @@ fn stamped_master_url() -> Option<String> {
             return Some(trimmed.to_string());
         }
     }
+    if cfg!(debug_assertions) {
+        return None;
+    }
     let boot_path = crate::directories::LauncherDirectories::new().bootstrap_file();
     let raw = std::fs::read_to_string(&boot_path).ok()?;
     let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
@@ -203,6 +206,13 @@ impl LauncherConfig {
     /// one written down the first time it ever started, and the only cure was
     /// deleting the config by hand.
     pub fn adopt_stamped_master(&mut self) -> Option<String> {
+        if cfg!(debug_assertions) && std::env::var_os("NORO_MASTER_URL").is_none() {
+            let dev_url = "http://127.0.0.1:8080";
+            if self.master_url != dev_url {
+                return Some(std::mem::replace(&mut self.master_url, dev_url.to_string()));
+            }
+            return None;
+        }
         let stamped = stamped_master_url()?;
         if stamped == self.master_url {
             return None;
