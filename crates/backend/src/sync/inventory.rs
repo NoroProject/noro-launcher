@@ -39,12 +39,8 @@ impl Inventory {
     }
 
     pub async fn save(&self, instance_dir: &Path) {
-        let path = instance_dir.join(INVENTORY_PATH);
-        if let Some(parent) = path.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
         if let Ok(bytes) = serde_json::to_vec(self) {
-            let _ = tokio::fs::write(path, bytes).await;
+            let _ = crate::fsutil::write_atomic(instance_dir.join(INVENTORY_PATH), bytes).await;
         }
     }
 }

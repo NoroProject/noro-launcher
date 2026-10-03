@@ -147,7 +147,13 @@ pub async fn sync_server(
 
     // Which build is installed. The files on disk don't say by themselves, so
     // without this there's no telling "install" and "update" from "launch".
-    let _ = tokio::fs::write(version_marker(instance_dir), marker_contents(manifest)).await;
+    // Without it the button goes back to offering «Install» for a build that
+    // is on disk, so a failure here is worth a log line.
+    if let Err(e) =
+        crate::fsutil::write_atomic(version_marker(instance_dir), marker_contents(manifest)).await
+    {
+        tracing::warn!(error = %e, "build marker not written");
+    }
 
     progress(SyncStage::Done, 1, 1, String::new());
     Ok(())

@@ -75,12 +75,8 @@ impl HashCache {
         if !self.dirty {
             return;
         }
-        let path = instance_dir.join(CACHE_PATH);
-        if let Some(parent) = path.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
         if let Ok(bytes) = serde_json::to_vec(&self.entries) {
-            let _ = tokio::fs::write(&path, bytes).await;
+            let _ = crate::fsutil::write_atomic(instance_dir.join(CACHE_PATH), bytes).await;
         }
     }
 }

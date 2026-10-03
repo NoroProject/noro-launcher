@@ -6,7 +6,7 @@
 
 use crate::backend::Ctx;
 use bridge::MessageToFrontend;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Sends the cached catalog straight away, then a fresh one from the master if
 /// it differs. The frontend can receive `LocaleCatalog` twice for one call.
@@ -56,15 +56,12 @@ fn cache_path(ctx: &Ctx, code: &str) -> PathBuf {
     ctx.dirs.root().join("locales").join(format!("{code}.ftl"))
 }
 
-fn read_cache(path: &PathBuf) -> Option<String> {
+fn read_cache(path: &Path) -> Option<String> {
     std::fs::read_to_string(path).ok()
 }
 
-fn write_cache(path: &PathBuf, ftl: &str) {
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Err(e) = std::fs::write(path, ftl) {
+fn write_cache(path: &Path, ftl: &str) {
+    if let Err(e) = crate::fsutil::write_atomic_sync(path, ftl.as_bytes()) {
         tracing::warn!(error = %e, "could not write catalog cache");
     }
 }

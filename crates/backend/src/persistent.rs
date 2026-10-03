@@ -12,13 +12,28 @@ pub struct Persistent<T> {
 }
 
 impl<T: Serialize + DeserializeOwned + Default + Clone> Persistent<T> {
-    /// A missing or unreadable file gives the default — nothing is reported,
-    /// and the first `save` overwrites whatever was there.
+    /// A missing file gives the default. A file that exists but doesn't parse
+    /// is moved aside as `<name>.broken` before the default takes over, so the
+    /// first `save` can't destroy the only copy of the player's settings, and
+    /// the reason ends up in the log rather than nowhere.
     pub fn load(path: PathBuf) -> Self {
-        let value = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+        let value = match std::fs::read_to_string(&path) {
+            Ok(text) => match serde_json::from_str(&text) {
+                Ok(value) => value,
+                Err(e) => {
+                    let mut aside = path.clone().into_os_string();
+                    aside.push(".broken");
+                    tracing::error!(
+                        path = %path.display(),
+                        error = %e,
+                        "settings file did not parse, starting from defaults; the old file is kept as .broken"
+                    );
+                    let _ = std::fs::rename(&path, aside);
+                    T::default()
+                }
+            },
+            Err(_) => T::default(),
+        };
         Self {
             path,
             value: Arc::new(RwLock::new(value)),
@@ -38,13 +53,46 @@ impl<T: Serialize + DeserializeOwned + Default + Clone> Persistent<T> {
         self.save();
     }
 
+    /// Atomic: an interrupted save leaves the previous file, not an empty one.
     pub fn save(&self) {
-        let snapshot = self.value.read();
-        if let Ok(json) = serde_json::to_string_pretty(&*snapshot) {
-            if let Some(parent) = self.path.parent() {
-                let _ = std::fs::create_dir_all(parent);
+        let json = match serde_json::to_string_pretty(&*self.value.read()) {
+            Ok(json) => json,
+            Err(e) => {
+                tracing::error!(error = %e, "settings did not serialize");
+                return;
             }
-            let _ = std::fs::write(&self.path, json);
+        };
+        if let Err(e) = crate::fsutil::write_atomic_sync(&self.path, json.as_bytes()) {
+            tracing::error!(path = %self.path.display(), error = %e, "settings not saved");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_http::TempDir;
+
+    #[derive(Debug, Default, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+    struct Sample {
+        value: u32,
+    }
+
+    #[test]
+    fn a_broken_file_is_kept_aside_instead_of_overwritten() {
+        let dir = TempDir::new("persistent");
+        let path = dir.path().join("config.json");
+        std::fs::write(&path, "{\"value\": 7").unwrap();
+
+        let loaded = Persistent::<Sample>::load(path.clone());
+        assert_eq!(loaded.get(), Sample::default());
+        loaded.update(|s| s.value = 1);
+
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("config.json.broken")).unwrap(),
+            "{\"value\": 7"
+        );
+        let reread = Persistent::<Sample>::load(path);
+        assert_eq!(reread.get().value, 1);
     }
 }

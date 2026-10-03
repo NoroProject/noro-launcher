@@ -69,3 +69,21 @@ fn an_old_config_reads_as_the_players_flags() {
     let flags = config.launch_config_for_server(&server, &gtnh()).jvm_flags;
     assert_eq!(flags, format!("-XX:+UseZGC {GTNH_FLAGS}"));
 }
+
+#[test]
+fn a_config_missing_fields_keeps_what_it_has() {
+    // An older or newer launcher may not know every field. Before, one missing
+    // field failed the whole parse and the player's settings were reset.
+    let json = r#"{"master_url":"https://example.com","memory_min_mb":1024,"memory_max_mb":3072,
+        "server_settings":{"00000000-0000-0000-0000-000000000001":{"memory_min_mb":512}}}"#;
+    let config: LauncherConfig = serde_json::from_str(json).unwrap();
+    assert_eq!(config.memory_max_mb, 3072);
+    assert!(config.jvm_flags.is_empty());
+    let server = config
+        .server_settings
+        .values()
+        .next()
+        .expect("server override survives");
+    assert_eq!(server.memory_min_mb, 512);
+    assert_eq!(server.memory_max_mb, 4096);
+}

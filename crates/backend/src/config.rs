@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
+/// Every field falls back to its default when missing: a version that adds or
+/// renames a field must not turn an existing config into a parse error, which
+/// would reset everything the player set.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LauncherConfig {
     pub master_url: String,
     #[serde(default = "default_locale")]
@@ -29,6 +33,7 @@ pub struct LauncherConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ServerClientSettings {
     pub memory_min_mb: u32,
     pub memory_max_mb: u32,
@@ -41,13 +46,28 @@ pub struct ServerClientSettings {
     pub fullscreen: bool,
 }
 
+const DEFAULT_MEMORY_MIN_MB: u32 = 2048;
+const DEFAULT_MEMORY_MAX_MB: u32 = 4096;
+
+impl Default for ServerClientSettings {
+    fn default() -> Self {
+        Self {
+            memory_min_mb: DEFAULT_MEMORY_MIN_MB,
+            memory_max_mb: DEFAULT_MEMORY_MAX_MB,
+            jvm_flags: String::new(),
+            show_console_on_launch: true,
+            fullscreen: false,
+        }
+    }
+}
+
 impl Default for LauncherConfig {
     fn default() -> Self {
         Self {
             master_url: default_master_url(),
             locale: default_locale(),
-            memory_min_mb: 2048,
-            memory_max_mb: 4096,
+            memory_min_mb: DEFAULT_MEMORY_MIN_MB,
+            memory_max_mb: DEFAULT_MEMORY_MAX_MB,
             jvm_flags: String::new(),
             show_console_on_launch: true,
             fullscreen: false,
