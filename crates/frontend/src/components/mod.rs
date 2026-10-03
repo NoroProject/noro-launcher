@@ -27,4 +27,4 @@ pub use progress::{progress_bar, slim_progress_bar};
 pub use segment::segment;
 pub use stage_row::stage_row;
 pub use version_badge::version_badge;
-pub use window_chrome::window_chrome;
+pub use window_chrome::{chrome_control, in_resize_edge, window_chrome};

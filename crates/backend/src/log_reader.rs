@@ -34,6 +34,9 @@ pub async fn spawn_log_reader<R>(
     // Big enough that a burst comes out in a few reads, and every read goes to
     // the window as one message however many lines it holds.
     let mut chunk = vec![0u8; 64 * 1024];
+    // A stack trace takes the level of the line that started it: its frames
+    // carry none of their own.
+    let mut last_level = GameLogLevel::Info;
 
     loop {
         match reader.read(&mut chunk).await {
@@ -77,9 +80,25 @@ pub async fn spawn_log_reader<R>(
                         }
                     }
 
+                    let parsed = crate::log_line::parse(&clean_text);
+                    let continuation = crate::log_line::continues(&clean_text, parsed.body);
+                    let level = if parsed.thrown {
+                        GameLogLevel::Error
+                    } else if continuation {
+                        last_level
+                    } else {
+                        level
+                    };
+                    if !continuation {
+                        last_level = level;
+                    }
                     lines.push(GameLogLine {
                         timestamp: chrono::Utc::now().timestamp_millis(),
                         level,
+                        thread: parsed.thread.map(str::to_string),
+                        logger: parsed.logger.map(str::to_string),
+                        body: parsed.body.to_string(),
+                        continuation,
                         text: clean_text.into_owned(),
                     });
                 }

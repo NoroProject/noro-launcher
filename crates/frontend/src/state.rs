@@ -4,9 +4,7 @@ use bridge::{
     BackendHandle, ClientSettingsState, LoginErrorKind, MessageToBackend, MessageToFrontend,
     OptionalModInfo, SyncStage,
 };
-use gpui::{
-    px, AppContext, Context, Entity, Image, IntoElement, ListAlignment, ListState, RenderImage,
-};
+use gpui::{px, AppContext, Context, Entity, Image, RenderImage};
 
 use schema::{LauncherVersion, NewsItem, NotifLevel, ServerEntry, UserProfile};
 
@@ -136,6 +134,7 @@ pub struct UiConfig {
     /// hidden — the toggle would flip but there is nowhere to send.
     pub crash_reports_available: bool,
     pub master_url: String,
+    pub console: bridge::ConsoleSettings,
 }
 
 impl Default for UiConfig {
@@ -149,6 +148,7 @@ impl Default for UiConfig {
             crash_reports: true,
             crash_reports_available: false,
             master_url: String::new(),
+            console: bridge::ConsoleSettings::default(),
         }
     }
 }
@@ -397,29 +397,12 @@ pub struct ImpersonatePrompt {
     pub reason: String,
     pub expires_in_secs: i64,
 }
-pub struct ConsoleWindow {
-    pub server_id: Uuid,
-    pub logs: Vec<LogEntry>,
-    pub list_state: ListState,
-    pub show_info: bool,
-    pub show_warn: bool,
-    pub show_error: bool,
-    pub search_query: String,
-    pub status_message: String,
-    pub copy_success: bool,
-}
+pub use crate::console_window::ConsoleWindow;
+use crate::console_window::MAX_LOG_LINES;
 
 pub struct GlobalLauncherUI(pub Entity<LauncherUI>);
 impl gpui::Global for GlobalLauncherUI {}
 
-impl gpui::Render for ConsoleWindow {
-    fn render(&mut self, _window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
-        use crate::pages::game_console;
-        game_console::console_window_body(self, cx)
-    }
-}
-
-const MAX_LOG_LINES: usize = 500;
 const CONSOLE_WINDOW_SIZE: (f32, f32) = (800., 500.);
 const CONSOLE_WINDOW_MIN_SIZE: (f32, f32) = (720., 440.);
 
@@ -911,6 +894,7 @@ impl LauncherUI {
                 master_url,
                 locale,
                 server_settings,
+                console,
             } => {
                 if let Some(loc) = i18n::Locale::from_code(&locale) {
                     self.locale = loc;
@@ -925,6 +909,7 @@ impl LauncherUI {
                     crash_reports,
                     crash_reports_available,
                     master_url,
+                    console,
                 };
                 self.server_settings = server_settings.into_iter().collect();
                 self.load_preset_renders(cx);
@@ -1107,30 +1092,10 @@ impl LauncherUI {
                     let drain = logs.len() - MAX_LOG_LINES;
                     logs.drain(0..drain);
                 }
-
-                // Once per batch: the filter runs over the whole buffer, and per
-                // line it was the frontend that fell behind the game.
                 if let Some(handle) = &self.console_window {
                     let _ = handle.update(cx, |view, _, cx| {
                         if view.server_id == server_id {
-                            view.logs.extend(lines);
-                            if view.logs.len() > MAX_LOG_LINES {
-                                let drain = view.logs.len() - MAX_LOG_LINES;
-                                view.logs.drain(0..drain);
-                            }
-
-                            use crate::console_model::filtered_logs;
-                            let visible_count = filtered_logs(
-                                &view.logs,
-                                view.show_info,
-                                view.show_warn,
-                                view.show_error,
-                                &view.search_query,
-                            )
-                            .len();
-
-                            view.list_state =
-                                ListState::new(visible_count, ListAlignment::Bottom, px(100.));
+                            view.append(lines);
                             cx.notify();
                         }
                     });
@@ -1826,6 +1791,12 @@ impl LauncherUI {
             cx,
         );
         let logs = self.logs.get(&server_id).cloned().unwrap_or_default();
+        let server_name = self
+            .server(&server_id)
+            .map(|s| s.name.clone())
+            .unwrap_or_default();
+        let settings = self.config.console;
+        let backend = self.backend.clone();
         let handle = cx.open_window(
             gpui::WindowOptions {
                 window_bounds: Some(gpui::WindowBounds::Windowed(bounds)),
@@ -1833,9 +1804,12 @@ impl LauncherUI {
                     px(CONSOLE_WINDOW_MIN_SIZE.0),
                     px(CONSOLE_WINDOW_MIN_SIZE.1),
                 )),
+                // Same chrome as the launcher: transparent titlebar, traffic
+                // lights parked off-screen, the bar drawn by `console_chrome`.
                 titlebar: Some(gpui::TitlebarOptions {
                     title: Some(gpui::SharedString::new_static("Noro Game Console")),
-                    ..Default::default()
+                    appears_transparent: true,
+                    traffic_light_position: Some(gpui::point(px(-120.), px(-120.))),
                 }),
                 ..Default::default()
             },
@@ -1851,17 +1825,7 @@ impl LauncherUI {
                         }
                     })
                     .detach();
-                    ConsoleWindow {
-                        server_id,
-                        logs: logs.clone(),
-                        list_state: ListState::new(logs.len(), ListAlignment::Bottom, px(100.)),
-                        show_info: true,
-                        show_warn: true,
-                        show_error: true,
-                        search_query: String::new(),
-                        status_message: String::new(),
-                        copy_success: false,
-                    }
+                    ConsoleWindow::new(server_id, server_name, logs, settings, backend)
                 })
             },
         );

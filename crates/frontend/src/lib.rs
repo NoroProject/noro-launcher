@@ -1,8 +1,11 @@
 mod assets;
 mod components;
+mod console_chrome;
 mod console_controls;
 mod console_model;
+mod console_settings;
 mod console_toolbar;
+mod console_window;
 mod icons;
 mod image_loader;
 mod login;

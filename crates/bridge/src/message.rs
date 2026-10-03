@@ -262,6 +262,9 @@ pub enum MessageToBackend {
     SetCrashReports {
         enabled: bool,
     },
+    SetConsoleSettings {
+        settings: ConsoleSettings,
+    },
     SetServerMemory {
         server_id: Uuid,
         min_mb: u32,
@@ -485,12 +488,58 @@ pub enum GameLogLevel {
     Error,
 }
 
-/// One line of the game's output, already classified.
+/// How the game console shows the log. Kept in the launcher's config: a console
+/// set up once opens the same way next time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ConsoleSettings {
+    pub show_time: bool,
+    pub show_thread: bool,
+    pub show_logger: bool,
+    /// Long lines wrap rather than run off the edge.
+    pub wrap: bool,
+    pub font_size: u8,
+    pub show_info: bool,
+    pub show_warn: bool,
+    pub show_error: bool,
+}
+
+impl ConsoleSettings {
+    pub const FONT_SIZES: [u8; 4] = [11, 12, 13, 14];
+}
+
+impl Default for ConsoleSettings {
+    fn default() -> Self {
+        Self {
+            show_time: true,
+            // Nearly every line is "Client thread" or "main": column after
+            // column of the same word, worth turning on only when it isn't.
+            show_thread: false,
+            show_logger: true,
+            wrap: true,
+            font_size: 12,
+            show_info: true,
+            show_warn: true,
+            show_error: true,
+        }
+    }
+}
+
+/// One line of the game's output, taken apart when it arrived.
 #[derive(Debug, Clone)]
 pub struct GameLogLine {
     pub timestamp: i64,
     pub level: GameLogLevel,
+    /// The line as the game printed it: what gets copied and searched.
     pub text: String,
+    /// `[Client thread/INFO]` → `Client thread`.
+    pub thread: Option<String>,
+    /// `[FML]` → `FML`; for a redirected print, the class that printed it.
+    pub logger: Option<String>,
+    /// The message without the game's own time, thread and logger in front.
+    pub body: String,
+    /// A frame of a stack trace and the like: the tail of the line above.
+    pub continuation: bool,
 }
 
 /// An optional mod as the UI sees it, with the player's permissions already
@@ -574,6 +623,7 @@ pub enum MessageToFrontend {
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,
+        console: ConsoleSettings,
     },
     /// Translation catalog, from the master or from the local cache.
     LocaleCatalog {

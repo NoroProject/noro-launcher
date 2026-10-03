@@ -1,164 +1,112 @@
-use crate::console_controls::{action, clipboard_text, toggle};
-use crate::console_model::joined_lines;
-use crate::state::{ConsoleWindow, GlobalLauncherUI, LogEntry};
+//! The console's toolbar: search, the level filters, and what to do with the
+//! log — follow it, copy it, clear it, change how it looks.
+
+use crate::console_controls::{icon_button, level_chip, search_field};
+use crate::console_window::ConsoleWindow;
+use crate::state::GlobalLauncherUI;
 use crate::theme::*;
-use gpui::{
-    div, prelude::*, px, rgb, AnyElement, AsyncApp, ClipboardItem, Context, FontWeight,
-    ListAlignment, ListState, WeakEntity,
-};
-use i18n::t;
+use gpui::{div, prelude::*, px, rgb, AnyElement, AsyncApp, ClipboardItem, Context, WeakEntity};
 
 type Cx<'a> = Context<'a, ConsoleWindow>;
 
-pub fn toolbar(view: &ConsoleWindow, logs: &[LogEntry], cx: &mut Cx) -> AnyElement {
-    let copy_text = joined_lines(logs);
+pub fn toolbar(view: &mut ConsoleWindow, cx: &mut Cx) -> AnyElement {
+    let counts = view.counts();
+    let s = view.settings;
+    let following = view.is_following();
+    let copied = view.copied;
+    let settings_open = view.settings_open;
     div()
-        .h(px(56.))
-        .px(px(16.))
+        .h(px(48.))
+        .w_full()
+        .flex_shrink_0()
+        .px(px(12.))
         .flex()
         .items_center()
-        .gap(px(12.))
-        .overflow_x_hidden()
+        .gap(px(8.))
         .bg(rgb(BG_PANEL))
         .border_b_1()
         .border_color(rgb(BORDER))
-        .child(title(
-            logs.len(),
-            view.logs.len(),
-            &view.search_query,
-            &view.status_message,
+        .child(search_field(view, cx))
+        .child(level_chip(
+            "console-info",
+            "INFO",
+            counts[0],
+            TEXT_SECONDARY,
+            s.show_info,
+            |s| s.show_info = !s.show_info,
+            cx,
+        ))
+        .child(level_chip(
+            "console-warn",
+            "WARN",
+            counts[1],
+            WARNING,
+            s.show_warn,
+            |s| s.show_warn = !s.show_warn,
+            cx,
+        ))
+        .child(level_chip(
+            "console-error",
+            "ERROR",
+            counts[2],
+            ERROR,
+            s.show_error,
+            |s| s.show_error = !s.show_error,
+            cx,
         ))
         .child(div().flex_1())
-        .child(toggle(
-            "INFO",
-            view.show_info,
-            |v| v.show_info = !v.show_info,
+        .child(icon_button(
+            "console-follow",
+            "arrow-down-to-line",
+            following,
+            |v, _| v.follow(),
             cx,
         ))
-        .child(toggle(
-            "WARN",
-            view.show_warn,
-            |v| v.show_warn = !v.show_warn,
+        .child(icon_button(
+            "console-copy",
+            if copied { "check" } else { "copy" },
+            copied,
+            copy,
             cx,
         ))
-        .child(toggle(
-            "ERROR",
-            view.show_error,
-            |v| v.show_error = !v.show_error,
-            cx,
-        ))
-        .child(action(
-            "BOTTOM",
-            |v, _| {
-                v.list_state = ListState::new(v.logs.len(), ListAlignment::Bottom, px(100.));
-                v.status_message = "FOLLOWING".to_string();
-            },
-            cx,
-        ))
-        .child(action(
-            if view.copy_success {
-                "✓ COPIED!"
-            } else {
-                "COPY"
-            },
-            move |v, cx| {
-                cx.write_to_clipboard(ClipboardItem::new_string(copy_text.clone()));
-                let lines = copy_text.lines().count();
-                v.status_message = format!("COPIED {lines}");
-                v.copy_success = true;
-
-                cx.spawn(|view: WeakEntity<ConsoleWindow>, cx: &mut AsyncApp| {
-                    let mut cx = cx.clone();
-                    async move {
-                        cx.background_executor()
-                            .timer(std::time::Duration::from_secs(2))
-                            .await;
-                        let _ = view.update(&mut cx, |v, cx| {
-                            v.copy_success = false;
-                            cx.notify();
-                        });
-                    }
-                })
-                .detach();
-            },
-            cx,
-        ))
-        .child(action(
-            "FIND",
-            |v, cx| {
-                if let Some(query) = clipboard_text(cx) {
-                    v.search_query = query.trim().to_string();
-                    v.status_message = if v.search_query.is_empty() {
-                        "EMPTY FIND".to_string()
-                    } else {
-                        "FIND FROM CLIPBOARD".to_string()
-                    };
-                } else {
-                    v.status_message = "NO CLIPBOARD TEXT".to_string();
-                }
-            },
-            cx,
-        ))
-        .child(action(
-            "RESET",
-            |v, _| {
-                v.search_query.clear();
-                v.status_message = "FILTER RESET".to_string();
-            },
-            cx,
-        ))
-        .child(action(
-            "CLEAR",
-            |v, cx| {
-                let count = v.logs.len();
-                v.logs.clear();
-                v.list_state = ListState::new(0, ListAlignment::Bottom, px(100.));
-                v.status_message = format!("CLEARED {count}");
-                if let Some(ui) = cx.try_global::<GlobalLauncherUI>() {
-                    let ui = ui.0.clone();
-                    let server_id = v.server_id;
-                    ui.update(cx, |ui, cx| {
-                        ui.logs.remove(&server_id);
-                        cx.notify();
-                    });
-                }
-            },
+        .child(icon_button("console-clear", "trash-2", false, clear, cx))
+        .child(icon_button(
+            "console-view",
+            "sliders-horizontal",
+            settings_open,
+            |v, _| v.settings_open = !v.settings_open,
             cx,
         ))
         .into_any_element()
 }
 
-fn title(visible: usize, total: usize, query: &str, status: &str) -> AnyElement {
-    let mut suffix = if query.is_empty() {
-        format!("{visible}/{total}")
-    } else {
-        format!("{visible}/{total} FIND {query}")
-    };
-    if !status.is_empty() {
-        suffix.push_str("  ");
-        suffix.push_str(status);
-    }
+fn copy(view: &mut ConsoleWindow, cx: &mut Cx) {
+    cx.write_to_clipboard(ClipboardItem::new_string(view.shown_text()));
+    view.copied = true;
+    cx.spawn(|view: WeakEntity<ConsoleWindow>, cx: &mut AsyncApp| {
+        let mut cx = cx.clone();
+        async move {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(2))
+                .await;
+            let _ = view.update(&mut cx, |v, cx| {
+                v.copied = false;
+                cx.notify();
+            });
+        }
+    })
+    .detach();
+}
 
-    div()
-        .flex()
-        .items_center()
-        .gap(px(12.))
-        .min_w_0()
-        .font_family(FONT_PIXEL_ALT)
-        .text_color(rgb(TEXT_SECONDARY))
-        .child(
-            div()
-                .text_size(px(16.))
-                .font_weight(FontWeight::BOLD)
-                .child(t("console-title")),
-        )
-        .child(
-            div()
-                .text_size(px(12.))
-                .text_color(rgb(TEXT_MUTED))
-                .overflow_hidden()
-                .text_ellipsis()
-                .child(suffix),
-        )
-        .into_any_element()
+fn clear(view: &mut ConsoleWindow, cx: &mut Cx) {
+    view.clear();
+    // The launcher keeps a copy for the next console it opens; it goes too.
+    if let Some(ui) = cx.try_global::<GlobalLauncherUI>() {
+        let ui = ui.0.clone();
+        let server_id = view.server_id;
+        ui.update(cx, |ui, cx| {
+            ui.logs.remove(&server_id);
+            cx.notify();
+        });
+    }
 }

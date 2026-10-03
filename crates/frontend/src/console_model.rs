@@ -1,4 +1,5 @@
-use crate::state::LogEntry;
+//! Labels the console puts on a line.
+
 use bridge::GameLogLevel;
 use chrono::{DateTime, Local, TimeZone};
 
@@ -16,36 +17,4 @@ pub fn time_label(timestamp: i64) -> String {
         .single()
         .map(|t: DateTime<Local>| t.format("%H:%M:%S").to_string())
         .unwrap_or_else(|| "00:00:00".to_string())
-}
-
-pub fn entry_line(entry: &LogEntry) -> String {
-    format!(
-        "{} {:>5} {}",
-        time_label(entry.timestamp),
-        level_label(entry.level),
-        entry.text
-    )
-}
-
-pub fn filtered_logs(
-    logs: &[LogEntry],
-    show_info: bool,
-    show_warn: bool,
-    show_error: bool,
-    query: &str,
-) -> Vec<LogEntry> {
-    let query = query.trim().to_ascii_lowercase();
-    logs.iter()
-        .filter(|entry| match entry.level {
-            GameLogLevel::Info => show_info,
-            GameLogLevel::Warn => show_warn,
-            GameLogLevel::Error => show_error,
-        })
-        .filter(|entry| query.is_empty() || entry.text.to_ascii_lowercase().contains(&query))
-        .cloned()
-        .collect()
-}
-
-pub fn joined_lines(logs: &[LogEntry]) -> String {
-    logs.iter().map(entry_line).collect::<Vec<_>>().join("\n")
 }

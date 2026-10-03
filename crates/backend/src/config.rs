@@ -26,6 +26,8 @@ pub struct LauncherConfig {
     /// publishes, which is the default.
     #[serde(default)]
     pub selected_build: BTreeMap<Uuid, Uuid>,
+    #[serde(default)]
+    pub console: bridge::ConsoleSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +56,7 @@ impl Default for LauncherConfig {
             crash_reports: default_crash_reports(),
             server_settings: BTreeMap::new(),
             selected_build: BTreeMap::new(),
+            console: bridge::ConsoleSettings::default(),
         }
     }
 }

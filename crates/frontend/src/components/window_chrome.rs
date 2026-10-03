@@ -2,8 +2,8 @@ use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
 use gpui::{
-    div, prelude::*, px, rgb, rgba, AnyElement, Context, FontWeight, MouseButton, MouseDownEvent,
-    Pixels, Point, Size, WindowControlArea,
+    div, prelude::*, px, rgb, rgba, AnyElement, App, Context, FontWeight, MouseButton,
+    MouseDownEvent, Pixels, Point, Size, Window, WindowControlArea,
 };
 use i18n::{t, Locale};
 
@@ -41,8 +41,10 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
         )
         .children(Locale::ALL.map(|l| lang_pill(l, l == active, cx)))
         .child(div().w(px(8.)))
-        .child(control("win-min", "minus", false))
-        .child(control("win-close", "x", true))
+        .child(chrome_control("win-min", "minus", false, |window, _| {
+            window.minimize_window()
+        }))
+        .child(chrome_control("win-close", "x", true, |_, cx| cx.quit()))
         .into_any_element()
 }
 
@@ -102,7 +104,7 @@ fn impersonate_pill(ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> Option<Any
 /// than that on purpose — otherwise hitting the zone with a mouse is a chore.
 const RESIZE_EDGE: f32 = 6.;
 
-fn in_resize_edge(position: Point<Pixels>, viewport: Size<Pixels>) -> bool {
+pub fn in_resize_edge(position: Point<Pixels>, viewport: Size<Pixels>) -> bool {
     let edge = px(RESIZE_EDGE);
     position.y <= edge || position.x <= edge || position.x >= viewport.width - edge
 }
@@ -134,7 +136,14 @@ fn lang_pill(locale: Locale, active: bool, cx: &mut Context<LauncherUI>) -> AnyE
         .into_any_element()
 }
 
-fn control(id: &'static str, icon: &'static str, is_close: bool) -> AnyElement {
+/// One of the window's own buttons; the system ones are parked off-screen.
+/// `danger` reddens the hover, for closing.
+pub fn chrome_control(
+    id: &'static str,
+    icon: &'static str,
+    danger: bool,
+    action: impl Fn(&mut Window, &mut App) + 'static,
+) -> AnyElement {
     div()
         .id(id)
         .size(px(26.))
@@ -143,14 +152,8 @@ fn control(id: &'static str, icon: &'static str, is_close: bool) -> AnyElement {
         .justify_center()
         .rounded(px(R_SM))
         .cursor_pointer()
-        .hover(move |s| s.bg(rgb(if is_close { ERROR } else { BG_CARD_HOV })))
+        .hover(move |s| s.bg(rgb(if danger { ERROR } else { BG_CARD_HOV })))
         .child(ic(icon, 14., TEXT_SECONDARY))
-        .on_click(move |_, window, cx| {
-            if is_close {
-                cx.quit();
-            } else {
-                window.minimize_window();
-            }
-        })
+        .on_click(move |_, window, cx| action(window, cx))
         .into_any_element()
 }

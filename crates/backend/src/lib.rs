@@ -13,6 +13,7 @@ pub mod directories;
 pub mod discord_rpc;
 pub mod game_runner;
 pub mod impersonation;
+mod log_line;
 pub mod log_reader;
 pub mod master_api;
 pub mod mod_icon;

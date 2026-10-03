@@ -428,6 +428,10 @@ impl BackendState {
                 self.ctx.config.update(|c| c.fullscreen = enabled);
             }
 
+            MessageToBackend::SetConsoleSettings { settings } => {
+                self.ctx.config.update(|c| c.console = settings);
+            }
+
             MessageToBackend::SetCrashReports { enabled } => {
                 // Takes effect on the next start: Sentry comes up before GPUI,
                 // and an installed panic hook can't be taken back off.
@@ -837,6 +841,7 @@ impl BackendState {
             crash_reports_available: crate::telemetry::is_available(),
             master_url: c.master_url,
             server_settings,
+            console: c.console,
         });
     }
 
