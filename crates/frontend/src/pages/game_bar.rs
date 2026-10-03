@@ -38,6 +38,9 @@ pub fn bottom_bar(
         .child(div().flex_1())
         .child(
             div()
+                // Flex shrinks children by default, and when the bar got tight
+                // the console button gave up width but kept its height.
+                .flex_none()
                 .flex()
                 .items_center()
                 .gap(px(16.))
@@ -58,6 +61,7 @@ fn console_button(active: bool, cx: &mut Cx) -> AnyElement {
         .id("toggle-console")
         // Matches the play button beside it.
         .size(px(56.))
+        .flex_none()
         .rounded(px(R_SM))
         .cursor_pointer()
         // Включённая иконка-кнопка подсвечивается кремовым, как в сайдбаре:
