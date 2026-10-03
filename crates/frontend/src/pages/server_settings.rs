@@ -69,6 +69,9 @@ fn page_header(
     cx: &mut Cx,
 ) -> AnyElement {
     div()
+        // As tall as the reset button, which only a local override shows:
+        // sized by its content the row grew by 8px and pushed the panel down.
+        .h(px(36.))
         .flex()
         .items_center()
         .gap(px(12.))
