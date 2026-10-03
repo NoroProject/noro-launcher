@@ -14,8 +14,12 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(page_header("newspaper", t("news-title")))
         .child(
             div()
+                // Without a scroll container the posts past the first screen
+                // were simply out of reach.
+                .id("news-scroll")
                 .flex_1()
                 .min_h_0()
+                .overflow_y_scroll()
                 .px(px(16.))
                 .py(px(20.))
                 .flex()
@@ -28,26 +32,40 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                         .flex()
                         .flex_col()
                         .gap(px(16.))
-                        .children(cards(&ui.news, cx)),
+                        .children(cards(ui, cx)),
                 ),
         )
         .into_any_element()
 }
 
-fn cards(items: &[NewsItem], cx: &mut Cx) -> Vec<AnyElement> {
+fn cards(ui: &LauncherUI, cx: &mut Cx) -> Vec<AnyElement> {
+    let items = &ui.news;
     if items.is_empty() {
         return vec![panel()
             .p(px(20.))
             .font_family(FONT_PIXEL_ALT)
             .text_size(px(16.))
             .text_color(rgb(TEXT_MUTED))
-            .child(t("news-empty"))
+            .child(if ui.news_loaded {
+                t("news-empty")
+            } else {
+                t("launcher-loading")
+            })
             .into_any_element()];
     }
-    items.iter().map(|item| card(item, cx)).collect()
+    items
+        .iter()
+        .map(|item| {
+            card(
+                item,
+                ui.news_excerpts.get(&item.id).cloned().unwrap_or_default(),
+                cx,
+            )
+        })
+        .collect()
 }
 
-fn card(item: &NewsItem, cx: &mut Cx) -> AnyElement {
+fn card(item: &NewsItem, excerpt: gpui::SharedString, cx: &mut Cx) -> AnyElement {
     let id = item.id;
     panel()
         // The id has to be unique within the frame, or GPUI merges the click
@@ -99,7 +117,7 @@ fn card(item: &NewsItem, cx: &mut Cx) -> AnyElement {
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(16.))
                 .text_color(rgb(TEXT_SECONDARY))
-                .child(super::markdown::plain_excerpt(&item.body, 240)),
+                .child(excerpt),
         )
         .into_any_element()
 }

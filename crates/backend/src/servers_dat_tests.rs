@@ -64,10 +64,13 @@ fn tempdir() -> std::path::PathBuf {
 #[test]
 fn writes_game_servers_and_skips_unchanged() {
     let dir = tempdir();
-    let server = build(vec![node("Main", "play.noro.dev", 25565, false)]);
+    let server = build(vec![node("Main", "play.example.com", 25565, false)]);
 
     assert!(sync(&dir, &server).unwrap());
-    assert_eq!(names(&dir), vec![("Main".into(), "play.noro.dev".into())]);
+    assert_eq!(
+        names(&dir),
+        vec![("Main".into(), "play.example.com".into())]
+    );
     // Nothing changed on the master, so the second pass leaves the file alone.
     assert!(!sync(&dir, &server).unwrap());
 }
@@ -76,30 +79,33 @@ fn writes_game_servers_and_skips_unchanged() {
 fn proxy_hides_backends_behind_it() {
     let dir = tempdir();
     let server = build(vec![
-        node("Proxy", "play.noro.dev", 25565, true),
+        node("Proxy", "play.example.com", 25565, true),
         node("Survival", "10.0.0.2", 25566, false),
         node("Creative", "10.0.0.3", 25567, false),
     ]);
 
     sync(&dir, &server).unwrap();
 
-    assert_eq!(names(&dir), vec![("Proxy".into(), "play.noro.dev".into())]);
+    assert_eq!(
+        names(&dir),
+        vec![("Proxy".into(), "play.example.com".into())]
+    );
 }
 
 #[test]
 fn without_proxy_every_node_is_listed() {
     let dir = tempdir();
     let server = build(vec![
-        node("Survival", "s1.noro.dev", 25565, false),
-        node("Creative", "s2.noro.dev", 25566, false),
+        node("Survival", "s1.example.com", 25565, false),
+        node("Creative", "s2.example.com", 25566, false),
     ]);
 
     sync(&dir, &server).unwrap();
 
     let got = names(&dir);
-    assert!(got.contains(&("Survival".into(), "s1.noro.dev".into())));
+    assert!(got.contains(&("Survival".into(), "s1.example.com".into())));
     assert!(
-        got.contains(&("Creative".into(), "s2.noro.dev:25566".into())),
+        got.contains(&("Creative".into(), "s2.example.com:25566".into())),
         "{got:?}"
     );
 }
@@ -109,7 +115,7 @@ fn keeps_player_entries_and_drops_removed_ones() {
     let dir = tempdir();
     sync(
         &dir,
-        &build(vec![node("Old", "old.noro.dev", 25565, false)]),
+        &build(vec![node("Old", "old.example.com", 25565, false)]),
     )
     .unwrap();
 
@@ -121,18 +127,18 @@ fn keeps_player_entries_and_drops_removed_ones() {
 
     sync(
         &dir,
-        &build(vec![node("New", "new.noro.dev", 25566, false)]),
+        &build(vec![node("New", "new.example.com", 25566, false)]),
     )
     .unwrap();
 
     let got = names(&dir);
-    assert!(got.contains(&("New".into(), "new.noro.dev:25566".into())));
+    assert!(got.contains(&("New".into(), "new.example.com:25566".into())));
     assert!(
         got.contains(&("Friend".into(), "friend.example".into())),
         "{got:?}"
     );
     assert!(
-        !got.iter().any(|(_, ip)| ip == "old.noro.dev"),
+        !got.iter().any(|(_, ip)| ip == "old.example.com"),
         "a server dropped from the build should go: {got:?}"
     );
 }
@@ -178,7 +184,7 @@ fn identity(dir: &Path) -> Vec<(String, String)> {
 #[test]
 fn the_server_entry_is_identical_across_restarts() {
     let dir = tempdir();
-    let server = build(vec![node("Main", "play.noro.dev", 25565, false)]);
+    let server = build(vec![node("Main", "play.example.com", 25565, false)]);
 
     sync(&dir, &server).unwrap();
     let first = identity(&dir);
@@ -194,8 +200,8 @@ fn reordered_nodes_from_the_database_do_not_rewrite_the_file() {
     // The fingerprint is computed over a sorted list, so the order the master
     // happens to return nodes in doesn't matter.
     let dir = tempdir();
-    let a = node("A", "a.noro.dev", 25565, false);
-    let b = node("B", "b.noro.dev", 25565, false);
+    let a = node("A", "a.example.com", 25565, false);
+    let b = node("B", "b.example.com", 25565, false);
 
     sync(&dir, &build(vec![a.clone(), b.clone()])).unwrap();
     assert!(!sync(&dir, &build(vec![b, a])).unwrap());
@@ -209,18 +215,18 @@ fn renaming_the_server_does_change_the_entry() {
     let dir = tempdir();
     sync(
         &dir,
-        &build(vec![node("Main", "play.noro.dev", 25565, false)]),
+        &build(vec![node("Main", "play.example.com", 25565, false)]),
     )
     .unwrap();
 
     assert!(sync(
         &dir,
-        &build(vec![node("Main Server", "play.noro.dev", 25565, false)])
+        &build(vec![node("Main Server", "play.example.com", 25565, false)])
     )
     .unwrap());
     assert_eq!(
         identity(&dir),
-        vec![("Main Server".into(), "play.noro.dev".into())]
+        vec![("Main Server".into(), "play.example.com".into())]
     );
 }
 
@@ -235,10 +241,10 @@ fn xaero_directories_are_protected_from_the_sync() {
         .collect();
 
     for path in [
-        "XaeroWaypoints/Multiplayer_play.noro.dev/waypoints.txt",
+        "XaeroWaypoints/Multiplayer_play.example.com/waypoints.txt",
         "xaero/minimap.json",
         "config/xaerominimap.txt",
-        "XaeroWorldMap/Multiplayer_play.noro.dev/region.zip",
+        "XaeroWorldMap/Multiplayer_play.example.com/region.zip",
     ] {
         assert!(
             crate::sync::file_sync::is_protected(path, &protected),

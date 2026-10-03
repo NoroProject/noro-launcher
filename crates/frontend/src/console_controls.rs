@@ -32,12 +32,13 @@ pub fn toggle(
 }
 
 pub fn action(
-    label: &'static str,
+    id: &'static str,
+    label: impl Into<gpui::SharedString>,
     on_click: impl Fn(&mut ConsoleWindow, &mut Context<ConsoleWindow>) + Send + Sync + 'static,
     cx: &mut Context<ConsoleWindow>,
 ) -> AnyElement {
     div()
-        .id(label)
+        .id(id)
         .cursor_pointer()
         .px(px(10.))
         .h(px(32.))
@@ -51,7 +52,7 @@ pub fn action(
         .text_size(px(12.))
         .text_color(rgb(TEXT_SECONDARY))
         .hover(|d| d.bg(rgb(BG_CARD_HOV)).text_color(rgb(TEXT_PRIMARY)))
-        .child(label)
+        .child(label.into())
         .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
             on_click(this, cx);
             cx.notify();

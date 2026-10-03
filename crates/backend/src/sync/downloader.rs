@@ -1,10 +1,10 @@
 //! Parallel download pool: retries with backoff, byte-level progress.
 
 use super::fetch::fetch_to_file;
-use super::integrity::sha1_file;
+use super::hash_cache::HashCache;
 use anyhow::{bail, Result};
 use futures::stream::{self, StreamExt};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -68,11 +68,13 @@ pub async fn download_all(
             Ok::<_, anyhow::Error>(())
         }
     }))
-    .buffer_unordered(concurrency)
-    .collect::<Vec<_>>()
-    .await;
+    .buffer_unordered(concurrency);
 
-    for r in results {
+    // The first failure ends the stage: dropping the stream cancels what is
+    // still in flight. Collecting first meant waiting for thousands of other
+    // files before the player learned the sync had already failed.
+    futures::pin_mut!(results);
+    while let Some(r) = results.next().await {
         r?;
     }
     Ok(())
@@ -86,7 +88,10 @@ async fn download_with_retry(
 ) -> Result<()> {
     let mut attempt = 1;
     loop {
-        let result = fetch_to_file(client, &task.url, &task.dest, &task.sha1, on_bytes).await;
+        let result = fetch_to_file(
+            client, &task.url, &task.dest, &task.sha1, on_bytes, cancelled,
+        )
+        .await;
         match result {
             Ok(()) => break,
             Err(e) if attempt >= MAX_ATTEMPTS || cancelled() => {
@@ -95,7 +100,7 @@ async fn download_with_retry(
             Err(e) => {
                 let delay = BASE_BACKOFF_MS * 2u64.pow(attempt - 1) + jitter_ms(BASE_BACKOFF_MS);
                 tracing::warn!(
-                    url = %task.url, attempt, error = %e,
+                    url = %task.url, attempt, error = %format!("{e:#}"),
                     "retrying download in {delay}ms"
                 );
                 tokio::time::sleep(Duration::from_millis(delay)).await;
@@ -125,10 +130,11 @@ fn jitter_ms(max: u64) -> u64 {
 }
 
 pub async fn needs_download(
-    dest: &PathBuf,
+    dest: &Path,
     expected_size: u64,
     expected_sha1: &str,
     verify_hash: bool,
+    cache: &HashCache,
 ) -> bool {
     let Ok(meta) = tokio::fs::metadata(dest).await else {
         return true;
@@ -137,9 +143,9 @@ pub async fn needs_download(
         return true;
     }
     if verify_hash {
-        match sha1_file(dest).await {
-            Ok(actual) => !actual.eq_ignore_ascii_case(expected_sha1),
-            Err(_) => true,
+        match cache.sha1_of(dest).await {
+            Some(actual) => !actual.eq_ignore_ascii_case(expected_sha1),
+            None => true,
         }
     } else {
         // Size matched. Artifacts are immutable, so that is good enough.

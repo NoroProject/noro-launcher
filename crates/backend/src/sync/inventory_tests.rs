@@ -39,7 +39,7 @@ async fn the_first_pass_only_remembers() {
     let dir = Scratch::new("first");
     dir.write("resourcepacks/my-pack.zip", "contents");
 
-    let (findings, inv) = scan(dir.path(), &[]).await;
+    let (findings, inv) = scan(dir.path(), &Default::default(), &Default::default()).await;
 
     assert!(findings.is_empty());
     inv.save(dir.path()).await;
@@ -49,11 +49,11 @@ async fn the_first_pass_only_remembers() {
 async fn a_new_file_is_flagged_on_the_second_pass() {
     let dir = Scratch::new("new");
     dir.write("resourcepacks/old.zip", "was here");
-    let (_, inv) = scan(dir.path(), &[]).await;
+    let (_, inv) = scan(dir.path(), &Default::default(), &Default::default()).await;
     inv.save(dir.path()).await;
 
     dir.write("resourcepacks/new.zip", "showed up");
-    let (findings, _) = scan(dir.path(), &[]).await;
+    let (findings, _) = scan(dir.path(), &Default::default(), &Default::default()).await;
 
     assert_eq!(subjects(&findings), ["resourcepacks/new.zip"]);
     assert!(!findings[0].repaired);
@@ -63,11 +63,11 @@ async fn a_new_file_is_flagged_on_the_second_pass() {
 async fn a_changed_file_is_flagged() {
     let dir = Scratch::new("changed");
     dir.write("config/mine.cfg", "was here");
-    let (_, inv) = scan(dir.path(), &[]).await;
+    let (_, inv) = scan(dir.path(), &Default::default(), &Default::default()).await;
     inv.save(dir.path()).await;
 
     dir.write("config/mine.cfg", "now different");
-    let (findings, _) = scan(dir.path(), &[]).await;
+    let (findings, _) = scan(dir.path(), &Default::default(), &Default::default()).await;
 
     assert_eq!(subjects(&findings), ["config/mine.cfg"]);
     assert_eq!(findings[0].detail.as_deref(), Some("changed"));
@@ -77,10 +77,10 @@ async fn a_changed_file_is_flagged() {
 async fn an_unchanged_file_says_nothing() {
     let dir = Scratch::new("same");
     dir.write("config/mine.cfg", "never changes");
-    let (_, inv) = scan(dir.path(), &[]).await;
+    let (_, inv) = scan(dir.path(), &Default::default(), &Default::default()).await;
     inv.save(dir.path()).await;
 
-    let (findings, _) = scan(dir.path(), &[]).await;
+    let (findings, _) = scan(dir.path(), &Default::default(), &Default::default()).await;
     assert!(findings.is_empty());
 }
 
@@ -89,11 +89,11 @@ async fn build_files_are_not_findings() {
     // They have their own integrity check; no point flagging twice.
     let dir = Scratch::new("known");
     dir.write("mods/core.jar", "build file");
-    let (_, inv) = scan(dir.path(), &["mods/core.jar".to_string()]).await;
+    let (_, inv) = scan(dir.path(), &["mods/core.jar"].into(), &Default::default()).await;
     inv.save(dir.path()).await;
 
     dir.write("mods/core.jar", "swapped out");
-    let (findings, _) = scan(dir.path(), &["mods/core.jar".to_string()]).await;
+    let (findings, _) = scan(dir.path(), &["mods/core.jar"].into(), &Default::default()).await;
 
     assert!(findings.is_empty());
 }
@@ -103,11 +103,11 @@ async fn worlds_are_never_walked() {
     // saves/ is gigabytes; hashing it for an inventory is not on.
     let dir = Scratch::new("saves");
     dir.write("saves/World/level.dat", "a world");
-    let (_, inv) = scan(dir.path(), &[]).await;
+    let (_, inv) = scan(dir.path(), &Default::default(), &Default::default()).await;
     inv.save(dir.path()).await;
 
     dir.write("saves/World/level.dat", "the world moved on");
-    let (findings, _) = scan(dir.path(), &[]).await;
+    let (findings, _) = scan(dir.path(), &Default::default(), &Default::default()).await;
 
     assert!(findings.is_empty());
 }
@@ -115,12 +115,12 @@ async fn worlds_are_never_walked() {
 #[tokio::test]
 async fn screenshots_and_logs_are_ignored() {
     let dir = Scratch::new("noise");
-    let (_, inv) = scan(dir.path(), &[]).await;
+    let (_, inv) = scan(dir.path(), &Default::default(), &Default::default()).await;
     inv.save(dir.path()).await;
 
     dir.write("screenshots/2026.png", "a picture");
     dir.write("logs/latest.log", "a log");
-    let (findings, _) = scan(dir.path(), &[]).await;
+    let (findings, _) = scan(dir.path(), &Default::default(), &Default::default()).await;
 
     assert!(findings.is_empty(), "{:?}", subjects(&findings));
 }

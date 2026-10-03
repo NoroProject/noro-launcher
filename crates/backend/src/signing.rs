@@ -1,8 +1,10 @@
 //! ed25519 signature checks on the build manifest.
 //!
-//! The public key is baked into the binary: `NORO_SIGNING_PUBKEY` (hex) at
-//! compile time for production, otherwise derived from the shared
-//! [`schema::DEV_SIGNING_SEED`].
+//! The public key comes from the bootstrapper (`NORO_SIGNING_PUBKEY` in the
+//! environment, or `bootstrap.json`), or is baked in at compile time. Debug
+//! builds without one derive it from the shared [`schema::DEV_SIGNING_SEED`].
+//! Release builds never do: that seed is in the sources, so trusting it would
+//! accept anything anyone signs.
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use once_cell::sync::Lazy;
@@ -28,22 +30,39 @@ fn resolve_signing_pubkey_hex() -> Option<String> {
     option_env!("NORO_SIGNING_PUBKEY").map(String::from)
 }
 
-static VERIFYING_KEY: Lazy<VerifyingKey> = Lazy::new(|| {
-    match resolve_signing_pubkey_hex() {
-        Some(hex_str) => {
-            let bytes = hex::decode(hex_str).expect("NORO_SIGNING_PUBKEY: not valid hex");
-            let arr: [u8; 32] = bytes
-                .try_into()
-                .expect("NORO_SIGNING_PUBKEY: must be 32 bytes");
-            VerifyingKey::from_bytes(&arr).expect("NORO_SIGNING_PUBKEY: not a valid key")
+fn parse_key(hex_str: &str) -> Result<VerifyingKey, &'static str> {
+    let bytes = hex::decode(hex_str).map_err(|_| "not valid hex")?;
+    let arr: [u8; 32] = bytes.try_into().map_err(|_| "must be 32 bytes")?;
+    VerifyingKey::from_bytes(&arr).map_err(|_| "not a valid key")
+}
+
+/// `None` fails every check. A broken key used to panic on the first manifest
+/// and take the launcher down with it; failing closed leaves it running and
+/// says why in the log.
+static VERIFYING_KEY: Lazy<Option<VerifyingKey>> =
+    Lazy::new(|| match resolve_signing_pubkey_hex() {
+        Some(hex_str) => match parse_key(&hex_str) {
+            Ok(key) => Some(key),
+            Err(e) => {
+                tracing::error!("NORO_SIGNING_PUBKEY: {e}; every signature check will fail");
+                None
+            }
+        },
+        // Dev builds derive the key from the same seed the master uses.
+        None if cfg!(debug_assertions) => {
+            Some(ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED).verifying_key())
         }
         None => {
-            // Dev builds derive the key from the same seed the master uses.
-            let sk = ed25519_dalek::SigningKey::from_bytes(&schema::DEV_SIGNING_SEED);
-            sk.verifying_key()
+            tracing::error!("no signing key is configured; every signature check will fail");
+            None
         }
-    }
-});
+    });
+
+fn verify(msg: &[u8], signature: &Signature) -> bool {
+    VERIFYING_KEY
+        .as_ref()
+        .is_some_and(|key| key.verify(msg, signature).is_ok())
+}
 
 pub fn verify_manifest(manifest: &schema::BuildManifest) -> bool {
     if manifest.signature.len() != 64 {
@@ -54,8 +73,7 @@ pub fn verify_manifest(manifest: &schema::BuildManifest) -> bool {
         Err(_) => return false,
     };
     let signature = Signature::from_bytes(&sig_bytes);
-    let msg = manifest.signing_bytes();
-    VERIFYING_KEY.verify(&msg, &signature).is_ok()
+    verify(&manifest.signing_bytes(), &signature)
 }
 
 /// Signature over raw bytes, used for the launcher's own update binary.
@@ -67,8 +85,7 @@ pub fn verify_bytes(data: &[u8], signature_b64: &str) -> bool {
     let Ok(sig_bytes): Result<[u8; 64], _> = sig_raw.try_into() else {
         return false;
     };
-    let signature = Signature::from_bytes(&sig_bytes);
-    VERIFYING_KEY.verify(data, &signature).is_ok()
+    verify(data, &Signature::from_bytes(&sig_bytes))
 }
 
 #[cfg(test)]
@@ -167,6 +184,13 @@ mod tests {
         let mut m = manifest();
         m.signature = foreign.sign(&m.signing_bytes()).to_bytes().to_vec();
         assert!(!verify_manifest(&m));
+    }
+
+    #[test]
+    fn a_malformed_key_is_an_error_not_a_panic() {
+        assert!(parse_key("zz").is_err());
+        assert!(parse_key("abcd").is_err());
+        assert!(parse_key(&hex::encode(dev_key().verifying_key().to_bytes())).is_ok());
     }
 
     #[test]

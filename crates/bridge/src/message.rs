@@ -140,7 +140,7 @@ pub struct TicketView {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TicketMessageView {
     pub author: String,
-    /// Role the author held when they wrote, e.g. «Хелпер». Staff only.
+    /// Role the author held when they wrote, e.g. «Helper». Staff only.
     pub role: Option<String>,
     pub content: String,
     pub at: i64,
@@ -186,13 +186,6 @@ pub enum MessageToBackend {
     // --- Auth ---
     /// The site owns the login methods, so this hands off to a browser.
     StartWebLogin {
-        modal_action: ModalAction,
-    },
-    StartKeyLogin {
-        key: String,
-        modal_action: ModalAction,
-    },
-    StartBiometricLogin {
         modal_action: ModalAction,
     },
     Logout,
@@ -260,6 +253,10 @@ pub enum MessageToBackend {
         enabled: bool,
     },
     SetCrashReports {
+        enabled: bool,
+    },
+    /// Whether friends on Discord see what the player is doing.
+    SetDiscordRpc {
         enabled: bool,
     },
     SetServerMemory {
@@ -435,35 +432,6 @@ pub enum SyncStage {
 }
 
 impl SyncStage {
-    pub fn label(&self) -> &'static str {
-        match self {
-            SyncStage::CheckingFiles => "Checking files...",
-            SyncStage::DownloadingJava => "Downloading Java...",
-            SyncStage::DownloadingMinecraft => "Downloading Minecraft...",
-            SyncStage::DownloadingLibraries => "Downloading libraries...",
-            SyncStage::DownloadingAssets => "Downloading assets...",
-            SyncStage::DownloadingMods => "Downloading mods...",
-            SyncStage::ApplyingForgePatches => "Applying Forge patches...",
-            SyncStage::Cleaning => "Cleaning extra files...",
-            SyncStage::Done => "Done",
-        }
-    }
-
-    /// There is very little room next to the bar.
-    pub fn short_label(&self) -> &'static str {
-        match self {
-            SyncStage::CheckingFiles => "Checking",
-            SyncStage::DownloadingJava => "Java",
-            SyncStage::DownloadingMinecraft => "Minecraft",
-            SyncStage::DownloadingLibraries => "Libraries",
-            SyncStage::DownloadingAssets => "Assets",
-            SyncStage::DownloadingMods => "Mods",
-            SyncStage::ApplyingForgePatches => "Forge",
-            SyncStage::Cleaning => "Cleaning",
-            SyncStage::Done => "Done",
-        }
-    }
-
     /// Download stages count bytes, the rest count files — the two can't be
     /// added up into a single total.
     pub fn is_download(&self) -> bool {
@@ -548,6 +516,10 @@ pub enum MessageToFrontend {
         kind: LoginErrorKind,
     },
     LoggedOut,
+    /// The startup session check ended without a signed-in player: there was
+    /// no stored session, or the master couldn't be reached to confirm it.
+    /// Until this (or `LoginSuccess`) arrives the window shows "checking".
+    SessionCheckDone,
 
     ServerList {
         servers: Vec<ServerEntry>,
@@ -571,9 +543,13 @@ pub enum MessageToFrontend {
         /// Whether a DSN was baked into this build; without one the toggle has
         /// nowhere to send and isn't worth showing.
         crash_reports_available: bool,
+        discord_rpc: bool,
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,
+        /// Physical memory of this computer, to keep the memory setting
+        /// within it. `None` where it can't be read.
+        system_memory_mb: Option<u32>,
     },
     /// Translation catalog, from the master or from the local cache.
     LocaleCatalog {
@@ -584,7 +560,7 @@ pub enum MessageToFrontend {
         server_id: Uuid,
         mods: Vec<OptionalModInfo>,
         allow_suggestions: bool,
-        /// Разрешает ли сборка ставить своё. Решает оператор, не игрок.
+        /// Whether the build allows adding your own content. The operator decides, not the player.
         allow_personal: bool,
         installed_files: Vec<String>,
     },
@@ -628,7 +604,10 @@ pub enum MessageToFrontend {
     },
     SyncFailed {
         server_id: Uuid,
+        /// A translation key naming the cause.
         reason: String,
+        /// The technical chain, for the console and support. May be empty.
+        detail: String,
     },
     /// The launch was called off before it started, and whoever called it off
     /// has already told the player why: the button just goes back to normal.

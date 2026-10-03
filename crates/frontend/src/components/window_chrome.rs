@@ -41,8 +41,8 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
         )
         .children(Locale::ALL.map(|l| lang_pill(l, l == active, cx)))
         .child(div().w(px(8.)))
-        .child(control("win-min", "minus", false))
-        .child(control("win-close", "x", true))
+        .child(control("win-min", "minus", false, cx))
+        .child(control("win-close", "x", true, cx))
         .into_any_element()
 }
 
@@ -134,9 +134,19 @@ fn lang_pill(locale: Locale, active: bool, cx: &mut Context<LauncherUI>) -> AnyE
         .into_any_element()
 }
 
-fn control(id: &'static str, icon: &'static str, is_close: bool) -> AnyElement {
+fn control(
+    id: &'static str,
+    icon: &'static str,
+    is_close: bool,
+    cx: &mut Context<LauncherUI>,
+) -> AnyElement {
     div()
         .id(id)
+        .tooltip(crate::components::hint(i18n::t(if is_close {
+            "hint-close"
+        } else {
+            "hint-minimize"
+        })))
         .size(px(26.))
         .flex()
         .items_center()
@@ -145,12 +155,14 @@ fn control(id: &'static str, icon: &'static str, is_close: bool) -> AnyElement {
         .cursor_pointer()
         .hover(move |s| s.bg(rgb(if is_close { ERROR } else { BG_CARD_HOV })))
         .child(ic(icon, 14., TEXT_SECONDARY))
-        .on_click(move |_, window, cx| {
-            if is_close {
+        .on_click(cx.listener(move |this, _, window, cx| {
+            if !is_close {
+                window.minimize_window();
+            } else if this.request_close() {
                 cx.quit();
             } else {
-                window.minimize_window();
+                cx.notify();
             }
-        })
+        }))
         .into_any_element()
 }

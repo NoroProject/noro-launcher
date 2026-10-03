@@ -57,6 +57,11 @@ pub fn box_for(
                 }))
                 .on_key_down(
                     cx.listener(move |this, event: &gpui::KeyDownEvent, _w, cx| {
+                        if let Some(text) = super::common::pasted(event, cx) {
+                            this.compose.push_str(&text);
+                            cx.notify();
+                            return;
+                        }
                         match event.keystroke.key.as_str() {
                             "backspace" => {
                                 this.compose.pop();

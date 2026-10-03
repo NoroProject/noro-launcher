@@ -33,7 +33,8 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                         .gap(px(16.))
                         .child(settings_panel(ui, cx))
                         .when_some(ui.update_available.clone(), |d, v| {
-                            d.child(update_panel(v.version, cx))
+                            let progress = ui.update_modal.as_ref().map(|m| m.snapshot());
+                            d.child(update_panel(v.version, progress, cx))
                         })
                         .child(version_badge()),
                 ),
@@ -62,22 +63,45 @@ fn header() -> AnyElement {
         .into_any_element()
 }
 
-fn update_panel(version: String, cx: &mut Cx) -> AnyElement {
+/// While the update downloads, the button gives way to its progress: a second
+/// click used to start a second download of the same binary.
+fn update_panel(
+    version: String,
+    progress: Option<bridge::ModalProgress>,
+    cx: &mut Cx,
+) -> AnyElement {
+    let control = match progress {
+        Some(p) => div()
+            .w(px(180.))
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .child(crate::components::progress_bar(p.fraction()))
+            .child(
+                div()
+                    .font_family(FONT_PIXEL_ALT)
+                    .text_size(px(11.))
+                    .text_color(rgb(TEXT_MUTED))
+                    .child(crate::sync_text::megabytes(p.done, p.total)),
+            )
+            .into_any_element(),
+        None => btn(
+            "do-update",
+            t("settings-install-update"),
+            true,
+            cx.listener(|this, _e, _w, cx| {
+                this.install_update(cx);
+                cx.notify();
+            }),
+        )
+        .into_any_element(),
+    };
     panel()
         .child(row(
             "download",
             t("settings-update"),
             t("settings-update-hint"),
-            btn(
-                "do-update",
-                t("settings-install-update"),
-                true,
-                cx.listener(|this, _e, _w, cx| {
-                    this.install_update();
-                    cx.notify();
-                }),
-            )
-            .into_any_element(),
+            control,
             false,
         ))
         .child(

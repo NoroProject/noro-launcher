@@ -10,9 +10,9 @@ use uuid::Uuid;
 
 pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     // Kick off a default search on first entry. This runs on every frame, so
-    // Один запрос на вход, а не «пока список пуст». Это условие проверяется на
-    // каждом кадре: с проверкой по содержимому пустая выдача и ещё не пришедший
-    // ответ давали по запросу на кадр.
+    // One request per visit, not "while the list is empty". This runs every frame:
+    // checking the contents, an empty result or an answer still on its way meant
+    // a request per frame.
     if ui.content_requested_for != Some(server_id) {
         ui.search_content(server_id, 0);
     }
@@ -147,8 +147,8 @@ fn page_header(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 }
 
 fn mod_catalog_grid(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
-    // Пустоту запоминаем отдельно, а сам список читаем ниже по ссылке: копия
-    // выдачи снималась на каждом кадре.
+    // Emptiness is noted separately and the list is read below by reference: a
+    // copy of the results was taken every frame.
     let no_hits = ui.mod_catalog_hits.is_empty();
     let search = super::content_search::search_bar(ui, server_id, cx);
     let pagination = super::content_search::pagination_controls(ui, server_id, cx);
@@ -179,7 +179,10 @@ fn mod_catalog_grid(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyEle
                             args.set("reason", e.clone());
                             (i18n::t_args("content-unavailable", &args), ERROR)
                         }
-                        None => (t("content-searching"), TEXT_MUTED),
+                        None if ui.content_searching => (t("content-searching"), TEXT_MUTED),
+                        // A finished search with nothing in it used to keep
+                        // saying "searching" forever.
+                        None => (t("content-no-results"), TEXT_MUTED),
                     };
                     div()
                         .size_full()
@@ -193,9 +196,9 @@ fn mod_catalog_grid(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyEle
                         .child(text)
                         .into_any_element()
                 } else {
-                    // Виртуальный список: строятся только те карточки, что
-                    // видно. Раньше двадцать карточек собирались на каждом
-                    // кадре целиком, включая те, что за краем окна.
+                    // A virtual list: only visible cards are built. The twenty
+                    // cards used to be built in full every frame, including those
+                    // past the edge of the window.
                     uniform_list(
                         "catalog-hits",
                         ui.mod_catalog_hits.len(),

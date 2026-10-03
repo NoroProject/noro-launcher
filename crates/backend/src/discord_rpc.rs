@@ -30,19 +30,29 @@ pub enum DiscordRpcState {
     },
 }
 
+enum Command {
+    State(DiscordRpcState),
+    Enable(bool),
+}
+
 #[derive(Clone)]
 pub struct DiscordRpc {
-    tx: mpsc::UnboundedSender<DiscordRpcState>,
+    tx: mpsc::UnboundedSender<Command>,
 }
 
 impl DiscordRpc {
     pub fn update(&self, state: DiscordRpcState) {
-        let _ = self.tx.send(state);
+        let _ = self.tx.send(Command::State(state));
+    }
+
+    /// Off clears what Discord shows and stops connecting until switched on.
+    pub fn set_enabled(&self, enabled: bool) {
+        let _ = self.tx.send(Command::Enable(enabled));
     }
 }
 
-pub fn spawn_discord_rpc() -> DiscordRpc {
-    let (tx, mut rx) = mpsc::unbounded_channel::<DiscordRpcState>();
+pub fn spawn_discord_rpc(enabled: bool) -> DiscordRpc {
+    let (tx, mut rx) = mpsc::unbounded_channel::<Command>();
 
     tokio::spawn(async move {
         let app_id =
@@ -50,6 +60,7 @@ pub fn spawn_discord_rpc() -> DiscordRpc {
 
         let mut client: Option<DiscordIpcClient> = None;
         let mut connected = false;
+        let mut enabled = enabled;
         let mut current_state = DiscordRpcState::Launcher { server_name: None };
 
         let launcher_start_time = SystemTime::now()
@@ -61,11 +72,25 @@ pub fn spawn_discord_rpc() -> DiscordRpc {
 
         loop {
             tokio::select! {
-                Some(new_state) = rx.recv() => {
+                Some(command) = rx.recv() => {
+                    let new_state = match command {
+                        Command::State(state) => state,
+                        Command::Enable(on) => {
+                            enabled = on;
+                            if !on && connected {
+                                if let Some(ref mut c) = client {
+                                    let _ = c.clear_activity();
+                                    let _ = c.close();
+                                }
+                                connected = false;
+                            }
+                            continue;
+                        }
+                    };
                     let changed = current_state != new_state;
                     current_state = new_state;
 
-                    if connected || changed {
+                    if enabled && (connected || changed) {
                         if !connected {
                             try_connect(&app_id, &mut client, &mut connected);
                         }
@@ -80,7 +105,7 @@ pub fn spawn_discord_rpc() -> DiscordRpc {
                     }
                 }
                 _ = check_interval.tick() => {
-                    if !connected {
+                    if enabled && !connected {
                         try_connect(&app_id, &mut client, &mut connected);
                         if connected {
                             if let Some(ref mut c) = client {

@@ -126,7 +126,13 @@ fn row(ui: &LauncherUI, server_id: Uuid, item: &PersonalItem, cx: &mut Cx) -> An
                 )
                 .child(state_line(item)),
         )
-        .child(actions(server_id, id, enabled, cx))
+        .child(actions(
+            server_id,
+            id,
+            enabled,
+            ui.is_armed(&format!("remove-{id}")),
+            cx,
+        ))
         .into_any_element()
 }
 
@@ -161,7 +167,7 @@ fn state_line(item: &PersonalItem) -> AnyElement {
         .into_any_element()
 }
 
-fn actions(server_id: Uuid, id: Uuid, enabled: bool, cx: &mut Cx) -> AnyElement {
+fn actions(server_id: Uuid, id: Uuid, enabled: bool, armed: bool, cx: &mut Cx) -> AnyElement {
     div()
         .flex()
         .items_center()
@@ -170,7 +176,17 @@ fn actions(server_id: Uuid, id: Uuid, enabled: bool, cx: &mut Cx) -> AnyElement 
             format!("toggle-{id}"),
             if enabled { "eye" } else { "eye-off" },
             if enabled { TEXT_MUTED } else { WARNING },
+            t(if enabled {
+                "hint-content-off"
+            } else {
+                "hint-content-on"
+            }),
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                // One change at a time: a second click while the first is on its
+                // way used to send it twice.
+                if this.content_busy {
+                    return;
+                }
                 this.content_busy = true;
                 this.backend
                     .send(MessageToBackend::SetPersonalContentEnabled {
@@ -181,17 +197,47 @@ fn actions(server_id: Uuid, id: Uuid, enabled: bool, cx: &mut Cx) -> AnyElement 
                 cx.notify();
             }),
         ))
-        .child(icon_action(
-            format!("remove-{id}"),
-            "trash-2",
-            ERROR,
-            cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                this.content_busy = true;
-                this.backend
-                    .send(MessageToBackend::RemovePersonalContent { server_id, id });
-                cx.notify();
-            }),
-        ))
+        // Removing takes two clicks: the second says what it will do.
+        .child(if armed {
+            div()
+                .id(SharedString::from(format!("remove-{id}")))
+                .h(px(30.))
+                .px(px(10.))
+                .rounded(px(R_SM))
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .bg(rgb(ERROR))
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(11.))
+                .text_color(rgb(TEXT_PRIMARY))
+                .child(t("common-delete"))
+                .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    if this.confirm_or_arm(format!("remove-{id}"), cx) {
+                        // One change at a time: a second click while the first is on its
+                        // way used to send it twice.
+                        if this.content_busy {
+                            return;
+                        }
+                        this.content_busy = true;
+                        this.backend
+                            .send(MessageToBackend::RemovePersonalContent { server_id, id });
+                    }
+                    cx.notify();
+                }))
+                .into_any_element()
+        } else {
+            icon_action(
+                format!("remove-{id}"),
+                "trash-2",
+                ERROR,
+                t("common-delete"),
+                cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                    this.confirm_or_arm(format!("remove-{id}"), cx);
+                    cx.notify();
+                }),
+            )
+        })
         .into_any_element()
 }
 
@@ -199,10 +245,12 @@ fn icon_action(
     id: String,
     icon: &'static str,
     colour: u32,
+    hint: String,
     on_click: impl Fn(&ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static,
 ) -> AnyElement {
     div()
         .id(SharedString::from(id))
+        .tooltip(crate::components::hint(hint))
         .size(px(30.))
         .rounded(px(R_SM))
         .flex()

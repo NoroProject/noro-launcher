@@ -43,12 +43,31 @@ fn main() {
         }
     };
 
-    if lockfile.try_lock_exclusive().is_err() {
+    if !acquire_lock(&lockfile) {
         focus_existing(&socket_path);
         return;
     }
 
     run_primary(&app_dir, &socket_path, &lockfile_path);
+}
+
+/// The lock is held by a running launcher — unless this process is the one it
+/// just started to replace itself (an update, a restart). Then the old one is
+/// on its way out, and giving up here would leave nothing running.
+fn acquire_lock(lockfile: &std::fs::File) -> bool {
+    if lockfile.try_lock_exclusive().is_ok() {
+        return true;
+    }
+    if std::env::var_os(backend::updater::RESTART_ENV).is_none() {
+        return false;
+    }
+    for _ in 0..50 {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        if lockfile.try_lock_exclusive().is_ok() {
+            return true;
+        }
+    }
+    false
 }
 
 fn run_primary(
@@ -95,7 +114,16 @@ fn run_primary(
     frontend::start(backend_handle, frontend_recv);
 
     tracing::info!("frontend is gone, stopping the backend");
-    runtime.block_on(quit_coordinator.quit());
+    // Bounded: whatever goes wrong in the backend, the process must exit and
+    // release the lock, or the next launch can't start at all.
+    if runtime
+        .block_on(async {
+            tokio::time::timeout(std::time::Duration::from_secs(10), quit_coordinator.quit()).await
+        })
+        .is_err()
+    {
+        tracing::error!("the backend did not stop in time, exiting anyway");
+    }
     let _ = std::fs::remove_file(lockfile_path);
     // `exit` skips destructors, so the sentry guard never flushes on its own.
     backend::telemetry::flush();
@@ -104,7 +132,8 @@ fn run_primary(
 
 fn spawn_focus_listener(
     runtime: &tokio::runtime::Runtime,
-    socket_path: PathBuf,
+    // Windows uses a named pipe instead.
+    #[cfg_attr(windows, allow(unused_variables))] socket_path: PathBuf,
     frontend: bridge::FrontendHandle,
     cancel: tokio_util::sync::CancellationToken,
 ) {

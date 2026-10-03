@@ -15,7 +15,7 @@ use part::BodyPartType;
 use project::{project_part, ProjectedQuad};
 use raster::Texture;
 
-pub use preview::{render_view, PREVIEW_H, PREVIEW_W};
+pub use preview::{render_frame, PREVIEW_H, PREVIEW_W};
 
 /// Widest and tallest the model gets at any angle, in model units (brute-forced
 /// upstream). Used to fit the figure into the output regardless of rotation.
@@ -78,8 +78,26 @@ fn is_slim(skin: &Skin) -> bool {
     skin.image.get_pixel(54 * s, 20 * s)[3] < 20
 }
 
+/// A skin (and cape) decoded once. The preview draws sixty frames a second,
+/// and decoding both PNGs again for each of them was most of a frame's cost.
+pub struct Decoded {
+    skin: Skin,
+    cape: Option<DynamicImage>,
+    slim: bool,
+}
+
+/// `None` if the skin is not a valid 64×64 / 64×32 layout.
+pub fn decode(skin_png: &[u8], cape_png: Option<&[u8]>) -> Option<Decoded> {
+    let skin = load_skin(skin_png)?;
+    let cape = cape_png.and_then(|b| image::load_from_memory(b).ok());
+    let slim = is_slim(&skin);
+    Some(Decoded { skin, cape, slim })
+}
+
 /// Render one frame onto a transparent RGBA canvas. `None` if the skin is not a
-/// valid 64×64 / 64×32 layout.
+/// valid 64×64 / 64×32 layout. Decodes every call — for tests only; the preview
+/// decodes once and calls [`render_decoded`].
+#[cfg(test)]
 pub fn render_rgba(
     skin_png: &[u8],
     cape_png: Option<&[u8]>,
@@ -87,9 +105,17 @@ pub fn render_rgba(
     height: u32,
     view: &View,
 ) -> Option<RgbaImage> {
-    let skin = load_skin(skin_png)?;
-    let cape = cape_png.and_then(|b| image::load_from_memory(b).ok());
-    let slim = is_slim(&skin);
+    Some(render_decoded(
+        &decode(skin_png, cape_png)?,
+        width,
+        height,
+        view,
+    ))
+}
+
+pub fn render_decoded(decoded: &Decoded, width: u32, height: u32, view: &View) -> RgbaImage {
+    let Decoded { skin, cape, slim } = decoded;
+    let slim = *slim;
 
     let rot = Mat3::rotation_yx(view.yaw.to_radians(), view.pitch.to_radians());
     let mut quads: Vec<ProjectedQuad> = Vec::new();
@@ -131,5 +157,5 @@ pub fn render_rgba(
             raster::rasterize_quad(&quad, tex, &mut out, &mut zbuf);
         }
     }
-    Some(out)
+    out
 }

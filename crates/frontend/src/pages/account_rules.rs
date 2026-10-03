@@ -53,7 +53,9 @@ pub fn view(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
         .flex_col()
         .gap(px(12.))
         .child(search(ui, cx))
-        .child(if empty {
+        .child(if empty && !ui.account_loaded.contains("rules") {
+            super::account::loading()
+        } else if empty {
             super::account::empty("info", t("account-rules-none"))
         } else {
             super::account::scroll("account-rules-scroll", blocks)
@@ -88,6 +90,11 @@ fn search(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
             cx.notify();
         }))
         .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, _w, cx| {
+            if let Some(text) = super::common::pasted(event, cx) {
+                this.rules_query.push_str(&text);
+                cx.notify();
+                return;
+            }
             match event.keystroke.key.as_str() {
                 "backspace" => {
                     this.rules_query.pop();

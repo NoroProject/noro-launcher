@@ -106,13 +106,18 @@ fn threads(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     .flex_col()
                     .items_center()
                     .gap(px(10.))
-                    .child(ic("inbox", 24., TEXT_MUTED))
-                    .child(
-                        div()
-                            .text_size(px(11.))
-                            .text_color(rgb(TEXT_MUTED))
-                            .child(t("messages-none")),
-                    ),
+                    .child(ic(
+                        if ui.dm_loaded { "inbox" } else { "hourglass" },
+                        24.,
+                        TEXT_MUTED,
+                    ))
+                    .child(div().text_size(px(11.)).text_color(rgb(TEXT_MUTED)).child(
+                        if ui.dm_loaded {
+                            t("messages-none")
+                        } else {
+                            t("launcher-loading")
+                        },
+                    )),
             )
         })
         .into_any_element()
@@ -209,7 +214,7 @@ fn badge(unread: i64) -> AnyElement {
 }
 
 fn thread(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
-    // По ссылке: клон переписки копировал каждое сообщение на каждом кадре.
+    // By reference: cloning the conversation copied every message on every frame.
     let Some(open) = ui.dm_open.as_ref() else {
         return panel()
             .flex_1()
@@ -253,6 +258,7 @@ fn thread(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(
             panel()
                 .id("dm-messages")
+                .track_scroll(&ui.dm_scroll)
                 .flex_1()
                 .min_h_0()
                 .overflow_y_scroll()

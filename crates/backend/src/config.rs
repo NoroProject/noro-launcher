@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
+/// Every field falls back to its default when missing: a version that adds or
+/// renames a field must not turn an existing config into a parse error, which
+/// would reset everything the player set.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LauncherConfig {
     pub master_url: String,
     #[serde(default = "default_locale")]
@@ -19,6 +23,9 @@ pub struct LauncherConfig {
     pub fullscreen: bool,
     #[serde(default = "default_crash_reports")]
     pub crash_reports: bool,
+    /// Rich Presence: the server and what the player is doing, shown to their
+    /// Discord friends. On by default, as it has always been.
+    pub discord_rpc: bool,
     /// Per-server overrides for the fields above.
     #[serde(default)]
     pub server_settings: BTreeMap<Uuid, ServerClientSettings>,
@@ -29,6 +36,7 @@ pub struct LauncherConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ServerClientSettings {
     pub memory_min_mb: u32,
     pub memory_max_mb: u32,
@@ -41,17 +49,33 @@ pub struct ServerClientSettings {
     pub fullscreen: bool,
 }
 
+const DEFAULT_MEMORY_MIN_MB: u32 = 2048;
+const DEFAULT_MEMORY_MAX_MB: u32 = 4096;
+
+impl Default for ServerClientSettings {
+    fn default() -> Self {
+        Self {
+            memory_min_mb: DEFAULT_MEMORY_MIN_MB,
+            memory_max_mb: DEFAULT_MEMORY_MAX_MB,
+            jvm_flags: String::new(),
+            show_console_on_launch: true,
+            fullscreen: false,
+        }
+    }
+}
+
 impl Default for LauncherConfig {
     fn default() -> Self {
         Self {
             master_url: default_master_url(),
             locale: default_locale(),
-            memory_min_mb: 2048,
-            memory_max_mb: 4096,
+            memory_min_mb: DEFAULT_MEMORY_MIN_MB,
+            memory_max_mb: DEFAULT_MEMORY_MAX_MB,
             jvm_flags: String::new(),
             show_console_on_launch: true,
             fullscreen: false,
             crash_reports: default_crash_reports(),
+            discord_rpc: true,
             server_settings: BTreeMap::new(),
             selected_build: BTreeMap::new(),
         }
@@ -65,13 +89,20 @@ fn default_crash_reports() -> bool {
 }
 
 fn default_locale() -> String {
-    // ru and en are the only two we ship, so everything else lands on en.
-    std::env::var("LANG")
-        .ok()
-        .and_then(|l| l.split('.').next().map(str::to_string))
-        .filter(|l| l.starts_with("ru"))
-        .map(|_| "ru".to_string())
-        .unwrap_or_else(|| "en".to_string())
+    let system = sys_locale::get_locale()
+        .or_else(|| std::env::var("LANG").ok())
+        .unwrap_or_default();
+    locale_for(&system).to_string()
+}
+
+/// ru and en are the only two we ship, so everything else lands on en.
+/// Accepts both `ru-RU` (Windows, macOS) and `ru_RU.UTF-8` (Unix).
+fn locale_for(system: &str) -> &'static str {
+    if system.to_ascii_lowercase().starts_with("ru") {
+        "ru"
+    } else {
+        "en"
+    }
 }
 
 /// The master address is baked in at build time and is mandatory for release
@@ -149,7 +180,8 @@ impl LauncherConfig {
         let settings = self.settings_for_server(server_id, Some(recommended));
         let mut config = self.clone();
         config.memory_min_mb = settings.memory_min_mb;
-        config.memory_max_mb = settings.memory_max_mb;
+        // A recommendation with min above max would stop the JVM from starting.
+        config.memory_max_mb = settings.memory_max_mb.max(settings.memory_min_mb);
         config.jvm_flags = launch_jvm_flags(&settings.jvm_flags, &recommended.jvm_flags);
         config.show_console_on_launch = settings.show_console_on_launch;
         config.fullscreen = settings.fullscreen;
@@ -269,8 +301,11 @@ pub struct OptionalModsSelection {
 }
 
 impl OptionalModsSelection {
-    pub fn for_server(&self, server_id: &Uuid) -> Vec<String> {
-        self.enabled.get(server_id).cloned().unwrap_or_default()
+    /// `None` until the player has toggled something for this server. An empty
+    /// list is a real choice — every optional mod off — and must not fall back
+    /// to the build's defaults.
+    pub fn for_server(&self, server_id: &Uuid) -> Option<Vec<String>> {
+        self.enabled.get(server_id).cloned()
     }
 }
 

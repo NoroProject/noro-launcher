@@ -13,9 +13,9 @@ pub fn mod_toggle(
         .h(px(22.))
         .rounded_full()
         .flex_shrink_0()
-        // Кремовый, а не зелёный: включённый мод — это не «всё хорошо», а
-        // выбор игрока, и зелёный светофор среди кремовых акцентов выглядел
-        // деталью из другого интерфейса.
+        // Cream, not green: an enabled mod isn't "all good", it's the player's
+        // choice, and a green traffic light among cream accents looked like a part
+        // from another interface.
         .bg(if enabled { rgb(CTA) } else { rgb(BG_INPUT) })
         .border_1()
         .border_color(if enabled { rgb(CTA) } else { rgb(BORDER) })

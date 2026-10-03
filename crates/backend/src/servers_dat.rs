@@ -61,10 +61,11 @@ pub fn sync(instance_dir: &Path, server: &ServerEntry) -> Result<bool> {
     std::fs::create_dir_all(instance_dir).ok();
     let bytes =
         fastnbt::to_bytes(&ServersDat { servers: out }).context("serializing servers.dat")?;
-    std::fs::write(&path, bytes).with_context(|| format!("writing {}", path.display()))?;
+    crate::fsutil::write_atomic_sync(&path, &bytes)
+        .with_context(|| format!("writing {}", path.display()))?;
     // Deliberately not `.ok()`: with no stamp, the next launch rewrites
     // servers.dat from scratch and loses whatever the player added.
-    std::fs::write(&stamp_path, stamp_with_ips(&stamp, &desired))
+    crate::fsutil::write_atomic_sync(&stamp_path, stamp_with_ips(&stamp, &desired).as_bytes())
         .with_context(|| format!("writing {}", stamp_path.display()))?;
     Ok(true)
 }
@@ -111,7 +112,7 @@ fn read(path: &Path) -> Result<ServersDat> {
     match fastnbt::from_bytes(&bytes) {
         Ok(dat) => Ok(dat),
         Err(e) => {
-            tracing::warn!(path = %path.display(), error = %e, "servers.dat unreadable, list rebuilt from scratch");
+            tracing::warn!(path = %path.display(), error = %format!("{e:#}"), "servers.dat unreadable, list rebuilt from scratch");
             Ok(ServersDat::default())
         }
     }

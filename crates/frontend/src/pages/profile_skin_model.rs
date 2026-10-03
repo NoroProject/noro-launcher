@@ -48,9 +48,9 @@ fn choice(
     // While an upload is in flight the click is dropped rather than the
     // button disabled.
     let busy = ui.skin_uploading;
-    // Тем же сегментом, что и остальные переключатели: это выбор из двух, а не
-    // кнопка действия, и кремовая заливка на нём звучала громче, чем «Загрузить
-    // скин» рядом.
+    // The same segment as the other switches: it is a choice of two, not an
+    // action button, and a cream fill on it spoke louder than "Upload skin"
+    // next to it.
     crate::components::segment(
         if slim {
             "skin-model-slim"

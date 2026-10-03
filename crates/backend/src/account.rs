@@ -22,11 +22,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 fn api(ctx: &Ctx) -> Option<MasterApi> {
-    MasterApi::new(
-        ctx.http.clone(),
-        &ctx.config.get().master_url,
-        ctx.ws.token(),
-    )
+    MasterApi::for_session(ctx)
 }
 
 /// Unix seconds out of an RFC 3339 field. `0` when it is missing: a date of
@@ -103,17 +99,17 @@ pub fn rules(ctx: &Ctx) {
             .get("categories")
             .and_then(Value::as_array)
             .map(|list| {
-                // У раздела свода поле называется `name`, а не `title`: с
-                // `title` категория у каждого правила выходила пустой.
+                // A rulebook section calls the field `name`, not `title`: reading
+                // `title` left every rule with an empty category.
                 list.iter()
                     .map(|c| (text(c, "id"), text(c, "name")))
                     .collect()
             })
             .unwrap_or_default();
 
-        // Наказания приходят отдельным плоским списком и сопоставляются по
-        // `rule_id`: запрос на каждое правило превратил бы открытие свода в
-        // сотню обращений, и мастер отдаёт их так ровно поэтому.
+        // Punishments come as a separate flat list matched by `rule_id`: a
+        // request per rule would turn opening the rulebook into a hundred calls,
+        // which is exactly why the master serves them this way.
         let mut sanctions: std::collections::HashMap<String, Vec<bridge::SanctionView>> =
             Default::default();
         for s in raw
@@ -187,11 +183,11 @@ pub fn ticket(ctx: &Ctx, id: Uuid) {
         let Ok(raw) = api.ticket(id).await.inspect_err(log("ticket")) else {
             return;
         };
-        // `GET /api/tickets/{id}` отдаёт только страницу сообщений, без самой
-        // карточки: тему и статус берёт из списка тот, кто открывал.
+        // `GET /api/tickets/{id}` returns only a page of messages, not the ticket
+        // itself: subject and status come from the list whoever opened it had.
         //
-        // Порядок в ответе обратный — свежие первыми, потому что так строится
-        // страница. Лента читается сверху вниз, поэтому здесь разворачиваем.
+        // The response is newest first, because that is how a page is built. The
+        // thread reads top to bottom, so it is reversed here.
         let mut messages: Vec<TicketMessageView> = array(&raw)
             .iter()
             .map(|m| TicketMessageView {
@@ -203,7 +199,7 @@ pub fn ticket(ctx: &Ctx, id: Uuid) {
                     .map(str::to_string),
                 content: text(m, "content"),
                 at: at(m, "at"),
-                // `player` — это сам игрок; всё прочее пишет персонал.
+                // `player` is the player; everything else is written by staff.
                 staff: text(m, "author_side") != "player",
             })
             .collect();
@@ -282,8 +278,8 @@ pub fn dm_thread(ctx: &Ctx, peer: Uuid) {
             return;
         };
         let me = ctx.profile().map(|p| p.id);
-        // Сообщения лежат внутри страницы (`messages.items`), а не в корне
-        // ответа, и идут свежими вперёд — лента читается наоборот.
+        // Messages sit inside the page (`messages.items`), not at the root of the
+        // response, and come newest first; the thread reads the other way.
         let mut messages: Vec<DmMessageView> = raw
             .get("messages")
             .map(array)
@@ -359,5 +355,5 @@ fn avatar_of(master: &str, v: &Value, peer_name: &str) -> Option<String> {
 /// A failure here is not worth interrupting anybody over: the page stays as it
 /// was, and the log says why.
 fn log(what: &'static str) -> impl Fn(&anyhow::Error) {
-    move |e| tracing::debug!(error = %e, "could not load {what}")
+    move |e| tracing::debug!(error = %format!("{e:#}"), "could not load {what}")
 }

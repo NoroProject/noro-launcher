@@ -12,13 +12,18 @@ pub fn base_copy_path(instance_dir: &Path, rel: &str) -> std::path::PathBuf {
 
 /// Only copies paths we can actually merge by key — keeping a copy of every
 /// config for a format we can't merge costs disk and buys nothing.
+///
+/// Call it only for a file that was just downloaded, when what sits on disk is
+/// the server's text. After a kept or merged conflict the disk holds the
+/// player's version, and recording that as the base makes the next merge
+/// believe the player never changed anything — so it takes every value from
+/// the server and wipes their edits.
 pub async fn remember_base(instance_dir: &Path, rel: &str) {
     if !is_mergeable(rel) {
         return;
     }
-    let dst = base_copy_path(instance_dir, rel);
-    if let Some(parent) = dst.parent() {
-        let _ = tokio::fs::create_dir_all(parent).await;
-    }
-    let _ = tokio::fs::copy(instance_dir.join(rel), dst).await;
+    let Ok(text) = tokio::fs::read(instance_dir.join(rel)).await else {
+        return;
+    };
+    let _ = crate::fsutil::write_atomic(base_copy_path(instance_dir, rel), text).await;
 }

@@ -103,7 +103,15 @@ async fn merged_updates_a_file_the_player_never_touched() {
     let mut base = BaseHashes::default();
     base.set("config/a.json", &mine);
 
-    let a = decide_file(dir.path(), &m, &m.verified_files[0], &base, true).await;
+    let a = decide_file(
+        dir.path(),
+        &m,
+        &m.verified_files[0],
+        &base,
+        true,
+        &Default::default(),
+    )
+    .await;
     assert_eq!(action_name(&a), "download");
 }
 
@@ -117,7 +125,15 @@ async fn merged_keeps_edits_the_server_did_not_touch() {
     // Base matches the server's hash, so the server changed nothing.
     base.set("config/a.json", server_sha1);
 
-    let a = decide_file(dir.path(), &m, &m.verified_files[0], &base, true).await;
+    let a = decide_file(
+        dir.path(),
+        &m,
+        &m.verified_files[0],
+        &base,
+        true,
+        &Default::default(),
+    )
+    .await;
     assert_eq!(action_name(&a), "skip");
 }
 
@@ -129,7 +145,15 @@ async fn merged_reports_a_conflict_when_both_sides_changed() {
     let mut base = BaseHashes::default();
     base.set("config/a.json", "original-sha1");
 
-    let a = decide_file(dir.path(), &m, &m.verified_files[0], &base, true).await;
+    let a = decide_file(
+        dir.path(),
+        &m,
+        &m.verified_files[0],
+        &base,
+        true,
+        &Default::default(),
+    )
+    .await;
     assert_eq!(action_name(&a), "conflict");
 }
 
@@ -143,6 +167,7 @@ async fn a_missing_file_is_installed_in_every_mode() {
         &m.verified_files[0],
         &BaseHashes::default(),
         true,
+        &Default::default(),
     )
     .await;
     assert_eq!(action_name(&a), "download");
@@ -161,6 +186,7 @@ async fn user_managed_never_updates_an_existing_file() {
         &m.verified_files[0],
         &BaseHashes::default(),
         true,
+        &Default::default(),
     )
     .await;
     assert_eq!(action_name(&a), "skip");
@@ -178,6 +204,7 @@ async fn unmanaged_is_never_touched() {
         &m.verified_files[0],
         &BaseHashes::default(),
         true,
+        &Default::default(),
     )
     .await;
     assert_eq!(action_name(&a), "skip");

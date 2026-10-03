@@ -1,17 +1,17 @@
 use crate::console_controls::{action, clipboard_text, toggle};
-use crate::console_model::joined_lines;
-use crate::state::{ConsoleWindow, GlobalLauncherUI, LogEntry};
+use crate::console_model::Filters;
+use crate::state::{ConsoleWindow, GlobalLauncherUI};
 use crate::theme::*;
 use gpui::{
-    div, prelude::*, px, rgb, AnyElement, AsyncApp, ClipboardItem, Context, FontWeight,
-    ListAlignment, ListState, WeakEntity,
+    div, prelude::*, px, rgb, AnyElement, AsyncApp, ClipboardItem, Context, FontWeight, WeakEntity,
 };
 use i18n::t;
 
 type Cx<'a> = Context<'a, ConsoleWindow>;
 
-pub fn toolbar(view: &ConsoleWindow, logs: &[LogEntry], cx: &mut Cx) -> AnyElement {
-    let copy_text = joined_lines(logs);
+/// The level toggles keep log4j's own names: they are what the lines say.
+pub fn toolbar(view: &ConsoleWindow, cx: &mut Cx) -> AnyElement {
+    let filters = view.buffer.filters().clone();
     div()
         .h(px(56.))
         .px(px(16.))
@@ -23,48 +23,64 @@ pub fn toolbar(view: &ConsoleWindow, logs: &[LogEntry], cx: &mut Cx) -> AnyEleme
         .border_b_1()
         .border_color(rgb(BORDER))
         .child(title(
-            logs.len(),
-            view.logs.len(),
-            &view.search_query,
+            view.buffer.visible_len(),
+            view.buffer.total(),
+            &filters.query,
             &view.status_message,
         ))
         .child(div().flex_1())
         .child(toggle(
             "INFO",
-            view.show_info,
-            |v| v.show_info = !v.show_info,
+            filters.info,
+            |v| {
+                let f = v.buffer.filters().clone();
+                v.set_filters(Filters { info: !f.info, ..f });
+            },
             cx,
         ))
         .child(toggle(
             "WARN",
-            view.show_warn,
-            |v| v.show_warn = !v.show_warn,
+            filters.warn,
+            |v| {
+                let f = v.buffer.filters().clone();
+                v.set_filters(Filters { warn: !f.warn, ..f });
+            },
             cx,
         ))
         .child(toggle(
             "ERROR",
-            view.show_error,
-            |v| v.show_error = !v.show_error,
+            filters.error,
+            |v| {
+                let f = v.buffer.filters().clone();
+                v.set_filters(Filters {
+                    error: !f.error,
+                    ..f
+                });
+            },
             cx,
         ))
         .child(action(
-            "BOTTOM",
+            "console-bottom",
+            t("console-to-bottom"),
             |v, _| {
-                v.list_state = ListState::new(v.logs.len(), ListAlignment::Bottom, px(100.));
-                v.status_message = "FOLLOWING".to_string();
+                v.follow();
+                v.status_message.clear();
             },
             cx,
         ))
         .child(action(
+            "console-copy",
             if view.copy_success {
-                "✓ COPIED!"
+                format!("✓ {}", t("common-copied").to_uppercase())
             } else {
-                "COPY"
+                t("common-copy").to_uppercase()
             },
-            move |v, cx| {
-                cx.write_to_clipboard(ClipboardItem::new_string(copy_text.clone()));
-                let lines = copy_text.lines().count();
-                v.status_message = format!("COPIED {lines}");
+            |v, cx| {
+                // Built on the click, not on every frame the button is drawn.
+                let text = v.buffer.copy_text();
+                let lines = v.buffer.visible_len();
+                cx.write_to_clipboard(ClipboardItem::new_string(text));
+                v.status_message = i18n::t_count("console-copied", lines as i64);
                 v.copy_success = true;
 
                 cx.spawn(|view: WeakEntity<ConsoleWindow>, cx: &mut AsyncApp| {
@@ -84,39 +100,56 @@ pub fn toolbar(view: &ConsoleWindow, logs: &[LogEntry], cx: &mut Cx) -> AnyEleme
             cx,
         ))
         .child(action(
-            "FIND",
+            "console-find",
+            t("console-find"),
             |v, cx| {
-                if let Some(query) = clipboard_text(cx) {
-                    v.search_query = query.trim().to_string();
-                    v.status_message = if v.search_query.is_empty() {
-                        "EMPTY FIND".to_string()
-                    } else {
-                        "FIND FROM CLIPBOARD".to_string()
-                    };
-                } else {
-                    v.status_message = "NO CLIPBOARD TEXT".to_string();
+                // GPUI has no text field; the search text comes from the
+                // clipboard.
+                let query = clipboard_text(cx)
+                    .map(|q| q.trim().to_lowercase())
+                    .unwrap_or_default();
+                if query.is_empty() {
+                    v.status_message = t("console-clipboard-empty");
+                    return;
                 }
+                v.status_message.clear();
+                let f = v.buffer.filters().clone();
+                v.set_filters(Filters { query, ..f });
             },
             cx,
         ))
         .child(action(
-            "RESET",
+            "console-reset",
+            t("console-reset"),
             |v, _| {
-                v.search_query.clear();
-                v.status_message = "FILTER RESET".to_string();
+                v.status_message.clear();
+                v.set_filters(Filters::default());
             },
             cx,
         ))
+        .child(action("console-save", t("console-save"), save, cx))
         .child(action(
-            "CLEAR",
+            "console-clear",
+            if view.clear_armed {
+                t("console-clear-confirm")
+            } else {
+                t("console-clear")
+            },
             |v, cx| {
-                let count = v.logs.len();
-                v.logs.clear();
-                v.list_state = ListState::new(0, ListAlignment::Bottom, px(100.));
-                v.status_message = format!("CLEARED {count}");
+                // Clearing can't be undone and the line that mattered is
+                // usually the one just scrolled past: ask once.
+                if !v.clear_armed {
+                    v.clear_armed = true;
+                    disarm_later(cx);
+                    return;
+                }
+                v.clear_armed = false;
+                let count = v.buffer.total();
+                let server_id = v.server_id;
+                v.show_server(server_id, Vec::new());
+                v.status_message = i18n::t_count("console-cleared", count as i64);
                 if let Some(ui) = cx.try_global::<GlobalLauncherUI>() {
                     let ui = ui.0.clone();
-                    let server_id = v.server_id;
                     ui.update(cx, |ui, cx| {
                         ui.logs.remove(&server_id);
                         cx.notify();
@@ -128,11 +161,69 @@ pub fn toolbar(view: &ConsoleWindow, logs: &[LogEntry], cx: &mut Cx) -> AnyEleme
         .into_any_element()
 }
 
+fn disarm_later(cx: &mut Cx) {
+    cx.spawn(|view: WeakEntity<ConsoleWindow>, cx: &mut AsyncApp| {
+        let mut cx = cx.clone();
+        async move {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(3))
+                .await;
+            let _ = view.update(&mut cx, |v, cx| {
+                v.clear_armed = false;
+                cx.notify();
+            });
+        }
+    })
+    .detach();
+}
+
+/// The visible lines to a file the player picks. Copying thousands of lines
+/// through the clipboard into a chat is how logs used to reach support.
+fn save(v: &mut ConsoleWindow, cx: &mut Cx) {
+    let text = v.buffer.copy_text();
+    if text.is_empty() {
+        return;
+    }
+    let name = format!(
+        "noro-console-{}.log",
+        chrono::Local::now().format("%Y-%m-%d_%H-%M-%S")
+    );
+    let dir = dirs::download_dir()
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(std::env::temp_dir);
+    let picked = cx.prompt_for_new_path(&dir, Some(&name));
+    cx.spawn(|view: WeakEntity<ConsoleWindow>, cx: &mut AsyncApp| {
+        let mut cx = cx.clone();
+        async move {
+            let Ok(Ok(Some(path))) = picked.await else {
+                return; // cancelled
+            };
+            let written = cx
+                .background_executor()
+                .spawn(async move { std::fs::write(&path, text) })
+                .await;
+            let _ = view.update(&mut cx, |v, cx| {
+                v.status_message = match written {
+                    Ok(()) => t("console-saved"),
+                    Err(e) => format!("{}: {e}", t("console-save-failed")),
+                };
+                cx.notify();
+            });
+        }
+    })
+    .detach();
+}
+
 fn title(visible: usize, total: usize, query: &str, status: &str) -> AnyElement {
     let mut suffix = if query.is_empty() {
         format!("{visible}/{total}")
     } else {
-        format!("{visible}/{total} FIND {query}")
+        let mut args = i18n::FluentArgs::new();
+        args.set("query", query.to_string());
+        format!(
+            "{visible}/{total} {}",
+            i18n::t_args("console-find-query", &args)
+        )
     };
     if !status.is_empty() {
         suffix.push_str("  ");

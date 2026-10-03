@@ -78,12 +78,12 @@ impl BaseHashes {
     /// A failed write doesn't abort the launch: without a base the next pass
     /// treats the files as unknown and refuses to overwrite anything.
     pub async fn save(&self, instance_dir: &Path) {
-        let path = instance_dir.join(BASE_PATH);
-        if let Some(parent) = path.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
-        }
+        // Atomic, because a torn file reads back as "no base", and with no
+        // base every merged file becomes a conflict on the next pass.
         if let Ok(bytes) = serde_json::to_vec(&self.0) {
-            let _ = tokio::fs::write(path, bytes).await;
+            if let Err(e) = crate::fsutil::write_atomic(instance_dir.join(BASE_PATH), bytes).await {
+                tracing::warn!(error = %format!("{e:#}"), "base hashes not saved");
+            }
         }
     }
 }

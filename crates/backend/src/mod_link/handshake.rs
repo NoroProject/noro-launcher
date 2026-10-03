@@ -29,7 +29,9 @@ pub async fn write(instance_dir: &Path, port: u16, key: &str) -> Result<()> {
         key: key.to_string(),
         protocol: PROTOCOL,
     })?;
-    tokio::fs::write(path(instance_dir), body).await?;
+    // The mod reads this once at startup; half a file there means no panel
+    // for the whole session.
+    crate::fsutil::write_atomic(path(instance_dir), body).await?;
     Ok(())
 }
 

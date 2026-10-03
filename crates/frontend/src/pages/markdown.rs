@@ -83,13 +83,22 @@ pub fn render(source: &str) -> Vec<AnyElement> {
 
 pub fn plain_excerpt(source: &str, limit: usize) -> String {
     let mut out = String::new();
+    // Counted as it grows: recounting the whole string after every event made
+    // a long post quadratic.
+    let mut chars = 0;
     for event in Parser::new(source) {
         match event {
-            Event::Text(text) | Event::Code(text) => out.push_str(&text),
-            Event::SoftBreak | Event::HardBreak | Event::End(TagEnd::Paragraph) => out.push(' '),
+            Event::Text(text) | Event::Code(text) => {
+                chars += text.chars().count();
+                out.push_str(&text);
+            }
+            Event::SoftBreak | Event::HardBreak | Event::End(TagEnd::Paragraph) => {
+                chars += 1;
+                out.push(' ');
+            }
             _ => {}
         }
-        if out.chars().count() > limit {
+        if chars > limit {
             break;
         }
     }
@@ -133,9 +142,9 @@ fn flush(
         return;
     }
 
-    // Основной шрифт, а не пиксельный: описание мода — это абзацы сплошного
-    // текста, и моноширинный пиксель на них читается как распечатка лога.
-    // Пиксельный остаётся заголовкам и подписям, где его и ждут.
+    // The body font, not the pixel one: a mod description is paragraphs of running
+    // text, and monospaced pixels make it read like a printed log. The pixel font
+    // stays with headings and captions, where it is expected.
     let mut block = div()
         .font_family(FONT)
         .child(StyledText::new(text).with_highlights(highlights));

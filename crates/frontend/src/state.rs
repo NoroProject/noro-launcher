@@ -57,20 +57,68 @@ pub enum AccountTab {
     Rules,
 }
 
+/// What the sync panel's heading says. Kept as a state rather than as text so
+/// the words follow the language.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SyncHeading {
+    Preparing,
+    Stage(SyncStage),
+    /// Several download stages at once; no single one is the heading.
+    Downloading,
+    /// Files are in place; the check and the JVM start take a few seconds.
+    Launching,
+    Cancelling,
+}
+
+/// Why the last sync or launch failed.
+#[derive(Clone, Debug)]
+pub struct SyncFailure {
+    /// A translation key.
+    pub reason: String,
+    /// The technical chain, for whoever reads the console or a support report.
+    pub detail: String,
+}
+
 /// Sync and run state for one server.
 #[derive(Default, Clone)]
 pub struct SyncUiState {
-    pub stage: String,
+    pub heading: Option<SyncHeading>,
     pub detail: String,
     /// Bytes per download stage — they run in parallel and each gets its own
     /// bar. BTreeMap so the row order doesn't depend on who reported first.
     pub stages: std::collections::BTreeMap<SyncStage, (u64, u64)>,
     pub syncing: bool,
-    pub failed: Option<String>,
+    pub failed: Option<SyncFailure>,
     pub running: bool,
+    /// The launch in flight. Kept so it can be cancelled: the backend has
+    /// always honoured a cancel, but nothing in the window could ask for one.
+    pub launch: Option<bridge::ModalAction>,
+    pub rate: crate::sync_text::Rate,
+    /// The stop button was clicked once and waits for the confirming click.
+    pub stop_armed: bool,
 }
 
 impl SyncUiState {
+    pub fn heading_text(&self) -> String {
+        match &self.heading {
+            None | Some(SyncHeading::Preparing) => i18n::t("game-preparing"),
+            Some(SyncHeading::Stage(stage)) => crate::sync_text::stage_label(*stage),
+            Some(SyncHeading::Downloading) => i18n::t("sync-downloading"),
+            Some(SyncHeading::Launching) => i18n::t("sync-launching"),
+            Some(SyncHeading::Cancelling) => i18n::t("sync-cancelling"),
+        }
+    }
+
+    /// The launch can still be called off: it hasn't reached the JVM yet.
+    pub fn cancellable(&self) -> bool {
+        self.syncing
+            && self.launch.is_some()
+            && !matches!(
+                self.heading,
+                Some(SyncHeading::Launching | SyncHeading::Cancelling)
+            )
+    }
+
     pub fn done(&self) -> u64 {
         self.stages.values().map(|(d, _)| d).sum()
     }
@@ -102,18 +150,21 @@ fn translate_notification(key: &str, args: &std::collections::BTreeMap<String, S
 
 #[derive(Clone)]
 pub struct Toast {
-    /// Растёт на каждую плашку. Нужен, чтобы таймер снял именно свою: пока он
-    /// спит, стопка успевает смениться целиком.
+    /// Grows with every toast. The timer has to remove its own: while it
+    /// sleeps, the stack can turn over completely.
     pub id: u64,
     pub text: String,
     pub level: NotifLevel,
+    /// Bumped when the same text comes again. Only the newest timer may
+    /// remove the toast, which is what makes a repeat actually extend it.
+    pub generation: u64,
 }
 
 impl Toast {
-    /// Сколько плашка живёт.
+    /// How long the toast stays.
     ///
-    /// Чем хуже новость, тем дольше: «скин загружен» читается краем глаза, а
-    /// причину, по которой не запустилась игра, человек ещё и перечитывает.
+    /// The worse the news, the longer: "skin uploaded" is read at a glance, while
+    /// the reason the game didn't start is something people read twice.
     pub fn lifetime(&self) -> std::time::Duration {
         let secs = match self.level {
             NotifLevel::Error => 9,
@@ -135,7 +186,9 @@ pub struct UiConfig {
     /// Whether a DSN is baked into this build. Without one the settings row is
     /// hidden — the toggle would flip but there is nowhere to send.
     pub crash_reports_available: bool,
+    pub discord_rpc: bool,
     pub master_url: String,
+    pub system_memory_mb: Option<u32>,
 }
 
 impl Default for UiConfig {
@@ -148,7 +201,9 @@ impl Default for UiConfig {
             fullscreen: false,
             crash_reports: true,
             crash_reports_available: false,
+            discord_rpc: true,
             master_url: String::new(),
+            system_memory_mb: None,
         }
     }
 }
@@ -167,8 +222,9 @@ pub enum ProfileTab {
 pub struct SavedSkinPreset {
     pub id: String,
     pub name: String,
-    pub bytes: Vec<u8>,
-    pub preview: Option<Arc<RenderImage>>,
+    /// Shared: the preset cards are drawn every frame the skin turns, and
+    /// copying each preset's PNG for every one of them added up.
+    pub bytes: Arc<Vec<u8>>,
 }
 
 pub struct LauncherUI {
@@ -180,6 +236,11 @@ pub struct LauncherUI {
     /// Current preview frame. `RenderImage` and not `Image`, because it draws
     /// synchronously.
     pub skin_preview: Option<Arc<RenderImage>>,
+    /// The current skin and cape, decoded once per change rather than per frame.
+    pub skin_decoded: Option<(u64, Arc<crate::skin::Decoded>)>,
+    /// Whether the main window has the focus. The skin preview only animates
+    /// while it does.
+    pub window_active: bool,
     pub skin_bytes: Option<Vec<u8>>,
     pub skin_url: Option<String>,
     /// Rotation of the figure, in degrees.
@@ -188,6 +249,8 @@ pub struct LauncherUI {
     pub skin_sway: f32,
     pub skin_loading: bool,
     pub skin_uploading: bool,
+    /// The skin before an upload, to go back to if the upload is refused.
+    pub skin_before_upload: Option<Vec<u8>>,
     pub skin_dragging: bool,
     /// Cursor x at the last drag sample, in window px.
     pub skin_drag_x: f32,
@@ -208,6 +271,9 @@ pub struct LauncherUI {
     /// UI language. The catalog itself lives in i18n's global state.
     pub locale: i18n::Locale,
     pub online: bool,
+    /// The socket to the master went down and hasn't come back. Separate from
+    /// `online`, which is also false for the moment before the first connect.
+    pub connection_lost: bool,
     pub logging_in: bool,
     pub sidebar_collapsed: bool,
     pub mod_catalog_hits: Vec<bridge::CatalogHitInfo>,
@@ -229,6 +295,8 @@ pub struct LauncherUI {
     pub rename_focus: Option<gpui::FocusHandle>,
     pub startup_checking: bool,
     pub login_error: Option<String>,
+    /// The web sign-in in flight, so it can be cancelled.
+    pub login_modal: Option<bridge::ModalAction>,
     pub login_mode_key: bool,
     pub login_key_input: String,
     pub login_key_focus: Option<gpui::FocusHandle>,
@@ -239,53 +307,64 @@ pub struct LauncherUI {
     pub news: Vec<NewsItem>,
     pub sync: HashMap<Uuid, SyncUiState>,
     pub build_state: HashMap<Uuid, bridge::BuildState>,
-    pub logs: HashMap<Uuid, Vec<LogEntry>>,
+    pub logs: HashMap<Uuid, std::collections::VecDeque<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
     pub installed_files: HashMap<Uuid, Vec<String>>,
-    /// Имена того, что сборка уже везёт, приведённые к виду для сравнения.
+    /// Names of what the build already ships, normalised for comparison.
     ///
-    /// Считается один раз на приход манифеста: карточка каталога спрашивает
-    /// «это уже стоит?» на каждом кадре, и приводить к общему виду сотни имён
-    /// каждый раз — это и есть тормоза списка.
+    /// Computed once per manifest: a catalog card asks "is this installed?" every
+    /// frame, and normalising hundreds of names each time is exactly what made the
+    /// list slow.
     pub installed_keys: HashMap<Uuid, std::collections::HashSet<String>>,
     pub allow_mod_suggestions: HashMap<Uuid, bool>,
-    /// Разрешает ли сборка свой контент. Вкладки «Моды» без этого нет вовсе:
-    /// кнопка, ведущая к отказу, хуже её отсутствия.
+    /// Whether the build allows content of your own. Without it there is no
+    /// "Mods" tab at all: a button that leads to a refusal is worse than none.
     pub allow_personal_content: HashMap<Uuid, bool>,
     pub suggested_mods: HashSet<String>,
     pub background_images: HashMap<Uuid, Arc<RenderImage>>,
     pub news_images: HashMap<Uuid, Arc<Image>>,
+    /// Card text per post, made when the news arrive: parsing every post's
+    /// markdown again for every frame was most of the news page's cost.
+    pub news_excerpts: HashMap<Uuid, gpui::SharedString>,
     news_images_loading: HashSet<Uuid>,
     pub server_icons: HashMap<Uuid, Arc<RenderImage>>,
-    /// Уже разобранные пиксели, а не сжатый файл: `Image` уходит в кеш ассетов
-    /// GPUI и разбирается там при отрисовке, и на списке из двадцати иконок это
-    /// стоило 311 мс на кадр против 30 мс на том же экране без картинок.
+    /// Decoded pixels rather than the compressed file: an `Image` goes to GPUI's
+    /// asset cache and is decoded there while drawing, and on a list of twenty
+    /// icons that cost 311 ms a frame against 30 ms on the same screen without them.
     pub optional_mod_icons: HashMap<String, Arc<RenderImage>>,
     background_image_urls: HashMap<Uuid, String>,
     server_icon_urls: HashMap<Uuid, String>,
     background_loading: HashSet<Uuid>,
     icons_loading: HashSet<Uuid>,
     optional_mod_icons_loading: HashSet<String>,
-    /// Картинки, которых нет: 404, оборванная ссылка, отказ провайдера.
+    /// Images that aren't there: a 404, a dead link, a provider refusing.
     ///
-    /// Без этого списка неудача ничем не отличалась от «ещё не пробовали»:
-    /// запрос уходил заново на каждом кадре, а завершение каждой попытки
-    /// дёргало перерисовку — то есть следующий кадр, то есть следующую попытку.
-    /// Десяток битых иконок в выдаче каталога так укладывал весь интерфейс.
+    /// Without this list a failure looked just like "not tried yet": the request
+    /// went out again every frame, and each finished attempt triggered a redraw,
+    /// which meant the next frame and the next attempt. A dozen broken icons in
+    /// the catalog brought the whole interface down that way.
     optional_mod_icons_failed: HashSet<String>,
-    /// То же для фонов и значков сборок, по адресу картинки.
+    /// The same for build backgrounds and icons, by image URL.
     image_failed: HashSet<String>,
 
     pub update_available: Option<LauncherVersion>,
     pub updating: bool,
-    /// Стопка плашек, старые сверху. Одна на всё окно теряла предыдущую:
-    /// синхронизация умеет сообщить о трёх вещах подряд, и видно было третью.
+    /// The update download in flight; its progress is read from here.
+    pub update_modal: Option<bridge::ModalAction>,
+    /// A stack of toasts, oldest on top. A single one for the whole window lost
+    /// the previous message: sync can report three things in a row, and only the third showed.
     pub toasts: Vec<Toast>,
     next_toast_id: u64,
     pub config: UiConfig,
     pub server_settings: HashMap<Uuid, ClientSettingsState>,
     pub server_recommendations: HashMap<Uuid, ClientSettingsState>,
     pub console_window: Option<gpui::WindowHandle<ConsoleWindow>>,
+    /// The main window, to raise it when the launcher is started again.
+    pub main_window: Option<gpui::AnyWindowHandle>,
+    /// Closing would stop a running game or download; the window is asking.
+    pub close_prompt: bool,
+    /// A destructive button clicked once, waiting for the confirming click.
+    pub armed_action: Option<String>,
     pub impersonate_prompt: Option<ImpersonatePrompt>,
     /// Username the launcher is currently acting as.
     pub impersonating_as: Option<String>,
@@ -308,12 +387,12 @@ pub struct LauncherUI {
     pub content_versions: HashMap<(String, String), Vec<bridge::ContentVersionInfo>>,
     /// Which project's version list is open, if any.
     pub content_picker: Option<(String, String)>,
-    /// Показывать в списке версий и те, что сборке не подходят.
+    /// Also list versions that don't fit the build.
     ///
-    /// По умолчанию выключено: у популярного мода полсотни версий, из них
-    /// подходит одна-две, и искать их глазами среди строк «не выпущена под эту
-    /// сборку» — не выбор, а поиск. Но список не прячется совсем: увидеть, что
-    /// мод вообще существует под другие версии, бывает важно.
+    /// Off by default: a popular mod has fifty versions, one or two of which fit,
+    /// and finding them among rows of "not released for this build" is a search,
+    /// not a choice. The list isn't hidden entirely though: seeing that the mod
+    /// exists for other versions at all can matter.
     pub content_versions_all: bool,
     pub content_kind: schema::personal::ContentKind,
     pub content_mode: ContentMode,
@@ -324,12 +403,12 @@ pub struct LauncherUI {
     pub content_show_installed: bool,
     /// `relevance` · `downloads` · `follows` · `newest` · `updated`.
     pub content_sort: String,
-    /// Сборка, для которой каталог уже спрашивали, и висит ли запрос сейчас.
+    /// The build the catalog was already requested for, and whether a request is in flight.
     ///
-    /// Без этих двух полей условие «список пуст — спроси» срабатывало на
-    /// каждом кадре: пустая выдача или ещё не пришедший ответ давали шестьдесят
-    /// запросов в секунду, и лагал от этого не только лаунчер, но и мастер, —
-    /// он на каждый из них ходил в Modrinth.
+    /// Without these two fields "the list is empty, ask" fired every frame: an
+    /// empty result or an answer still on its way meant sixty requests a second,
+    /// which lagged not only the launcher but the master too, since it went to
+    /// Modrinth for each one.
     pub content_requested_for: Option<Uuid>,
     pub content_searching: bool,
 
@@ -348,13 +427,19 @@ pub struct LauncherUI {
 
     // ── The player's own pages ──────────────────────────────────────────────
     pub account_tab: AccountTab,
-    /// Какие списки аккаунта уже спрашивали.
+    /// Which account lists were already requested.
     ///
-    /// Проверка «список пуст — спроси» стоит в рендере, то есть срабатывает на
-    /// каждом кадре. У игрока без наказаний, без обращений или до ответа
-    /// мастера это давало запрос на кадр — шестьдесят в секунду, каждый со
-    /// своей перерисовкой по ответу. Отсюда и «лагают все списки».
+    /// The "list is empty, ask" check sits in render, so it runs every frame. For
+    /// a player with no punishments or tickets, or before the master answered,
+    /// that was a request per frame, sixty a second, each with its own redraw on
+    /// the reply. Hence "every list lags".
     pub account_requested: HashSet<&'static str>,
+    /// Which of them have answered. Asked but not answered is "loading", not
+    /// "nothing here": a player with punishments used to see "none" for the
+    /// second it took the master to reply.
+    pub account_loaded: HashSet<&'static str>,
+    pub dm_loaded: bool,
+    pub news_loaded: bool,
     pub punishments: Vec<bridge::PunishmentView>,
     pub rules: Vec<bridge::RuleView>,
     pub rules_query: String,
@@ -363,11 +448,15 @@ pub struct LauncherUI {
     /// The ticket that is open, with its thread.
     pub ticket_open: Option<(Uuid, String, String, Vec<bridge::TicketMessageView>)>,
     pub dm_threads: Vec<bridge::DmThreadView>,
-    /// Список переписок уже спрашивали. Проверка по пустому списку не годится:
-    /// она стоит в рендере и у аккаунта без переписок давала запрос на кадр.
+    /// The conversation list was already requested. Checking for an empty list
+    /// won't do: it sits in render and asked every frame for an account with none.
     pub dm_requested: bool,
     /// The conversation that is open.
     pub dm_open: Option<bridge::DmThreadOpen>,
+    /// Conversations open on their newest message, like any chat; without a
+    /// handle they opened at the top, on the oldest one.
+    pub dm_scroll: gpui::ScrollHandle,
+    pub ticket_scroll: gpui::ScrollHandle,
     /// What is being typed, in whichever of the two is open.
     pub compose: String,
     pub compose_focus: Option<gpui::FocusHandle>,
@@ -395,18 +484,76 @@ pub struct ImpersonatePrompt {
     pub grant_id: Uuid,
     pub target_username: String,
     pub reason: String,
-    pub expires_in_secs: i64,
+    pub expires_at: std::time::Instant,
+}
+
+impl ImpersonatePrompt {
+    pub fn seconds_left(&self) -> i64 {
+        self.expires_at
+            .saturating_duration_since(std::time::Instant::now())
+            .as_secs() as i64
+    }
 }
 pub struct ConsoleWindow {
     pub server_id: Uuid,
-    pub logs: Vec<LogEntry>,
+    pub buffer: crate::console_model::ConsoleBuffer,
     pub list_state: ListState,
-    pub show_info: bool,
-    pub show_warn: bool,
-    pub show_error: bool,
-    pub search_query: String,
     pub status_message: String,
     pub copy_success: bool,
+    /// The first click on "clear" asks; a second within a few seconds clears.
+    pub clear_armed: bool,
+}
+
+impl ConsoleWindow {
+    fn new(server_id: Uuid, lines: impl IntoIterator<Item = LogEntry>) -> Self {
+        let buffer = crate::console_model::ConsoleBuffer::from_lines(lines, Default::default());
+        let list_state = ListState::new(buffer.visible_len(), ListAlignment::Top, px(100.));
+        // Follows new lines while the reader is at the bottom; scrolling up
+        // stops it, and scrolling back down picks it up again. Recreating the
+        // list for every batch used to throw the reader back to the bottom.
+        list_state.set_follow_mode(gpui::FollowMode::Tail);
+        Self {
+            server_id,
+            buffer,
+            list_state,
+            status_message: String::new(),
+            copy_success: false,
+            clear_armed: false,
+        }
+    }
+
+    /// New lines go in as a splice at the end (and one at the front for what
+    /// fell off), so the reader's position holds.
+    pub fn push(&mut self, lines: Vec<LogEntry>) {
+        let before = self.buffer.visible_len();
+        let change = self.buffer.append(lines);
+        if change.removed_front > 0 {
+            self.list_state.splice(0..change.removed_front, 0);
+        }
+        let end = before - change.removed_front;
+        if change.added_back > 0 {
+            self.list_state.splice(end..end, change.added_back);
+        }
+    }
+
+    pub fn set_filters(&mut self, filters: crate::console_model::Filters) {
+        self.buffer.set_filters(filters);
+        self.list_state.reset(self.buffer.visible_len());
+        self.list_state.set_follow_mode(gpui::FollowMode::Tail);
+    }
+
+    /// The console follows the server the player is looking at.
+    pub fn show_server(&mut self, server_id: Uuid, lines: impl IntoIterator<Item = LogEntry>) {
+        let filters = self.buffer.filters().clone();
+        self.server_id = server_id;
+        self.buffer = crate::console_model::ConsoleBuffer::from_lines(lines, filters);
+        self.list_state.reset(self.buffer.visible_len());
+        self.list_state.set_follow_mode(gpui::FollowMode::Tail);
+    }
+
+    pub fn follow(&mut self) {
+        self.list_state.set_follow_mode(gpui::FollowMode::Tail);
+    }
 }
 
 pub struct GlobalLauncherUI(pub Entity<LauncherUI>);
@@ -419,7 +566,18 @@ impl gpui::Render for ConsoleWindow {
     }
 }
 
-const MAX_LOG_LINES: usize = 500;
+use crate::console_model::MAX_LOG_LINES;
+
+/// Catalogue icons and avatars are drawn at a few dozen pixels.
+const ICON_SIDE: u32 = 128;
+/// Mod screenshots fill a wide gallery box.
+const SCREENSHOT_SIDE: u32 = 480;
+/// Remote pictures kept decoded at once before the cache starts over.
+const REMOTE_IMAGE_CAP: usize = 256;
+
+fn trimmed(url: Option<&String>) -> Option<&str> {
+    url.map(|u| u.trim()).filter(|u| !u.is_empty())
+}
 const CONSOLE_WINDOW_SIZE: (f32, f32) = (800., 500.);
 const CONSOLE_WINDOW_MIN_SIZE: (f32, f32) = (720., 440.);
 
@@ -441,9 +599,12 @@ impl LauncherUI {
             skin_sway: 0.0,
             skin_loading: false,
             skin_uploading: false,
+            skin_before_upload: None,
             skin_dragging: false,
             skin_drag_x: 0.0,
             skin_anim_running: false,
+            skin_decoded: None,
+            window_active: true,
             cape_bytes: None,
             cape_url: None,
             cape_loading: false,
@@ -458,6 +619,7 @@ impl LauncherUI {
             perf: Default::default(),
             locale: i18n::Locale::default(),
             online: false,
+            connection_lost: false,
             logging_in: false,
             sidebar_collapsed: false,
             mod_catalog_hits: Vec::new(),
@@ -475,6 +637,7 @@ impl LauncherUI {
             rename_focus: None,
             startup_checking: true,
             login_error: None,
+            login_modal: None,
             login_mode_key: false,
             login_key_input: String::new(),
             login_key_focus: None,
@@ -492,6 +655,7 @@ impl LauncherUI {
             suggested_mods: HashSet::new(),
             background_images: HashMap::new(),
             news_images: HashMap::new(),
+            news_excerpts: HashMap::new(),
             news_images_loading: HashSet::new(),
             server_icons: HashMap::new(),
             optional_mod_icons: HashMap::new(),
@@ -509,12 +673,16 @@ impl LauncherUI {
             remote_action_prompt: None,
             impersonating_as: None,
             updating: false,
+            update_modal: None,
             toasts: Vec::new(),
             next_toast_id: 0,
             config: UiConfig::default(),
             server_settings: HashMap::new(),
             server_recommendations: HashMap::new(),
             console_window: None,
+            main_window: None,
+            close_prompt: false,
+            armed_action: None,
 
             notifications: Vec::new(),
             notifications_total: 0,
@@ -547,6 +715,9 @@ impl LauncherUI {
 
             account_tab: AccountTab::default(),
             account_requested: HashSet::new(),
+            account_loaded: HashSet::new(),
+            dm_loaded: false,
+            news_loaded: false,
             punishments: Vec::new(),
             rules: Vec::new(),
             rules_query: String::new(),
@@ -556,6 +727,8 @@ impl LauncherUI {
             dm_threads: Vec::new(),
             dm_requested: false,
             dm_open: None,
+            dm_scroll: gpui::ScrollHandle::new(),
+            ticket_scroll: gpui::ScrollHandle::new(),
             compose: String::new(),
             compose_focus: None,
         }
@@ -622,7 +795,9 @@ impl LauncherUI {
             return;
         }
 
-        self.background_images.remove(&server_id);
+        // The old picture stays up until the new one is in; replacing it is
+        // also what hands its texture back to GPUI below. Removing it first
+        // meant the replacement never found anything to release.
         self.background_image_urls.insert(server_id, url.clone());
         self.background_loading.insert(server_id);
         cx.spawn(async move |this, cx| {
@@ -635,9 +810,9 @@ impl LauncherUI {
                 }
                 match result {
                     Ok(image) => {
-                        // Старую текстуру возвращаем GPUI: атлас держит каждый
-                        // `RenderImage` по id и сам ничего не вытесняет, так что
-                        // смена фона иначе оставляла бы за собой мегабайты.
+                        // Hand the old texture back to GPUI: the atlas keeps every
+                        // `RenderImage` by id and never evicts one on its own, so
+                        // changing the background would leave megabytes behind.
                         if let Some(stale) = state.background_images.insert(server_id, image) {
                             if Arc::strong_count(&stale) == 1 {
                                 cx.drop_image(stale, None);
@@ -645,9 +820,9 @@ impl LauncherUI {
                         }
                     }
                     Err(err) => {
-                        // Один раз на адрес. Раньше неудача не запоминалась, и
-                        // следующий кадр качал снова — вместе с новым тостом
-                        // об ошибке на каждую попытку.
+                        // Once per URL. A failure used not to be remembered, and
+                        // the next frame downloaded again, with a new error toast
+                        // for every attempt.
                         state.image_failed.insert(expected_url);
                         let mut args = i18n::FluentArgs::new();
                         args.set("reason", err.to_string());
@@ -680,7 +855,6 @@ impl LauncherUI {
         {
             return;
         }
-        self.server_icons.remove(&server_id);
         self.server_icon_urls.insert(server_id, url.clone());
         self.icons_loading.insert(server_id);
         cx.spawn(async move |this, cx| {
@@ -709,13 +883,28 @@ impl LauncherUI {
         .detach();
     }
 
-    /// Сколько картинок так и не загрузилось. Оверлею — чтобы отличить
-    /// «иконок нет» от «иконки не приходят».
+    /// How many images never loaded. For the overlay, to tell "no icons"
+    /// from "icons aren't arriving".
     pub fn failed_image_count(&self) -> usize {
         self.optional_mod_icons_failed.len() + self.image_failed.len()
     }
 
     pub fn ensure_optional_mod_icon_loaded(&mut self, url: Option<String>, cx: &mut Context<Self>) {
+        self.ensure_remote_image_loaded(url, ICON_SIDE, cx);
+    }
+
+    /// Screenshots are shown much larger than icons; decoded at icon size they
+    /// came out blurry.
+    pub fn ensure_screenshot_loaded(&mut self, url: Option<String>, cx: &mut Context<Self>) {
+        self.ensure_remote_image_loaded(url, SCREENSHOT_SIDE, cx);
+    }
+
+    fn ensure_remote_image_loaded(
+        &mut self,
+        url: Option<String>,
+        max_side: u32,
+        cx: &mut Context<Self>,
+    ) {
         let Some(url) = url.filter(|u| !u.trim().is_empty()) else {
             return;
         };
@@ -727,14 +916,22 @@ impl LauncherUI {
         }
         self.optional_mod_icons_loading.insert(url.clone());
         cx.spawn(async move |this, cx| {
-            let result = crate::image_loader::load_render_image_capped(url.clone(), 128).await;
+            let result = crate::image_loader::load_render_image_capped(url.clone(), max_side).await;
             let _ = this.update(cx, |state, cx| {
                 state.optional_mod_icons_loading.remove(&url);
                 match result {
                     Ok(image) => {
+                        // Catalogue pages, avatars and screenshots all land
+                        // here, and nothing ever left. Past the cap the lot is
+                        // released; what is still on screen loads again.
+                        if state.optional_mod_icons.len() >= REMOTE_IMAGE_CAP {
+                            for (_, stale) in state.optional_mod_icons.drain() {
+                                cx.drop_image(stale, None);
+                            }
+                        }
                         state.optional_mod_icons.insert(url, image);
-                        // Перерисовка только когда есть что показать: иначе
-                        // неудача сама вызывает кадр, который её повторит.
+                        // Redraw only when there is something to show: otherwise
+                        // a failure triggers the very frame that repeats it.
                         cx.notify();
                     }
                     Err(e) => {
@@ -747,76 +944,48 @@ impl LauncherUI {
         .detach();
     }
 
-    fn replace_servers(&mut self, servers: Vec<ServerEntry>) {
+    fn replace_servers(&mut self, servers: Vec<ServerEntry>, cx: &mut Context<Self>) {
         let next_ids: HashSet<_> = servers.iter().map(|s| s.id).collect();
         let old_ids: Vec<_> = self.servers.iter().map(|s| s.id).collect();
 
         for id in old_ids {
             if !next_ids.contains(&id) {
-                self.clear_server_assets(id);
+                self.clear_background(id, cx);
+                self.clear_icon(id, cx);
             }
         }
 
         for server in &servers {
-            self.sync_asset_url(server.id, server.background_url.as_ref(), true);
-            self.sync_asset_url(server.id, server.icon_url.as_ref(), false);
+            if trimmed(server.background_url.as_ref()).is_none() {
+                self.clear_background(server.id, cx);
+            }
+            if trimmed(server.icon_url.as_ref()).is_none() {
+                self.clear_icon(server.id, cx);
+            }
         }
+        // A changed address needs nothing here: `ensure_*_loaded` sees the new
+        // URL on the next frame, loads it, and releases the old picture when
+        // the new one replaces it.
 
         self.servers = servers;
     }
 
-    fn sync_asset_url(&mut self, server_id: Uuid, url: Option<&String>, is_background: bool) {
-        let url = url.and_then(|u| {
-            let trimmed = u.trim();
-            (!trimmed.is_empty()).then(|| trimmed.to_string())
-        });
-        match (is_background, url) {
-            (true, Some(url)) if self.background_image_urls.get(&server_id) != Some(&url) => {
-                self.background_images.remove(&server_id);
-                self.background_loading.remove(&server_id);
-                self.background_image_urls.insert(server_id, url);
-            }
-            (false, Some(url)) if self.server_icon_urls.get(&server_id) != Some(&url) => {
-                self.server_icons.remove(&server_id);
-                self.icons_loading.remove(&server_id);
-                self.server_icon_urls.insert(server_id, url);
-            }
-            (true, None) => self.clear_background(server_id),
-            (false, None) => self.clear_icon(server_id),
-            _ => {}
+    /// Every removal hands the texture back to GPUI, whose atlas never evicts
+    /// anything on its own.
+    fn clear_background(&mut self, server_id: Uuid, cx: &mut Context<Self>) {
+        if let Some(image) = self.background_images.remove(&server_id) {
+            cx.drop_image(image, None);
         }
-    }
-
-    fn clear_server_assets(&mut self, server_id: Uuid) {
-        self.clear_background(server_id);
-        self.clear_icon(server_id);
-    }
-
-    fn clear_background(&mut self, server_id: Uuid) {
-        self.background_images.remove(&server_id);
         self.background_loading.remove(&server_id);
         self.background_image_urls.remove(&server_id);
     }
 
-    fn clear_icon(&mut self, server_id: Uuid) {
-        self.server_icons.remove(&server_id);
+    fn clear_icon(&mut self, server_id: Uuid, cx: &mut Context<Self>) {
+        if let Some(image) = self.server_icons.remove(&server_id) {
+            cx.drop_image(image, None);
+        }
         self.icons_loading.remove(&server_id);
         self.server_icon_urls.remove(&server_id);
-    }
-
-    pub fn save_current_skin_preset(&mut self) {
-        if let Some(bytes) = &self.skin_bytes {
-            let num = self.custom_presets.len() + 1;
-            let name = format!("Skin {}", num);
-            let id = uuid::Uuid::new_v4().to_string();
-            let preset = SavedSkinPreset {
-                id,
-                name,
-                bytes: bytes.clone(),
-                preview: self.skin_preview.clone(),
-            };
-            self.custom_presets.push(preset);
-        }
     }
 
     pub fn load_preset_renders(&mut self, cx: &mut Context<Self>) {
@@ -849,9 +1018,9 @@ impl LauncherUI {
     pub fn on_message(&mut self, msg: MessageToFrontend, cx: &mut Context<Self>) {
         match msg {
             MessageToFrontend::LoginSuccess { user } => {
-                // Счётчик у колокольчика обязан быть верным до того, как панель
-                // откроют: непрочитанное, пришедшее офлайн, иначе не видно
-                // вовсе.
+                // The bell counter has to be right before the panel is opened:
+                // otherwise anything unread that arrived while offline would
+                // never show.
                 self.backend.send(MessageToBackend::RequestNotifications {
                     offset: 0,
                     unread_only: false,
@@ -859,6 +1028,7 @@ impl LauncherUI {
                 self.user = Some(user);
                 self.load_user_skin(cx);
                 self.logging_in = false;
+                self.login_modal = None;
                 self.startup_checking = false;
                 self.login_error = None;
                 self.backend.send(MessageToBackend::RequestCapesList);
@@ -869,17 +1039,23 @@ impl LauncherUI {
             }
             MessageToFrontend::LoginFailed { kind } => {
                 self.logging_in = false;
+                self.login_modal = None;
                 self.startup_checking = false;
                 self.login_error = Some(match kind {
                     LoginErrorKind::Cancelled => i18n::t("error-sign-in-cancelled"),
                     // `r` is a translation key from the master, not text.
                     LoginErrorKind::Rejected(r) => i18n::t(&r),
-                    LoginErrorKind::Network(e) => format!("Network: {e}"),
+                    LoginErrorKind::Network(e) => {
+                        let mut args = i18n::FluentArgs::new();
+                        args.set("reason", e);
+                        i18n::t_args("error-network", &args)
+                    }
                 });
             }
             MessageToFrontend::LoggedOut => {
+                self.clear_account_data();
                 self.user = None;
-                self.reset_skin_preview();
+                self.reset_skin_preview(cx);
                 self.skin_url = None;
                 self.skin_loading = false;
                 self.skin_uploading = false;
@@ -894,11 +1070,16 @@ impl LauncherUI {
                 self.startup_checking = false;
                 self.page = Page::Login;
             }
-            MessageToFrontend::ServerList { servers } => self.replace_servers(servers),
+            MessageToFrontend::ServerList { servers } => self.replace_servers(servers, cx),
             MessageToFrontend::NewsUpdated { items } => {
-                self.news_images
-                    .retain(|id, _| items.iter().any(|n| n.id == *id));
+                let ids: HashSet<Uuid> = items.iter().map(|n| n.id).collect();
+                self.news_images.retain(|id, _| ids.contains(id));
+                self.news_excerpts = items
+                    .iter()
+                    .map(|n| (n.id, crate::pages::plain_excerpt(&n.body, 240).into()))
+                    .collect();
                 self.news = items;
+                self.news_loaded = true;
             }
             MessageToFrontend::ConfigState {
                 memory_min_mb,
@@ -908,9 +1089,11 @@ impl LauncherUI {
                 fullscreen,
                 crash_reports,
                 crash_reports_available,
+                discord_rpc,
                 master_url,
                 locale,
                 server_settings,
+                system_memory_mb,
             } => {
                 if let Some(loc) = i18n::Locale::from_code(&locale) {
                     self.locale = loc;
@@ -924,13 +1107,15 @@ impl LauncherUI {
                     fullscreen,
                     crash_reports,
                     crash_reports_available,
+                    discord_rpc,
                     master_url,
+                    system_memory_mb,
                 };
                 self.server_settings = server_settings.into_iter().collect();
                 self.load_preset_renders(cx);
-                if self.user.is_none() {
-                    self.startup_checking = false;
-                }
+            }
+            MessageToFrontend::SessionCheckDone => {
+                self.startup_checking = false;
             }
             MessageToFrontend::LocaleCatalog { code, ftl } => {
                 // The master's catalog overrides the built-in one; a broken one
@@ -1020,18 +1205,23 @@ impl LauncherUI {
             } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = stage != SyncStage::Done;
+                let cancelling = s.heading == Some(SyncHeading::Cancelling);
                 if stage.is_download() {
                     s.stages.insert(stage, (done, total));
-                    // Several stages run at once, so no single one of them gets
-                    // to be the heading.
-                    s.stage = "Downloading...".into();
+                    s.rate.record(s.done());
+                    if !cancelling {
+                        s.heading = Some(SyncHeading::Downloading);
+                    }
                 } else {
                     // Checking files opens a new pass; the bars from the last
                     // run don't belong to it.
                     if stage == SyncStage::CheckingFiles && done == 0 {
                         s.stages.clear();
+                        s.rate.clear();
                     }
-                    s.stage = stage.label().to_string();
+                    if !cancelling {
+                        s.heading = Some(SyncHeading::Stage(stage));
+                    }
                 }
                 if !file.is_empty() {
                     s.detail = file;
@@ -1044,42 +1234,66 @@ impl LauncherUI {
                 // until GameStarted or SyncFailed — a second click here started
                 // a second game in the same folder.
                 let s = self.sync.entry(server_id).or_default();
-                s.stage = "Launching...".into();
+                s.heading = Some(SyncHeading::Launching);
             }
             MessageToFrontend::LaunchCancelled { server_id } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = false;
                 s.failed = None;
+                s.launch = None;
+                s.heading = None;
+                s.stages.clear();
+                s.rate.clear();
             }
             MessageToFrontend::LiveSynced {
-                server_id,
+                server_id: _,
                 updated,
                 locked,
             } => {
                 // New packs arrived while the game is running. Nothing shows
                 // until the client reloads its resources, and that's the
-                // player's call: mid-fight it isn't welcome.
-                let s = self.sync.entry(server_id).or_default();
-                s.stage = if locked.is_empty() {
-                    format!("{} pack(s) updated. Press F3+T to apply", updated.len())
+                // player's call: mid-fight it isn't welcome. Said in a toast:
+                // the sync panel this used to go to is hidden while playing.
+                let text = if locked.is_empty() {
+                    i18n::t_count("sync-live-updated", updated.len() as i64)
                 } else {
-                    format!(
-                        "{} pack(s) updated, {} more will land on next launch",
-                        updated.len(),
-                        locked.len()
-                    )
+                    let mut args = i18n::FluentArgs::new();
+                    args.set("count", updated.len() as i64);
+                    args.set("locked", locked.len() as i64);
+                    i18n::t_args("sync-live-partial", &args)
                 };
+                self.notify_toast(text, NotifLevel::Info, cx);
             }
-            MessageToFrontend::SyncFailed { server_id, reason } => {
+            MessageToFrontend::SyncFailed {
+                server_id,
+                reason,
+                detail,
+            } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.syncing = false;
-                s.failed = Some(reason.clone());
-                self.notify_toast(reason, NotifLevel::Error, cx);
+                s.launch = None;
+                s.heading = None;
+                s.rate.clear();
+                self.notify_toast(i18n::t(&reason), NotifLevel::Error, cx);
+                // The technical chain goes where people look when a toast isn't
+                // enough: the console, and from there a support report.
+                if !detail.is_empty() {
+                    let logs = self.logs.entry(server_id).or_default();
+                    logs.push_back(LogEntry {
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                        level: bridge::GameLogLevel::Error,
+                        text: format!("[launcher] {detail}"),
+                    });
+                }
+                self.sync.entry(server_id).or_default().failed =
+                    Some(SyncFailure { reason, detail });
             }
             MessageToFrontend::GameStarted { server_id } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.running = true;
                 s.syncing = false;
+                s.launch = None;
+                s.heading = None;
                 if self
                     .server_client_settings(server_id)
                     .show_console_on_launch
@@ -1103,38 +1317,22 @@ impl LauncherUI {
             MessageToFrontend::GameLog { server_id, lines } => {
                 let logs = self.logs.entry(server_id).or_default();
                 logs.extend(lines.iter().cloned());
-                if logs.len() > MAX_LOG_LINES {
-                    let drain = logs.len() - MAX_LOG_LINES;
-                    logs.drain(0..drain);
+                while logs.len() > MAX_LOG_LINES {
+                    logs.pop_front();
                 }
 
-                // Once per batch: the filter runs over the whole buffer, and per
-                // line it was the frontend that fell behind the game.
                 if let Some(handle) = &self.console_window {
                     let _ = handle.update(cx, |view, _, cx| {
                         if view.server_id == server_id {
-                            view.logs.extend(lines);
-                            if view.logs.len() > MAX_LOG_LINES {
-                                let drain = view.logs.len() - MAX_LOG_LINES;
-                                view.logs.drain(0..drain);
-                            }
-
-                            use crate::console_model::filtered_logs;
-                            let visible_count = filtered_logs(
-                                &view.logs,
-                                view.show_info,
-                                view.show_warn,
-                                view.show_error,
-                                &view.search_query,
-                            )
-                            .len();
-
-                            view.list_state =
-                                ListState::new(visible_count, ListAlignment::Bottom, px(100.));
+                            view.push(lines);
                             cx.notify();
                         }
                     });
                 }
+                // Nothing in the main window shows the log; redrawing it for
+                // every batch kept the launcher busy for as long as the game
+                // was writing.
+                return;
             }
             MessageToFrontend::BuildStateChanged { server_id, state } => {
                 self.build_state.insert(server_id, state);
@@ -1156,8 +1354,10 @@ impl LauncherUI {
                     grant_id,
                     target_username,
                     reason,
-                    expires_in_secs,
+                    expires_at: std::time::Instant::now()
+                        + std::time::Duration::from_secs(expires_in_secs.max(0) as u64),
                 });
+                self.tick_impersonate_prompt(grant_id, cx);
             }
             MessageToFrontend::LogRequestPrompt {
                 request_id,
@@ -1191,9 +1391,12 @@ impl LauncherUI {
             MessageToFrontend::ImpersonationChanged { as_username } => {
                 self.impersonate_prompt = None;
                 self.impersonating_as = as_username;
+                // Another account now: what was loaded belongs to the last one.
+                self.clear_account_data();
             }
             MessageToFrontend::SkinUploadFailed => {
                 self.skin_uploading = false;
+                self.skin_bytes = self.skin_before_upload.take();
             }
             MessageToFrontend::PermissionsUpdated { user } => {
                 self.user = Some(user);
@@ -1231,8 +1434,7 @@ impl LauncherUI {
                     let preset_struct = SavedSkinPreset {
                         id: id.clone(),
                         name: name.clone(),
-                        bytes: Vec::new(),
-                        preview: None,
+                        bytes: Arc::default(),
                     };
                     self.custom_presets.push(preset_struct);
 
@@ -1246,7 +1448,7 @@ impl LauncherUI {
                                 if let Some(found) =
                                     this.custom_presets.iter_mut().find(|cp| cp.id == id_bytes)
                                 {
-                                    found.bytes = bytes;
+                                    found.bytes = Arc::new(bytes);
                                 }
                                 cx.notify();
                             });
@@ -1273,7 +1475,16 @@ impl LauncherUI {
                 }
             }
             MessageToFrontend::ConnectionState { online } => {
+                let was_lost = self.connection_lost;
                 self.online = online;
+                self.connection_lost = !online;
+                // Images that failed while offline are worth one more try:
+                // started without a network, the launcher otherwise showed no
+                // icons or backgrounds for the whole session.
+                if online && was_lost {
+                    self.image_failed.clear();
+                    self.optional_mod_icons_failed.clear();
+                }
             }
             MessageToFrontend::NotificationFeed {
                 items,
@@ -1340,13 +1551,22 @@ impl LauncherUI {
                 self.java_busy = false;
             }
 
-            MessageToFrontend::PunishmentsLoaded { items } => self.punishments = items,
-            MessageToFrontend::RulesLoaded { items } => self.rules = items,
-            MessageToFrontend::TicketsLoaded { items } => self.tickets = items,
+            MessageToFrontend::PunishmentsLoaded { items } => {
+                self.punishments = items;
+                self.account_loaded.insert("punishments");
+            }
+            MessageToFrontend::RulesLoaded { items } => {
+                self.rules = items;
+                self.account_loaded.insert("rules");
+            }
+            MessageToFrontend::TicketsLoaded { items } => {
+                self.tickets = items;
+                self.account_loaded.insert("tickets");
+            }
             MessageToFrontend::TicketLoaded { id, messages, .. } => {
-                // Тему и статус несёт список: ручка сообщений отдаёт только их
-                // самих, и подставить сюда пустые строки значило бы стереть
-                // заголовок открытого обращения.
+                // Subject and status come from the list: the messages endpoint returns
+                // only the messages, and putting empty strings here would erase the
+                // title of the open ticket.
                 let (subject, status) = self
                     .tickets
                     .iter()
@@ -1354,11 +1574,16 @@ impl LauncherUI {
                     .map(|t| (t.subject.clone(), t.status.clone()))
                     .unwrap_or_default();
                 self.ticket_open = Some((id, subject, status, messages));
+                self.ticket_scroll.scroll_to_bottom();
                 self.compose.clear();
             }
-            MessageToFrontend::DmThreadsLoaded { items } => self.dm_threads = items,
+            MessageToFrontend::DmThreadsLoaded { items } => {
+                self.dm_threads = items;
+                self.dm_loaded = true;
+            }
             MessageToFrontend::DmThreadLoaded { thread } => {
                 self.dm_open = Some(*thread);
+                self.dm_scroll.scroll_to_bottom();
                 self.compose.clear();
             }
             MessageToFrontend::DmArrived { peer, message } => {
@@ -1368,12 +1593,22 @@ impl LauncherUI {
                 if let Some(open) = self.dm_open.as_mut() {
                     if open.peer == peer {
                         open.messages.push(message);
+                        self.dm_scroll.scroll_to_bottom();
                     }
                 }
                 self.backend.send(MessageToBackend::RequestDmThreads);
             }
 
-            MessageToFrontend::OpenOrFocusMainWindow => {}
+            MessageToFrontend::OpenOrFocusMainWindow => {
+                // A second launch hands over to this one. Deferred: raising the
+                // window updates it, and this runs inside an update of its view.
+                if let Some(handle) = self.main_window {
+                    cx.defer(move |cx| {
+                        let _ = handle.update(cx, |_, window, _| window.activate_window());
+                        cx.activate(true);
+                    });
+                }
+            }
             MessageToFrontend::CloseModal => {
                 self.logging_in = false;
             }
@@ -1384,48 +1619,51 @@ impl LauncherUI {
         cx.notify();
     }
 
-    /// Показать плашку и снять её по таймеру.
+    /// Show a toast and remove it on a timer.
     ///
-    /// Таймер спит в фоне и будит окно один раз — на снятие. Считать оставшееся
-    /// время в самом рендере значило бы держать перерисовку все эти секунды,
-    /// то есть жечь кадры ради затухающей надписи.
+    /// The timer sleeps in the background and wakes the window once, to remove it.
+    /// Counting the time left in render would mean redrawing for all those seconds,
+    /// burning frames on a fading label.
     pub fn notify_toast(&mut self, text: String, level: NotifLevel, cx: &mut Context<Self>) {
-        // Тот же текст, что уже висит, второй плашкой не становится: две
-        // одинаковые строки рядом выглядят как сбой, а не как два события.
-        // Продлеваем ту, что есть, — таймер у неё уже свой.
-        if let Some(existing) = self.toasts.iter().find(|t| t.text == text) {
-            let id = existing.id;
-            let lifetime = existing.lifetime();
-            let executor = cx.background_executor().clone();
-            cx.spawn(async move |this, cx| {
-                executor.timer(lifetime).await;
-                let _ = this.update(cx, |state, cx| {
-                    state.dismiss_toast(id);
-                    cx.notify();
-                });
-            })
-            .detach();
-            return;
-        }
+        // The same text again doesn't become a second toast: two identical
+        // lines side by side look like a glitch. The one up stays longer.
+        let (id, generation, lifetime) =
+            if let Some(existing) = self.toasts.iter_mut().find(|t| t.text == text) {
+                existing.generation += 1;
+                (existing.id, existing.generation, existing.lifetime())
+            } else {
+                let id = self.next_toast_id;
+                self.next_toast_id += 1;
+                let toast = Toast {
+                    id,
+                    text,
+                    level,
+                    generation: 0,
+                };
+                let lifetime = toast.lifetime();
+                self.toasts.push(toast);
+                // More than four is a wall, not messages; the oldest goes early.
+                if self.toasts.len() > 4 {
+                    self.toasts.remove(0);
+                }
+                (id, 0, lifetime)
+            };
 
-        let id = self.next_toast_id;
-        self.next_toast_id += 1;
-        let toast = Toast { id, text, level };
-        let lifetime = toast.lifetime();
-
-        self.toasts.push(toast);
-        // Больше четырёх на экране — это уже не сообщения, а стена; самое
-        // старое уходит раньше срока.
-        if self.toasts.len() > 4 {
-            self.toasts.remove(0);
-        }
-
+        // The timer sleeps in the background and wakes the window once, to
+        // remove the toast. Counting down in render would redraw every frame
+        // for a fading line of text.
         let executor = cx.background_executor().clone();
         cx.spawn(async move |this, cx| {
             executor.timer(lifetime).await;
             let _ = this.update(cx, |state, cx| {
-                state.dismiss_toast(id);
-                cx.notify();
+                let current = state
+                    .toasts
+                    .iter()
+                    .any(|t| t.id == id && t.generation == generation);
+                if current {
+                    state.dismiss_toast(id);
+                    cx.notify();
+                }
             });
         })
         .detach();
@@ -1468,31 +1706,109 @@ impl LauncherUI {
         self.logging_in = true;
         self.login_error = None;
         let modal = bridge::ModalAction::new("Website sign in");
+        self.login_modal = Some(modal.clone());
         self.backend.send(MessageToBackend::StartWebLogin {
             modal_action: modal,
         });
     }
 
-    pub fn start_key_login(&mut self, key: String) {
-        if key.trim().is_empty() {
-            return;
-        }
-        self.logging_in = true;
-        self.login_error = None;
-        let modal = bridge::ModalAction::new("Key sign in");
-        self.backend.send(MessageToBackend::StartKeyLogin {
-            key: key.trim().to_string(),
-            modal_action: modal,
-        });
+    /// Everything that belongs to the signed-in account. Left in place, the
+    /// next account — another player on the same computer, or an admin
+    /// entering someone's account — saw the previous one's tickets, messages
+    /// and punishments, and the "already loaded" flags kept them from being
+    /// fetched again.
+    fn clear_account_data(&mut self) {
+        self.account_requested.clear();
+        self.account_loaded.clear();
+        self.dm_loaded = false;
+        self.punishments.clear();
+        self.tickets.clear();
+        self.ticket_open = None;
+        self.dm_threads.clear();
+        self.dm_open = None;
+        self.dm_requested = false;
+        self.compose.clear();
+        self.notifications.clear();
+        self.notifications_total = 0;
+        self.unread = 0;
+        self.capes.clear();
+        self.cape_images.clear();
+        let custom: HashSet<String> = self.custom_presets.iter().map(|p| p.id.clone()).collect();
+        self.preset_images.retain(|id, _| !custom.contains(id));
+        self.custom_presets.clear();
+        self.personal_content.clear();
+        self.suggested_mods.clear();
     }
 
-    pub fn start_biometric_login(&mut self) {
-        self.logging_in = true;
-        self.login_error = None;
-        let modal = bridge::ModalAction::new("Biometric sign in");
-        self.backend.send(MessageToBackend::StartBiometricLogin {
-            modal_action: modal,
-        });
+    /// The most the memory steppers go to: this computer's RAM less a gigabyte
+    /// for the system, or the old fixed cap where the RAM isn't known. The
+    /// steppers used to go to 64 GB on any machine.
+    pub fn memory_ceiling_mb(&self) -> u32 {
+        self.config
+            .system_memory_mb
+            .map(|m| m.saturating_sub(1024).max(1024))
+            .unwrap_or(65536)
+            .min(65536)
+    }
+
+    /// The game's share past three quarters of the RAM leaves the system and
+    /// the launcher swapping, which looks like the game lagging.
+    pub fn memory_warning(&self, max_mb: u32) -> Option<String> {
+        let total = self.config.system_memory_mb?;
+        if (max_mb as u64) * 4 <= (total as u64) * 3 {
+            return None;
+        }
+        let mut args = i18n::FluentArgs::new();
+        args.set("total", format!("{:.0}", total as f64 / 1024.0));
+        Some(i18n::t_args("settings-memory-too-much", &args))
+    }
+
+    /// Closes whatever sits on top; false when nothing was open.
+    pub fn close_top_overlay(&mut self) -> bool {
+        if std::mem::take(&mut self.close_prompt) {
+            return true;
+        }
+        if std::mem::take(&mut self.jvm_flags_open) {
+            return true;
+        }
+        if std::mem::take(&mut self.java_picker_open) {
+            return true;
+        }
+        if self.content_picker.take().is_some() {
+            return true;
+        }
+        if std::mem::take(&mut self.build_picker_open) {
+            return true;
+        }
+        if std::mem::take(&mut self.notifications_open) {
+            return true;
+        }
+        if std::mem::take(&mut self.log_request_preview_open) {
+            return true;
+        }
+        if self.mod_catalog_selected.take().is_some() {
+            self.mod_project = None;
+            return true;
+        }
+        false
+    }
+
+    /// Whether the window may close now. With a game running or a download in
+    /// flight it may not: closing would stop them, so the window asks first.
+    pub fn request_close(&mut self) -> bool {
+        let busy = self.sync.values().any(|s| s.running || s.syncing);
+        if busy {
+            self.close_prompt = true;
+        }
+        !busy
+    }
+
+    /// The sign-in task polls the flag and answers with a cancelled login.
+    pub fn cancel_login(&mut self) {
+        if let Some(modal) = self.login_modal.take() {
+            modal.cancel();
+        }
+        self.logging_in = false;
     }
 
     pub fn logout(&mut self) {
@@ -1503,7 +1819,9 @@ impl LauncherUI {
         if self.skin_uploading {
             return;
         }
-        self.skin_bytes = Some(bytes.clone());
+        // Shown right away; put back if the master turns it down, or the
+        // preview went on showing a skin that was never accepted.
+        self.skin_before_upload = self.skin_bytes.replace(bytes.clone());
         self.skin_uploading = true;
         self.backend.send(MessageToBackend::UploadSkin { bytes });
     }
@@ -1559,15 +1877,76 @@ impl LauncherUI {
     }
 
     pub fn launch(&mut self, id: Uuid) {
+        let modal = bridge::ModalAction::new("Launch");
         let s = self.sync.entry(id).or_default();
         s.syncing = true;
         s.failed = None;
-        s.stage = "Preparing...".into();
-        let modal = bridge::ModalAction::new("Launch");
+        s.heading = Some(SyncHeading::Preparing);
+        s.launch = Some(modal.clone());
         self.backend.send(MessageToBackend::LaunchServer {
             server_id: id,
             modal_action: modal,
         });
+    }
+
+    /// Asks the running sync to stop. It stops between chunks and reports back
+    /// with `LaunchCancelled`; the button says "cancelling" until then, so a
+    /// new launch can't start under the old one.
+    pub fn cancel_launch(&mut self, id: Uuid) {
+        if let Some(s) = self.sync.get_mut(&id) {
+            if let Some(modal) = &s.launch {
+                modal.cancel();
+                s.heading = Some(SyncHeading::Cancelling);
+            }
+        }
+    }
+
+    /// Two clicks for anything that can't be undone: the first arms the button
+    /// for a few seconds, the second goes through. True on the second.
+    pub fn confirm_or_arm(&mut self, key: String, cx: &mut Context<Self>) -> bool {
+        if self.armed_action.as_deref() == Some(key.as_str()) {
+            self.armed_action = None;
+            return true;
+        }
+        self.armed_action = Some(key.clone());
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| {
+            executor.timer(std::time::Duration::from_secs(4)).await;
+            let _ = this.update(cx, |ui, cx| {
+                if ui.armed_action.as_deref() == Some(key.as_str()) {
+                    ui.armed_action = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        false
+    }
+
+    pub fn is_armed(&self, key: &str) -> bool {
+        self.armed_action.as_deref() == Some(key)
+    }
+
+    /// First click arms, second click stops; the arming wears off on its own.
+    pub fn stop_clicked(&mut self, id: Uuid, cx: &mut Context<Self>) {
+        let s = self.sync.entry(id).or_default();
+        if s.stop_armed {
+            s.stop_armed = false;
+            self.kill(id);
+            return;
+        }
+        s.stop_armed = true;
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| {
+            executor.timer(std::time::Duration::from_secs(4)).await;
+            let _ = this.update(cx, |ui, cx| {
+                if let Some(s) = ui.sync.get_mut(&id) {
+                    s.stop_armed = false;
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     pub fn kill(&mut self, id: Uuid) {
@@ -1696,6 +2075,12 @@ impl LauncherUI {
 
     /// Takes effect on the next launch: Sentry comes up before GPUI, and its
     /// panic hook can't be removed while the process runs.
+    pub fn set_discord_rpc(&mut self, enabled: bool) {
+        self.config.discord_rpc = enabled;
+        self.backend
+            .send(MessageToBackend::SetDiscordRpc { enabled });
+    }
+
     pub fn set_crash_reports(&mut self, enabled: bool) {
         self.config.crash_reports = enabled;
         self.backend
@@ -1726,6 +2111,33 @@ impl LauncherUI {
     /// Close the forced-collection modal; there is nothing to answer there.
     pub fn dismiss_log_request(&mut self) {
         self.log_request_prompt = None;
+    }
+
+    /// Counts the seconds down once a second while the request is up, and
+    /// takes it away when it runs out: the number used to stay where it
+    /// started, and an expired request could still be "allowed".
+    fn tick_impersonate_prompt(&mut self, grant_id: Uuid, cx: &mut Context<Self>) {
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| loop {
+            executor.timer(std::time::Duration::from_secs(1)).await;
+            let still_up = this.update(cx, |ui, cx| {
+                let Some(prompt) = &ui.impersonate_prompt else {
+                    return false;
+                };
+                if prompt.grant_id != grant_id {
+                    return false;
+                }
+                if prompt.seconds_left() <= 0 {
+                    ui.impersonate_prompt = None;
+                }
+                cx.notify();
+                ui.impersonate_prompt.is_some()
+            });
+            if !matches!(still_up, Ok(true)) {
+                break;
+            }
+        })
+        .detach();
     }
 
     pub fn answer_impersonate(&mut self, accepted: bool) {
@@ -1795,15 +2207,40 @@ impl LauncherUI {
         });
     }
 
-    pub fn install_update(&mut self) {
-        if let Some(v) = self.update_available.clone() {
-            self.updating = true;
-            let modal = bridge::ModalAction::new("Update");
-            self.backend.send(MessageToBackend::InstallUpdate {
-                version: v,
-                modal_action: modal,
-            });
+    pub fn install_update(&mut self, cx: &mut Context<Self>) {
+        if self.updating {
+            return;
         }
+        let Some(v) = self.update_available.clone() else {
+            return;
+        };
+        self.updating = true;
+        let modal = bridge::ModalAction::new("Update");
+        self.update_modal = Some(modal.clone());
+        self.backend.send(MessageToBackend::InstallUpdate {
+            version: v,
+            modal_action: modal.clone(),
+        });
+        // The download reports into the modal, not through messages: redraw a
+        // few times a second while it runs, and stand down if it fails. On
+        // success the launcher restarts into the new version.
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |this, cx| loop {
+            executor.timer(std::time::Duration::from_millis(250)).await;
+            let progress = modal.snapshot();
+            let done = progress.error.is_some() || progress.finished;
+            let alive = this.update(cx, |ui, cx| {
+                if progress.error.is_some() {
+                    ui.updating = false;
+                    ui.update_modal = None;
+                }
+                cx.notify();
+            });
+            if done || alive.is_err() {
+                break;
+            }
+        })
+        .detach();
     }
 
     pub fn toggle_console(&mut self, cx: &mut Context<Self>) {
@@ -1814,7 +2251,16 @@ impl LauncherUI {
 
     pub fn open_console(&mut self, server_id: Uuid, cx: &mut Context<Self>) {
         if let Some(handle) = &self.console_window {
-            let _ = handle.update(cx, |_, _, cx| {
+            let lines: Vec<LogEntry> = self
+                .logs
+                .get(&server_id)
+                .map(|l| l.iter().cloned().collect())
+                .unwrap_or_default();
+            let _ = handle.update(cx, |view, window, cx| {
+                if view.server_id != server_id {
+                    view.show_server(server_id, lines);
+                }
+                window.activate_window();
                 cx.notify();
             });
             return;
@@ -1825,7 +2271,11 @@ impl LauncherUI {
             gpui::size(px(CONSOLE_WINDOW_SIZE.0), px(CONSOLE_WINDOW_SIZE.1)),
             cx,
         );
-        let logs = self.logs.get(&server_id).cloned().unwrap_or_default();
+        let logs: Vec<LogEntry> = self
+            .logs
+            .get(&server_id)
+            .map(|l| l.iter().cloned().collect())
+            .unwrap_or_default();
         let handle = cx.open_window(
             gpui::WindowOptions {
                 window_bounds: Some(gpui::WindowBounds::Windowed(bounds)),
@@ -1834,7 +2284,7 @@ impl LauncherUI {
                     px(CONSOLE_WINDOW_MIN_SIZE.1),
                 )),
                 titlebar: Some(gpui::TitlebarOptions {
-                    title: Some(gpui::SharedString::new_static("Noro Game Console")),
+                    title: Some(i18n::t("console-title").into()),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -1851,23 +2301,14 @@ impl LauncherUI {
                         }
                     })
                     .detach();
-                    ConsoleWindow {
-                        server_id,
-                        logs: logs.clone(),
-                        list_state: ListState::new(logs.len(), ListAlignment::Bottom, px(100.)),
-                        show_info: true,
-                        show_warn: true,
-                        show_error: true,
-                        search_query: String::new(),
-                        status_message: String::new(),
-                        copy_success: false,
-                    }
+                    ConsoleWindow::new(server_id, logs)
                 })
             },
         );
 
-        if let Ok(h) = handle {
-            self.console_window = Some(h);
+        match handle {
+            Ok(h) => self.console_window = Some(h),
+            Err(e) => tracing::warn!(error = %e, "console window did not open"),
         }
     }
 }

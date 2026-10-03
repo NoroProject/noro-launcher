@@ -6,6 +6,7 @@ use super::sidebar_user::user_card;
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
 use gpui::{div, prelude::*, px, rgb, AnyElement, ClickEvent};
+use i18n::t;
 
 pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     let collapsed = ui.sidebar_collapsed;
@@ -39,6 +40,7 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     d.child(logo(cx)).child(nav_icon(
                         "sidebar-toggle-btn",
                         "panel-left-close",
+                        t("hint-collapse-sidebar"),
                         false,
                         cx.listener(|this, _e, _w, cx| {
                             this.sidebar_collapsed = true;
@@ -66,9 +68,9 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     d.child(empty_hint())
                 }),
         )
-        // Иконки и карточка профиля разными строками. В одну они не помещались:
-        // на пять кнопок и имя в сайдбаре 280 px, и имя схлопывалось в две
-        // точки — единственное, что человек там ищет.
+        // Icons and the profile card on separate rows. They didn't fit on one: five
+        // buttons and a name in a 280 px sidebar squeezed the name down to two dots,
+        // which is the one thing people look for there.
         .child(
             div()
                 .border_t_1()
@@ -78,8 +80,8 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .flex()
                 .flex_col()
                 .gap(px(4.))
-                // Свёрнутый сайдбар: колокольчик остаётся, иначе уведомления
-                // из него недостижимы вовсе.
+                // Collapsed sidebar: the bell stays, or notifications can't be reached
+                // from it at all.
                 .child(nav_row(ui, collapsed, cx))
                 .when(!collapsed, |d| d.child(user_card(ui, cx)))
                 .when(collapsed, |d| {
@@ -101,6 +103,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .child(dot_icon(
             "messages-bottom",
             "mail",
+            t("hint-messages"),
             ui.page == Page::Messages,
             super::messages::unread_total(ui) > 0,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
@@ -111,6 +114,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .child(nav_icon(
             "account-bottom",
             "shield",
+            t("hint-account"),
             ui.page == Page::Account,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
                 this.page = Page::Account;
@@ -120,6 +124,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .child(nav_icon(
             "news-bottom",
             "newspaper",
+            t("hint-news"),
             ui.page == Page::News,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
                 this.page = Page::News;
@@ -129,6 +134,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .child(nav_icon(
             "settings-bottom",
             "settings",
+            t("hint-settings"),
             ui.page == Page::Settings,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
                 this.page = Page::Settings;

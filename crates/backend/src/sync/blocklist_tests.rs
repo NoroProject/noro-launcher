@@ -46,7 +46,12 @@ async fn a_banned_file_inside_an_unsynced_folder_is_still_removed() {
     dir.write("resourcepacks/super-xray.zip", "blocked");
     dir.write("resourcepacks/plain.zip", "fine");
 
-    let report = enforce(dir.path(), &[rule("*xray*", BlockAction::Delete)]).await;
+    let report = enforce(
+        dir.path(),
+        &[rule("*xray*", BlockAction::Delete)],
+        &Default::default(),
+    )
+    .await;
 
     assert_eq!(report.findings.len(), 1);
     assert!(report.findings[0].repaired);
@@ -59,7 +64,12 @@ async fn flag_reports_without_deleting() {
     let dir = Scratch::new("flag");
     dir.write("mods/suspicious.jar", "contents");
 
-    let report = enforce(dir.path(), &[rule("*suspicious*", BlockAction::Flag)]).await;
+    let report = enforce(
+        dir.path(),
+        &[rule("*suspicious*", BlockAction::Flag)],
+        &Default::default(),
+    )
+    .await;
 
     assert_eq!(report.findings.len(), 1);
     assert!(!report.findings[0].repaired);
@@ -72,7 +82,12 @@ async fn block_launch_stops_the_game() {
     let dir = Scratch::new("block");
     dir.write("mods/cheat.jar", "contents");
 
-    let report = enforce(dir.path(), &[rule("*cheat*", BlockAction::BlockLaunch)]).await;
+    let report = enforce(
+        dir.path(),
+        &[rule("*cheat*", BlockAction::BlockLaunch)],
+        &Default::default(),
+    )
+    .await;
 
     assert!(report.block_launch);
     // Kept on disk so the player can see what is holding the launch.
@@ -95,6 +110,7 @@ async fn a_hash_rule_catches_a_renamed_file() {
             reason: "known xray build".into(),
             action: BlockAction::Delete,
         }],
+        &Default::default(),
     )
     .await;
 
@@ -108,7 +124,12 @@ async fn saves_are_never_scanned() {
     let dir = Scratch::new("saves");
     dir.write("saves/World/xray-data.dat", "anything");
 
-    let report = enforce(dir.path(), &[rule("*xray*", BlockAction::Delete)]).await;
+    let report = enforce(
+        dir.path(),
+        &[rule("*xray*", BlockAction::Delete)],
+        &Default::default(),
+    )
+    .await;
 
     assert!(report.findings.is_empty());
     assert!(dir.path().join("saves/World/xray-data.dat").exists());
@@ -119,7 +140,12 @@ async fn the_launcher_service_directory_is_left_alone() {
     let dir = Scratch::new("service");
     dir.write(".noro/base-hashes.json", "{}");
 
-    let report = enforce(dir.path(), &[rule("*", BlockAction::Delete)]).await;
+    let report = enforce(
+        dir.path(),
+        &[rule("*", BlockAction::Delete)],
+        &Default::default(),
+    )
+    .await;
 
     assert!(report.findings.is_empty());
     assert!(dir.path().join(".noro/base-hashes.json").exists());
@@ -130,7 +156,7 @@ async fn an_empty_ruleset_does_no_work() {
     let dir = Scratch::new("empty");
     dir.write("mods/xray.jar", "contents");
 
-    let report = enforce(dir.path(), &[]).await;
+    let report = enforce(dir.path(), &[], &Default::default()).await;
 
     assert!(report.findings.is_empty());
     assert!(dir.path().join("mods/xray.jar").exists());

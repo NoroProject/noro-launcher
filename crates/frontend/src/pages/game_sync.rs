@@ -46,10 +46,8 @@ pub fn sync_overlay(server_id: Uuid, sync: &SyncUiState, cx: &mut Cx) -> AnyElem
                                 }))
                                 .child(if sync.failed.is_some() {
                                     t("sync-failed")
-                                } else if sync.stage.is_empty() {
-                                    t("game-preparing")
                                 } else {
-                                    sync.stage.to_uppercase()
+                                    sync.heading_text().to_uppercase()
                                 }),
                         )
                         .child(div().flex_1())
@@ -82,6 +80,17 @@ pub fn sync_overlay(server_id: Uuid, sync: &SyncUiState, cx: &mut Cx) -> AnyElem
                             .child(sync.detail.clone()),
                     )
                 })
+                .when(sync.cancellable(), |d| {
+                    d.child(div().flex().justify_end().child(cta_button(
+                        "sync-cancel-btn",
+                        Some("x"),
+                        t("common-cancel"),
+                        cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+                            this.cancel_launch(server_id);
+                            cx.notify();
+                        }),
+                    )))
+                })
                 .when_some(sync.failed.clone(), |d, e| {
                     d.child(
                         div()
@@ -93,10 +102,29 @@ pub fn sync_overlay(server_id: Uuid, sync: &SyncUiState, cx: &mut Cx) -> AnyElem
                             .child(
                                 div()
                                     .flex_1()
-                                    .text_sm()
-                                    .font_family(FONT_PIXEL_ALT)
-                                    .text_color(rgb(ERROR))
-                                    .child(format!("Error: {e}")),
+                                    .min_w_0()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(4.))
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_family(FONT_PIXEL_ALT)
+                                            .text_color(rgb(ERROR))
+                                            .child(t(&e.reason)),
+                                    )
+                                    // The chain itself, for whoever helps them:
+                                    // the full text is in the console.
+                                    .when(!e.detail.is_empty(), |d| {
+                                        d.child(
+                                            div()
+                                                .text_xs()
+                                                .truncate()
+                                                .font_family(FONT_PIXEL_ALT)
+                                                .text_color(rgb(TEXT_MUTED))
+                                                .child(e.detail.clone()),
+                                        )
+                                    }),
                             )
                             .child(cta_button(
                                 "sync-retry-btn",
