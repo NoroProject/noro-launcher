@@ -14,6 +14,7 @@ pub fn cta_button(
     div()
         .id(id.into())
         .h(px(56.))
+        .px_3()
         .w_full()
         .flex()
         .items_center()
