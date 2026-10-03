@@ -2,6 +2,7 @@ pub mod blocklist;
 pub mod downloader;
 pub mod fetch;
 pub mod file_sync;
+pub mod hash_cache;
 pub mod integrity;
 pub mod inventory;
 pub mod keymerge;

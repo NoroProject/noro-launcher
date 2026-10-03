@@ -1,5 +1,6 @@
 //! What to do with each file in the manifest, driven by the path rules.
 
+use super::hash_cache::HashCache;
 use super::merge::{self, BaseHashes, Decision};
 use crate::directories::safe_join;
 use schema::{BuildManifest, ConflictPolicy, FileEntry, PathMode};
@@ -18,6 +19,7 @@ pub async fn decide_file(
     file: &FileEntry,
     base: &BaseHashes,
     verify_hash: bool,
+    cache: &HashCache,
 ) -> Action {
     let Some(dest) = safe_join(instance_dir, &file.path) else {
         return Action::Skip;
@@ -39,7 +41,9 @@ pub async fn decide_file(
         }
 
         PathMode::Managed => {
-            if super::downloader::needs_download(&dest, file.size, &file.sha1, verify_hash).await {
+            if super::downloader::needs_download(&dest, file.size, &file.sha1, verify_hash, cache)
+                .await
+            {
                 Action::Download
             } else {
                 Action::Skip
@@ -47,10 +51,7 @@ pub async fn decide_file(
         }
 
         PathMode::Merged => {
-            let mine = match tokio::fs::metadata(&dest).await {
-                Ok(_) => super::integrity::sha1_file(&dest).await.ok(),
-                Err(_) => None,
-            };
+            let mine = cache.sha1_of(&dest).await;
             match merge::decide(mine.as_deref(), base.get(&file.path), &file.sha1) {
                 Decision::Update => Action::Download,
                 Decision::KeepMine | Decision::Nothing => Action::Skip,

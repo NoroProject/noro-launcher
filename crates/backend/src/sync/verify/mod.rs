@@ -9,11 +9,10 @@
 //! antivirus notices nothing, and someone who dropped a mod in on purpose
 //! doesn't learn where the check is.
 
-mod cache;
 mod scan;
 
 use crate::directories::safe_join;
-use cache::HashCache;
+use crate::sync::hash_cache::HashCache;
 use schema::{BuildManifest, IntegrityFinding, IntegrityKind, IntegrityReport, UserProfile};
 use std::path::Path;
 
@@ -24,7 +23,7 @@ pub async fn verify_before_launch(
     enabled_optional: &[String],
     user: &UserProfile,
 ) -> IntegrityReport {
-    let mut cache = HashCache::load(instance_dir).await;
+    let cache = HashCache::load(instance_dir).await;
     let mut findings = Vec::new();
     let mut checked = 0u32;
 
@@ -53,17 +52,19 @@ pub async fn verify_before_launch(
 
     // Blocked files override every path rule — they reach into directories
     // sync never touches.
-    let blocked = crate::sync::blocklist::enforce(instance_dir, &manifest.blocked_files).await;
+    let blocked =
+        crate::sync::blocklist::enforce(instance_dir, &manifest.blocked_files, &cache).await;
     let block_launch = blocked.block_launch;
     findings.extend(blocked.findings);
 
     // Inventory of the unsynced directories: what the player put there.
-    let known: Vec<String> = manifest
+    let known: std::collections::HashSet<&str> = manifest
         .verified_files
         .iter()
-        .map(|f| f.path.clone())
+        .map(|f| f.path.as_str())
         .collect();
-    let (inventory_findings, inventory) = crate::sync::inventory::scan(instance_dir, &known).await;
+    let (inventory_findings, inventory) =
+        crate::sync::inventory::scan(instance_dir, &known, &cache).await;
     findings.extend(inventory_findings);
     inventory.save(instance_dir).await;
 

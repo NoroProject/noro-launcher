@@ -78,6 +78,7 @@ pub async fn sync_server(
     let effective = effective_files(manifest, enabled_optional, user);
 
     let base = super::merge::BaseHashes::load(instance_dir).await;
+    let cache = super::hash_cache::HashCache::load(instance_dir).await;
     let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
 
     let tasks::Collected {
@@ -93,6 +94,7 @@ pub async fn sync_server(
         &stamp,
         &progress,
         &cancelled,
+        &cache,
     )
     .await?;
     // All stages run at once. They touch disjoint files, and a single big JDK
@@ -133,6 +135,14 @@ pub async fn sync_server(
         })
     });
     futures::future::try_join_all(jobs).await?;
+
+    // Every downloaded file was hashed on the way in and matched the
+    // manifest. Recording that saves the pre-launch check from reading each
+    // of them again a second later.
+    for (_, task) in &tasks {
+        cache.record(&task.dest, &task.sha1).await;
+    }
+    cache.save(instance_dir).await;
 
     // Both of these have to happen after the downloads: before them the
     // server's version isn't on disk yet, and recording its hash would lie to

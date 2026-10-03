@@ -53,6 +53,7 @@ pub async fn outdated(
     manifest: &BuildManifest,
     enabled_optional: &[String],
     user: &UserProfile,
+    cache: &crate::sync::hash_cache::HashCache,
 ) -> Vec<FileEntry> {
     let personal: BTreeSet<&str> = manifest
         .personal_content
@@ -74,7 +75,10 @@ pub async fn outdated(
             schema::mode_for(&entry.path, &manifest.path_rules)
         };
         let stale = match mode {
-            PathMode::Managed => !matches(&path, &entry.sha1).await,
+            PathMode::Managed => !cache
+                .sha1_of(&path)
+                .await
+                .is_some_and(|had| had.eq_ignore_ascii_case(&entry.sha1)),
             // Installed once, then the player's: only a missing file is ours.
             PathMode::UserManaged => tokio::fs::metadata(&path).await.is_err(),
             // Packs are binary; there is nothing to merge, and a merged path
@@ -86,12 +90,6 @@ pub async fn outdated(
         }
     }
     out
-}
-
-async fn matches(path: &Path, sha1: &str) -> bool {
-    crate::sync::integrity::sha1_file(path)
-        .await
-        .is_ok_and(|had| had.eq_ignore_ascii_case(sha1))
 }
 
 /// Where a pack is downloaded before it is swapped in.
@@ -129,7 +127,10 @@ pub async fn apply(
     if !crate::sync::file_sync::version_marker(instance_dir).exists() {
         return Ok(done);
     }
-    for entry in outdated(instance_dir, manifest, enabled_optional, user).await {
+    // Packs are checked on every manifest, i.e. whenever the server page is
+    // opened; without the cache that rehashed every shader pack each time.
+    let cache = crate::sync::hash_cache::HashCache::load(instance_dir).await;
+    for entry in outdated(instance_dir, manifest, enabled_optional, user, &cache).await {
         let Some(dest) = safe_join(instance_dir, &entry.path) else {
             continue;
         };
@@ -146,6 +147,7 @@ pub async fn apply(
             continue;
         }
         if swap_in(&staged, &dest).await? {
+            cache.record(&dest, &entry.sha1).await;
             if let Some(pack) = pack_name(&entry.path) {
                 let _ = enable_once(instance_dir, pack).await;
             }
@@ -154,6 +156,7 @@ pub async fn apply(
             done.locked.push(entry.path);
         }
     }
+    cache.save(instance_dir).await;
     Ok(done)
 }
 

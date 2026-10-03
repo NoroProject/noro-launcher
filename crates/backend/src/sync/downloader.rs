@@ -1,10 +1,10 @@
 //! Parallel download pool: retries with backoff, byte-level progress.
 
 use super::fetch::fetch_to_file;
-use super::integrity::sha1_file;
+use super::hash_cache::HashCache;
 use anyhow::{bail, Result};
 use futures::stream::{self, StreamExt};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -125,10 +125,11 @@ fn jitter_ms(max: u64) -> u64 {
 }
 
 pub async fn needs_download(
-    dest: &PathBuf,
+    dest: &Path,
     expected_size: u64,
     expected_sha1: &str,
     verify_hash: bool,
+    cache: &HashCache,
 ) -> bool {
     let Ok(meta) = tokio::fs::metadata(dest).await else {
         return true;
@@ -137,9 +138,9 @@ pub async fn needs_download(
         return true;
     }
     if verify_hash {
-        match sha1_file(dest).await {
-            Ok(actual) => !actual.eq_ignore_ascii_case(expected_sha1),
-            Err(_) => true,
+        match cache.sha1_of(dest).await {
+            Some(actual) => !actual.eq_ignore_ascii_case(expected_sha1),
+            None => true,
         }
     } else {
         // Size matched. Artifacts are immutable, so that is good enough.
