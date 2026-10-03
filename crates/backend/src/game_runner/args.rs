@@ -19,7 +19,7 @@ pub fn push_jvm_args(cmd: &mut Command, ctx: &Substitution<'_>, loader_client_na
         .manifest
         .jvm_args
         .iter()
-        .flat_map(|arg| arg_values(arg))
+        .flat_map(arg_values)
         .any(|arg| matches!(arg.as_str(), "-cp" | "-classpath" | "--class-path"));
     if !has_classpath {
         cmd.arg("-cp").arg(ctx.classpath);
