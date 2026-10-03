@@ -87,3 +87,12 @@ fn a_config_missing_fields_keeps_what_it_has() {
     assert_eq!(server.memory_min_mb, 512);
     assert_eq!(server.memory_max_mb, 4096);
 }
+
+#[test]
+fn system_locales_map_to_the_ones_we_ship() {
+    assert_eq!(locale_for("ru-RU"), "ru");
+    assert_eq!(locale_for("ru_RU.UTF-8"), "ru");
+    assert_eq!(locale_for("en-US"), "en");
+    assert_eq!(locale_for("de-DE"), "en");
+    assert_eq!(locale_for(""), "en");
+}

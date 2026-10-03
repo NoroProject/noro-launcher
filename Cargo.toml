@@ -106,6 +106,9 @@ open = "5"
 discord-rich-presence = "0.2.4"
 memchr = "2"
 regex = "1"
+# The OS language on every platform. `LANG` alone is unset on Windows, so
+# Russian-speaking Windows players started in English.
+sys-locale = "0.3"
 
 # Отладочная сборка: свой код без оптимизаций, чужой — с ними.
 #

@@ -85,13 +85,20 @@ fn default_crash_reports() -> bool {
 }
 
 fn default_locale() -> String {
-    // ru and en are the only two we ship, so everything else lands on en.
-    std::env::var("LANG")
-        .ok()
-        .and_then(|l| l.split('.').next().map(str::to_string))
-        .filter(|l| l.starts_with("ru"))
-        .map(|_| "ru".to_string())
-        .unwrap_or_else(|| "en".to_string())
+    let system = sys_locale::get_locale()
+        .or_else(|| std::env::var("LANG").ok())
+        .unwrap_or_default();
+    locale_for(&system).to_string()
+}
+
+/// ru and en are the only two we ship, so everything else lands on en.
+/// Accepts both `ru-RU` (Windows, macOS) and `ru_RU.UTF-8` (Unix).
+fn locale_for(system: &str) -> &'static str {
+    if system.to_ascii_lowercase().starts_with("ru") {
+        "ru"
+    } else {
+        "en"
+    }
 }
 
 /// The master address is baked in at build time and is mandatory for release

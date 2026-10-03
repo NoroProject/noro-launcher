@@ -928,9 +928,9 @@ impl LauncherUI {
                 };
                 self.server_settings = server_settings.into_iter().collect();
                 self.load_preset_renders(cx);
-                if self.user.is_none() {
-                    self.startup_checking = false;
-                }
+            }
+            MessageToFrontend::SessionCheckDone => {
+                self.startup_checking = false;
             }
             MessageToFrontend::LocaleCatalog { code, ftl } => {
                 // The master's catalog overrides the built-in one; a broken one

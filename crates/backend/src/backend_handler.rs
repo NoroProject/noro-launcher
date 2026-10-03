@@ -173,14 +173,7 @@ impl BackendState {
                 });
             }
 
-            MessageToBackend::Logout => {
-                let _ = token_store::clear();
-                self.access_token = None;
-                self.user = None;
-                self.ctx.set_profile(None);
-                self.ctx.ws.set_token(None);
-                self.ctx.send(MessageToFrontend::LoggedOut);
-            }
+            MessageToBackend::Logout => self.sign_out(),
 
             MessageToBackend::RequestServerList => {
                 self.ctx.ws.send(ClientWsMsg::RequestServerList);
@@ -1008,12 +1001,7 @@ impl BackendState {
 
             ServerWsMsg::AuthFail { reason } => {
                 tracing::warn!("auth fail: {reason}");
-                let _ = token_store::clear();
-                self.access_token = None;
-                self.user = None;
-                self.ctx.set_profile(None);
-                self.ctx.ws.set_token(None);
-                self.ctx.send(MessageToFrontend::LoggedOut);
+                self.on_auth_failed();
             }
             ServerWsMsg::ServerList { servers } => {
                 // Until the manifest comes, the disk still tells whether a build
@@ -1370,7 +1358,7 @@ impl BackendState {
         });
     }
 
-    fn exit_impersonation(&mut self) {
+    pub(crate) fn exit_impersonation(&mut self) {
         let Some(own) = self.own_token.take() else {
             return;
         };

@@ -548,6 +548,10 @@ pub enum MessageToFrontend {
         kind: LoginErrorKind,
     },
     LoggedOut,
+    /// The startup session check ended without a signed-in player: there was
+    /// no stored session, or the master couldn't be reached to confirm it.
+    /// Until this (or `LoginSuccess`) arrives the window shows "checking".
+    SessionCheckDone,
 
     ServerList {
         servers: Vec<ServerEntry>,
