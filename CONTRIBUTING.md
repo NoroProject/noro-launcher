@@ -146,7 +146,7 @@ cargo test --workspace
 
 CI runs the same three on Linux, with clippy warnings as errors, and runs
 clippy on Windows and macOS as well, so platform-specific code compiles before
-a release does. Pull requests from forks run on GitHub-hosted runners.
+a release does. Every job runs on GitHub-hosted runners.
 
 The toolchain is pinned in `rust-toolchain.toml`. It only takes effect through
 rustup — if `rustc` comes from Homebrew, the file is ignored and you will drift

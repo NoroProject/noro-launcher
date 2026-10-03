@@ -82,7 +82,7 @@ impl BaseHashes {
         // base every merged file becomes a conflict on the next pass.
         if let Ok(bytes) = serde_json::to_vec(&self.0) {
             if let Err(e) = crate::fsutil::write_atomic(instance_dir.join(BASE_PATH), bytes).await {
-                tracing::warn!(error = %e, "base hashes not saved");
+                tracing::warn!(error = %format!("{e:#}"), "base hashes not saved");
             }
         }
     }

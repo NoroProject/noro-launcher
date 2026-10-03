@@ -24,10 +24,9 @@ env:
 jobs:
   rust:
     name: rust fmt + clippy + test
-    # The self-hosted runner only takes code from this repository. A pull
-    # request from a fork runs whatever its author wrote, so it goes to a
-    # throwaway GitHub runner instead of our machine.
-    runs-on: ${{ fromJSON((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && '"ubuntu-latest"' || '["self-hosted", "Linux"]') }}
+    # GitHub-hosted: a pull request runs whatever its author wrote, and a
+    # self-hosted machine that is switched off leaves every check queued.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 

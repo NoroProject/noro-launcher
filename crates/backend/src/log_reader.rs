@@ -100,7 +100,11 @@ pub async fn spawn_log_reader<R>(
                 }
             }
             Err(e) => {
-                tracing::warn!(error = %e, "game output stopped being readable");
+                // Keep draining even though nothing more can be shown. A pipe
+                // nobody reads fills up, and the game then blocks on its next
+                // write to stdout and freezes.
+                tracing::warn!(error = %format!("{e:#}"), "game output stopped being readable");
+                let _ = tokio::io::copy(&mut reader, &mut tokio::io::sink()).await;
                 break;
             }
         }

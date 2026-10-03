@@ -188,13 +188,6 @@ pub enum MessageToBackend {
     StartWebLogin {
         modal_action: ModalAction,
     },
-    StartKeyLogin {
-        key: String,
-        modal_action: ModalAction,
-    },
-    StartBiometricLogin {
-        modal_action: ModalAction,
-    },
     Logout,
 
     // --- Servers and content ---

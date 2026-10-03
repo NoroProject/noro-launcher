@@ -1,5 +1,6 @@
 //! Launching the game: classpath, argument substitution, authlib-injector, JVM.
 
+mod argfile;
 mod args;
 mod authlib;
 mod classpath;
@@ -89,8 +90,23 @@ pub async fn launch(
         classpath::loader_client_name(manifest).as_deref(),
     );
 
+    let jvm_count = cmd.as_std().get_args().count();
     cmd.arg(&manifest.main_class);
     args::push_game_args(&mut cmd, &ctx, connect, config.fullscreen);
+
+    if argfile::too_long(argfile::command_line_len(&cmd)) {
+        if argfile::java_major(&java).is_some_and(|v| v >= 9) {
+            let file = instance_dir.join(".noro").join("jvm-args.txt");
+            cmd = argfile::split_into_file(&cmd, jvm_count, &file)
+                .await
+                .with_context(|| format!("writing {}", file.display()))?;
+        } else {
+            tracing::warn!(
+                "the command line is longer than Windows allows and this Java is too old \
+                 for an argument file; the game may not start"
+            );
+        }
+    }
 
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
@@ -137,7 +153,7 @@ async fn write_legacy_classpath(
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("\n");
-    tokio::fs::write(&legacy_cp_path, content)
+    crate::fsutil::write_atomic(&legacy_cp_path, content)
         .await
         .with_context(|| format!("writing {}", legacy_cp_path.display()))?;
     Ok(legacy_cp_path)

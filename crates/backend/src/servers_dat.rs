@@ -112,7 +112,7 @@ fn read(path: &Path) -> Result<ServersDat> {
     match fastnbt::from_bytes(&bytes) {
         Ok(dat) => Ok(dat),
         Err(e) => {
-            tracing::warn!(path = %path.display(), error = %e, "servers.dat unreadable, list rebuilt from scratch");
+            tracing::warn!(path = %path.display(), error = %format!("{e:#}"), "servers.dat unreadable, list rebuilt from scratch");
             Ok(ServersDat::default())
         }
     }

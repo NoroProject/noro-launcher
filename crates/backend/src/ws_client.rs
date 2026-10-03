@@ -192,7 +192,7 @@ async fn run_connection(
                             let _ = inbound.send(msg);
                         }
                         // Usually a message type newer than this launcher.
-                        Err(e) => tracing::debug!(error = %e, "unreadable message from the master"),
+                        Err(e) => tracing::debug!(error = %format!("{e:#}"), "unreadable message from the master"),
                     },
                     Some(Ok(Message::Ping(_))) | Some(Ok(Message::Pong(_))) => {}
                     Some(Ok(Message::Close(_))) | None | Some(Err(_)) => return Ended::Dropped,

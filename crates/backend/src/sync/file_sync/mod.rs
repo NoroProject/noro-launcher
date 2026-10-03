@@ -162,7 +162,7 @@ pub async fn sync_server(
     if let Err(e) =
         crate::fsutil::write_atomic(version_marker(instance_dir), marker_contents(manifest)).await
     {
-        tracing::warn!(error = %e, "build marker not written");
+        tracing::warn!(error = %format!("{e:#}"), "build marker not written");
     }
 
     progress(SyncStage::Done, 1, 1, String::new());

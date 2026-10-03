@@ -100,7 +100,7 @@ async fn download_with_retry(
             Err(e) => {
                 let delay = BASE_BACKOFF_MS * 2u64.pow(attempt - 1) + jitter_ms(BASE_BACKOFF_MS);
                 tracing::warn!(
-                    url = %task.url, attempt, error = %e,
+                    url = %task.url, attempt, error = %format!("{e:#}"),
                     "retrying download in {delay}ms"
                 );
                 tokio::time::sleep(Duration::from_millis(delay)).await;

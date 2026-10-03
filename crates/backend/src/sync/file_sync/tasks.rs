@@ -144,7 +144,7 @@ pub(super) async fn collect(
                     if let Err(e) =
                         crate::sync::merge::backup_conflict(instance_dir, &f.path, stamp).await
                     {
-                        tracing::warn!(path = %f.path, error = %e, "could not back up the player's version");
+                        tracing::warn!(path = %f.path, error = %format!("{e:#}"), "could not back up the player's version");
                     }
                     true
                 }

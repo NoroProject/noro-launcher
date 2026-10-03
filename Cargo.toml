@@ -69,13 +69,18 @@ sentry = { version = "0.34", default-features = false, features = [
 sentry-tracing = "0.34"
 
 # WebSocket client to the master
-tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+# Both root sets: the bundled one, and the system store, where antivirus HTTPS
+# scanning (Kaspersky, ESET) and corporate proxies put their own CA. With the
+# bundled set alone every request failed on those machines.
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots", "rustls-tls-native-roots"] }
 
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "stream",
     "rustls-tls",
+    # The system certificate store too; see tokio-tungstenite above.
+    "rustls-tls-native-roots",
     "multipart",
     # Without it the h2 crate never makes it into the build and the launcher
     # fetches thousands of assets over HTTP/1.1, one request per connection.

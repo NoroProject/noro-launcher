@@ -24,9 +24,9 @@ fn api(ctx: &Ctx) -> Option<MasterApi> {
 }
 
 fn failed(ctx: &Ctx, e: anyhow::Error) {
-    tracing::debug!(error = %e, "personal content request failed");
+    tracing::debug!(error = %format!("{e:#}"), "personal content request failed");
     ctx.send(MessageToFrontend::ContentActionFailed {
-        message: e.to_string(),
+        message: format!("{e:#}"),
     });
 }
 

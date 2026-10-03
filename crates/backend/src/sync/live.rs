@@ -189,7 +189,7 @@ pub async fn enable_delivered_packs(
             .collect();
     for pack in packs {
         if let Err(e) = enable_once(instance_dir, pack).await {
-            tracing::warn!(pack, error = %e, "could not enable a delivered pack");
+            tracing::warn!(pack, error = %format!("{e:#}"), "could not enable a delivered pack");
         }
     }
 }

@@ -25,7 +25,7 @@ impl<T: Serialize + DeserializeOwned + Default + Clone> Persistent<T> {
                     aside.push(".broken");
                     tracing::error!(
                         path = %path.display(),
-                        error = %e,
+                        error = %format!("{e:#}"),
                         "settings file did not parse, starting from defaults; the old file is kept as .broken"
                     );
                     let _ = std::fs::rename(&path, aside);
@@ -58,12 +58,12 @@ impl<T: Serialize + DeserializeOwned + Default + Clone> Persistent<T> {
         let json = match serde_json::to_string_pretty(&*self.value.read()) {
             Ok(json) => json,
             Err(e) => {
-                tracing::error!(error = %e, "settings did not serialize");
+                tracing::error!(error = %format!("{e:#}"), "settings did not serialize");
                 return;
             }
         };
         if let Err(e) = crate::fsutil::write_atomic_sync(&self.path, json.as_bytes()) {
-            tracing::error!(path = %self.path.display(), error = %e, "settings not saved");
+            tracing::error!(path = %self.path.display(), error = %format!("{e:#}"), "settings not saved");
         }
     }
 }

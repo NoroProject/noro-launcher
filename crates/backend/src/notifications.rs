@@ -29,7 +29,7 @@ pub fn request(ctx: &Ctx, offset: u32, unread_only: bool) {
         let page = match api.notifications(offset, PAGE, unread_only).await {
             Ok(page) => page,
             Err(e) => {
-                tracing::debug!(error = %e, "could not load the notification feed");
+                tracing::debug!(error = %format!("{e:#}"), "could not load the notification feed");
                 return;
             }
         };
@@ -52,7 +52,9 @@ pub fn mark_read(ctx: &Ctx, id: Uuid) {
         let Some(api) = api(&ctx) else { return };
         match api.mark_read(id).await {
             Ok(unread) => ctx.send(MessageToFrontend::UnreadChanged { unread }),
-            Err(e) => tracing::debug!(error = %e, "could not mark the notification read"),
+            Err(e) => {
+                tracing::debug!(error = %format!("{e:#}"), "could not mark the notification read")
+            }
         }
     });
 }
@@ -62,7 +64,7 @@ pub fn mark_all_read(ctx: &Ctx) {
     tokio::spawn(async move {
         let Some(api) = api(&ctx) else { return };
         if let Err(e) = api.mark_all_read().await {
-            tracing::debug!(error = %e, "could not mark the feed read");
+            tracing::debug!(error = %format!("{e:#}"), "could not mark the feed read");
             return;
         }
         ctx.send(MessageToFrontend::UnreadChanged { unread: 0 });
@@ -107,7 +109,7 @@ fn toast(notification: &schema::notifications::Notification) {
             builder.body(&shorten(&body, 160));
         }
         if let Err(e) = builder.show() {
-            tracing::debug!(error = %e, "the system would not show a notification");
+            tracing::debug!(error = %format!("{e:#}"), "the system would not show a notification");
         }
     });
 }

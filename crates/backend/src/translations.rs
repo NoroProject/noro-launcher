@@ -33,7 +33,7 @@ pub fn refresh(ctx: &Ctx, code: String) {
                 tracing::debug!(locale = %code, "master has no catalog, keeping the built-in one");
             }
             Err(e) => {
-                tracing::warn!(locale = %code, error = %e, "could not fetch translation catalog");
+                tracing::warn!(locale = %code, error = %format!("{e:#}"), "could not fetch translation catalog");
             }
         }
     });
@@ -62,6 +62,6 @@ fn read_cache(path: &Path) -> Option<String> {
 
 fn write_cache(path: &Path, ftl: &str) {
     if let Err(e) = crate::fsutil::write_atomic_sync(path, ftl.as_bytes()) {
-        tracing::warn!(error = %e, "could not write catalog cache");
+        tracing::warn!(error = %format!("{e:#}"), "could not write catalog cache");
     }
 }

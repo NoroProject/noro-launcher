@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use crate::auth::{token_store, web_login};
+use crate::auth::web_login;
 use crate::backend::{spawn_sync_and_launch, BackendState, InternalEvent};
 use bridge::{
     ClientSettingsState, LoginErrorKind, MessageToBackend, MessageToFrontend, OptionalModInfo,
@@ -47,126 +47,11 @@ impl BackendState {
                             });
                         }
                         Err(e) => {
-                            let kind = if e.to_string().contains("cancel") {
+                            let kind = if e.downcast_ref::<web_login::LoginCancelled>().is_some() {
                                 LoginErrorKind::Cancelled
                             } else {
-                                LoginErrorKind::Network(e.to_string())
+                                LoginErrorKind::Network(format!("{e:#}"))
                             };
-                            let _ = internal.send(InternalEvent::LoginFailed { kind });
-                        }
-                    }
-                });
-            }
-
-            MessageToBackend::StartKeyLogin { key, modal_action } => {
-                let master = self.ctx.config.get().master_url;
-                let http = self.ctx.http.clone();
-                let internal = self.ctx.internal.clone();
-                modal_action.set_stage("Checking authorization key...");
-
-                tokio::spawn(async move {
-                    let base = master.trim_end_matches('/');
-                    let res = http
-                        .get(format!("{base}/api/me"))
-                        .header("Authorization", format!("Bearer {key}"))
-                        .send()
-                        .await;
-
-                    match res {
-                        Ok(r) if r.status().is_success() => {
-                            if let Ok(profile) = r.json::<schema::UserProfile>().await {
-                                modal_action.finish();
-                                let auth = token_store::StoredAuth {
-                                    access_token: key,
-                                    refresh_token: String::new(),
-                                };
-                                let _ = internal.send(InternalEvent::LoginCompleted {
-                                    auth,
-                                    user: profile,
-                                });
-                            }
-                        }
-                        Ok(r) => {
-                            let txt = r.text().await.unwrap_or_default();
-                            modal_action.fail(txt.clone());
-                            let _ = internal.send(InternalEvent::LoginFailed {
-                                kind: bridge::LoginErrorKind::Rejected(if txt.is_empty() {
-                                    "Invalid access key".into()
-                                } else {
-                                    txt
-                                }),
-                            });
-                        }
-                        Err(e) => {
-                            modal_action.fail(e.to_string());
-                            let _ = internal.send(InternalEvent::LoginFailed {
-                                kind: bridge::LoginErrorKind::Network(e.to_string()),
-                            });
-                        }
-                    }
-                });
-            }
-
-            MessageToBackend::StartBiometricLogin { modal_action } => {
-                let master = self.ctx.config.get().master_url;
-                let http = self.ctx.http.clone();
-                let internal = self.ctx.internal.clone();
-                let modal = modal_action.clone();
-                modal.set_stage("Waiting for biometric authentication...");
-
-                tokio::spawn(async move {
-                    if let Ok(true) =
-                        crate::auth::biometrics::authenticate_biometrics("Sign in to Noro Launcher")
-                    {
-                        if let Some(stored) = token_store::load() {
-                            let key = stored.access_token.clone();
-                            let base = master.trim_end_matches('/');
-                            let res = http
-                                .get(format!("{base}/api/me"))
-                                .header("Authorization", format!("Bearer {key}"))
-                                .send()
-                                .await;
-
-                            if let Ok(r) = res {
-                                if r.status().is_success() {
-                                    if let Ok(profile) = r.json::<schema::UserProfile>().await {
-                                        modal.finish();
-                                        let auth = token_store::StoredAuth {
-                                            access_token: key,
-                                            refresh_token: stored.refresh_token,
-                                        };
-                                        let _ = internal.send(InternalEvent::LoginCompleted {
-                                            auth,
-                                            user: profile,
-                                        });
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Nothing usable in the keyring, so fall back to the site.
-                    modal.set_stage("Waiting for sign in on the website...");
-                    let cancelled = {
-                        let m = modal.clone();
-                        move || m.is_cancelled()
-                    };
-                    match web_login::login(&master, cancelled).await {
-                        Ok(res) => {
-                            modal.finish();
-                            let _ = internal.send(InternalEvent::LoginCompleted {
-                                auth: res.auth,
-                                user: res.user,
-                            });
-                        }
-                        Err(e) => {
-                            let kind = if e.to_string().contains("cancel") {
-                                bridge::LoginErrorKind::Cancelled
-                            } else {
-                                bridge::LoginErrorKind::Network(e.to_string())
-                            };
-                            modal.fail(e.to_string());
                             let _ = internal.send(InternalEvent::LoginFailed { kind });
                         }
                     }
@@ -331,9 +216,9 @@ impl BackendState {
                             limit: page.limit,
                         }),
                         Err(e) => {
-                            tracing::error!(error = %e, "catalog search failed");
+                            tracing::error!(error = %format!("{e:#}"), "catalog search failed");
                             ctx.send(MessageToFrontend::CatalogFailed {
-                                message: e.to_string(),
+                                message: format!("{e:#}"),
                             });
                         }
                     }
@@ -500,10 +385,10 @@ impl BackendState {
                             let _ = ctx.internal.send(InternalEvent::RestartInto(exe));
                         }
                         Err(e) => {
-                            modal.fail(e.to_string());
+                            modal.fail(format!("{e:#}"));
                             ctx.send(MessageToFrontend::AddNotification {
                                 key: "notif-update-failed".into(),
-                                args: [("reason".to_string(), e.to_string())].into(),
+                                args: [("reason".to_string(), format!("{e:#}"))].into(),
                                 level: schema::NotifLevel::Error,
                             });
                         }
@@ -830,7 +715,7 @@ impl BackendState {
                         locked: done.locked,
                     });
                 }
-                Err(e) => tracing::warn!(error = %e, "live sync failed"),
+                Err(e) => tracing::warn!(error = %format!("{e:#}"), "live sync failed"),
             }
         });
     }
@@ -1188,7 +1073,7 @@ impl BackendState {
                     });
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, action = action.as_str(), "action failed")
+                    tracing::warn!(error = %format!("{e:#}"), action = action.as_str(), "action failed")
                 }
             }
         });
@@ -1282,7 +1167,7 @@ impl BackendState {
                     args: std::collections::BTreeMap::new(),
                     level: schema::NotifLevel::Info,
                 }),
-                Err(e) => tracing::warn!(error = %e, "requested logs were not sent"),
+                Err(e) => tracing::warn!(error = %format!("{e:#}"), "requested logs were not sent"),
             }
         });
     }
@@ -1315,10 +1200,10 @@ impl BackendState {
                     });
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "could not enter the player's account");
+                    tracing::warn!(error = %format!("{e:#}"), "could not enter the player's account");
                     ctx.send(MessageToFrontend::AddNotification {
                         key: "notif-impersonate-failed".into(),
-                        args: [("reason".to_string(), e.to_string())].into(),
+                        args: [("reason".to_string(), format!("{e:#}"))].into(),
                         level: schema::NotifLevel::Error,
                     });
                 }
@@ -1375,10 +1260,10 @@ impl BackendState {
                     });
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "support bundle not sent");
+                    tracing::warn!(error = %format!("{e:#}"), "support bundle not sent");
                     ctx.send(MessageToFrontend::AddNotification {
                         key: "notif-support-failed".into(),
-                        args: [("reason".to_string(), e.to_string())].into(),
+                        args: [("reason".to_string(), format!("{e:#}"))].into(),
                         level: schema::NotifLevel::Error,
                     });
                 }

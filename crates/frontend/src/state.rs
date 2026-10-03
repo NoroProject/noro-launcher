@@ -1765,28 +1765,6 @@ impl LauncherUI {
         self.logging_in = false;
     }
 
-    pub fn start_key_login(&mut self, key: String) {
-        if key.trim().is_empty() {
-            return;
-        }
-        self.logging_in = true;
-        self.login_error = None;
-        let modal = bridge::ModalAction::new("Key sign in");
-        self.backend.send(MessageToBackend::StartKeyLogin {
-            key: key.trim().to_string(),
-            modal_action: modal,
-        });
-    }
-
-    pub fn start_biometric_login(&mut self) {
-        self.logging_in = true;
-        self.login_error = None;
-        let modal = bridge::ModalAction::new("Biometric sign in");
-        self.backend.send(MessageToBackend::StartBiometricLogin {
-            modal_action: modal,
-        });
-    }
-
     pub fn logout(&mut self) {
         self.backend.send(MessageToBackend::Logout);
     }

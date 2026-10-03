@@ -19,6 +19,19 @@ pub struct LoginResult {
     pub user: UserProfile,
 }
 
+/// The player backed out. A type rather than a message, so telling it apart
+/// from a failure doesn't depend on how an error happens to be worded.
+#[derive(Debug)]
+pub struct LoginCancelled;
+
+impl std::fmt::Display for LoginCancelled {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("login cancelled")
+    }
+}
+
+impl std::error::Error for LoginCancelled {}
+
 fn random_state() -> String {
     uuid::Uuid::new_v4().simple().to_string()
 }
@@ -72,7 +85,7 @@ pub async fn login(master_url: &str, cancelled: impl Fn() -> bool) -> Result<Log
     let deadline = tokio::time::Instant::now() + Duration::from_secs(300);
     loop {
         if cancelled() {
-            bail!("login cancelled");
+            return Err(LoginCancelled.into());
         }
         let accept = tokio::time::timeout(Duration::from_millis(500), listener.accept()).await;
         match accept {

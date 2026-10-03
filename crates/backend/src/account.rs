@@ -355,5 +355,5 @@ fn avatar_of(master: &str, v: &Value, peer_name: &str) -> Option<String> {
 /// A failure here is not worth interrupting anybody over: the page stays as it
 /// was, and the log says why.
 fn log(what: &'static str) -> impl Fn(&anyhow::Error) {
-    move |e| tracing::debug!(error = %e, "could not load {what}")
+    move |e| tracing::debug!(error = %format!("{e:#}"), "could not load {what}")
 }
