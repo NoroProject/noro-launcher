@@ -70,19 +70,19 @@ pub async fn launch(
     ));
     cmd.arg(classpath::standard_ignore_list());
 
-    add_authlib(client, config, dirs, &mut cmd).await;
-    for flag in config.jvm_flags.split_whitespace() {
+    add_authlib(client, config, dirs, &mut cmd).await?;
+    for flag in args::split_flags(&config.jvm_flags) {
         cmd.arg(flag);
     }
 
-    let ctx = args::Substitution {
-        instance_dir: &instance_dir,
-        natives_dir: &natives_dir,
-        classpath: &classpath,
+    let ctx = args::Substitution::new(
+        &instance_dir,
+        &natives_dir,
+        &classpath,
         manifest,
         login,
-        primary_game_artifact: &primary_game_artifact,
-    };
+        &primary_game_artifact,
+    );
     args::push_jvm_args(
         &mut cmd,
         &ctx,
@@ -143,21 +143,26 @@ async fn write_legacy_classpath(
     Ok(legacy_cp_path)
 }
 
+/// Without the agent the game starts, then fails to join any server with a
+/// session error that points nowhere near the launcher — so a missing agent
+/// stops the launch here, with the reason.
 async fn add_authlib(
     client: &reqwest::Client,
     config: &LauncherConfig,
     dirs: &LauncherDirectories,
     cmd: &mut Command,
-) {
-    if let Ok(authlib) = ensure_authlib_injector(client, config, dirs).await {
-        // authlib-injector wants the Yggdrasil API root, not the master's root:
-        // it fetches the ALI metadata from there and derives the authserver and
-        // sessionserver paths from it.
-        let master_url = config.master_url.replace("localhost", "127.0.0.1");
-        cmd.arg(format!(
-            "-javaagent:{}={}/api/yggdrasil",
-            authlib.to_string_lossy(),
-            master_url.trim_end_matches('/')
-        ));
-    }
+) -> Result<()> {
+    let authlib = ensure_authlib_injector(client, config, dirs)
+        .await
+        .context("authlib-injector is not available")?;
+    // authlib-injector wants the Yggdrasil API root, not the master's root:
+    // it fetches the ALI metadata from there and derives the authserver and
+    // sessionserver paths from it.
+    let master_url = config.master_url.replace("localhost", "127.0.0.1");
+    cmd.arg(format!(
+        "-javaagent:{}={}/api/yggdrasil",
+        authlib.to_string_lossy(),
+        master_url.trim_end_matches('/')
+    ));
+    Ok(())
 }

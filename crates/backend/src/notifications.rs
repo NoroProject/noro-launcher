@@ -17,11 +17,7 @@ use uuid::Uuid;
 const PAGE: u32 = 30;
 
 fn api(ctx: &Ctx) -> Option<MasterApi> {
-    MasterApi::new(
-        ctx.http.clone(),
-        &ctx.config.get().master_url,
-        ctx.ws.token(),
-    )
+    MasterApi::for_session(ctx)
 }
 
 /// One page of the feed. `offset` of 0 is a refresh, anything else is "load

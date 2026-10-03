@@ -76,9 +76,17 @@ pub fn init_tracing(sentry_on: bool) {
 
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| "info,backend=debug,frontend=debug,bridge=debug".into());
+    // A release build on Windows has no console: stdout goes nowhere, and every
+    // warning the launcher wrote was lost — including from "report a problem".
+    let file = open_log_file().map(|file| {
+        tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_writer(std::sync::Mutex::new(file))
+    });
     let registry = tracing_subscriber::registry()
         .with(filter)
-        .with(tracing_subscriber::fmt::layer());
+        .with(tracing_subscriber::fmt::layer())
+        .with(file);
 
     if sentry_on {
         registry.with(sentry_tracing::layer()).init();
@@ -96,4 +104,28 @@ pub fn is_available() -> bool {
 /// Needed before `init`, because the log subscriber is installed first.
 pub fn is_enabled(config: &LauncherConfig) -> bool {
     is_available() && config.crash_reports
+}
+
+/// Past this the log is rotated at startup, keeping one previous file.
+const MAX_LOG_BYTES: u64 = 5 * 1024 * 1024;
+
+/// Where the launcher's own log lives; "report a problem" picks it up there.
+pub fn log_path() -> std::path::PathBuf {
+    crate::LauncherDirectories::new()
+        .root()
+        .join("logs")
+        .join("launcher.log")
+}
+
+fn open_log_file() -> Option<std::fs::File> {
+    let path = log_path();
+    std::fs::create_dir_all(path.parent()?).ok()?;
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > MAX_LOG_BYTES) {
+        let _ = std::fs::rename(&path, path.with_extension("log.1"));
+    }
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .ok()
 }

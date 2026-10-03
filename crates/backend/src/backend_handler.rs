@@ -265,56 +265,32 @@ impl BackendState {
                 icon_url,
                 description,
             } => {
-                let Some(token) = self.access_token.clone() else {
-                    self.ctx.send(MessageToFrontend::AddNotification {
-                        key: "notif-sign-in-to-suggest".into(),
-                        args: std::collections::BTreeMap::new(),
-                        level: schema::NotifLevel::Error,
-                    });
+                let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
+                    self.notify("notif-sign-in-to-suggest", schema::NotifLevel::Error);
                     return;
                 };
                 let ctx = self.ctx.clone();
-                let http = self.ctx.http.clone();
                 tokio::spawn(async move {
-                    let master_url = ctx.config.get().master_url;
-
-                    let res = http
-                        .post(format!("{master_url}/api/mod-suggestions"))
-                        .bearer_auth(&token)
-                        .json(&serde_json::json!({
-                            "server_id": server_id,
-                            "build_id": build_id,
-                            "provider": provider,
-                            "project_id": project_id,
-                            "title": title,
-                            "icon_url": icon_url,
-                            "description": description,
-                        }))
-                        .send()
-                        .await;
-
-                    match res {
-                        Ok(res) if res.status().is_success() => {
-                            ctx.send(MessageToFrontend::AddNotification {
-                                key: "Mod request submitted to admin!".into(),
-                                args: std::collections::BTreeMap::new(),
-                                level: schema::NotifLevel::Info,
-                            });
-                        }
-                        Ok(res) => {
-                            ctx.send(MessageToFrontend::AddNotification {
-                                key: format!("Failed to submit request ({})", res.status()),
-                                args: std::collections::BTreeMap::new(),
-                                level: schema::NotifLevel::Error,
-                            });
-                        }
-                        Err(e) => {
-                            ctx.send(MessageToFrontend::AddNotification {
-                                key: format!("Network error: {e}"),
-                                args: std::collections::BTreeMap::new(),
-                                level: schema::NotifLevel::Error,
-                            });
-                        }
+                    let body = serde_json::json!({
+                        "server_id": server_id,
+                        "build_id": build_id,
+                        "provider": provider,
+                        "project_id": project_id,
+                        "title": title,
+                        "icon_url": icon_url,
+                        "description": description,
+                    });
+                    match api.suggest_mod(&body).await {
+                        Ok(()) => ctx.send(MessageToFrontend::AddNotification {
+                            key: "notif-mod-suggestion-sent".into(),
+                            args: std::collections::BTreeMap::new(),
+                            level: schema::NotifLevel::Info,
+                        }),
+                        Err(e) => ctx.send(MessageToFrontend::AddNotification {
+                            key: "notif-mod-suggestion-failed".into(),
+                            args: [("reason".to_string(), format!("{e:#}"))].into(),
+                            level: schema::NotifLevel::Error,
+                        }),
                     }
                 });
             }
@@ -369,31 +345,26 @@ impl BackendState {
                 project_id,
             } => {
                 let ctx = self.ctx.clone();
-                let http = self.ctx.http.clone();
                 tokio::spawn(async move {
-                    let master_url = ctx.config.get().master_url;
-                    let url = format!(
-                        "{master_url}/api/admin/catalog/{}/project/{}",
-                        urlencoding::encode(&provider),
-                        urlencoding::encode(&project_id),
-                    );
-                    // The page's fields line up with `ModProjectInfo` by name,
-                    // and serde drops whatever else the master sends.
+                    // The player's catalog endpoint: the admin one this used
+                    // to call refuses anyone without staff rights.
                     let loaded = async {
-                        http.get(&url)
-                            .send()
-                            .await?
-                            .error_for_status()?
-                            .json::<bridge::ModProjectInfo>()
-                            .await
+                        let api = crate::master_api::MasterApi::for_session(&ctx)
+                            .ok_or_else(|| anyhow::anyhow!("not signed in"))?;
+                        let page = api.catalog_project(&provider, &project_id).await?;
+                        // The page's fields line up with `ModProjectInfo` by
+                        // name, and serde drops whatever else the master sends.
+                        Ok::<_, anyhow::Error>(serde_json::from_value::<bridge::ModProjectInfo>(
+                            page,
+                        )?)
                     }
                     .await;
                     match loaded {
                         Ok(project) => ctx.send(MessageToFrontend::ModProjectLoaded { project }),
                         Err(e) => {
-                            tracing::error!(error = %e, "mod page failed to load");
+                            tracing::error!(error = %format!("{e:#}"), "mod page failed to load");
                             ctx.send(MessageToFrontend::CatalogFailed {
-                                message: e.to_string(),
+                                message: format!("{e:#}"),
                             });
                         }
                     }
@@ -536,117 +507,86 @@ impl BackendState {
             }
 
             MessageToBackend::SetSkinModel { slim } => {
-                if let Some(token) = &self.access_token {
-                    let master = self.ctx.config.get().master_url.clone();
-                    let http = self.ctx.http.clone();
-                    let t = token.clone();
-                    let internal = self.ctx.internal.clone();
-                    let ctx2 = self.ctx.clone();
-                    tokio::spawn(async move {
-                        match set_skin_model_on_master(&http, &master, &t, slim).await {
-                            Ok(profile) => {
-                                let _ =
-                                    internal.send(InternalEvent::ProfileUpdated { user: profile });
-                            }
-                            Err(e) => {
-                                ctx2.send(MessageToFrontend::AddNotification {
-                                    key: "notif-skin-model-failed".into(),
-                                    args: [("reason".to_string(), e.to_string())].into(),
-                                    level: schema::NotifLevel::Error,
-                                });
-                            }
+                let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
+                    return;
+                };
+                let ctx = self.ctx.clone();
+                tokio::spawn(async move {
+                    match api.set_skin_model(slim).await {
+                        Ok(profile) => {
+                            let _ = ctx
+                                .internal
+                                .send(InternalEvent::ProfileUpdated { user: profile });
                         }
-                    });
-                }
+                        Err(e) => ctx.send(MessageToFrontend::AddNotification {
+                            key: "notif-skin-model-failed".into(),
+                            args: [("reason".to_string(), format!("{e:#}"))].into(),
+                            level: schema::NotifLevel::Error,
+                        }),
+                    }
+                });
             }
             MessageToBackend::UploadSkin { bytes } => {
-                if let Some(token) = &self.access_token {
-                    let master = self.ctx.config.get().master_url.clone();
-                    let http = self.ctx.http.clone();
-                    let t = token.clone();
-                    let b = bytes.clone();
-                    let internal = self.ctx.internal.clone();
-                    let ctx2 = self.ctx.clone();
-                    tokio::spawn(async move {
-                        match upload_skin_to_master(&http, &master, &t, b).await {
-                            Ok(profile) => {
-                                let _ =
-                                    internal.send(InternalEvent::ProfileUpdated { user: profile });
-                            }
-                            Err(e) => {
-                                ctx2.send(MessageToFrontend::AddNotification {
-                                    key: "notif-skin-upload-failed".into(),
-                                    args: [("reason".to_string(), e.to_string())].into(),
-                                    level: schema::NotifLevel::Error,
-                                });
-                                ctx2.send(MessageToFrontend::SkinUploadFailed);
-                            }
+                let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
+                    self.notify("notif-sign-in-to-upload", schema::NotifLevel::Error);
+                    self.ctx.send(MessageToFrontend::SkinUploadFailed);
+                    return;
+                };
+                let ctx = self.ctx.clone();
+                tokio::spawn(async move {
+                    match api.upload_skin(bytes).await {
+                        Ok(profile) => {
+                            let _ = ctx
+                                .internal
+                                .send(InternalEvent::ProfileUpdated { user: profile });
                         }
-                    });
-                } else {
-                    self.ctx.send(MessageToFrontend::AddNotification {
-                        key: "notif-sign-in-to-upload".into(),
-                        args: Default::default(),
-                        level: schema::NotifLevel::Error,
-                    });
-                }
+                        Err(e) => {
+                            ctx.send(MessageToFrontend::AddNotification {
+                                key: "notif-skin-upload-failed".into(),
+                                args: [("reason".to_string(), format!("{e:#}"))].into(),
+                                level: schema::NotifLevel::Error,
+                            });
+                            ctx.send(MessageToFrontend::SkinUploadFailed);
+                        }
+                    }
+                });
             }
 
             MessageToBackend::RequestCapesList => {
-                if let Some(token) = &self.access_token {
-                    let master = self.ctx.config.get().master_url.clone();
-                    let http = self.ctx.http.clone();
-                    let t = token.clone();
-                    let ctx = self.ctx.clone();
-                    tokio::spawn(async move {
-                        if let Ok(capes) = fetch_capes_from_master(&http, &master, &t).await {
-                            ctx.send(MessageToFrontend::CapesList { capes });
-                        }
-                    });
-                }
+                let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
+                    return;
+                };
+                let ctx = self.ctx.clone();
+                tokio::spawn(async move {
+                    match api.capes().await {
+                        Ok(capes) => ctx.send(MessageToFrontend::CapesList { capes }),
+                        Err(e) => tracing::warn!(error = %format!("{e:#}"), "capes did not load"),
+                    }
+                });
             }
 
-            MessageToBackend::RequestSkinPresetsList => {
-                if let Some(token) = &self.access_token {
-                    let master = self.ctx.config.get().master_url.clone();
-                    let http = self.ctx.http.clone();
-                    let t = token.clone();
-                    let ctx = self.ctx.clone();
-                    tokio::spawn(async move {
-                        if let Ok(presets) =
-                            fetch_skin_presets_from_master(&http, &master, &t).await
-                        {
-                            ctx.send(MessageToFrontend::SkinPresetsList { presets });
-                        }
-                    });
-                }
-            }
+            MessageToBackend::RequestSkinPresetsList => self.request_skin_presets(),
 
             MessageToBackend::SelectCape { cape_id } => {
-                if let Some(token) = &self.access_token {
-                    let master = self.ctx.config.get().master_url.clone();
-                    let http = self.ctx.http.clone();
-                    let t = token.clone();
-                    let internal = self.ctx.internal.clone();
-                    let ctx = self.ctx.clone();
-                    tokio::spawn(async move {
-                        match select_cape_on_master(&http, &master, &t, cape_id).await {
-                            Ok(profile) => {
-                                let _ = internal.send(InternalEvent::ProfileUpdated {
-                                    user: profile.clone(),
-                                });
-                                ctx.send(MessageToFrontend::PermissionsUpdated { user: profile });
-                            }
-                            Err(e) => {
-                                ctx.send(MessageToFrontend::AddNotification {
-                                    key: "notif-cape-update-failed".into(),
-                                    args: [("reason".to_string(), e.to_string())].into(),
-                                    level: schema::NotifLevel::Error,
-                                });
-                            }
+                let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
+                    return;
+                };
+                let ctx = self.ctx.clone();
+                tokio::spawn(async move {
+                    match api.select_cape(cape_id).await {
+                        Ok(profile) => {
+                            let _ = ctx.internal.send(InternalEvent::ProfileUpdated {
+                                user: profile.clone(),
+                            });
+                            ctx.send(MessageToFrontend::PermissionsUpdated { user: profile });
                         }
-                    });
-                }
+                        Err(e) => ctx.send(MessageToFrontend::AddNotification {
+                            key: "notif-cape-update-failed".into(),
+                            args: [("reason".to_string(), format!("{e:#}"))].into(),
+                            level: schema::NotifLevel::Error,
+                        }),
+                    }
+                });
             }
 
             MessageToBackend::RequestNotifications {
@@ -763,13 +703,25 @@ impl BackendState {
             return;
         }
 
-        modal.set_stage("Fetching build manifest...");
+        self.last_launched = Some(server_id);
         self.pending_launch.insert(server_id, modal);
 
         if let Some(manifest) = self.manifests.get(&server_id).cloned() {
             self.begin_launch(server_id, manifest);
         } else {
             self.ctx.ws.send(self.request_manifest_msg(server_id));
+            // The answer can be lost with the socket. Without a deadline the
+            // button stayed on «Preparing» for good.
+            let seq = {
+                let seq = self.launch_seq.entry(server_id).or_default();
+                *seq += 1;
+                *seq
+            };
+            let internal = self.ctx.internal.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(45)).await;
+                let _ = internal.send(InternalEvent::ManifestTimeout { server_id, seq });
+            });
         }
     }
 
@@ -908,7 +860,7 @@ impl BackendState {
                         .filter(|f| f.ends_with(".jar"))
                         .find_map(|f| {
                             let path = safe_join(&instance_dir, f)?;
-                            crate::mod_icon::extract_jar_icon(&path)
+                            crate::mod_icon::cached_jar_icon(&path)
                         })
                 });
                 OptionalModInfo {
@@ -959,20 +911,10 @@ impl BackendState {
             ServerWsMsg::AuthOk { user } => {
                 self.user = Some(user.clone());
                 self.ctx.set_profile(Some(user.clone()));
+                // The window asks for the skin presets itself when the login
+                // lands; fetching them here as well downloaded every preset
+                // twice per login and again on every reconnect.
                 self.ctx.send(MessageToFrontend::LoginSuccess { user });
-                if let Some(token) = &self.access_token {
-                    let master = self.ctx.config.get().master_url.clone();
-                    let http = self.ctx.http.clone();
-                    let t = token.clone();
-                    let ctx = self.ctx.clone();
-                    tokio::spawn(async move {
-                        if let Ok(presets) =
-                            fetch_skin_presets_from_master(&http, &master, &t).await
-                        {
-                            ctx.send(MessageToFrontend::SkinPresetsList { presets });
-                        }
-                    });
-                }
             }
             // Лента и счётчик живут на мастере; здесь остаётся показать.
             ServerWsMsg::NotificationPush {
@@ -1201,10 +1143,27 @@ impl BackendState {
                 });
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 if let Ok(current_exe) = std::env::current_exe() {
-                    let _ = std::process::Command::new(current_exe).spawn();
+                    crate::updater::restart(&current_exe);
                 }
-                std::process::exit(0);
             });
+            return;
+        }
+
+        // Deleting mods or assets under a running JVM breaks the session and
+        // the files only half go; it waits until the game is closed.
+        let destructive = matches!(
+            action,
+            schema::RemoteAction::ReinstallBuild | schema::RemoteAction::ClearAssetCache
+        );
+        let busy = {
+            let running = self.ctx.running.lock();
+            match server_id {
+                Some(id) => running.contains_key(&id),
+                None => !running.is_empty(),
+            }
+        };
+        if destructive && busy {
+            self.notify("notif-remote-action-busy", schema::NotifLevel::Warning);
             return;
         }
 
@@ -1236,7 +1195,7 @@ impl BackendState {
         forced: bool,
         target_server_id: Option<Uuid>,
     ) {
-        let server_id = target_server_id.or_else(|| self.manifests.keys().copied().next());
+        let server_id = target_server_id.or_else(|| self.fallback_log_server());
         let instance_dir = match server_id {
             Some(ref id) => self.ctx.dirs.instance(id),
             None => self.ctx.dirs.root.clone(),
@@ -1291,7 +1250,7 @@ impl BackendState {
         let Some(token) = self.access_token.clone() else {
             return;
         };
-        let server_id = self.manifests.keys().copied().next();
+        let server_id = self.fallback_log_server();
         let instance_dir = match server_id {
             Some(ref id) => self.ctx.dirs.instance(id),
             None => self.ctx.dirs.root.clone(),
@@ -1379,7 +1338,7 @@ impl BackendState {
         };
         // No server means no logs: the game writes them into the instance
         // directory.
-        let Some(server_id) = server_id.or_else(|| self.manifests.keys().copied().next()) else {
+        let Some(server_id) = server_id.or_else(|| self.fallback_log_server()) else {
             self.notify("notif-support-nothing-to-send", schema::NotifLevel::Warning);
             return;
         };
@@ -1418,6 +1377,39 @@ impl BackendState {
         });
     }
 
+    fn request_skin_presets(&self) {
+        let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
+            return;
+        };
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match api.skin_presets().await {
+                Ok(presets) => ctx.send(MessageToFrontend::SkinPresetsList { presets }),
+                Err(e) => tracing::warn!(error = %format!("{e:#}"), "skin presets did not load"),
+            }
+        });
+    }
+
+    /// Whose logs to send when the request names no server: the one last
+    /// launched, else the instance whose game wrote a log most recently. Picking
+    /// the first key of a `HashMap` sent an arbitrary server's logs.
+    fn fallback_log_server(&self) -> Option<Uuid> {
+        if self.last_launched.is_some() {
+            return self.last_launched;
+        }
+        let entries = std::fs::read_dir(self.ctx.dirs.instances()).ok()?;
+        entries
+            .filter_map(Result::ok)
+            .filter_map(|e| {
+                let id = Uuid::parse_str(&e.file_name().to_string_lossy()).ok()?;
+                let log = e.path().join("logs/latest.log");
+                let modified = std::fs::metadata(&log).and_then(|m| m.modified()).ok()?;
+                Some((modified, id))
+            })
+            .max()
+            .map(|(_, id)| id)
+    }
+
     fn notify(&self, key: &str, level: schema::NotifLevel) {
         self.ctx.send(MessageToFrontend::AddNotification {
             key: key.into(),
@@ -1425,131 +1417,4 @@ impl BackendState {
             level,
         });
     }
-}
-
-/// Switches the skin model. Answers with the updated profile, same as an upload.
-async fn set_skin_model_on_master(
-    http: &reqwest::Client,
-    master: &str,
-    token: &str,
-    slim: bool,
-) -> Result<schema::UserProfile, String> {
-    let url = format!("{}/api/me/skin/model", master.trim_end_matches('/'));
-    let res = http
-        .put(&url)
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&serde_json::json!({ "model": if slim { "slim" } else { "classic" } }))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !res.status().is_success() {
-        let status = res.status();
-        let txt = res.text().await.unwrap_or_default();
-        return Err(format!("HTTP {} {}", status, txt));
-    }
-    res.json::<schema::UserProfile>()
-        .await
-        .map_err(|e| e.to_string())
-}
-
-async fn upload_skin_to_master(
-    http: &reqwest::Client,
-    master: &str,
-    token: &str,
-    bytes: Vec<u8>,
-) -> Result<schema::UserProfile, String> {
-    let base = master.trim_end_matches('/');
-    let url = format!("{}/api/me/skin", base);
-    let part = reqwest::multipart::Part::bytes(bytes)
-        .file_name("skin.png")
-        .mime_str("image/png")
-        .map_err(|e| e.to_string())?;
-    let form = reqwest::multipart::Form::new().part("skin", part);
-    let res = http
-        .post(&url)
-        .header("Authorization", format!("Bearer {}", token))
-        .multipart(form)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !res.status().is_success() {
-        let status = res.status();
-        let txt = res.text().await.unwrap_or_default();
-        return Err(format!("HTTP {} {}", status, txt));
-    }
-    res.json::<schema::UserProfile>()
-        .await
-        .map_err(|e| e.to_string())
-}
-
-async fn fetch_capes_from_master(
-    http: &reqwest::Client,
-    master: &str,
-    token: &str,
-) -> Result<Vec<schema::CapeRow>, String> {
-    let base = master.trim_end_matches('/');
-    let url = format!("{}/api/capes", base);
-    let res = http
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", token))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !res.status().is_success() {
-        let status = res.status();
-        let txt = res.text().await.unwrap_or_default();
-        return Err(format!("HTTP {} {}", status, txt));
-    }
-    res.json::<Vec<schema::CapeRow>>()
-        .await
-        .map_err(|e| e.to_string())
-}
-
-async fn select_cape_on_master(
-    http: &reqwest::Client,
-    master: &str,
-    token: &str,
-    cape_id: Option<uuid::Uuid>,
-) -> Result<schema::UserProfile, String> {
-    let base = master.trim_end_matches('/');
-    let url = format!("{}/api/me/cape", base);
-    let req = schema::SelectCapeReq { cape_id };
-    let res = http
-        .put(&url)
-        .header("Authorization", format!("Bearer {}", token))
-        .json(&req)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !res.status().is_success() {
-        let status = res.status();
-        let txt = res.text().await.unwrap_or_default();
-        return Err(format!("HTTP {} {}", status, txt));
-    }
-    res.json::<schema::UserProfile>()
-        .await
-        .map_err(|e| e.to_string())
-}
-
-async fn fetch_skin_presets_from_master(
-    http: &reqwest::Client,
-    master: &str,
-    token: &str,
-) -> Result<Vec<bridge::ServerSkinPresetItem>, String> {
-    let base = master.trim_end_matches('/');
-    let url = format!("{}/api/me/skin-presets", base);
-    let res = http
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", token))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !res.status().is_success() {
-        let status = res.status();
-        let txt = res.text().await.unwrap_or_default();
-        return Err(format!("HTTP {} {}", status, txt));
-    }
-    res.json::<Vec<bridge::ServerSkinPresetItem>>()
-        .await
-        .map_err(|e| e.to_string())
 }

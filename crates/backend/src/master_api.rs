@@ -44,6 +44,15 @@ impl MasterApi {
         })
     }
 
+    /// The client for the current session, `None` when nobody is signed in.
+    pub fn for_session(ctx: &crate::backend::Ctx) -> Option<Self> {
+        Self::new(
+            ctx.http.clone(),
+            &ctx.config.get().master_url,
+            ctx.ws.token(),
+        )
+    }
+
     async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         let res = self
             .http
@@ -156,8 +165,12 @@ impl MasterApi {
     }
 
     pub async fn catalog_project(&self, provider: &str, id: &str) -> Result<Value> {
-        self.get(&format!("/api/catalog/{provider}/project/{id}"))
-            .await
+        self.get(&format!(
+            "/api/catalog/{}/project/{}",
+            urlencoding::encode(provider),
+            urlencoding::encode(id)
+        ))
+        .await
     }
 
     pub async fn catalog_versions(&self, provider: &str, id: &str, query: &str) -> Result<Value> {
@@ -165,6 +178,54 @@ impl MasterApi {
             "/api/catalog/{provider}/project/{id}/versions?{query}"
         ))
         .await
+    }
+
+    // ── Skins and capes ─────────────────────────────────────────────────────
+
+    /// Answers with the updated profile, same as an upload.
+    pub async fn set_skin_model(&self, slim: bool) -> Result<schema::UserProfile> {
+        self.put(
+            "/api/me/skin/model",
+            &json!({ "model": if slim { "slim" } else { "classic" } }),
+        )
+        .await
+    }
+
+    pub async fn upload_skin(&self, png: Vec<u8>) -> Result<schema::UserProfile> {
+        let part = reqwest::multipart::Part::bytes(png)
+            .file_name("skin.png")
+            .mime_str("image/png")?;
+        let res = self
+            .http
+            .post(format!("{}/api/me/skin", self.base))
+            .bearer_auth(&self.token)
+            .multipart(reqwest::multipart::Form::new().part("skin", part))
+            .send()
+            .await
+            .context("the master is not answering")?;
+        parse(res).await
+    }
+
+    pub async fn capes(&self) -> Result<Vec<schema::CapeRow>> {
+        self.get("/api/capes").await
+    }
+
+    pub async fn select_cape(&self, cape_id: Option<Uuid>) -> Result<schema::UserProfile> {
+        self.put(
+            "/api/me/cape",
+            &serde_json::to_value(schema::SelectCapeReq { cape_id })?,
+        )
+        .await
+    }
+
+    pub async fn skin_presets(&self) -> Result<Vec<bridge::ServerSkinPresetItem>> {
+        self.get("/api/me/skin-presets").await
+    }
+
+    pub async fn suggest_mod(&self, body: &Value) -> Result<()> {
+        self.post::<Value>("/api/mod-suggestions", body)
+            .await
+            .map(|_| ())
     }
 
     // ── Java runtimes ───────────────────────────────────────────────────────
@@ -267,5 +328,12 @@ async fn parse<T: DeserializeOwned>(res: reqwest::Response) -> Result<T> {
             .unwrap_or_else(|| body.chars().take(200).collect());
         return Err(anyhow!("{status}: {detail}"));
     }
-    serde_json::from_str(&body).context("the master answered with something unexpected")
+    // An empty success body reads as `null`, so a call that only cares about
+    // the status doesn't fail on a 204.
+    let body = if body.trim().is_empty() {
+        "null"
+    } else {
+        body.as_str()
+    };
+    serde_json::from_str(body).context("the master answered with something unexpected")
 }

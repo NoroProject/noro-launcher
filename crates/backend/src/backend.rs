@@ -55,6 +55,11 @@ pub enum InternalEvent {
     /// The master couldn't be reached to say either way. The session is kept:
     /// unreachable is not the same as rejected.
     SessionUnverified,
+    /// A launch has waited too long for its manifest.
+    ManifestTimeout {
+        server_id: Uuid,
+        seq: u64,
+    },
 }
 
 /// What a background task gets: everything shared, nothing owned by the loop.
@@ -113,6 +118,12 @@ pub struct BackendState {
     /// Builds whose state the window already has. A guess from the disk is
     /// only for the rest: it must never replace what a manifest established.
     pub build_state_known: HashSet<Uuid>,
+    /// The server the player last pressed Play for. Logs for "report a
+    /// problem" come from there: the game writes them into that instance.
+    pub last_launched: Option<Uuid>,
+    /// Bumped per launch request, so a stale timeout can't fail a newer launch
+    /// of the same server.
+    pub launch_seq: HashMap<Uuid, u64>,
     /// A token refresh is on its way; further auth failures wait for it.
     pub refresh_in_flight: bool,
     /// When the last refresh succeeded. Failing again right after one means
@@ -212,6 +223,8 @@ async fn run(
         manifests: HashMap::new(),
         pending_launch: HashMap::new(),
         build_state_known: HashSet::new(),
+        last_launched: None,
+        launch_seq: HashMap::new(),
         refresh_in_flight: false,
         last_refresh: None,
     };
@@ -266,7 +279,8 @@ impl BackendState {
             }
         }
         tracing::info!("backend: main loop finished");
-        self.quit.clone().quit();
+        // Checking in with the coordinator happens when `self.quit` is
+        // dropped together with the state — on an error or a panic as well.
     }
 
     fn handle_internal(&mut self, event: InternalEvent) {
@@ -288,8 +302,18 @@ impl BackendState {
                 self.ctx.send(MessageToFrontend::CloseModal);
             }
             InternalEvent::RestartInto(exe) => {
-                self.ctx.send(MessageToFrontend::Quit);
+                // Returns only if the new binary didn't start; the old one
+                // keeps running rather than leaving nothing.
                 crate::updater::restart(&exe);
+                self.ctx.send(MessageToFrontend::AddNotification {
+                    key: "notif-update-failed".into(),
+                    args: [(
+                        "reason".to_string(),
+                        format!("could not start {}", exe.display()),
+                    )]
+                    .into(),
+                    level: schema::NotifLevel::Error,
+                });
             }
             InternalEvent::ProfileUpdated { user } => {
                 self.user = Some(user.clone());
@@ -332,6 +356,21 @@ impl BackendState {
                 self.refresh_in_flight = false;
                 if self.user.is_none() {
                     self.ctx.send(MessageToFrontend::SessionCheckDone);
+                }
+            }
+            InternalEvent::ManifestTimeout { server_id, seq } => {
+                if self.launch_seq.get(&server_id) != Some(&seq) {
+                    return;
+                }
+                if let Some(modal) = self.pending_launch.remove(&server_id) {
+                    modal.fail("notif-manifest-timeout");
+                    self.ctx
+                        .send(MessageToFrontend::LaunchCancelled { server_id });
+                    self.ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-manifest-timeout".into(),
+                        args: BTreeMap::new(),
+                        level: schema::NotifLevel::Error,
+                    });
                 }
             }
         }
@@ -506,7 +545,8 @@ async fn fetch_me(ctx: &Ctx, token: &str) -> Result<UserProfile, MeError> {
 async fn restore_session(ctx: Ctx, token: String) {
     let event = match fetch_me(&ctx, &token).await {
         Ok(user) => {
-            tracing::info!("restore_session: restored for {}", user.username);
+            // No name here: this log goes out with "report a problem".
+            tracing::info!("restore_session: session restored");
             InternalEvent::SessionRestored { user }
         }
         Err(MeError::Unreachable) => InternalEvent::SessionUnverified,
@@ -705,6 +745,10 @@ pub fn spawn_sync_and_launch(req: Launch) {
                 .await;
         if !report.findings.is_empty() {
             tracing::warn!(findings = report.findings.len(), "found mismatched files");
+        }
+        // Only when something was actually put right. A new pack the player
+        // added is a finding for the master, not a repair to announce.
+        if report.findings.iter().any(|f| f.repaired) {
             ctx.send(MessageToFrontend::AddNotification {
                 key: "notif-build-files-restored".into(),
                 args: std::collections::BTreeMap::new(),

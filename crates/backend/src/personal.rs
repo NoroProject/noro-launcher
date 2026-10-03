@@ -20,11 +20,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 fn api(ctx: &Ctx) -> Option<MasterApi> {
-    MasterApi::new(
-        ctx.http.clone(),
-        &ctx.config.get().master_url,
-        ctx.ws.token(),
-    )
+    MasterApi::for_session(ctx)
 }
 
 fn failed(ctx: &Ctx, e: anyhow::Error) {

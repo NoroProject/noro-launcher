@@ -22,11 +22,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 fn api(ctx: &Ctx) -> Option<MasterApi> {
-    MasterApi::new(
-        ctx.http.clone(),
-        &ctx.config.get().master_url,
-        ctx.ws.token(),
-    )
+    MasterApi::for_session(ctx)
 }
 
 /// Unix seconds out of an RFC 3339 field. `0` when it is missing: a date of

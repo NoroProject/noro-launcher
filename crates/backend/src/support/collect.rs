@@ -41,6 +41,13 @@ pub async fn collect(
         }
     }
 
+    // The launcher's own log, redacted like the rest: most failures before the
+    // game starts (a download, a signature, the JVM refusing) only show here.
+    let launcher_log = crate::telemetry::log_path();
+    if let Some(dir) = launcher_log.parent() {
+        push(&mut files, dir, "launcher.log").await;
+    }
+
     Bundle {
         environment: super::environment::describe(instance_dir, manifest, enabled_optional).await,
         files,

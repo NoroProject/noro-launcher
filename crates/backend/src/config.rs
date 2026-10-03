@@ -176,7 +176,8 @@ impl LauncherConfig {
         let settings = self.settings_for_server(server_id, Some(recommended));
         let mut config = self.clone();
         config.memory_min_mb = settings.memory_min_mb;
-        config.memory_max_mb = settings.memory_max_mb;
+        // A recommendation with min above max would stop the JVM from starting.
+        config.memory_max_mb = settings.memory_max_mb.max(settings.memory_min_mb);
         config.jvm_flags = launch_jvm_flags(&settings.jvm_flags, &recommended.jvm_flags);
         config.show_console_on_launch = settings.show_console_on_launch;
         config.fullscreen = settings.fullscreen;
