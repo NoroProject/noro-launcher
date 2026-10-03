@@ -125,7 +125,7 @@ fn head(subject: String, status: String, cx: &mut Cx) -> AnyElement {
                 .bg(rgba(0x00000040))
                 .text_size(px(10.))
                 .text_color(rgb(TEXT_MUTED))
-                .child(super::account::ticket_status_label(&status)),
+                .child(super::account_tickets::ticket_status_label(&status)),
         )
         .into_any_element()
 }

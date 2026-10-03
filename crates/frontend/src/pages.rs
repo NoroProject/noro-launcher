@@ -1,8 +1,10 @@
 //! Launcher pages facade.
 
 mod account;
+mod account_punishments;
 mod account_rules;
 mod account_thread;
+mod account_tickets;
 mod build_picker;
 pub mod close_dialog;
 mod common;
