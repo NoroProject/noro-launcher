@@ -7,8 +7,8 @@ use crate::theme::*;
 use gpui::{div, img, prelude::*, px, rgb, AnyElement, CursorStyle, MouseButton};
 use i18n::t;
 
-pub(super) const PREVIEW_W: f32 = crate::skin::PREVIEW_W as f32;
-pub(super) const PREVIEW_H: f32 = crate::skin::PREVIEW_H as f32;
+const PREVIEW_W: f32 = crate::skin::PREVIEW_W as f32;
+const PREVIEW_H: f32 = crate::skin::PREVIEW_H as f32;
 
 pub fn skin_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     panel()
@@ -24,11 +24,11 @@ pub fn skin_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn is_grabbable(ui: &LauncherUI) -> bool {
+fn is_grabbable(ui: &LauncherUI) -> bool {
     ui.skin_bytes.is_some() && ui.skin_preview.is_some()
 }
 
-pub(super) fn preview_box(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
+fn preview_box(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()
         .id("skin-preview-area")
         .w_full()
@@ -50,7 +50,7 @@ pub(super) fn preview_box(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn drag_hint() -> AnyElement {
+fn drag_hint() -> AnyElement {
     div()
         .font_family(FONT_PIXEL_ALT)
         .text_size(px(11.))
@@ -59,7 +59,7 @@ pub(super) fn drag_hint() -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn preview_content(ui: &LauncherUI) -> AnyElement {
+fn preview_content(ui: &LauncherUI) -> AnyElement {
     if let Some(p) = &ui.skin_preview {
         return img(p.clone())
             .w(px(PREVIEW_W))
@@ -78,7 +78,7 @@ pub(super) fn preview_content(ui: &LauncherUI) -> AnyElement {
     placeholder(t("profile-no-skin"))
 }
 
-pub(super) fn placeholder(text: impl Into<gpui::SharedString>) -> AnyElement {
+fn placeholder(text: impl Into<gpui::SharedString>) -> AnyElement {
     div()
         .size_full()
         .flex()

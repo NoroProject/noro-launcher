@@ -43,6 +43,8 @@ mod remote_action_dialog;
 mod server_mod_catalog;
 mod server_mods;
 mod server_settings;
+mod server_settings_header;
+mod server_settings_memory;
 mod settings;
 mod settings_panel;
 mod settings_rows;

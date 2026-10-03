@@ -176,7 +176,7 @@ pub(super) fn custom_preset_card(
 ///
 /// The field is inline because GPUI gives us no text-input dialog on any of the
 /// three platforms.
-pub(super) fn name_row(
+fn name_row(
     ui: &LauncherUI,
     preset: &crate::state::SavedSkinPreset,
     is_active: bool,
@@ -232,7 +232,7 @@ pub(super) fn name_row(
 }
 
 /// Enter saves, Escape cancels. An empty name is discarded rather than stored.
-pub(super) fn rename_key(
+fn rename_key(
     this: &mut LauncherUI,
     event: &gpui::KeyDownEvent,
     _w: &mut gpui::Window,

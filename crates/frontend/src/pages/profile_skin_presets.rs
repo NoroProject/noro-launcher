@@ -62,7 +62,7 @@ pub fn skin_presets_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
+fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
     div()
         .id("add-preset-tile")
         .w(gpui::relative(0.315))
@@ -103,7 +103,7 @@ pub(super) fn add_preset_tile_card(cx: &mut Cx) -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn header_row() -> AnyElement {
+fn header_row() -> AnyElement {
     div()
         .flex()
         .items_center()
@@ -119,7 +119,7 @@ pub(super) fn header_row() -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn is_preset_active(ui: &LauncherUI, id: &str) -> bool {
+fn is_preset_active(ui: &LauncherUI, id: &str) -> bool {
     let lower_id = id.to_lowercase();
     if let Some(url) = &ui.skin_url {
         let lower_url = url.to_lowercase();
@@ -142,7 +142,7 @@ pub(super) fn is_preset_active(ui: &LauncherUI, id: &str) -> bool {
     false
 }
 
-pub(super) fn standard_preset_card(
+fn standard_preset_card(
     ui: &LauncherUI,
     name: &'static str,
     id: &'static str,
@@ -229,7 +229,7 @@ pub(super) fn standard_preset_card(
         .into_any_element()
 }
 
-pub(super) fn apply_preset(this: &mut LauncherUI, name: &'static str, cx: &mut Cx) {
+fn apply_preset(this: &mut LauncherUI, name: &'static str, cx: &mut Cx) {
     let master_url = this.config.master_url.clone();
     let url = format!(
         "{}/api/textures/presets/{}.png",
