@@ -1,7 +1,7 @@
 # noro-launcher — Project Instructions
 
 This is the single instruction file for `noro-launcher`.
-Shared ideology, design tokens, and universal rules: **[../INSTRUCTIONS.md](../INSTRUCTIONS.md)**.
+Shared ideology, design tokens, and universal rules: **`../INSTRUCTIONS.md`** (only in the monorepo checkout; this repository stands on its own without it).
 Short agent cheatsheet: **[./AGENTS.md](./AGENTS.md)** / **[./CLAUDE.md](./CLAUDE.md)**.
 
 ---

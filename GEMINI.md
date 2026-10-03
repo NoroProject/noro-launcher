@@ -1,13 +1,25 @@
-# GEMINI.md
+# noro-launcher — Agent Guidelines (GEMINI.md)
 
-Core rules are consolidated in **[INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
+Detailed repository instructions: **[./INSTRUCTIONS.md](./INSTRUCTIONS.md)**. The
+rules below are the short version; where they differ, INSTRUCTIONS.md wins.
 
 ## Core Mandates
-- **Simplicity First.** Avoid cleverness.
-- **Strict i18n Localization.** ALL user-facing UI text, headings, labels, button titles, empty states, input placeholders, and field hints MUST be localized via Fluent FTL keys (`useT()` / `t(...)`). Hardcoding UI strings in `.vue` or `.rs` files is strictly forbidden.
-- **Surgical Edits.** Use targeted replacements.
-- **Validation.** Always run `cargo check` / `cargo test -p i18n` and `bun run typecheck`.
-- **File Limits.** Enforce ≤150 lines per file.
-- **4-pt Grid.** Strictly adhere to the 4-pt grid for all UI dimensions.
-- **No Automatic Git Push / Tagging.** Local `git commit` is allowed and encouraged for history tracking. NEVER perform `git push` or create release tags automatically — push ONLY when explicitly instructed by the user.
-- **Forbidden `master-v*` Tags.** NEVER create or push `master-v*` tags. Use only standard `v*` tags (e.g. `v1.7.12`).
+- **Simplicity First.** Avoid cleverness and speculative abstractions.
+- **Public AGPL-3.0 repository.** Comments in English; no private domains,
+  credentials or personal paths (use `example.com`).
+- **Strict i18n.** Every player-visible string goes through `i18n::t`. Add the
+  keys to `noro-shared` (`en.ftl` and `ru.ftl`) first.
+- **GPUI textures.** Drop replaced images with `cx.drop_image(old, None)` and
+  downscale images to their display size.
+- **File size.** Aim for 150 lines per file; 400 is the hard ceiling.
+- **4-pt grid** for every UI dimension.
+- **No automatic push or tagging.** Commit locally; push and tag only when
+  asked. Release tags are `v*` or `launcher-v*`, never `master-v*`.
+
+## Verification
+```bash
+cargo check --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo fmt --all
+```

@@ -1,7 +1,7 @@
 # noro-launcher — Agent Guidelines (AGENTS.md)
 
 Detailed repository instructions: **[./INSTRUCTIONS.md](./INSTRUCTIONS.md)**.
-Root project ideology and universal rules: **[../INSTRUCTIONS.md](../INSTRUCTIONS.md)**.
+Root project ideology and universal rules: **`../INSTRUCTIONS.md`** (only in the monorepo checkout; this repository stands on its own without it).
 
 ## Mandatory Launcher Rules:
 - **Public AGPL-3.0 Repository:** All code comments in English. No private domains, internal credentials, or personal paths (use `example.com`).
