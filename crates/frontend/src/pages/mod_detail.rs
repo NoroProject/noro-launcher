@@ -22,7 +22,7 @@ pub fn view(ui: &mut LauncherUI, server_id: Uuid, hit: CatalogHitInfo, cx: &mut 
         .map(|p| p.gallery.clone())
         .unwrap_or_default();
     for url in &shots {
-        ui.ensure_optional_mod_icon_loaded(Some(url.clone()), cx);
+        ui.ensure_screenshot_loaded(Some(url.clone()), cx);
     }
 
     let show_gallery = ui.mod_detail_gallery && !shots.is_empty();

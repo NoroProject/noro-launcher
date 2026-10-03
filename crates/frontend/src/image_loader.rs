@@ -9,17 +9,62 @@ struct LoadedImage {
     bytes: Vec<u8>,
 }
 
+/// One small runtime and one client for every picture the window loads. Each
+/// image used to get its own OS thread, its own tokio runtime and a fresh
+/// `reqwest::get` — no connection reuse, no HTTP/2, no timeouts, and no limit
+/// on how many ran at once when a catalogue page opened.
+static RUNTIME: std::sync::LazyLock<tokio::runtime::Runtime> = std::sync::LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .thread_name("noro-images")
+        .enable_all()
+        .build()
+        .expect("image runtime")
+});
+
+static CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    reqwest::Client::builder()
+        .user_agent(concat!("noro-launcher/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .read_timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_default()
+});
+
+/// Downloads in flight at once.
+static SLOTS: std::sync::LazyLock<tokio::sync::Semaphore> =
+    std::sync::LazyLock::new(|| tokio::sync::Semaphore::new(8));
+
+/// Runs `work` on the image runtime and waits for it from any executor —
+/// GPUI's included.
+async fn on_runtime<T: Send + 'static>(
+    work: impl std::future::Future<Output = Result<T, String>> + Send + 'static,
+) -> Result<T, String> {
+    RUNTIME
+        .spawn(work)
+        .await
+        .map_err(|_| "image loader stopped".to_string())?
+}
+
+/// CPU work (decoding, resizing) off both the UI thread and the runtime's
+/// workers.
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    on_runtime(async move {
+        tokio::task::spawn_blocking(work)
+            .await
+            .map_err(|_| "image decoder stopped".to_string())?
+    })
+    .await
+}
+
 pub async fn load_image_from_url(url: String) -> Result<Arc<Image>, String> {
     if url.starts_with("data:") {
         return decode_data_url(&url);
     }
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    std::thread::spawn(move || {
-        let result =
-            fetch_image(url).map(|image| Arc::new(Image::from_bytes(image.format, image.bytes)));
-        let _ = tx.send(result);
-    });
-    rx.await.map_err(|_| "image loader stopped".to_string())?
+    let image = fetch_image(url).await?;
+    Ok(Arc::new(Image::from_bytes(image.format, image.bytes)))
 }
 
 /// Like `load_image_from_url`, but shrinks anything larger than `max_side`
@@ -35,18 +80,15 @@ pub async fn load_image_capped(url: String, max_side: u32) -> Result<Arc<Image>,
     if url.starts_with("data:") {
         return decode_data_url(&url);
     }
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    std::thread::spawn(move || {
-        let result = fetch_image(url).map(|image| {
-            let (format, bytes) = match downscale(&image.bytes, max_side) {
-                Some(smaller) => smaller,
-                None => (image.format, image.bytes),
-            };
-            Arc::new(Image::from_bytes(format, bytes))
-        });
-        let _ = tx.send(result);
-    });
-    rx.await.map_err(|_| "image loader stopped".to_string())?
+    let image = fetch_image(url).await?;
+    blocking(move || {
+        let (format, bytes) = match downscale(&image.bytes, max_side) {
+            Some(smaller) => smaller,
+            None => (image.format, image.bytes),
+        };
+        Ok(Arc::new(Image::from_bytes(format, bytes)))
+    })
+    .await
 }
 
 /// `None` when the image is already small enough or can't be decoded.
@@ -80,46 +122,9 @@ pub async fn load_image_and_bytes(url: String) -> Result<(Arc<Image>, Vec<u8>), 
         let bytes = B64.decode(b64).map_err(|e| e.to_string())?;
         return Ok((img, bytes));
     }
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    std::thread::spawn(move || {
-        let result = fetch_image_and_bytes(url);
-        let _ = tx.send(result);
-    });
-    rx.await.map_err(|_| "image loader stopped".to_string())?
-}
-
-fn fetch_image_and_bytes(url: String) -> Result<(Arc<Image>, Vec<u8>), String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| e.to_string())?;
-    runtime.block_on(async move {
-        let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
-        if !response.status().is_success() {
-            return Err(format!("HTTP {}", response.status()));
-        }
-
-        let content_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.split(';').next())
-            .map(str::trim)
-            .map(str::to_string);
-        let bytes = response.bytes().await.map_err(|e| e.to_string())?.to_vec();
-        let format = image_format_from_bytes(&bytes)
-            .or_else(|| {
-                content_type
-                    .as_deref()
-                    .and_then(ImageFormat::from_mime_type)
-            })
-            .or_else(|| image_format_from_url(&url))
-            .ok_or_else(|| "unknown image format".to_string())?;
-
-        let (final_format, final_bytes) = normalize_image_bytes(bytes, format);
-        let img = Arc::new(Image::from_bytes(final_format, final_bytes.clone()));
-        Ok((img, final_bytes))
-    })
+    let image = fetch_image(url).await?;
+    let img = Arc::new(Image::from_bytes(image.format, image.bytes.clone()));
+    Ok((img, image.bytes))
 }
 
 fn normalize_image_bytes(bytes: Vec<u8>, fallback_format: ImageFormat) -> (ImageFormat, Vec<u8>) {
@@ -153,17 +158,14 @@ fn decode_data_url(url: &str) -> Result<Arc<Image>, String> {
     Ok(Arc::new(Image::from_bytes(final_format, final_bytes)))
 }
 
-fn fetch_image(url: String) -> Result<LoadedImage, String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| e.to_string())?;
-    runtime.block_on(async move {
-        let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+/// The body as it came, with the declared content type.
+async fn fetch_raw(url: String) -> Result<(Vec<u8>, Option<String>), String> {
+    on_runtime(async move {
+        let _slot = SLOTS.acquire().await.map_err(|e| e.to_string())?;
+        let response = CLIENT.get(&url).send().await.map_err(|e| e.to_string())?;
         if !response.status().is_success() {
             return Err(format!("HTTP {}", response.status()));
         }
-
         let content_type = response
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
@@ -172,21 +174,26 @@ fn fetch_image(url: String) -> Result<LoadedImage, String> {
             .map(str::trim)
             .map(str::to_string);
         let bytes = response.bytes().await.map_err(|e| e.to_string())?.to_vec();
-        let format = image_format_from_bytes(&bytes)
-            .or_else(|| {
-                content_type
-                    .as_deref()
-                    .and_then(ImageFormat::from_mime_type)
-            })
-            .or_else(|| image_format_from_url(&url))
-            .ok_or_else(|| "unknown image format".to_string())?;
-
-        let (final_format, final_bytes) = normalize_image_bytes(bytes, format);
-        Ok(LoadedImage {
-            format: final_format,
-            bytes: final_bytes,
-        })
+        Ok((bytes, content_type))
     })
+    .await
+}
+
+async fn fetch_image(url: String) -> Result<LoadedImage, String> {
+    let (bytes, content_type) = fetch_raw(url.clone()).await?;
+    let format = image_format_from_bytes(&bytes)
+        .or_else(|| {
+            content_type
+                .as_deref()
+                .and_then(ImageFormat::from_mime_type)
+        })
+        .or_else(|| image_format_from_url(&url))
+        .ok_or_else(|| "unknown image format".to_string())?;
+    blocking(move || {
+        let (format, bytes) = normalize_image_bytes(bytes, format);
+        Ok(LoadedImage { format, bytes })
+    })
+    .await
 }
 
 fn image_format_from_bytes(bytes: &[u8]) -> Option<ImageFormat> {
@@ -264,18 +271,11 @@ pub async fn load_render_image_capped(
         let b64 = url.split(',').nth(1).ok_or("invalid data URL")?;
         B64.decode(b64).map_err(|e| e.to_string())?
     } else {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        std::thread::spawn(move || {
-            let _ = tx.send(fetch_image(url).map(|image| image.bytes));
-        });
-        rx.await.map_err(|_| "image loader stopped".to_string())??
+        // Decoded to pixels right away, so the PNG round trip that `Image`
+        // needs for WebP and friends would be wasted here.
+        fetch_raw(url).await?.0
     };
-
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(decode_to_frame(&bytes, max_side));
-    });
-    rx.await.map_err(|_| "image decoder stopped".to_string())?
+    blocking(move || decode_to_frame(&bytes, max_side)).await
 }
 
 /// Decode, shrink and swap to BGRA — the order GPUI uploads textures in.

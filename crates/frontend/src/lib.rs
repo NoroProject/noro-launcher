@@ -130,6 +130,18 @@ fn open_window(
             let view_weak: WeakEntity<LauncherUI> = view.downgrade();
             cx.set_global(GlobalLauncherUI(view.clone()));
 
+            // The skin preview animates only while the window has the focus;
+            // coming back to it picks the animation up again.
+            view.update(cx, |_, cx| {
+                cx.observe_window_activation(window, |ui, window, cx| {
+                    ui.window_active = window.is_window_active();
+                    if ui.window_active && ui.page == Page::Profile {
+                        ui.start_skin_animation(cx);
+                    }
+                })
+                .detach();
+            });
+
             // Alt+F4 and the system's own close go through the same question
             // as the close button.
             let closing = view.downgrade();

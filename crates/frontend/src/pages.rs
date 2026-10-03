@@ -52,6 +52,7 @@ mod sidebar_user;
 mod skin_drag;
 mod toast;
 
+pub use markdown::plain_excerpt;
 pub use mod_icon::normalized as normalized_mod_name;
 pub use shell::launcher_shell;
 pub use toast::toast_overlay;

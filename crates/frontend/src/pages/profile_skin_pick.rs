@@ -52,8 +52,7 @@ pub fn on_upload_click(
                     this.custom_presets.push(SavedSkinPreset {
                         id: uuid::Uuid::new_v4().to_string(),
                         name: skin.name,
-                        bytes: skin.bytes,
-                        preview: this.skin_preview.clone(),
+                        bytes: std::sync::Arc::new(skin.bytes),
                     });
                     cx.notify();
                 });

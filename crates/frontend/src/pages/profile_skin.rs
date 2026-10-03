@@ -169,7 +169,7 @@ fn custom_preset_card(
     let bytes = preset.bytes.clone();
     let id = preset.id.clone();
     let name = preset.name.clone();
-    let is_active = ui.skin_bytes.as_ref() == Some(&bytes);
+    let is_active = ui.skin_bytes.as_deref() == Some(bytes.as_slice());
 
     let edit_id: SharedString = format!("edit-{}", id).into();
     let del_id: SharedString = format!("del-{}", id).into();
@@ -216,7 +216,7 @@ fn custom_preset_card(
         .gap(px(4.))
         .on_click(cx.listener(move |this, _, _, cx| {
             if !card_apply_bytes.is_empty() {
-                this.upload_skin(card_apply_bytes.clone());
+                this.upload_skin(card_apply_bytes.to_vec());
                 cx.notify();
             }
         }))
@@ -304,7 +304,7 @@ fn custom_preset_card(
                 .text_color(rgb(TEXT_PRIMARY))
                 .child(t("profile-preset-wear"))
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.upload_skin(apply_bytes.clone());
+                    this.upload_skin(apply_bytes.to_vec());
                     cx.notify();
                 }))
                 .into_any_element()

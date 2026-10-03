@@ -16,7 +16,7 @@ impl LauncherUI {
         if self.skin_url != user.skin_url {
             self.skin_url = user.skin_url.clone();
             self.skin_uploading = false;
-            self.reset_skin_preview();
+            self.reset_skin_preview(cx);
         }
         if self.cape_url != user.cape_url {
             self.cape_url = user.cape_url.clone();
@@ -83,9 +83,14 @@ impl LauncherUI {
         .detach();
     }
 
-    pub(crate) fn reset_skin_preview(&mut self) {
+    pub(crate) fn reset_skin_preview(&mut self, cx: &mut Context<Self>) {
         self.skin_image = None;
-        self.skin_preview = None;
+        // The last frame goes back to GPUI's atlas, or it stays there for the
+        // rest of the session.
+        if let Some(frame) = self.skin_preview.take() {
+            cx.drop_image(frame, None);
+        }
+        self.skin_decoded = None;
         self.skin_bytes = None;
         self.skin_yaw = 0.0;
         self.skin_sway = 0.0;

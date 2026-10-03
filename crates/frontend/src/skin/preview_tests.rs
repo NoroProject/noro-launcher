@@ -2,6 +2,7 @@
 //! way. These check that both actually reach the rasteriser.
 
 use super::*;
+use crate::skin::render_rgba;
 use image::{ImageEncoder, RgbaImage};
 
 /// 64×64 classic skin carrying nothing but a head, each face its own colour.
@@ -78,7 +79,8 @@ fn sway_moves_limbs_without_touching_the_facing() {
 #[test]
 fn a_rendered_frame_is_bgra_and_full_size() {
     let skin = test_skin();
-    let frame = render_view(&skin, None, 0.0, 0.0).expect("frame renders");
+    let decoded = crate::skin::decode(&skin, None).expect("skin decodes");
+    let frame = render_frame(&decoded, 0.0, 0.0);
     let size = frame.size(0);
     // The frame comes out at the supersample size, not the logical PREVIEW_*.
     assert_eq!(u32::from(size.width), SUPERSAMPLE_W);

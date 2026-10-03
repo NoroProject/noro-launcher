@@ -83,13 +83,22 @@ pub fn render(source: &str) -> Vec<AnyElement> {
 
 pub fn plain_excerpt(source: &str, limit: usize) -> String {
     let mut out = String::new();
+    // Counted as it grows: recounting the whole string after every event made
+    // a long post quadratic.
+    let mut chars = 0;
     for event in Parser::new(source) {
         match event {
-            Event::Text(text) | Event::Code(text) => out.push_str(&text),
-            Event::SoftBreak | Event::HardBreak | Event::End(TagEnd::Paragraph) => out.push(' '),
+            Event::Text(text) | Event::Code(text) => {
+                chars += text.chars().count();
+                out.push_str(&text);
+            }
+            Event::SoftBreak | Event::HardBreak | Event::End(TagEnd::Paragraph) => {
+                chars += 1;
+                out.push(' ');
+            }
             _ => {}
         }
-        if out.chars().count() > limit {
+        if chars > limit {
             break;
         }
     }

@@ -6,7 +6,7 @@
 //! synchronously and past the cache, so the frame is there at once and doesn't
 //! stay in memory forever.
 
-use super::{render_rgba, View};
+use super::{render_decoded, Decoded, View};
 use gpui::RenderImage;
 use image::Frame;
 use std::sync::Arc;
@@ -24,24 +24,19 @@ const IDLE_PITCH: f64 = 6.0;
 /// `sway` is the limb cycle's progress in `[0, 1)`. It is deliberately
 /// unrelated to `yaw`, so dragging the figure with the mouse doesn't speed up
 /// or rewind the arms and legs.
-pub fn render_view(
-    skin_png: &[u8],
-    cape_png: Option<&[u8]>,
-    yaw: f64,
-    sway: f64,
-) -> Option<Arc<RenderImage>> {
+pub fn render_frame(decoded: &Decoded, yaw: f64, sway: f64) -> Arc<RenderImage> {
     let view = View {
         yaw,
         pitch: IDLE_PITCH,
         sway,
         ..View::default()
     };
-    let mut canvas = render_rgba(skin_png, cape_png, SUPERSAMPLE_W, SUPERSAMPLE_H, &view)?;
+    let mut canvas = render_decoded(decoded, SUPERSAMPLE_W, SUPERSAMPLE_H, &view);
     // GPUI uploads textures as BGRA.
     for pixel in canvas.chunks_exact_mut(4) {
         pixel.swap(0, 2);
     }
-    Some(Arc::new(RenderImage::new(vec![Frame::new(canvas)])))
+    Arc::new(RenderImage::new(vec![Frame::new(canvas)]))
 }
 
 #[cfg(test)]

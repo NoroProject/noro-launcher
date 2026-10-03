@@ -213,8 +213,9 @@ pub enum ProfileTab {
 pub struct SavedSkinPreset {
     pub id: String,
     pub name: String,
-    pub bytes: Vec<u8>,
-    pub preview: Option<Arc<RenderImage>>,
+    /// Shared: the preset cards are drawn every frame the skin turns, and
+    /// copying each preset's PNG for every one of them added up.
+    pub bytes: Arc<Vec<u8>>,
 }
 
 pub struct LauncherUI {
@@ -226,6 +227,11 @@ pub struct LauncherUI {
     /// Current preview frame. `RenderImage` and not `Image`, because it draws
     /// synchronously.
     pub skin_preview: Option<Arc<RenderImage>>,
+    /// The current skin and cape, decoded once per change rather than per frame.
+    pub skin_decoded: Option<(u64, Arc<crate::skin::Decoded>)>,
+    /// Whether the main window has the focus. The skin preview only animates
+    /// while it does.
+    pub window_active: bool,
     pub skin_bytes: Option<Vec<u8>>,
     pub skin_url: Option<String>,
     /// Rotation of the figure, in degrees.
@@ -306,6 +312,9 @@ pub struct LauncherUI {
     pub suggested_mods: HashSet<String>,
     pub background_images: HashMap<Uuid, Arc<RenderImage>>,
     pub news_images: HashMap<Uuid, Arc<Image>>,
+    /// Card text per post, made when the news arrive: parsing every post's
+    /// markdown again for every frame was most of the news page's cost.
+    pub news_excerpts: HashMap<Uuid, gpui::SharedString>,
     news_images_loading: HashSet<Uuid>,
     pub server_icons: HashMap<Uuid, Arc<RenderImage>>,
     /// Уже разобранные пиксели, а не сжатый файл: `Image` уходит в кеш ассетов
@@ -524,6 +533,17 @@ impl gpui::Render for ConsoleWindow {
 }
 
 use crate::console_model::MAX_LOG_LINES;
+
+/// Catalogue icons and avatars are drawn at a few dozen pixels.
+const ICON_SIDE: u32 = 128;
+/// Mod screenshots fill a wide gallery box.
+const SCREENSHOT_SIDE: u32 = 480;
+/// Remote pictures kept decoded at once before the cache starts over.
+const REMOTE_IMAGE_CAP: usize = 256;
+
+fn trimmed(url: Option<&String>) -> Option<&str> {
+    url.map(|u| u.trim()).filter(|u| !u.is_empty())
+}
 const CONSOLE_WINDOW_SIZE: (f32, f32) = (800., 500.);
 const CONSOLE_WINDOW_MIN_SIZE: (f32, f32) = (720., 440.);
 
@@ -548,6 +568,8 @@ impl LauncherUI {
             skin_dragging: false,
             skin_drag_x: 0.0,
             skin_anim_running: false,
+            skin_decoded: None,
+            window_active: true,
             cape_bytes: None,
             cape_url: None,
             cape_loading: false,
@@ -598,6 +620,7 @@ impl LauncherUI {
             suggested_mods: HashSet::new(),
             background_images: HashMap::new(),
             news_images: HashMap::new(),
+            news_excerpts: HashMap::new(),
             news_images_loading: HashSet::new(),
             server_icons: HashMap::new(),
             optional_mod_icons: HashMap::new(),
@@ -731,7 +754,9 @@ impl LauncherUI {
             return;
         }
 
-        self.background_images.remove(&server_id);
+        // The old picture stays up until the new one is in; replacing it is
+        // also what hands its texture back to GPUI below. Removing it first
+        // meant the replacement never found anything to release.
         self.background_image_urls.insert(server_id, url.clone());
         self.background_loading.insert(server_id);
         cx.spawn(async move |this, cx| {
@@ -789,7 +814,6 @@ impl LauncherUI {
         {
             return;
         }
-        self.server_icons.remove(&server_id);
         self.server_icon_urls.insert(server_id, url.clone());
         self.icons_loading.insert(server_id);
         cx.spawn(async move |this, cx| {
@@ -825,6 +849,21 @@ impl LauncherUI {
     }
 
     pub fn ensure_optional_mod_icon_loaded(&mut self, url: Option<String>, cx: &mut Context<Self>) {
+        self.ensure_remote_image_loaded(url, ICON_SIDE, cx);
+    }
+
+    /// Screenshots are shown much larger than icons; decoded at icon size they
+    /// came out blurry.
+    pub fn ensure_screenshot_loaded(&mut self, url: Option<String>, cx: &mut Context<Self>) {
+        self.ensure_remote_image_loaded(url, SCREENSHOT_SIDE, cx);
+    }
+
+    fn ensure_remote_image_loaded(
+        &mut self,
+        url: Option<String>,
+        max_side: u32,
+        cx: &mut Context<Self>,
+    ) {
         let Some(url) = url.filter(|u| !u.trim().is_empty()) else {
             return;
         };
@@ -836,11 +875,19 @@ impl LauncherUI {
         }
         self.optional_mod_icons_loading.insert(url.clone());
         cx.spawn(async move |this, cx| {
-            let result = crate::image_loader::load_render_image_capped(url.clone(), 128).await;
+            let result = crate::image_loader::load_render_image_capped(url.clone(), max_side).await;
             let _ = this.update(cx, |state, cx| {
                 state.optional_mod_icons_loading.remove(&url);
                 match result {
                     Ok(image) => {
+                        // Catalogue pages, avatars and screenshots all land
+                        // here, and nothing ever left. Past the cap the lot is
+                        // released; what is still on screen loads again.
+                        if state.optional_mod_icons.len() >= REMOTE_IMAGE_CAP {
+                            for (_, stale) in state.optional_mod_icons.drain() {
+                                cx.drop_image(stale, None);
+                            }
+                        }
                         state.optional_mod_icons.insert(url, image);
                         // Перерисовка только когда есть что показать: иначе
                         // неудача сама вызывает кадр, который её повторит.
@@ -856,76 +903,48 @@ impl LauncherUI {
         .detach();
     }
 
-    fn replace_servers(&mut self, servers: Vec<ServerEntry>) {
+    fn replace_servers(&mut self, servers: Vec<ServerEntry>, cx: &mut Context<Self>) {
         let next_ids: HashSet<_> = servers.iter().map(|s| s.id).collect();
         let old_ids: Vec<_> = self.servers.iter().map(|s| s.id).collect();
 
         for id in old_ids {
             if !next_ids.contains(&id) {
-                self.clear_server_assets(id);
+                self.clear_background(id, cx);
+                self.clear_icon(id, cx);
             }
         }
 
         for server in &servers {
-            self.sync_asset_url(server.id, server.background_url.as_ref(), true);
-            self.sync_asset_url(server.id, server.icon_url.as_ref(), false);
+            if trimmed(server.background_url.as_ref()).is_none() {
+                self.clear_background(server.id, cx);
+            }
+            if trimmed(server.icon_url.as_ref()).is_none() {
+                self.clear_icon(server.id, cx);
+            }
         }
+        // A changed address needs nothing here: `ensure_*_loaded` sees the new
+        // URL on the next frame, loads it, and releases the old picture when
+        // the new one replaces it.
 
         self.servers = servers;
     }
 
-    fn sync_asset_url(&mut self, server_id: Uuid, url: Option<&String>, is_background: bool) {
-        let url = url.and_then(|u| {
-            let trimmed = u.trim();
-            (!trimmed.is_empty()).then(|| trimmed.to_string())
-        });
-        match (is_background, url) {
-            (true, Some(url)) if self.background_image_urls.get(&server_id) != Some(&url) => {
-                self.background_images.remove(&server_id);
-                self.background_loading.remove(&server_id);
-                self.background_image_urls.insert(server_id, url);
-            }
-            (false, Some(url)) if self.server_icon_urls.get(&server_id) != Some(&url) => {
-                self.server_icons.remove(&server_id);
-                self.icons_loading.remove(&server_id);
-                self.server_icon_urls.insert(server_id, url);
-            }
-            (true, None) => self.clear_background(server_id),
-            (false, None) => self.clear_icon(server_id),
-            _ => {}
+    /// Every removal hands the texture back to GPUI, whose atlas never evicts
+    /// anything on its own.
+    fn clear_background(&mut self, server_id: Uuid, cx: &mut Context<Self>) {
+        if let Some(image) = self.background_images.remove(&server_id) {
+            cx.drop_image(image, None);
         }
-    }
-
-    fn clear_server_assets(&mut self, server_id: Uuid) {
-        self.clear_background(server_id);
-        self.clear_icon(server_id);
-    }
-
-    fn clear_background(&mut self, server_id: Uuid) {
-        self.background_images.remove(&server_id);
         self.background_loading.remove(&server_id);
         self.background_image_urls.remove(&server_id);
     }
 
-    fn clear_icon(&mut self, server_id: Uuid) {
-        self.server_icons.remove(&server_id);
+    fn clear_icon(&mut self, server_id: Uuid, cx: &mut Context<Self>) {
+        if let Some(image) = self.server_icons.remove(&server_id) {
+            cx.drop_image(image, None);
+        }
         self.icons_loading.remove(&server_id);
         self.server_icon_urls.remove(&server_id);
-    }
-
-    pub fn save_current_skin_preset(&mut self) {
-        if let Some(bytes) = &self.skin_bytes {
-            let num = self.custom_presets.len() + 1;
-            let name = format!("Skin {}", num);
-            let id = uuid::Uuid::new_v4().to_string();
-            let preset = SavedSkinPreset {
-                id,
-                name,
-                bytes: bytes.clone(),
-                preview: self.skin_preview.clone(),
-            };
-            self.custom_presets.push(preset);
-        }
     }
 
     pub fn load_preset_renders(&mut self, cx: &mut Context<Self>) {
@@ -995,7 +1014,7 @@ impl LauncherUI {
             MessageToFrontend::LoggedOut => {
                 self.clear_account_data();
                 self.user = None;
-                self.reset_skin_preview();
+                self.reset_skin_preview(cx);
                 self.skin_url = None;
                 self.skin_loading = false;
                 self.skin_uploading = false;
@@ -1010,10 +1029,14 @@ impl LauncherUI {
                 self.startup_checking = false;
                 self.page = Page::Login;
             }
-            MessageToFrontend::ServerList { servers } => self.replace_servers(servers),
+            MessageToFrontend::ServerList { servers } => self.replace_servers(servers, cx),
             MessageToFrontend::NewsUpdated { items } => {
-                self.news_images
-                    .retain(|id, _| items.iter().any(|n| n.id == *id));
+                let ids: HashSet<Uuid> = items.iter().map(|n| n.id).collect();
+                self.news_images.retain(|id, _| ids.contains(id));
+                self.news_excerpts = items
+                    .iter()
+                    .map(|n| (n.id, crate::pages::plain_excerpt(&n.body, 240).into()))
+                    .collect();
                 self.news = items;
             }
             MessageToFrontend::ConfigState {
@@ -1362,8 +1385,7 @@ impl LauncherUI {
                     let preset_struct = SavedSkinPreset {
                         id: id.clone(),
                         name: name.clone(),
-                        bytes: Vec::new(),
-                        preview: None,
+                        bytes: Arc::default(),
                     };
                     self.custom_presets.push(preset_struct);
 
@@ -1377,7 +1399,7 @@ impl LauncherUI {
                                 if let Some(found) =
                                     this.custom_presets.iter_mut().find(|cp| cp.id == id_bytes)
                                 {
-                                    found.bytes = bytes;
+                                    found.bytes = Arc::new(bytes);
                                 }
                                 cx.notify();
                             });

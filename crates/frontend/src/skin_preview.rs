@@ -16,27 +16,46 @@ const SWAY_PERIOD_MS: f32 = 2400.0;
 const YAW_DEG_PER_SEC: f32 = 60.0;
 
 pub(crate) struct FrameJob {
-    skin: Vec<u8>,
-    cape: Option<Vec<u8>>,
+    decoded: Arc<skin::Decoded>,
     yaw: f64,
     sway: f64,
+}
+
+/// Identifies a skin + cape pair without keeping a copy of either.
+fn skin_key(skin: &[u8], cape: Option<&[u8]>) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    skin.hash(&mut h);
+    cape.hash(&mut h);
+    h.finish()
 }
 
 impl LauncherUI {
     /// Advances the clocks. `None` means there is nothing to render.
     fn next_frame_job(&mut self, elapsed: Duration) -> Option<FrameJob> {
-        let skin = self.skin_bytes.clone()?;
-        if self.page != Page::Profile {
+        // Nobody is looking: the window is in the background or minimized,
+        // usually because the game is up. Sixty frames a second of CPU
+        // rasterising for nobody; the loop restarts when the window does.
+        if self.page != Page::Profile || !self.window_active {
             return None;
         }
+        let skin = self.skin_bytes.as_deref()?;
+        let key = skin_key(skin, self.cape_bytes.as_deref());
+        let decoded = match &self.skin_decoded {
+            Some((k, d)) if *k == key => d.clone(),
+            _ => {
+                let d = Arc::new(skin::decode(skin, self.cape_bytes.as_deref())?);
+                self.skin_decoded = Some((key, d.clone()));
+                d
+            }
+        };
         let dt = elapsed.as_secs_f32().min(0.25); // don't jump after a long pause
         self.skin_sway = (self.skin_sway + dt * 1000.0 / SWAY_PERIOD_MS).fract();
         if !self.skin_dragging {
             self.skin_yaw = (self.skin_yaw + dt * YAW_DEG_PER_SEC).rem_euclid(360.0);
         }
         Some(FrameJob {
-            skin,
-            cape: self.cape_bytes.clone(),
+            decoded,
             yaw: self.skin_yaw as f64,
             sway: self.skin_sway as f64,
         })
@@ -72,9 +91,7 @@ impl LauncherUI {
                 };
 
                 let frame = executor
-                    .spawn(async move {
-                        skin::render_view(&job.skin, job.cape.as_deref(), job.yaw, job.sway)
-                    })
+                    .spawn(async move { Some(skin::render_frame(&job.decoded, job.yaw, job.sway)) })
                     .await;
 
                 let alive = this.update(cx, |state, cx| {
@@ -84,14 +101,8 @@ impl LauncherUI {
                         // RenderImage in the sprite atlas by id and never evicts
                         // one on its own, so dropping our Arc frees the pixels
                         // but leaves the texture — half a megabyte every 16 ms.
-                        //
-                        // Unless a saved preset kept this exact frame: then the
-                        // texture is still on screen and evicting it just makes
-                        // GPUI upload it again on the next paint.
                         if let Some(stale) = state.skin_preview.replace(frame) {
-                            if Arc::strong_count(&stale) == 1 {
-                                cx.drop_image(stale, None);
-                            }
+                            cx.drop_image(stale, None);
                         }
                         cx.notify();
                     }
