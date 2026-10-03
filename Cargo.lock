@@ -2177,6 +2177,7 @@ dependencies = [
  "base64",
  "bridge",
  "chrono",
+ "dirs 5.0.1",
  "gpui",
  "gpui_platform",
  "i18n",
@@ -3129,7 +3130,7 @@ dependencies = [
 [[package]]
 name = "i18n"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#8b270403b243f466b5a0c66a99f200e974c925f0"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#1cd7d204eafe8188454aa649678a5ae06ed7e830"
 dependencies = [
  "fluent-bundle",
  "parking_lot",
@@ -3149,7 +3150,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.57.0",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -3836,7 +3837,7 @@ dependencies = [
 [[package]]
 name = "mc_mod_utils"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#8b270403b243f466b5a0c66a99f200e974c925f0"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#1cd7d204eafe8188454aa649678a5ae06ed7e830"
 dependencies = [
  "base64",
  "serde",
@@ -5749,7 +5750,7 @@ dependencies = [
 [[package]]
 name = "schema"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#8b270403b243f466b5a0c66a99f200e974c925f0"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#1cd7d204eafe8188454aa649678a5ae06ed7e830"
 dependencies = [
  "chrono",
  "once_cell",
