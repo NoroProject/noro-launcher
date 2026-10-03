@@ -138,9 +138,15 @@ pub async fn apply(
         // shader pack can be hundreds of megabytes, and a bad download must
         // not replace a good file.
         let staged = staging_path(&dest);
-        if let Err(e) =
-            crate::sync::fetch::fetch_to_file(client, &entry.url, &staged, &entry.sha1, &|_| {})
-                .await
+        if let Err(e) = crate::sync::fetch::fetch_to_file(
+            client,
+            &entry.url,
+            &staged,
+            &entry.sha1,
+            &|_| {},
+            &|| false,
+        )
+        .await
         {
             tracing::warn!(path = %entry.path, error = %format!("{e:#}"), "live sync skipped a file");
             let _ = tokio::fs::remove_file(&staged).await;

@@ -102,7 +102,7 @@ async fn exchange(master_url: &str, code: &str, verifier: &str) -> Result<LoginR
     }
 
     let url = format!("{}/oauth2/token", master_url.trim_end_matches('/'));
-    let resp: TokenResp = reqwest::Client::new()
+    let resp: TokenResp = crate::http::client()?
         .post(&url)
         .json(&serde_json::json!({
             "grant_type": "authorization_code",

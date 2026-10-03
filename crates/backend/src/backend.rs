@@ -139,9 +139,7 @@ async fn run(
         }
     });
     let optional = Persistent::<OptionalModsSelection>::load(dirs.optional_mods_file());
-    let http = reqwest::Client::builder()
-        .user_agent(format!("noro-launcher/{}", env!("CARGO_PKG_VERSION")))
-        .build()?;
+    let http = crate::http::client()?;
 
     let stored = token_store::load();
     if stored.is_some() {
@@ -571,11 +569,18 @@ pub fn spawn_sync_and_launch(req: Launch) {
         .await;
 
         if let Err(e) = sync_result {
-            modal.fail(e.to_string());
-            ctx.send(MessageToFrontend::SyncFailed {
-                server_id,
-                reason: e.to_string(),
-            });
+            // A cancel surfaces as an error from deep inside the download; it
+            // is the player's choice, not a failure to report.
+            if modal.is_cancelled() {
+                ctx.send(MessageToFrontend::LaunchCancelled { server_id });
+                return;
+            }
+            // `{:#}` keeps the cause chain: "download of X failed: SHA1
+            // mismatch" rather than only the outermost context.
+            let reason = format!("{e:#}");
+            tracing::error!(%server_id, error = %reason, "sync failed");
+            modal.fail(reason.clone());
+            ctx.send(MessageToFrontend::SyncFailed { server_id, reason });
             return;
         }
         ctx.send(MessageToFrontend::SyncComplete { server_id });
@@ -658,6 +663,12 @@ pub fn spawn_sync_and_launch(req: Launch) {
         let online = server.as_ref().and_then(|s| s.online);
         let max_online = server.as_ref().and_then(|s| s.max_online);
 
+        // Cancelled while the files were being checked: stop before the game.
+        if modal.is_cancelled() {
+            ctx.send(MessageToFrontend::LaunchCancelled { server_id });
+            return;
+        }
+
         // The channel to the case mod has to be up before the game starts: the
         // mod reads the handshake file once, at startup, and being late here
         // means no panel until the next login.
@@ -679,9 +690,10 @@ pub fn spawn_sync_and_launch(req: Launch) {
             }
             Err(e) => {
                 ctx.mod_link.stop().await;
+                tracing::error!(%server_id, error = %format!("{e:#}"), "launch failed");
                 ctx.send(MessageToFrontend::SyncFailed {
                     server_id,
-                    reason: format!("launch failed: {e}"),
+                    reason: format!("launch failed: {e:#}"),
                 });
             }
         }

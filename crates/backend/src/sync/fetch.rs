@@ -14,6 +14,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 /// progress back — otherwise the bar runs past 100%.
 pub type BytesFn<'a> = &'a (dyn Fn(i64) + Send + Sync);
 
+/// Polled between chunks, so a cancel stops a 200 MB download mid-file rather
+/// than after it. The partial stays for the next attempt to resume.
+pub type CancelFn<'a> = &'a (dyn Fn() -> bool + Send + Sync);
+
 /// Appends `.part` instead of using `with_extension`, which replaces the
 /// extension: `emotes/x.json` and `emotes/x.ogg` would share one partial file
 /// and, downloading in parallel, write over each other.
@@ -31,6 +35,7 @@ pub async fn fetch_to_file(
     dest: &Path,
     expected_sha1: &str,
     on_bytes: BytesFn<'_>,
+    cancelled: CancelFn<'_>,
 ) -> Result<()> {
     if let Some(parent) = dest.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -85,6 +90,10 @@ pub async fn fetch_to_file(
 
     let mut stream = resp.bytes_stream();
     while let Some(chunk) = stream.next().await {
+        if cancelled() {
+            file.flush().await?;
+            bail!("cancelled");
+        }
         let chunk = chunk.with_context(|| format!("download from {url} interrupted"))?;
         hasher.update(&chunk);
         file.write_all(&chunk).await?;

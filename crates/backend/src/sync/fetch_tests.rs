@@ -88,6 +88,7 @@ async fn resume_continues_the_hash_across_the_join() {
         &dest,
         &sha1_of(&data),
         &on_bytes,
+        &|| false,
     )
     .await
     .expect("resume should succeed");
@@ -118,6 +119,7 @@ async fn a_200_response_replaces_the_partial_instead_of_appending() {
         &dest,
         &sha1_of(&data),
         &on_bytes,
+        &|| false,
     )
     .await
     .expect("should overwrite the partial and match the hash");
@@ -142,6 +144,7 @@ async fn a_wrong_hash_removes_the_partial_so_a_retry_starts_clean() {
         &dest,
         &sha1_of(b"other"),
         &on_bytes,
+        &|| false,
     )
     .await
     .expect_err("a hash mismatch should be an error");
@@ -173,4 +176,28 @@ fn tempdir() -> std::path::PathBuf {
     ));
     std::fs::create_dir_all(&base).unwrap();
     base
+}
+
+/// Cancel is checked between chunks, so a big file stops mid-download and
+/// nothing lands under the real name.
+#[tokio::test]
+async fn a_cancel_stops_the_download_mid_file() {
+    let data = payload();
+    let url = serve_once(data.clone(), true).await;
+    let dir = crate::test_http::TempDir::new("fetch-cancel");
+    let dest = dir.path().join("big.bin");
+
+    let err = fetch_to_file(
+        &reqwest::Client::new(),
+        &url,
+        &dest,
+        &sha1_of(&data),
+        &|_| {},
+        &|| true,
+    )
+    .await
+    .unwrap_err();
+
+    assert!(err.to_string().contains("cancelled"), "{err:#}");
+    assert!(!dest.exists());
 }

@@ -68,11 +68,13 @@ pub async fn download_all(
             Ok::<_, anyhow::Error>(())
         }
     }))
-    .buffer_unordered(concurrency)
-    .collect::<Vec<_>>()
-    .await;
+    .buffer_unordered(concurrency);
 
-    for r in results {
+    // The first failure ends the stage: dropping the stream cancels what is
+    // still in flight. Collecting first meant waiting for thousands of other
+    // files before the player learned the sync had already failed.
+    futures::pin_mut!(results);
+    while let Some(r) = results.next().await {
         r?;
     }
     Ok(())
@@ -86,7 +88,10 @@ async fn download_with_retry(
 ) -> Result<()> {
     let mut attempt = 1;
     loop {
-        let result = fetch_to_file(client, &task.url, &task.dest, &task.sha1, on_bytes).await;
+        let result = fetch_to_file(
+            client, &task.url, &task.dest, &task.sha1, on_bytes, cancelled,
+        )
+        .await;
         match result {
             Ok(()) => break,
             Err(e) if attempt >= MAX_ATTEMPTS || cancelled() => {
