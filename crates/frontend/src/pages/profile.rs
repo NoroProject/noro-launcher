@@ -2,7 +2,8 @@
 
 use super::common::{page_title, panel, tabs, Cx};
 use super::profile_cape::cape_panel;
-use super::profile_skin::{skin_card, skin_presets_panel};
+use super::profile_skin::skin_card;
+use super::profile_skin_presets::skin_presets_panel;
 use super::profile_user::user_card;
 use super::skin_drag;
 use crate::state::{LauncherUI, ProfileTab};
