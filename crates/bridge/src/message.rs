@@ -562,7 +562,10 @@ pub enum MessageToFrontend {
         allow_suggestions: bool,
         /// Whether the build allows adding your own content. The operator decides, not the player.
         allow_personal: bool,
-        installed_files: Vec<String>,
+        /// The build's file paths, for telling "already installed" in the
+        /// catalog. `None` when they haven't changed since the last message:
+        /// thousands of paths used to cross over on every server open.
+        installed_files: Option<Vec<String>>,
     },
     ServerClientRecommendation {
         server_id: Uuid,

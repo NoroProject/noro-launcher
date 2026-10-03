@@ -1,3 +1,5 @@
+// Over 150 lines: parsing, caching and drawing of one format, which share
+// its block type and make sense only together.
 //! Markdown news bodies into GPUI elements.
 //!
 //! Inline styles go on as ranges over a single `StyledText` rather than as
@@ -6,10 +8,13 @@
 
 use crate::theme::*;
 use gpui::{
-    div, prelude::*, px, rgb, AnyElement, FontStyle, FontWeight, HighlightStyle, StyledText,
+    div, prelude::*, px, rgb, AnyElement, FontStyle, FontWeight, HighlightStyle, SharedString,
+    StyledText,
 };
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use std::cell::RefCell;
 use std::ops::Range;
+use std::rc::Rc;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Kind {
@@ -20,8 +25,70 @@ enum Kind {
     Item(usize),
 }
 
+/// What a source parses into, kept between frames. Building elements from it
+/// is cheap; running the parser over a long description sixty times a second
+/// was not.
+enum Block {
+    Rule,
+    Text {
+        kind: Kind,
+        text: SharedString,
+        highlights: Vec<(Range<usize>, HighlightStyle)>,
+    },
+}
+
+/// Recently shown sources. The news page and a mod page are the only users,
+/// one text at a time, so a handful covers going back and forth.
+const CACHED: usize = 8;
+
+thread_local! {
+    static CACHE: RefCell<Vec<(u64, Rc<Vec<Block>>)>> = const { RefCell::new(Vec::new()) };
+}
+
+fn cached(key: u64, parse: impl FnOnce() -> Vec<Block>) -> Rc<Vec<Block>> {
+    CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(pos) = cache.iter().position(|(k, _)| *k == key) {
+            let entry = cache.remove(pos);
+            let blocks = entry.1.clone();
+            cache.push(entry);
+            return blocks;
+        }
+        let blocks = Rc::new(parse());
+        if cache.len() >= CACHED {
+            cache.remove(0);
+        }
+        cache.push((key, blocks.clone()));
+        blocks
+    })
+}
+
+fn key(source: &str, salt: u8) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    salt.hash(&mut h);
+    source.hash(&mut h);
+    h.finish()
+}
+
 /// One element per paragraph, heading and list item.
 pub fn render(source: &str) -> Vec<AnyElement> {
+    cached(key(source, 0), || parse(source))
+        .iter()
+        .map(element)
+        .collect()
+}
+
+/// For sources that need converting first (CurseForge sends HTML). The
+/// conversion is cached along with the parse.
+pub fn render_converted(source: &str, convert: fn(&str) -> String) -> Vec<AnyElement> {
+    cached(key(source, 1), || parse(&convert(source)))
+        .iter()
+        .map(element)
+        .collect()
+}
+
+fn parse(source: &str) -> Vec<Block> {
     let parser = Parser::new_ext(source, Options::ENABLE_STRIKETHROUGH);
     let mut out = Vec::new();
     let mut buf = String::new();
@@ -67,7 +134,7 @@ pub fn render(source: &str) -> Vec<AnyElement> {
             }
             Event::SoftBreak => buf.push(' '),
             Event::HardBreak => buf.push('\n'),
-            Event::Rule => out.push(rule()),
+            Event::Rule => out.push(Block::Rule),
             Event::End(
                 TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock | TagEnd::Item,
             ) => {
@@ -131,7 +198,7 @@ fn style(weight: FontWeight, italic: Option<FontStyle>, color: Option<u32>) -> H
 /// Closes out the accumulated block. Empty ones are dropped, otherwise double
 /// line breaks would leave blank strips in the output.
 fn flush(
-    out: &mut Vec<AnyElement>,
+    out: &mut Vec<Block>,
     buf: &mut String,
     spans: &mut Vec<(Range<usize>, HighlightStyle)>,
     kind: Kind,
@@ -141,15 +208,31 @@ fn flush(
     if text.trim().is_empty() {
         return;
     }
+    out.push(Block::Text {
+        kind,
+        text: text.into(),
+        highlights,
+    });
+}
+
+fn element(block: &Block) -> AnyElement {
+    let (kind, text, highlights) = match block {
+        Block::Rule => return div().h(px(1.)).w_full().bg(rgb(BORDER)).into_any_element(),
+        Block::Text {
+            kind,
+            text,
+            highlights,
+        } => (*kind, text.clone(), highlights.clone()),
+    };
 
     // The body font, not the pixel one: a mod description is paragraphs of running
     // text, and monospaced pixels make it read like a printed log. The pixel font
     // stays with headings and captions, where it is expected.
-    let mut block = div()
+    let block = div()
         .font_family(FONT)
         .child(StyledText::new(text).with_highlights(highlights));
 
-    block = match kind {
+    match kind {
         Kind::Heading(size) => block
             .font_family(FONT_PIXEL_ALT)
             .text_size(px(size as f32))
@@ -172,11 +255,6 @@ fn flush(
             .text_color(rgb(TEXT_SECONDARY))
             .pl(px(12. + 16. * level as f32)),
         Kind::Paragraph => block.text_size(px(14.)).text_color(rgb(TEXT_SECONDARY)),
-    };
-
-    out.push(block.into_any_element());
-}
-
-fn rule() -> AnyElement {
-    div().h(px(1.)).w_full().bg(rgb(BORDER)).into_any_element()
+    }
+    .into_any_element()
 }

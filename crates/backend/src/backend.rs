@@ -60,6 +60,10 @@ pub enum InternalEvent {
         server_id: Uuid,
         seq: u64,
     },
+    /// Jar icons for a build's optional mods have been read in the background.
+    JarIconsReady {
+        server_id: Uuid,
+    },
 }
 
 /// What a background task gets: everything shared, nothing owned by the loop.
@@ -118,6 +122,8 @@ pub struct BackendState {
     pub cached_manifests: HashMap<Uuid, BuildManifest>,
     /// Whether the socket to the master is up.
     pub online: bool,
+    /// The build whose file list the window already has, per server.
+    pub files_sent_for: HashMap<Uuid, Uuid>,
     /// Launches waiting on a manifest to arrive.
     pub pending_launch: HashMap<Uuid, bridge::ModalAction>,
     /// Builds whose state the window already has. A guess from the disk is
@@ -228,6 +234,7 @@ async fn run(
         manifests: HashMap::new(),
         cached_manifests: HashMap::new(),
         online: false,
+        files_sent_for: HashMap::new(),
         pending_launch: HashMap::new(),
         build_state_known: HashSet::new(),
         last_launched: None,
@@ -379,6 +386,11 @@ impl BackendState {
                         self.ctx.send(MessageToFrontend::LoginSuccess { user });
                     }
                     _ => self.ctx.send(MessageToFrontend::SessionCheckDone),
+                }
+            }
+            InternalEvent::JarIconsReady { server_id } => {
+                if let Some(manifest) = self.manifests.get(&server_id).cloned() {
+                    self.send_optional_mods(server_id, &manifest);
                 }
             }
             InternalEvent::ManifestTimeout { server_id, seq } => {

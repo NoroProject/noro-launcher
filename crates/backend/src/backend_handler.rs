@@ -739,8 +739,11 @@ impl BackendState {
         });
     }
 
-    fn send_optional_mods(&self, server_id: Uuid, manifest: &schema::BuildManifest) {
+    pub(crate) fn send_optional_mods(&mut self, server_id: Uuid, manifest: &schema::BuildManifest) {
         use crate::directories::safe_join;
+        // Jars nobody has read yet are read off the loop; the list goes out
+        // again once they are, with their icons.
+        let mut unread: Vec<std::path::PathBuf> = Vec::new();
         let enabled = crate::sync::file_sync::resolve_enabled(
             manifest,
             self.ctx.optional.get().for_server(&server_id),
@@ -763,7 +766,13 @@ impl BackendState {
                         .filter(|f| f.ends_with(".jar"))
                         .find_map(|f| {
                             let path = safe_join(&instance_dir, f)?;
-                            crate::mod_icon::cached_jar_icon(&path)
+                            match crate::mod_icon::known_jar_icon(&path) {
+                                Some(icon) => icon,
+                                None => {
+                                    unread.push(path);
+                                    None
+                                }
+                            }
                         })
                 });
                 OptionalModInfo {
@@ -780,11 +789,27 @@ impl BackendState {
                 }
             })
             .collect();
-        let installed_files = manifest
-            .verified_files
-            .iter()
-            .map(|f| f.path.clone())
-            .collect();
+        let installed_files = if self.files_sent_for.get(&server_id) == Some(&manifest.build_id) {
+            None
+        } else {
+            self.files_sent_for.insert(server_id, manifest.build_id);
+            Some(
+                manifest
+                    .verified_files
+                    .iter()
+                    .map(|f| f.path.clone())
+                    .collect(),
+            )
+        };
+        if !unread.is_empty() {
+            let internal = self.ctx.internal.clone();
+            tokio::task::spawn_blocking(move || {
+                for path in &unread {
+                    crate::mod_icon::cached_jar_icon(path);
+                }
+                let _ = internal.send(InternalEvent::JarIconsReady { server_id });
+            });
+        }
         self.ctx.send(MessageToFrontend::OptionalMods {
             server_id,
             mods,
@@ -928,9 +953,12 @@ impl BackendState {
                 self.ctx
                     .send(MessageToFrontend::PermissionsUpdated { user });
                 self.ctx.ws.send(ClientWsMsg::RequestServerList);
-                for (server_id, manifest) in &self.manifests {
+                // Taken out for the loop rather than cloned: manifests are big.
+                let manifests = std::mem::take(&mut self.manifests);
+                for (server_id, manifest) in &manifests {
                     self.send_optional_mods(*server_id, manifest);
                 }
+                self.manifests = manifests;
             }
             ServerWsMsg::RequestDiagnostics => {
                 let ctx = self.ctx.clone();

@@ -218,6 +218,10 @@ pub enum ProfileTab {
     Capes,
 }
 
+/// Preset and cape cards are 72 px wide. The master renders at 8 to 10 times
+/// the texture size; twice the card is plenty on a HiDPI screen.
+const PRESET_RENDER_SIDE: u32 = 192;
+
 #[derive(Clone, Debug)]
 pub struct SavedSkinPreset {
     pub id: String,
@@ -309,7 +313,10 @@ pub struct LauncherUI {
     pub build_state: HashMap<Uuid, bridge::BuildState>,
     pub logs: HashMap<Uuid, std::collections::VecDeque<LogEntry>>,
     pub optional_mods: HashMap<Uuid, Vec<OptionalModInfo>>,
-    pub installed_files: HashMap<Uuid, Vec<String>>,
+    /// Normalised names of a build's files. Kept apart from the optional mod
+    /// names in `installed_keys`, because the file list only comes when the
+    /// build changes.
+    installed_file_keys: HashMap<Uuid, std::collections::HashSet<String>>,
     /// Names of what the build already ships, normalised for comparison.
     ///
     /// Computed once per manifest: a catalog card asks "is this installed?" every
@@ -648,7 +655,7 @@ impl LauncherUI {
             build_state: HashMap::new(),
             logs: HashMap::new(),
             optional_mods: HashMap::new(),
-            installed_files: HashMap::new(),
+            installed_file_keys: HashMap::new(),
             installed_keys: HashMap::new(),
             allow_mod_suggestions: HashMap::new(),
             allow_personal_content: HashMap::new(),
@@ -734,8 +741,12 @@ impl LauncherUI {
         }
     }
 
-    pub fn sync_state(&self, server_id: &Uuid) -> SyncUiState {
-        self.sync.get(server_id).cloned().unwrap_or_default()
+    /// By reference: the sidebar asks for every server on every frame, and a
+    /// copy each time duplicated the stage map and the rate samples.
+    pub fn sync_state(&self, server_id: &Uuid) -> &SyncUiState {
+        static IDLE: std::sync::LazyLock<SyncUiState> =
+            std::sync::LazyLock::new(SyncUiState::default);
+        self.sync.get(server_id).unwrap_or(&IDLE)
     }
 
     pub fn server(&self, id: &Uuid) -> Option<&ServerEntry> {
@@ -1004,7 +1015,9 @@ impl LauncherUI {
                 name
             );
             cx.spawn(async move |this, cx| {
-                if let Ok(img) = crate::image_loader::load_image_from_url(url).await {
+                if let Ok(img) =
+                    crate::image_loader::load_image_capped(url, PRESET_RENDER_SIDE).await
+                {
                     let _ = this.update(cx, |this, cx| {
                         this.preset_images.insert(name, img);
                         cx.notify();
@@ -1139,6 +1152,19 @@ impl LauncherUI {
                     .insert(server_id, allow_suggestions);
                 self.allow_personal_content
                     .insert(server_id, allow_personal);
+                if let Some(files) = installed_files {
+                    let file_keys = files
+                        .iter()
+                        .filter_map(|f| {
+                            std::path::Path::new(f)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .map(crate::pages::normalized_mod_name)
+                        })
+                        .filter(|k| !k.is_empty())
+                        .collect();
+                    self.installed_file_keys.insert(server_id, file_keys);
+                }
                 let mut keys: std::collections::HashSet<String> = self
                     .optional_mods
                     .get(&server_id)
@@ -1149,19 +1175,10 @@ impl LauncherUI {
                             .collect()
                     })
                     .unwrap_or_default();
-                keys.extend(
-                    installed_files
-                        .iter()
-                        .filter_map(|f| {
-                            std::path::Path::new(f)
-                                .file_name()
-                                .and_then(|n| n.to_str())
-                                .map(crate::pages::normalized_mod_name)
-                        })
-                        .filter(|k| !k.is_empty()),
-                );
+                if let Some(file_keys) = self.installed_file_keys.get(&server_id) {
+                    keys.extend(file_keys.iter().cloned());
+                }
                 self.installed_keys.insert(server_id, keys);
-                self.installed_files.insert(server_id, installed_files);
             }
             MessageToFrontend::ServerClientRecommendation {
                 server_id,
@@ -1405,15 +1422,22 @@ impl LauncherUI {
             MessageToFrontend::CapesList { capes } => {
                 self.capes = capes.clone();
                 let master_url = self.config.master_url.clone();
-                for cape in capes {
+                // A cape's render doesn't change; every reconnect used to
+                // download all of them again.
+                let have: HashSet<Uuid> = self.cape_images.keys().copied().collect();
+                for cape in capes.into_iter().filter(|c| !have.contains(&c.id)) {
                     let id = cape.id;
+                    // The texture address goes inside a query string, so it
+                    // has to be escaped like one.
                     let render_url = format!(
                         "{}/api/textures/renders/cape?url={}&scale=10",
                         master_url.trim_end_matches('/'),
-                        cape.url
+                        urlencoding::encode(&cape.url)
                     );
                     cx.spawn(async move |this, cx| {
-                        if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await
+                        if let Ok(img) =
+                            crate::image_loader::load_image_capped(render_url, PRESET_RENDER_SIDE)
+                                .await
                         {
                             let _ = this.update(cx, |this, cx| {
                                 this.cape_images.insert(id, img);
@@ -1425,18 +1449,28 @@ impl LauncherUI {
                 }
             }
             MessageToFrontend::SkinPresetsList { presets } => {
-                self.custom_presets.clear();
+                // A preset that was already here keeps its skin and render;
+                // only new ones are downloaded. Every list used to refetch all.
+                let mut previous: HashMap<String, Arc<Vec<u8>>> = self
+                    .custom_presets
+                    .drain(..)
+                    .map(|p| (p.id, p.bytes))
+                    .collect();
                 let master_url = self.config.master_url.clone();
                 for p in presets {
                     let id = p.id;
                     let name = p.name;
                     let url = p.skin_url;
-                    let preset_struct = SavedSkinPreset {
+                    let known = previous.remove(&id).filter(|bytes| !bytes.is_empty());
+                    let had_render = self.preset_images.contains_key(&id);
+                    self.custom_presets.push(SavedSkinPreset {
                         id: id.clone(),
                         name: name.clone(),
-                        bytes: Arc::default(),
-                    };
-                    self.custom_presets.push(preset_struct);
+                        bytes: known.clone().unwrap_or_default(),
+                    });
+                    if known.is_some() && had_render {
+                        continue;
+                    }
 
                     let url_bytes = url.clone();
                     let id_bytes = id.clone();
@@ -1463,7 +1497,9 @@ impl LauncherUI {
                     );
                     let id_render = id.clone();
                     cx.spawn(async move |this, cx| {
-                        if let Ok(img) = crate::image_loader::load_image_from_url(render_url).await
+                        if let Ok(img) =
+                            crate::image_loader::load_image_capped(render_url, PRESET_RENDER_SIDE)
+                                .await
                         {
                             let _ = this.update(cx, |this, cx| {
                                 this.preset_images.insert(id_render, img);
@@ -1472,6 +1508,10 @@ impl LauncherUI {
                         }
                     })
                     .detach();
+                }
+                // Presets deleted elsewhere: their renders go with them.
+                for id in previous.into_keys() {
+                    self.preset_images.remove(&id);
                 }
             }
             MessageToFrontend::ConnectionState { online } => {
