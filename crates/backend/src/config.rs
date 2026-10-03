@@ -32,6 +32,9 @@ pub struct LauncherConfig {
 pub struct ServerClientSettings {
     pub memory_min_mb: u32,
     pub memory_max_mb: u32,
+    /// The player's own flags. The build's are not kept here: they come with
+    /// every manifest and are added at launch, so a saved override can't drop
+    /// the ones the build does not start without.
     pub jvm_flags: String,
     pub show_console_on_launch: bool,
     #[serde(default)]
@@ -125,14 +128,17 @@ impl LauncherConfig {
         server_id: &Uuid,
         recommended: Option<&RecommendedClientSettings>,
     ) -> ServerClientSettings {
-        self.server_settings
-            .get(server_id)
-            .cloned()
-            .unwrap_or_else(|| {
-                recommended
-                    .map(ServerClientSettings::from)
-                    .unwrap_or_else(|| self.default_client_settings())
-            })
+        if let Some(saved) = self.server_settings.get(server_id) {
+            return saved.clone();
+        }
+        let mut settings = self.default_client_settings();
+        if let Some(recommended) = recommended {
+            settings.memory_min_mb = recommended.memory_min_mb;
+            settings.memory_max_mb = recommended.memory_max_mb;
+            settings.show_console_on_launch = recommended.show_console_on_launch;
+            settings.fullscreen = recommended.fullscreen;
+        }
+        settings
     }
 
     pub fn launch_config_for_server(
@@ -144,7 +150,7 @@ impl LauncherConfig {
         let mut config = self.clone();
         config.memory_min_mb = settings.memory_min_mb;
         config.memory_max_mb = settings.memory_max_mb;
-        config.jvm_flags = settings.jvm_flags;
+        config.jvm_flags = launch_jvm_flags(&settings.jvm_flags, &recommended.jvm_flags);
         config.show_console_on_launch = settings.show_console_on_launch;
         config.fullscreen = settings.fullscreen;
         config
@@ -232,16 +238,15 @@ impl LauncherConfig {
     }
 }
 
-impl From<&RecommendedClientSettings> for ServerClientSettings {
-    fn from(value: &RecommendedClientSettings) -> Self {
-        Self {
-            memory_min_mb: value.memory_min_mb,
-            memory_max_mb: value.memory_max_mb,
-            jvm_flags: value.jvm_flags.clone(),
-            show_console_on_launch: value.show_console_on_launch,
-            fullscreen: value.fullscreen,
-        }
-    }
+/// The player's flags first and the build's last: on a clash — a `-D` set
+/// twice, two `-Xmx` — the JVM keeps the later one, and the build's are the
+/// ones it can't start without (GTNH's system class loader, for one).
+fn launch_jvm_flags(player: &str, build: &str) -> String {
+    player
+        .split_whitespace()
+        .chain(build.split_whitespace())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 impl From<&ServerClientSettings> for bridge::ClientSettingsState {
@@ -268,3 +273,7 @@ impl OptionalModsSelection {
         self.enabled.get(server_id).cloned().unwrap_or_default()
     }
 }
+
+#[cfg(test)]
+#[path = "config_tests.rs"]
+mod tests;
