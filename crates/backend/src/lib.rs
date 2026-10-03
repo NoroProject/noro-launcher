@@ -21,6 +21,7 @@ pub mod master_api;
 pub mod mod_icon;
 pub mod mod_link;
 pub mod notifications;
+pub mod offline_cache;
 pub mod persistent;
 pub mod personal;
 pub mod remote_actions;

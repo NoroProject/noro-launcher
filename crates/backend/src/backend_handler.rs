@@ -597,7 +597,16 @@ impl BackendState {
         self.last_launched = Some(server_id);
         self.pending_launch.insert(server_id, modal);
 
+        let offline_manifest = if self.online {
+            None
+        } else {
+            self.cached_manifests.get(&server_id).cloned()
+        };
         if let Some(manifest) = self.manifests.get(&server_id).cloned() {
+            self.begin_launch(server_id, manifest);
+        } else if let Some(manifest) = offline_manifest {
+            // No master to ask; the build on disk is what there is.
+            tracing::info!(%server_id, "offline, launching the installed build");
             self.begin_launch(server_id, manifest);
         } else {
             self.ctx.ws.send(self.request_manifest_msg(server_id));
@@ -617,7 +626,7 @@ impl BackendState {
     }
 
     /// Sync and launch for a manifest that is already in hand.
-    fn begin_launch(&mut self, server_id: Uuid, manifest: schema::BuildManifest) {
+    pub(crate) fn begin_launch(&mut self, server_id: Uuid, manifest: schema::BuildManifest) {
         let Some(modal) = self.pending_launch.remove(&server_id) else {
             return; // nobody asked for a launch
         };
@@ -803,8 +812,7 @@ impl BackendState {
     pub async fn handle_from_master(&mut self, msg: ServerWsMsg) {
         match msg {
             ServerWsMsg::AuthOk { user } => {
-                self.user = Some(user.clone());
-                self.ctx.set_profile(Some(user.clone()));
+                self.set_user(user.clone());
                 // The window asks for the skin presets itself when the login
                 // lands; fetching them here as well downloaded every preset
                 // twice per login and again on every reconnect.
@@ -840,18 +848,11 @@ impl BackendState {
                 self.on_auth_failed();
             }
             ServerWsMsg::ServerList { servers } => {
-                // Until the manifest comes, the disk still tells whether a build
-                // is installed at all. Without this every installed build
-                // offered «Install» until the master answered.
-                for server in &servers {
-                    if self.build_state_known.insert(server.id) {
-                        self.ctx.send(MessageToFrontend::BuildStateChanged {
-                            server_id: server.id,
-                            state: crate::sync::installed_state(
-                                &self.ctx.dirs.instance(&server.id),
-                            ),
-                        });
-                    }
+                self.announce_installed_states(&servers);
+                // A borrowed account's list stays out of the cache, like its
+                // profile: it may hold servers only their roles can see.
+                if self.own_token.is_none() {
+                    crate::offline_cache::save_servers(&self.ctx.dirs, &servers);
                 }
                 self.servers = servers.clone();
                 self.ctx.send(MessageToFrontend::ServerList { servers });
@@ -861,6 +862,8 @@ impl BackendState {
             }
             ServerWsMsg::BuildManifest { manifest } => {
                 let server_id = manifest.server_id;
+                crate::offline_cache::save_manifest(&self.ctx.dirs, &manifest);
+                self.cached_manifests.insert(server_id, manifest.clone());
                 self.manifests.insert(server_id, manifest.clone());
                 self.send_server_recommendation(server_id, &manifest);
                 self.send_optional_mods(server_id, &manifest);
@@ -921,8 +924,7 @@ impl BackendState {
                 }
             }
             ServerWsMsg::PermissionsUpdated { user } => {
-                self.user = Some(user.clone());
-                self.ctx.set_profile(Some(user.clone()));
+                self.set_user(user.clone());
                 self.ctx
                     .send(MessageToFrontend::PermissionsUpdated { user });
                 self.ctx.ws.send(ClientWsMsg::RequestServerList);

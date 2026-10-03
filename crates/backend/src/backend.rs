@@ -113,6 +113,11 @@ pub struct BackendState {
     pub own_token: Option<String>,
     pub servers: Vec<ServerEntry>,
     pub manifests: HashMap<Uuid, BuildManifest>,
+    /// Installed builds' manifests from the disk. Only for when the master
+    /// doesn't answer: online, a launch always asks for the current one.
+    pub cached_manifests: HashMap<Uuid, BuildManifest>,
+    /// Whether the socket to the master is up.
+    pub online: bool,
     /// Launches waiting on a manifest to arrive.
     pub pending_launch: HashMap<Uuid, bridge::ModalAction>,
     /// Builds whose state the window already has. A guess from the disk is
@@ -221,6 +226,8 @@ async fn run(
         own_token: None,
         servers: Vec::new(),
         manifests: HashMap::new(),
+        cached_manifests: HashMap::new(),
+        online: false,
         pending_launch: HashMap::new(),
         build_state_known: HashSet::new(),
         last_launched: None,
@@ -234,6 +241,7 @@ async fn run(
     // than after the master answers.
     state.send_config_state();
     crate::translations::refresh(&state.ctx, state.ctx.config.get().locale);
+    state.load_offline_cache();
 
     // Over REST rather than waiting for the socket: the login screen would
     // otherwise flash by on every start. In the background, so the loop below
@@ -265,6 +273,7 @@ impl BackendState {
                     self.handle_from_master(msg).await;
                 }
                 Some(online) = self.conn_rx.recv() => {
+                    self.online = online;
                     self.ctx.send(MessageToFrontend::ConnectionState { online });
                     if online {
                         // Both lists may have moved on while we were offline.
@@ -292,7 +301,7 @@ impl BackendState {
                     tracing::info!("session saved to the keyring");
                 }
                 self.access_token = Some(auth.access_token.clone());
-                self.user = Some(user.clone());
+                self.set_user(user.clone());
                 self.ctx.ws.set_token(Some(auth.access_token));
                 self.ctx.send(MessageToFrontend::LoginSuccess { user });
                 self.ctx.send(MessageToFrontend::CloseModal);
@@ -316,7 +325,7 @@ impl BackendState {
                 });
             }
             InternalEvent::ProfileUpdated { user } => {
-                self.user = Some(user.clone());
+                self.set_user(user.clone());
                 self.ctx
                     .send(MessageToFrontend::PermissionsUpdated { user });
             }
@@ -333,8 +342,7 @@ impl BackendState {
                 });
             }
             InternalEvent::SessionRestored { user } => {
-                self.user = Some(user.clone());
-                self.ctx.set_profile(Some(user.clone()));
+                self.set_user(user.clone());
                 self.ctx.send(MessageToFrontend::LoginSuccess { user });
             }
             InternalEvent::TokensRefreshed { auth } => {
@@ -354,13 +362,37 @@ impl BackendState {
             }
             InternalEvent::SessionUnverified => {
                 self.refresh_in_flight = false;
-                if self.user.is_none() {
-                    self.ctx.send(MessageToFrontend::SessionCheckDone);
+                if self.user.is_some() {
+                    return;
+                }
+                // The master can't be reached, which says nothing against the
+                // session. Carry on as the player from last time, so installed
+                // builds can still be started; the socket checks the token
+                // properly once the master is back.
+                match (
+                    &self.access_token,
+                    crate::offline_cache::load_profile(&self.ctx.dirs),
+                ) {
+                    (Some(_), Some(user)) => {
+                        tracing::info!("master unreachable, continuing with the cached profile");
+                        self.set_user(user.clone());
+                        self.ctx.send(MessageToFrontend::LoginSuccess { user });
+                    }
+                    _ => self.ctx.send(MessageToFrontend::SessionCheckDone),
                 }
             }
             InternalEvent::ManifestTimeout { server_id, seq } => {
                 if self.launch_seq.get(&server_id) != Some(&seq) {
                     return;
+                }
+                // The master went quiet; an installed build can still start
+                // from what it sent last time.
+                if let Some(manifest) = self.cached_manifests.get(&server_id).cloned() {
+                    if self.pending_launch.contains_key(&server_id) {
+                        tracing::info!(%server_id, "no manifest from the master, launching the installed build");
+                        self.begin_launch(server_id, manifest);
+                        return;
+                    }
                 }
                 if let Some(modal) = self.pending_launch.remove(&server_id) {
                     modal.fail("notif-manifest-timeout");
@@ -389,6 +421,7 @@ impl BackendState {
         self.access_token = None;
         self.user = None;
         self.ctx.set_profile(None);
+        crate::offline_cache::forget_account(&self.ctx.dirs);
         self.ctx.ws.set_token(None);
         self.ctx.send(MessageToFrontend::LoggedOut);
     }
@@ -425,6 +458,48 @@ impl BackendState {
             };
             let _ = ctx.internal.send(event);
         });
+    }
+
+    /// Our own profile is also kept on disk for starting without the master; a
+    /// borrowed one isn't, like the borrowed token.
+    pub fn set_user(&mut self, user: UserProfile) {
+        if self.own_token.is_none() {
+            crate::offline_cache::save_profile(&self.ctx.dirs, &user);
+        }
+        self.ctx.set_profile(Some(user.clone()));
+        self.user = Some(user);
+    }
+
+    /// The disk tells whether a build is installed until its manifest comes.
+    /// Without this every installed build offered «Install» until the master
+    /// answered.
+    pub fn announce_installed_states(&mut self, servers: &[ServerEntry]) {
+        for server in servers {
+            if self.build_state_known.insert(server.id) {
+                self.ctx.send(MessageToFrontend::BuildStateChanged {
+                    server_id: server.id,
+                    state: crate::sync::installed_state(&self.ctx.dirs.instance(&server.id)),
+                });
+            }
+        }
+    }
+
+    /// The last server list and installed builds' manifests, before the
+    /// master answers or in case it never does.
+    fn load_offline_cache(&mut self) {
+        let servers = crate::offline_cache::load_servers(&self.ctx.dirs);
+        if servers.is_empty() {
+            return;
+        }
+        for server in &servers {
+            if let Some(manifest) = crate::offline_cache::load_manifest(&self.ctx.dirs, &server.id)
+            {
+                self.cached_manifests.insert(server.id, manifest);
+            }
+        }
+        self.announce_installed_states(&servers);
+        self.servers = servers.clone();
+        self.ctx.send(MessageToFrontend::ServerList { servers });
     }
 
     /// `None` until both the profile and the token are in hand — the game can't
@@ -739,6 +814,7 @@ pub fn spawn_sync_and_launch(req: Launch) {
             state: crate::sync::build_state(&instance_dir, &manifest),
         });
         modal.finish();
+        crate::offline_cache::save_manifest(&ctx.dirs, &manifest);
 
         // Nothing looks at the directory between the sync and the launch, so
         // check it against the manifest here. Extra files go, mismatches go to
