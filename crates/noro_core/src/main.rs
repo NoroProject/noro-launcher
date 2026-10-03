@@ -132,7 +132,8 @@ fn run_primary(
 
 fn spawn_focus_listener(
     runtime: &tokio::runtime::Runtime,
-    socket_path: PathBuf,
+    // Windows uses a named pipe instead.
+    #[cfg_attr(windows, allow(unused_variables))] socket_path: PathBuf,
     frontend: bridge::FrontendHandle,
     cancel: tokio_util::sync::CancellationToken,
 ) {

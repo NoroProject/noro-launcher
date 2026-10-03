@@ -7,10 +7,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod embedded_config;
+mod install;
+mod log;
+mod net;
 mod splash;
 mod verify;
 
-use anyhow::Context;
+use i18n::FluentArgs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -19,6 +22,7 @@ fn main() -> ExitCode {
     // other way to work on it is deleting the installed core before every run.
     #[cfg(debug_assertions)]
     if std::env::var_os("NORO_SPLASH_PREVIEW").is_some() {
+        set_locale(Path::new("."));
         return splash_preview();
     }
 
@@ -26,8 +30,13 @@ fn main() -> ExitCode {
         .unwrap_or_else(|| PathBuf::from("."))
         .join(schema::launcher_dir_name());
     let _ = std::fs::create_dir_all(&app_dir);
+    log::init(&app_dir);
+    set_locale(&app_dir);
 
     let core_path = app_dir.join(core_binary_name());
+    // Left by an update while the previous core was running. It isn't running
+    // any more by the time this can delete it, or the delete fails quietly.
+    let _ = std::fs::remove_file(install::moved_aside(&core_path));
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -36,97 +45,203 @@ fn main() -> ExitCode {
 
     // The signature is checked on every launch, not only after a download:
     // otherwise anything that can write to AppData gets executed forever.
-    if core_path.exists() {
-        match verify::verify_installed(&core_path) {
-            Ok(()) if !rt.block_on(update_pending(&app_dir)) => {
-                return run_core(&core_path, &app_dir)
-            }
-            Ok(()) => eprintln!("master has a different version, updating"),
+    let installed = core_path.exists()
+        && match verify::verify_installed(&core_path) {
+            Ok(()) => true,
             Err(e) => {
-                eprintln!("the installed launcher failed its signature check: {e:#}");
-                eprintln!("downloading it again");
+                log::line(&format!(
+                    "the installed launcher failed its signature check: {e:#}; downloading it again"
+                ));
                 verify::discard(&core_path);
+                false
             }
+        };
+    if installed {
+        if !rt.block_on(update_pending(&app_dir)) {
+            return run_core(&core_path, &app_dir);
         }
+        log::line("master has a different version, updating");
     }
 
     // First run, a rejected core, or an update. What follows can take minutes,
     // so the window goes up: GPUI takes the main thread, the download runs
     // behind it and reports progress through the channel.
     let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
-    let work_dir = app_dir.clone();
-    let work_core = core_path.clone();
-    let launch_path = core_path.clone();
-    let splash_app_dir = app_dir.clone();
+    let outcome = splash::run_with(rx, move |choices| {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime");
+        install_and_start(&rt, &app_dir, &core_path, installed, &reporter, &choices)
+    });
 
-    // Core is started from the `run_with` callback rather than after it,
-    // because only Linux ever reaches the code after it: on macOS and Windows
-    // GPUI takes the process down from inside `run_with`. Move this out and the
-    // update ends with the window closing and nothing starting.
-    let outcome = splash::run_with(
-        rx,
-        move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("tokio runtime");
-            rt.block_on(download_core(&work_dir, &work_core, &reporter))
-        },
-        Some(Box::new(move |res: &anyhow::Result<()>| {
-            if res.is_err() {
-                return;
-            }
-            let mut cmd = prepare_core_cmd(&launch_path, &splash_app_dir);
-            #[cfg(unix)]
-            {
-                use std::os::unix::process::CommandExt;
-                let err = cmd.exec();
-                eprintln!("could not start {}: {err}", launch_path.display());
-            }
-            #[cfg(not(unix))]
-            if let Err(e) = cmd.spawn() {
-                eprintln!("could not start {}: {e}", launch_path.display());
-            }
-        })),
-    );
-
-    // Linux only, and by now the callback has already started core.
+    // Linux only: on macOS and Windows GPUI ends the process inside
+    // `run_with`. Core has either been started by now or the player gave up.
     match outcome {
-        Some(Ok(())) => ExitCode::SUCCESS,
-        Some(Err(e)) => {
-            eprintln!("download failed: {e:#}");
-            ExitCode::FAILURE
-        }
-        None => ExitCode::FAILURE,
+        Some(true) => ExitCode::SUCCESS,
+        _ => ExitCode::FAILURE,
     }
 }
 
-/// Runs the bar around in circles until the window is closed.
+/// Runs behind the splash until core is running or the player closes the
+/// window. Core is started from in here rather than after `run_with`,
+/// because only Linux ever reaches the code after it.
+fn install_and_start(
+    rt: &tokio::runtime::Runtime,
+    app_dir: &Path,
+    core: &Path,
+    installed: bool,
+    report: &splash::Reporter,
+    choices: &splash::Choices,
+) -> bool {
+    let mut downloaded = false;
+    loop {
+        let failure = if downloaded {
+            None
+        } else {
+            match rt.block_on(download_core(app_dir, core, report)) {
+                Ok(()) => {
+                    downloaded = true;
+                    None
+                }
+                Err(f) => Some(f),
+            }
+        };
+        let failure = match failure {
+            None => start_core(core, app_dir).err(),
+            // No network, or a silent master: launch what we have. Getting
+            // into the game matters more than being current.
+            Some(f) if installed && verify::verify_installed(core).is_ok() => {
+                log::line(&format!(
+                    "update failed ({:#}), starting the installed version",
+                    f.error
+                ));
+                start_core(core, app_dir).err()
+            }
+            Some(f) => Some(f),
+        };
+        let Some(failure) = failure else {
+            return true;
+        };
+
+        log::line(&format!("{:#}", failure.error));
+        let _ = report.send(splash::Update::Failed {
+            message: i18n::t(failure.kind.key()),
+            detail: short(&format!("{:#}", failure.error)),
+        });
+        match choices.recv() {
+            Ok(splash::Choice::Retry) => log::line("retrying"),
+            _ => return false,
+        }
+    }
+}
+
+/// One line that fits under the message.
+fn short(detail: &str) -> String {
+    const MAX: usize = 140;
+    let line = detail.lines().next().unwrap_or_default();
+    if line.chars().count() <= MAX {
+        line.to_string()
+    } else {
+        let cut: String = line.chars().take(MAX).collect();
+        format!("{cut}…")
+    }
+}
+
+/// What went wrong, in terms of what the player can do about it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    /// Couldn't talk to the master: check the connection, try again.
+    Network,
+    /// The master answered but has nothing usable for this system.
+    Unavailable,
+    /// The download doesn't match its hash or signature.
+    Corrupt,
+    /// Writing the files failed: a full disk, permissions, an antivirus.
+    Disk,
+    /// Core is in place but wouldn't start.
+    Start,
+}
+
+impl Kind {
+    fn key(self) -> &'static str {
+        match self {
+            Kind::Network => "boot-error-network",
+            Kind::Unavailable => "boot-error-unavailable",
+            Kind::Corrupt => "boot-error-corrupt",
+            Kind::Disk => "boot-error-disk",
+            Kind::Start => "boot-error-start",
+        }
+    }
+}
+
+struct Failure {
+    kind: Kind,
+    error: anyhow::Error,
+}
+
+impl Failure {
+    fn new(kind: Kind, error: impl Into<anyhow::Error>) -> Self {
+        Self {
+            kind,
+            error: error.into(),
+        }
+    }
+
+    /// A 4xx or an unreadable answer won't change on retry; the rest is the
+    /// link.
+    fn http(e: reqwest::Error) -> Self {
+        let kind = if e.is_decode() || e.status().is_some_and(|s| s.is_client_error()) {
+            Kind::Unavailable
+        } else {
+            Kind::Network
+        };
+        Self::new(kind, e)
+    }
+}
+
+/// The player's choice from core's settings, or the system language on a
+/// first run.
+fn set_locale(app_dir: &Path) {
+    let chosen = std::fs::read_to_string(app_dir.join("config.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|config| config["locale"].as_str().map(str::to_string));
+    let code = chosen.or_else(sys_locale::get_locale).unwrap_or_default();
+    i18n::set_locale(i18n::Locale::from_code(&code).unwrap_or_default());
+}
+
+/// Runs the bar around in circles, failing every other pass, until the window
+/// is closed.
 #[cfg(debug_assertions)]
 fn splash_preview() -> ExitCode {
     let (reporter, rx) = tokio::sync::mpsc::unbounded_channel();
-    splash::run_with(
-        rx,
-        move || {
-            let stages = [
-                ("Checking version…", 0u64),
-                ("Downloading launcher-v1.2.3", 15_358_608),
-            ];
-            loop {
-                for (label, total) in stages {
-                    for step in 0..=100 {
-                        let _ = reporter.send(splash::Progress {
-                            label: label.to_string(),
-                            done: total / 100 * step,
-                            total,
-                        });
-                        std::thread::sleep(std::time::Duration::from_millis(60));
-                    }
+    splash::run_with(rx, move |choices| {
+        let stages = [
+            (i18n::t("boot-checking"), 0u64),
+            (downloading_label("launcher-v1.2.3", None), 15_358_608),
+        ];
+        loop {
+            for (label, total) in &stages {
+                for step in 0..=100 {
+                    let _ = reporter.send(splash::Update::Progress(splash::Progress {
+                        label: label.clone(),
+                        done: total / 100 * step,
+                        total: *total,
+                    }));
+                    std::thread::sleep(std::time::Duration::from_millis(30));
                 }
             }
-        },
-        None,
-    );
+            let _ = reporter.send(splash::Update::Failed {
+                message: i18n::t(Kind::Network.key()),
+                detail: "error sending request for url (https://example.com/api/launcher/version)"
+                    .into(),
+            });
+            if choices.recv() != Ok(splash::Choice::Retry) {
+                return;
+            }
+        }
+    });
     ExitCode::SUCCESS
 }
 
@@ -138,7 +253,7 @@ fn core_binary_name() -> &'static str {
     }
 }
 
-fn prepare_core_cmd(path: &std::path::Path, app_dir: &std::path::Path) -> std::process::Command {
+fn prepare_core_cmd(path: &Path, app_dir: &Path) -> std::process::Command {
     let master_url = verify::master_url();
     let pubkey = verify::raw_signing_pubkey();
 
@@ -160,33 +275,47 @@ fn prepare_core_cmd(path: &std::path::Path, app_dir: &std::path::Path) -> std::p
     cmd
 }
 
-fn run_core(path: &std::path::Path, app_dir: &std::path::Path) -> ExitCode {
+fn run_core(path: &Path, app_dir: &Path) -> ExitCode {
     let mut cmd = prepare_core_cmd(path, app_dir);
 
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
         let err = cmd.exec();
-        eprintln!("could not start {}: {err}", path.display());
+        log::line(&format!("could not start {}: {err}", path.display()));
         ExitCode::FAILURE
     }
 
     #[cfg(not(unix))]
     {
         match cmd.status() {
-            Ok(s) => {
-                if s.success() {
-                    ExitCode::SUCCESS
-                } else {
-                    ExitCode::FAILURE
-                }
-            }
+            Ok(s) if s.success() => ExitCode::SUCCESS,
+            Ok(_) => ExitCode::FAILURE,
             Err(e) => {
-                eprintln!("could not start {}: {e}", path.display());
+                log::line(&format!("could not start {}: {e}", path.display()));
                 ExitCode::FAILURE
             }
         }
     }
+}
+
+/// From behind the splash. On Unix this replaces the process and only comes
+/// back on failure; on Windows core is spawned and the splash then quits.
+fn start_core(path: &Path, app_dir: &Path) -> Result<(), Failure> {
+    let mut cmd = prepare_core_cmd(path, app_dir);
+    #[cfg(unix)]
+    let err = {
+        use std::os::unix::process::CommandExt;
+        cmd.exec()
+    };
+    #[cfg(not(unix))]
+    let Err(err) = cmd.spawn().map(drop) else {
+        return Ok(());
+    };
+    Err(Failure::new(
+        Kind::Start,
+        anyhow::Error::new(err).context(format!("could not start {}", path.display())),
+    ))
 }
 
 /// Is the master serving a different version than the one installed?
@@ -196,19 +325,16 @@ fn run_core(path: &std::path::Path, app_dir: &std::path::Path) -> ExitCode {
 /// update is what login needs, that circle never opens.
 ///
 /// No network, or a silent master, means launching what we have. Getting into
-/// the game matters more than being current.
+/// the game matters more than being current. No window is up yet, so the
+/// wait is short.
 async fn update_pending(app_dir: &Path) -> bool {
     let installed = std::fs::read_to_string(app_dir.join("version")).unwrap_or_default();
     let installed = installed.trim();
     if installed.is_empty() {
         return false;
     }
-    let url = format!(
-        "{}/api/launcher/version?platform={}",
-        verify::master_url().trim_end_matches('/'),
-        current_platform()
-    );
-    let Ok(resp) = reqwest::Client::new().get(&url).send().await else {
+    let resp = net::quick_client().get(version_url()).send().await;
+    let Ok(resp) = resp.and_then(|r| r.error_for_status()) else {
         return false;
     };
     let Ok(info) = resp.json::<serde_json::Value>().await else {
@@ -219,37 +345,61 @@ async fn update_pending(app_dir: &Path) -> bool {
         .is_some_and(|remote| remote != installed)
 }
 
+fn version_url() -> String {
+    format!(
+        "{}/api/launcher/version?platform={}",
+        verify::master_url().trim_end_matches('/'),
+        current_platform()
+    )
+}
+
+fn downloading_label(version: &str, size: Option<u64>) -> String {
+    let mut args = FluentArgs::new();
+    args.set("version", version.to_string());
+    match size {
+        Some(bytes) => {
+            args.set("size", format!("{:.1}", bytes as f64 / 1_048_576.0));
+            i18n::t_args("boot-downloading-size", &args)
+        }
+        None => i18n::t_args("boot-downloading", &args),
+    }
+}
+
 async fn download_core(
     app_dir: &Path,
     dest: &Path,
     report: &splash::Reporter,
-) -> anyhow::Result<()> {
-    let say = |label: &str, done: u64, total: u64| {
-        let _ = report.send(splash::Progress {
-            label: label.to_string(),
+) -> Result<(), Failure> {
+    let say = |label: String, done: u64, total: u64| {
+        let _ = report.send(splash::Update::Progress(splash::Progress {
+            label,
             done,
             total,
-        });
+        }));
     };
-    say("Checking version…", 0, 0);
-    let master_url = verify::master_url();
+    say(i18n::t("boot-checking"), 0, 0);
     let platform = current_platform();
-    let url = format!(
-        "{}/api/launcher/version?platform={platform}",
-        master_url.trim_end_matches('/')
-    );
+    let client = net::client();
+    let url = version_url();
+    let info: serde_json::Value = net::retry(|| async {
+        client
+            .get(&url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+    })
+    .await
+    .map_err(Failure::http)?;
 
-    let client = reqwest::Client::new();
-    let resp = client.get(&url).send().await?.error_for_status()?;
-    let info: serde_json::Value = resp.json().await?;
-
+    let unavailable = |what: &str| Failure::new(Kind::Unavailable, anyhow::anyhow!("{what}"));
     if info.is_null() {
-        anyhow::bail!("no launcher build for {platform}");
+        return Err(unavailable(&format!("no launcher build for {platform}")));
     }
-
     let download_url = info["url"]
         .as_str()
-        .ok_or_else(|| anyhow::anyhow!("no url in the response"))?;
+        .ok_or_else(|| unavailable("no url in the response"))?;
     // Both of these are required rather than optional. The sha256 catches a
     // corrupted download but not a substituted one — whoever can swap the file
     // can swap the hash beside it — so it's the signature that decides, and an
@@ -257,63 +407,70 @@ async fn download_core(
     let expected_sha = info["sha256"]
         .as_str()
         .filter(|s| !s.trim().is_empty())
-        .ok_or_else(|| anyhow::anyhow!("master sent no sha256"))?;
+        .ok_or_else(|| unavailable("master sent no sha256"))?;
     let signature = info["signature"]
         .as_str()
         .filter(|s| !s.trim().is_empty())
-        .ok_or_else(|| anyhow::anyhow!("master sent no signature"))?;
+        .ok_or_else(|| unavailable("master sent no signature"))?;
     // This ends up in the version file next to the binary, so a placeholder
     // would leave the next update check comparing against nonsense.
     let version = info["version"]
         .as_str()
         .filter(|s| !s.trim().is_empty())
-        .ok_or_else(|| anyhow::anyhow!("master sent no version"))?;
+        .ok_or_else(|| unavailable("master sent no version"))?;
 
-    say(&format!("Downloading {version}"), 0, 0);
-    let mut resp = client.get(download_url).send().await?.error_for_status()?;
-
-    // Chunk by chunk for the progress bar; reqwest hands them over without
-    // dragging in futures.
-    let total = resp.content_length().unwrap_or(0);
-    let mut bytes: Vec<u8> = Vec::with_capacity(total as usize);
-    // One report per percent. The window redraws once either way, and reporting
-    // per chunk would be a message for every packet.
-    let mut reported = 0u64;
-    while let Some(chunk) = resp.chunk().await? {
-        bytes.extend_from_slice(&chunk);
-        let done = bytes.len() as u64;
-        if total > 0 && done * 100 / total > reported {
-            reported = done * 100 / total;
-            say(&format!("Downloading {version}"), done, total);
+    let bytes = net::retry(|| async {
+        say(downloading_label(version, None), 0, 0);
+        let mut resp = client.get(download_url).send().await?.error_for_status()?;
+        // Chunk by chunk for the progress bar; reqwest hands them over without
+        // dragging in futures.
+        let total = resp.content_length().unwrap_or(0);
+        let mut bytes: Vec<u8> = Vec::with_capacity(total as usize);
+        // One report per percent, or per half megabyte when the size isn't
+        // known. The window redraws once either way, and reporting per chunk
+        // would be a message for every packet.
+        let mut reported = 0u64;
+        while let Some(chunk) = resp.chunk().await? {
+            bytes.extend_from_slice(&chunk);
+            let done = bytes.len() as u64;
+            match (done * 100).checked_div(total) {
+                Some(percent) if percent > reported => {
+                    reported = percent;
+                    say(downloading_label(version, None), done, total);
+                }
+                Some(_) => {}
+                None if done / (512 * 1024) > reported => {
+                    reported = done / (512 * 1024);
+                    say(downloading_label(version, Some(done)), 0, 0);
+                }
+                None => {}
+            }
         }
-    }
+        Ok(bytes)
+    })
+    .await
+    .map_err(Failure::http)?;
 
     use sha2::Digest;
     let hash = hex::encode(sha2::Sha256::digest(&bytes));
     if !hash.eq_ignore_ascii_case(expected_sha) {
-        anyhow::bail!("sha256 mismatch: expected {expected_sha}, got {hash}");
+        return Err(Failure::new(
+            Kind::Corrupt,
+            anyhow::anyhow!("sha256 mismatch: expected {expected_sha}, got {hash}"),
+        ));
     }
-
     verify::verify_bytes(&bytes, signature)
-        .map_err(|e| anyhow::anyhow!("launcher signature check failed: {e}"))?;
+        .map_err(|e| Failure::new(Kind::Corrupt, e.context("launcher signature check failed")))?;
 
-    std::fs::write(dest, &bytes)?;
-    verify::store(dest, signature)?;
+    install::install(app_dir, dest, &bytes, signature, version).map_err(|e| {
+        Failure::new(
+            Kind::Disk,
+            anyhow::Error::new(e).context(format!("could not install into {}", app_dir.display())),
+        )
+    })?;
+    log::line(&format!("installed {version}"));
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(dest)?.permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(dest, perms)?;
-    }
-
-    // Without this the launcher downloads itself again on every start.
-    let version_file = app_dir.join("version");
-    std::fs::write(&version_file, version)
-        .with_context(|| format!("could not write {}", version_file.display()))?;
-
-    say("Done", 1, 1);
+    say(i18n::t("boot-starting"), 1, 1);
     Ok(())
 }
 

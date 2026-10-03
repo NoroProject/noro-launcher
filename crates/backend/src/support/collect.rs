@@ -43,9 +43,11 @@ pub async fn collect(
 
     // The launcher's own log, redacted like the rest: most failures before the
     // game starts (a download, a signature, the JVM refusing) only show here.
+    // The bootstrapper writes its own beside it.
     let launcher_log = crate::telemetry::log_path();
     if let Some(dir) = launcher_log.parent() {
         push(&mut files, dir, "launcher.log").await;
+        push(&mut files, dir, "bootstrapper.log").await;
     }
 
     Bundle {

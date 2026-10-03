@@ -9,12 +9,15 @@ schema = { workspace = true }
 i18n = { workspace = true }
 bridge = { workspace = true }
 
-# GPUI из репозитория Zed. gpui_platform с font-kit + runtime_shaders — это и есть
-# «фикс шрифтов»: текстовая система и встроенные шрифты грузятся через AssetSource.
-# Пин на коммит, собирающийся на стабильном toolchain (main использует
-# нестабильную cold_path). Это та же ревизия, что в референсном проекте.
+# GPUI from the Zed repository. font-kit + runtime_shaders on gpui_platform is
+# what makes the bundled fonts load through the AssetSource. Pinned to a commit
+# that builds on the stable toolchain (main uses the unstable cold_path).
+# `x11` and `wayland` have to be named: Zed's workspace pulls gpui_linux in
+# with default features off, and without them GPUI on Linux has no window
+# backend and panics on start. Linking needs libxkbcommon-dev and
+# libxkbcommon-x11-dev.
 gpui = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1", features = ["font-kit", "runtime_shaders"] }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1", features = ["font-kit", "runtime_shaders", "x11", "wayland"] }
 
 tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros"] }
 reqwest = { workspace = true }

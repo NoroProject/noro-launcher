@@ -1,6 +1,8 @@
 //! Native biometric authentication (Touch ID on macOS, Windows Hello on Windows).
 
-use anyhow::{anyhow, Result};
+#[cfg(not(target_os = "windows"))]
+use anyhow::anyhow;
+use anyhow::Result;
 
 // Only macOS and Windows shell out; on Linux this import is unused and `-D
 // warnings` turns that into a build failure.

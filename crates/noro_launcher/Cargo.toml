@@ -9,7 +9,7 @@ name = "noro-launcher"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "macros", "sync"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "macros", "sync", "time"] }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -19,12 +19,18 @@ dirs = { workspace = true }
 ed25519-dalek = { workspace = true }
 base64 = { workspace = true }
 schema = { workspace = true }
+i18n = { workspace = true }
+sys-locale = { workspace = true }
 
 # The splash is drawn with the same GPUI as the launcher: while core downloads,
 # that window is everything the player sees. Keep the revision identical to the
 # one frontend pins, or the build ends up with two incompatible copies.
+# `x11` and `wayland` have to be named: Zed's workspace pulls gpui_linux in
+# with default features off, and without them GPUI on Linux has no window
+# backend and panics on start. Linking needs libxkbcommon-dev and
+# libxkbcommon-x11-dev.
 gpui = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1", features = ["font-kit", "runtime_shaders"] }
+gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "ff8fa053ff0d0c02aec95def5b796dbe5cd541e1", features = ["font-kit", "runtime_shaders", "x11", "wayland"] }
 rust-embed = "8"
 parking_lot = "0.12"
 
