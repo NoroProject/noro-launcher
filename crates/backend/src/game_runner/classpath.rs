@@ -1,3 +1,4 @@
+use super::rules::arg_values;
 use crate::directories::safe_join;
 use schema::{ArtifactKind, BuildManifest, Modloader};
 use std::path::Path;
@@ -13,10 +14,15 @@ pub fn classpath_separator() -> &'static str {
 /// Under Forge and NeoForge neither the vanilla client jar nor the patched
 /// loader client jar goes on the legacy classpath — FML builds the game layer
 /// itself through `ProductionClientProvider`, and a duplicate there breaks it.
+///
+/// Forge up to 1.12 is the exception: it runs on launchwrapper, which loads
+/// Minecraft off the classpath like any library and patches it on the way in.
+/// There the client jar goes last, where the vanilla launcher puts it.
 pub fn build_classpath(instance_dir: &Path, manifest: &BuildManifest) -> String {
     let mut game_jar = None;
     let mut libs = Vec::new();
     let forge_like = is_forge_like(manifest);
+    let launchwrapper = forge_like && runs_on_launchwrapper(manifest);
 
     for f in &manifest.verified_files {
         // A manifest carries natives for every platform, but only ours were
@@ -30,7 +36,7 @@ pub fn build_classpath(instance_dir: &Path, manifest: &BuildManifest) -> String 
         };
         let path_str = path.to_string_lossy().into_owned();
         match kind {
-            ArtifactKind::ClientJar if !forge_like => game_jar = Some(path_str),
+            ArtifactKind::ClientJar if !forge_like || launchwrapper => game_jar = Some(path_str),
             ArtifactKind::Library if forge_like && is_loader_client_path(&f.path) => {}
             ArtifactKind::Library | ArtifactKind::Native => libs.push(path_str),
             _ => {}
@@ -38,11 +44,24 @@ pub fn build_classpath(instance_dir: &Path, manifest: &BuildManifest) -> String 
     }
 
     let mut entries = Vec::new();
-    if let Some(gj) = game_jar {
-        entries.push(gj);
+    if launchwrapper {
+        entries.extend(libs);
+        entries.extend(game_jar);
+    } else {
+        entries.extend(game_jar);
+        entries.extend(libs);
     }
-    entries.extend(libs);
     entries.join(classpath_separator())
+}
+
+/// Launchwrapper is told what to load through `--tweakClass`; ModLauncher has
+/// no such argument.
+fn runs_on_launchwrapper(manifest: &BuildManifest) -> bool {
+    manifest
+        .game_args
+        .iter()
+        .flat_map(arg_values)
+        .any(|arg| arg == "--tweakClass")
 }
 
 pub fn primary_game_artifact(instance_dir: &Path, manifest: &BuildManifest) -> Option<String> {
@@ -111,3 +130,7 @@ fn is_loader_path(path: &str) -> bool {
 fn is_forge_like(manifest: &BuildManifest) -> bool {
     matches!(manifest.modloader, Modloader::Forge | Modloader::NeoForge)
 }
+
+#[cfg(test)]
+#[path = "classpath_tests.rs"]
+mod tests;
