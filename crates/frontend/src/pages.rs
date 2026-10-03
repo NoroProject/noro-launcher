@@ -33,6 +33,7 @@ mod mod_detail_parts;
 mod mod_icon;
 mod news;
 mod news_detail;
+mod notification_card;
 mod notifications;
 mod profile;
 mod profile_cape;
