@@ -6,7 +6,28 @@
 //! zero additional disk space.
 
 use schema::ArtifactKind;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex};
+use tokio::sync::Mutex as TokioMutex;
+
+static STORE_LOCKS: LazyLock<Mutex<HashMap<String, Arc<TokioMutex<()>>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Exclusive in-flight lock per SHA1 preventing parallel download collisions.
+pub fn lock_for_sha1(sha1: &str) -> Arc<TokioMutex<()>> {
+    let mut map = STORE_LOCKS.lock().unwrap();
+    if map.len() > 1024 {
+        map.retain(|_, v| Arc::strong_count(v) > 1);
+    }
+    map.entry(sha1.to_string())
+        .or_insert_with(|| Arc::new(TokioMutex::new(())))
+        .clone()
+}
+
+pub async fn acquire_sha1_lock(sha1: &str) -> tokio::sync::OwnedMutexGuard<()> {
+    lock_for_sha1(sha1).lock_owned().await
+}
 
 pub fn store_path(store_root: &Path, sha1: &str) -> Option<PathBuf> {
     if sha1.len() < 4 || !sha1.bytes().all(|b| b.is_ascii_hexdigit()) {

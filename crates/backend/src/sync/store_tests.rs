@@ -82,3 +82,15 @@ async fn overwrites_existing_dest_and_sets_executable() {
         assert_eq!(perms.mode() & 0o111, 0o111);
     }
 }
+
+#[tokio::test]
+async fn lock_for_sha1_returns_shared_lock() {
+    let sha1 = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
+    let lock1 = lock_for_sha1(sha1);
+    let lock2 = lock_for_sha1(sha1);
+    assert!(Arc::ptr_eq(&lock1, &lock2));
+
+    let other_sha1 = "0123456789abcdef0123456789abcdef01234567";
+    let lock3 = lock_for_sha1(other_sha1);
+    assert!(!Arc::ptr_eq(&lock1, &lock3));
+}

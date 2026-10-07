@@ -95,9 +95,15 @@ async fn download_with_retry(
         None
     };
 
+    let _lock = if store_file.is_some() {
+        Some(super::store::acquire_sha1_lock(&task.sha1).await)
+    } else {
+        None
+    };
+
     if let Some(src) = &store_file {
         if super::store::has_valid(src, task.size).await {
-            let _ = super::store::link_or_copy(src, &task.dest).await;
+            super::store::link_or_copy(src, &task.dest).await?;
             on_bytes(task.size as i64);
             apply_exec_bit(&task.dest, task.executable).await?;
             return Ok(());
@@ -107,6 +113,11 @@ async fn download_with_retry(
     let target = store_file.as_deref().unwrap_or(&task.dest);
     let mut attempt = 1;
     loop {
+        if let Some(src) = &store_file {
+            if super::store::has_valid(src, task.size).await {
+                break;
+            }
+        }
         let result =
             fetch_to_file(client, &task.url, target, &task.sha1, on_bytes, cancelled).await;
         match result {

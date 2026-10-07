@@ -80,17 +80,6 @@ pub fn sync_overlay(server_id: Uuid, sync: &SyncUiState, cx: &mut Cx) -> AnyElem
                             .child(sync.detail.clone()),
                     )
                 })
-                .when(sync.cancellable(), |d| {
-                    d.child(div().flex().justify_end().child(cta_button(
-                        "sync-cancel-btn",
-                        Some("x"),
-                        t("common-cancel"),
-                        cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                            this.cancel_launch(server_id);
-                            cx.notify();
-                        }),
-                    )))
-                })
                 .when_some(sync.failed.clone(), |d, e| {
                     d.child(
                         div()

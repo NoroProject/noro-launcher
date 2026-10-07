@@ -116,9 +116,20 @@ pub async fn fetch_to_file(
         bail!("SHA1 mismatch for {url}: expected {expected_sha1}, got {actual}");
     }
 
-    tokio::fs::rename(&part, dest)
-        .await
-        .with_context(|| format!("renaming to {}", dest.display()))?;
+    if dest.exists() {
+        let _ = tokio::fs::remove_file(dest).await;
+    }
+    if let Err(e) = tokio::fs::rename(&part, dest).await {
+        if dest.exists() {
+            if let Ok(m) = tokio::fs::metadata(dest).await {
+                if m.len() > 0 {
+                    let _ = tokio::fs::remove_file(&part).await;
+                    return Ok(());
+                }
+            }
+        }
+        return Err(e).with_context(|| format!("renaming to {}", dest.display()));
+    }
     Ok(())
 }
 
