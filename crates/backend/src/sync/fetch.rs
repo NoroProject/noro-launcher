@@ -28,6 +28,50 @@ pub fn part_path(dest: &Path) -> PathBuf {
     PathBuf::from(p)
 }
 
+/// Direct in-memory fetch for small files (≤ 512 KB, e.g. configs and tiny assets).
+/// Bypasses .part files, range checks, and rename syscalls completely.
+pub async fn fetch_small_file(
+    client: &reqwest::Client,
+    url: &str,
+    dest: &Path,
+    expected_sha1: &str,
+    on_bytes: BytesFn<'_>,
+    cancelled: CancelFn<'_>,
+) -> Result<()> {
+    if cancelled() {
+        bail!("cancelled");
+    }
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .with_context(|| format!("GET {url}"))?;
+    let resp = resp
+        .error_for_status()
+        .with_context(|| format!("bad status from {url}"))?;
+    if cancelled() {
+        bail!("cancelled");
+    }
+    let bytes = resp.bytes().await?;
+    if cancelled() {
+        bail!("cancelled");
+    }
+    let actual = hex::encode(Sha1::digest(&bytes));
+    if !expected_sha1.is_empty() && !actual.eq_ignore_ascii_case(expected_sha1) {
+        bail!("SHA1 mismatch for {url}: expected {expected_sha1}, got {actual}");
+    }
+    if let Err(e) = tokio::fs::write(dest, &bytes).await {
+        if let Some(parent) = dest.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+            tokio::fs::write(dest, &bytes).await?;
+        } else {
+            return Err(e.into());
+        }
+    }
+    on_bytes(bytes.len() as i64);
+    Ok(())
+}
+
 /// Download `url` to `dest`. Work in progress lives in a neighbouring `.part`,
 /// so a dropped connection costs the remaining tail, not the whole file.
 pub async fn fetch_to_file(

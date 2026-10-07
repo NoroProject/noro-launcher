@@ -31,3 +31,34 @@ pub fn client() -> reqwest::Result<reqwest::Client> {
         .http2_keep_alive_while_idle(true)
         .build()
 }
+
+/// Pool of independent HTTP clients.
+///
+/// Multiplexing 12,000 small files over a single HTTP/2 TCP connection hits
+/// Cloudflare's stream creation rate limiter and single-socket packet loss delays.
+/// A pool provides multiple distinct TCP connections with independent HTTP/2 stream spaces.
+#[derive(Clone)]
+pub struct HttpClientPool {
+    clients: Vec<reqwest::Client>,
+}
+
+impl HttpClientPool {
+    pub fn new(size: usize) -> reqwest::Result<Self> {
+        let count = size.max(1);
+        let mut clients = Vec::with_capacity(count);
+        for _ in 0..count {
+            clients.push(client()?);
+        }
+        Ok(Self { clients })
+    }
+
+    pub fn get(&self, index: usize) -> &reqwest::Client {
+        &self.clients[index % self.clients.len()]
+    }
+}
+
+impl From<reqwest::Client> for HttpClientPool {
+    fn from(c: reqwest::Client) -> Self {
+        Self { clients: vec![c] }
+    }
+}

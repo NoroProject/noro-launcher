@@ -47,7 +47,6 @@ pub fn is_cacheable(kind: ArtifactKind) -> bool {
             | ArtifactKind::Asset
             | ArtifactKind::AssetIndex
             | ArtifactKind::Mod
-            | ArtifactKind::Config
     )
 }
 

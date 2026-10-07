@@ -19,7 +19,7 @@ fn cacheable_kinds_classified() {
     assert!(is_cacheable(ArtifactKind::Java));
     assert!(is_cacheable(ArtifactKind::Library));
     assert!(is_cacheable(ArtifactKind::Asset));
-    assert!(is_cacheable(ArtifactKind::Config));
+    assert!(!is_cacheable(ArtifactKind::Config));
     assert!(!is_cacheable(ArtifactKind::Other));
 }
 

@@ -1,7 +1,7 @@
 // File exceeds 150 lines: parallel download pool with retries, backoff, and local store linking.
 //! Parallel download pool: retries with backoff, byte-level progress.
 
-use super::fetch::fetch_to_file;
+use super::fetch::{fetch_small_file, fetch_to_file};
 use super::hash_cache::HashCache;
 use anyhow::{bail, Result};
 use futures::stream::{self, StreamExt};
@@ -29,24 +29,26 @@ const PROGRESS_STEP: i64 = 512 * 1024;
 
 /// `on_progress` gets the running byte total; `cancelled` aborts the pool.
 pub async fn download_all(
-    client: &reqwest::Client,
-    mut tasks: Vec<DownloadTask>,
+    pool: &crate::http::HttpClientPool,
+    tasks: Vec<DownloadTask>,
     concurrency: usize,
     on_progress: impl Fn(u64) + Send + Sync + 'static,
     cancelled: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Result<()> {
-    tasks.sort_by_key(|t| std::cmp::Reverse(t.size));
+    let tasks = interleave_tasks(tasks);
     let done = Arc::new(AtomicI64::new(0));
     let reported = Arc::new(AtomicI64::new(0));
     let on_progress = Arc::new(on_progress);
     let cancelled = Arc::new(cancelled);
+    let store_root = crate::directories::LauncherDirectories::new().store();
 
-    let results = stream::iter(tasks.into_iter().map(|task| {
-        let client = client.clone();
+    let results = stream::iter(tasks.into_iter().enumerate().map(|(idx, task)| {
+        let client = pool.get(idx).clone();
         let done = done.clone();
         let reported = reported.clone();
         let on_progress = on_progress.clone();
         let cancelled = cancelled.clone();
+        let store_root = store_root.clone();
         async move {
             if cancelled() {
                 bail!("cancelled");
@@ -64,10 +66,7 @@ pub async fn download_all(
                     }
                 }
             };
-            download_with_retry(&client, &task, &bytes, cancelled.as_ref()).await?;
-            // File finished: report the exact total instead of waiting for
-            // the next progress step.
-            on_progress(done.load(Ordering::Relaxed).max(0) as u64);
+            download_with_retry(&client, &task, &store_root, &bytes, cancelled.as_ref()).await?;
             Ok::<_, anyhow::Error>(())
         }
     }))
@@ -80,18 +79,41 @@ pub async fn download_all(
     while let Some(r) = results.next().await {
         r?;
     }
+    on_progress(done.load(Ordering::Relaxed).max(0) as u64);
     Ok(())
+}
+
+fn interleave_tasks(tasks: Vec<DownloadTask>) -> Vec<DownloadTask> {
+    let (mut large, small): (Vec<_>, Vec<_>) = tasks.into_iter().partition(|t| t.size > 512 * 1024);
+    if large.is_empty() || small.is_empty() {
+        large.extend(small);
+        return large;
+    }
+    large.sort_by_key(|t| std::cmp::Reverse(t.size));
+    let step = small.len() / large.len();
+    let mut result = Vec::with_capacity(large.len() + small.len());
+    let mut small_iter = small.into_iter();
+    for l in large {
+        result.push(l);
+        for _ in 0..step {
+            if let Some(s) = small_iter.next() {
+                result.push(s);
+            }
+        }
+    }
+    result.extend(small_iter);
+    result
 }
 
 async fn download_with_retry(
     client: &reqwest::Client,
     task: &DownloadTask,
+    store_root: &Path,
     on_bytes: &(dyn Fn(i64) + Send + Sync),
     cancelled: &(dyn Fn() -> bool + Send + Sync),
 ) -> Result<()> {
-    let store_root = crate::directories::LauncherDirectories::new().store();
     let store_file = if task.cacheable {
-        super::store::store_path(&store_root, &task.sha1)
+        super::store::store_path(store_root, &task.sha1)
     } else {
         None
     };
@@ -119,8 +141,11 @@ async fn download_with_retry(
                 break;
             }
         }
-        let result =
-            fetch_to_file(client, &task.url, target, &task.sha1, on_bytes, cancelled).await;
+        let result = if task.size <= 512 * 1024 {
+            fetch_small_file(client, &task.url, target, &task.sha1, on_bytes, cancelled).await
+        } else {
+            fetch_to_file(client, &task.url, target, &task.sha1, on_bytes, cancelled).await
+        };
         match result {
             Ok(()) => break,
             Err(e) if attempt >= MAX_ATTEMPTS || cancelled() => {

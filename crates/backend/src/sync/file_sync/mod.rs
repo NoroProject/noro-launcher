@@ -109,6 +109,9 @@ pub async fn sync_server(
         let _ = tokio::fs::create_dir_all(&p).await;
     }
 
+    // Independent HTTP connections to avoid single-socket HTTP/2 stream bottlenecks.
+    let http_pool = Arc::new(crate::http::HttpClientPool::new(4)?);
+
     // All stages run at once. They touch disjoint files, and a single big JDK
     // download would otherwise hold up a thousand small assets behind it.
     let jobs = STAGE_GROUPS.iter().filter_map(|g| {
@@ -127,10 +130,10 @@ pub async fn sync_server(
 
         let prog = progress.clone();
         let cancelled = cancelled.clone();
-        let client = client.clone();
+        let pool = http_pool.clone();
         Some(async move {
             download_all(
-                &client,
+                &pool,
                 group,
                 g.concurrency,
                 {
