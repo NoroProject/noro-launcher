@@ -69,7 +69,7 @@ pub async fn fetch_to_file(
     };
 
     let mut hasher = Sha1::new();
-    let mut file = if resuming {
+    let file = if resuming {
         // The server is sending the tail, so the hash has to cover what's
         // already on disk before it.
         hash_existing(&part, &mut hasher).await?;
@@ -88,19 +88,20 @@ pub async fn fetch_to_file(
             .with_context(|| format!("creating {}", part.display()))?
     };
 
+    let mut writer = tokio::io::BufWriter::with_capacity(128 * 1024, file);
     let mut stream = resp.bytes_stream();
     while let Some(chunk) = stream.next().await {
         if cancelled() {
-            file.flush().await?;
+            writer.flush().await?;
             bail!("cancelled");
         }
         let chunk = chunk.with_context(|| format!("download from {url} interrupted"))?;
         hasher.update(&chunk);
-        file.write_all(&chunk).await?;
+        writer.write_all(&chunk).await?;
         on_bytes(chunk.len() as i64);
     }
-    file.flush().await?;
-    drop(file);
+    writer.flush().await?;
+    drop(writer);
 
     let actual = hex::encode(hasher.finalize());
     if !expected_sha1.is_empty() && !actual.eq_ignore_ascii_case(expected_sha1) {

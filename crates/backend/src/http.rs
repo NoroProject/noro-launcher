@@ -18,7 +18,12 @@ pub fn client() -> reqwest::Result<reqwest::Client> {
         .user_agent(format!("noro-launcher/{}", env!("CARGO_PKG_VERSION")))
         .connect_timeout(CONNECT_TIMEOUT)
         .read_timeout(READ_TIMEOUT)
+        .tcp_nodelay(true)
         .tcp_keepalive(Duration::from_secs(30))
+        .http2_adaptive_window(true)
+        .http2_initial_stream_window_size(2 * 1024 * 1024)
+        .http2_initial_connection_window_size(8 * 1024 * 1024)
+        .http2_max_frame_size(Some(65536))
         // Notices a dead HTTP/2 connection between requests, before the next
         // download is queued on it.
         .http2_keep_alive_interval(Duration::from_secs(20))

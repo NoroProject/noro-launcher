@@ -17,7 +17,7 @@ pub(super) const STAGE_GROUPS: &[StageGroup] = &[
     StageGroup {
         stage: SyncStage::DownloadingJava,
         kinds: &[ArtifactKind::Java],
-        concurrency: 8,
+        concurrency: 32,
     },
     StageGroup {
         stage: SyncStage::DownloadingMinecraft,
@@ -32,7 +32,7 @@ pub(super) const STAGE_GROUPS: &[StageGroup] = &[
             ArtifactKind::Runtime,
             ArtifactKind::Native,
         ],
-        concurrency: 16,
+        concurrency: 32,
     },
     StageGroup {
         stage: SyncStage::DownloadingAssets,
@@ -43,6 +43,6 @@ pub(super) const STAGE_GROUPS: &[StageGroup] = &[
     StageGroup {
         stage: SyncStage::DownloadingMods,
         kinds: &[ArtifactKind::Mod, ArtifactKind::Config, ArtifactKind::Other],
-        concurrency: 12,
+        concurrency: 32,
     },
 ];
