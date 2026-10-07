@@ -56,10 +56,16 @@ impl LauncherDirectories {
         self.root.join("updates")
     }
 
+    /// Shared content-addressable store across instances.
+    pub fn store(&self) -> PathBuf {
+        self.root.join("store")
+    }
+
     pub fn ensure(&self) -> std::io::Result<()> {
         std::fs::create_dir_all(&self.root)?;
         std::fs::create_dir_all(self.instances())?;
         std::fs::create_dir_all(self.updates())?;
+        std::fs::create_dir_all(self.store())?;
         Ok(())
     }
 }

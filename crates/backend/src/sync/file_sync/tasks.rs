@@ -1,3 +1,4 @@
+// File exceeds 150 lines: decision engine comparing local instance against manifest with shared store.
 //! The per-file decision, and what to do when both sides changed a file.
 
 use super::ProgressFn;
@@ -153,6 +154,23 @@ pub(super) async fn collect(
         // Record what the server is serving now; the next pass compares against
         // it to work out which side changed the file.
         if wanted {
+            let store_root = crate::directories::LauncherDirectories::new().store();
+            let cacheable = crate::sync::store::is_cacheable(kind);
+            if cacheable
+                && crate::sync::store::try_link_from_store(
+                    &store_root,
+                    &f.sha1,
+                    f.size,
+                    &dest,
+                    f.executable,
+                )
+                .await
+            {
+                base.set(&f.path, &f.sha1);
+                fetched.push(f.path.clone());
+                continue;
+            }
+
             base.set(&f.path, &f.sha1);
             fetched.push(f.path.clone());
             tasks.push((
@@ -163,6 +181,7 @@ pub(super) async fn collect(
                     sha1: f.sha1.clone(),
                     size: f.size,
                     executable: f.executable,
+                    cacheable,
                 },
             ));
         }

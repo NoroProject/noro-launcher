@@ -1,3 +1,4 @@
+// File exceeds 150 lines: parallel download pool with retries, backoff, and local store linking.
 //! Parallel download pool: retries with backoff, byte-level progress.
 
 use super::fetch::fetch_to_file;
@@ -16,6 +17,7 @@ pub struct DownloadTask {
     pub sha1: String,
     pub size: u64,
     pub executable: bool,
+    pub cacheable: bool,
 }
 
 /// Network hiccups under load are normal; one 502 must not take the whole
@@ -86,12 +88,27 @@ async fn download_with_retry(
     on_bytes: &(dyn Fn(i64) + Send + Sync),
     cancelled: &(dyn Fn() -> bool + Send + Sync),
 ) -> Result<()> {
+    let store_root = crate::directories::LauncherDirectories::new().store();
+    let store_file = if task.cacheable {
+        super::store::store_path(&store_root, &task.sha1)
+    } else {
+        None
+    };
+
+    if let Some(src) = &store_file {
+        if super::store::has_valid(src, task.size).await {
+            let _ = super::store::link_or_copy(src, &task.dest).await;
+            on_bytes(task.size as i64);
+            apply_exec_bit(&task.dest, task.executable).await?;
+            return Ok(());
+        }
+    }
+
+    let target = store_file.as_deref().unwrap_or(&task.dest);
     let mut attempt = 1;
     loop {
-        let result = fetch_to_file(
-            client, &task.url, &task.dest, &task.sha1, on_bytes, cancelled,
-        )
-        .await;
+        let result =
+            fetch_to_file(client, &task.url, target, &task.sha1, on_bytes, cancelled).await;
         match result {
             Ok(()) => break,
             Err(e) if attempt >= MAX_ATTEMPTS || cancelled() => {
@@ -109,14 +126,23 @@ async fn download_with_retry(
         }
     }
 
-    // The java binary and natives need the exec bit on unix.
-    #[cfg(unix)]
-    if task.executable {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = tokio::fs::metadata(&task.dest).await?.permissions();
-        perms.set_mode(0o755);
-        tokio::fs::set_permissions(&task.dest, perms).await?;
+    if let Some(src) = &store_file {
+        super::store::link_or_copy(src, &task.dest).await?;
     }
+
+    apply_exec_bit(&task.dest, task.executable).await?;
+    Ok(())
+}
+
+async fn apply_exec_bit(path: &Path, executable: bool) -> Result<()> {
+    #[cfg(unix)]
+    if executable {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = tokio::fs::metadata(path).await?.permissions();
+        perms.set_mode(0o755);
+        tokio::fs::set_permissions(path, perms).await?;
+    }
+    let _ = (path, executable);
     Ok(())
 }
 
