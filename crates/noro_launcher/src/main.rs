@@ -288,9 +288,8 @@ fn run_core(path: &Path, app_dir: &Path) -> ExitCode {
 
     #[cfg(not(unix))]
     {
-        match cmd.status() {
-            Ok(s) if s.success() => ExitCode::SUCCESS,
-            Ok(_) => ExitCode::FAILURE,
+        match cmd.spawn() {
+            Ok(_) => ExitCode::SUCCESS,
             Err(e) => {
                 log::line(&format!("could not start {}: {e}", path.display()));
                 ExitCode::FAILURE
@@ -300,7 +299,7 @@ fn run_core(path: &Path, app_dir: &Path) -> ExitCode {
 }
 
 /// From behind the splash. On Unix this replaces the process and only comes
-/// back on failure; on Windows core is spawned and the splash then quits.
+/// back on failure; on Windows core is spawned and the bootstrapper exits immediately.
 fn start_core(path: &Path, app_dir: &Path) -> Result<(), Failure> {
     let mut cmd = prepare_core_cmd(path, app_dir);
     #[cfg(unix)]
@@ -309,9 +308,18 @@ fn start_core(path: &Path, app_dir: &Path) -> Result<(), Failure> {
         cmd.exec()
     };
     #[cfg(not(unix))]
-    let Err(err) = cmd.spawn().map(drop) else {
-        return Ok(());
-    };
+    {
+        match cmd.spawn() {
+            Ok(_) => std::process::exit(0),
+            Err(err) => {
+                return Err(Failure::new(
+                    Kind::Start,
+                    anyhow::Error::new(err).context(format!("could not start {}", path.display())),
+                ));
+            }
+        }
+    }
+    #[cfg(unix)]
     Err(Failure::new(
         Kind::Start,
         anyhow::Error::new(err).context(format!("could not start {}", path.display())),
