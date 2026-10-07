@@ -1,3 +1,4 @@
+// File exceeds 150 lines: bootstrapper lifecycle managing initial download, signature check, and core handoff.
 //! Bootstrapper: check for a newer build, fetch the core binary, hand over.
 //!
 //! This binary is never updated after the first install, which is what lets it
