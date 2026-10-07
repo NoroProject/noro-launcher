@@ -47,6 +47,7 @@ pub fn is_cacheable(kind: ArtifactKind) -> bool {
             | ArtifactKind::Asset
             | ArtifactKind::AssetIndex
             | ArtifactKind::Mod
+            | ArtifactKind::Config
     )
 }
 
@@ -62,7 +63,9 @@ pub async fn link_or_copy(src: &Path, dst: &Path) -> std::io::Result<()> {
         let _ = tokio::fs::remove_file(dst).await;
     }
     if let Some(parent) = dst.parent() {
-        tokio::fs::create_dir_all(parent).await?;
+        if !parent.exists() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
     }
     match tokio::fs::hard_link(src, dst).await {
         Ok(()) => Ok(()),

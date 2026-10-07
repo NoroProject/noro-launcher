@@ -30,11 +30,12 @@ const PROGRESS_STEP: i64 = 512 * 1024;
 /// `on_progress` gets the running byte total; `cancelled` aborts the pool.
 pub async fn download_all(
     client: &reqwest::Client,
-    tasks: Vec<DownloadTask>,
+    mut tasks: Vec<DownloadTask>,
     concurrency: usize,
     on_progress: impl Fn(u64) + Send + Sync + 'static,
     cancelled: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Result<()> {
+    tasks.sort_by_key(|t| std::cmp::Reverse(t.size));
     let done = Arc::new(AtomicI64::new(0));
     let reported = Arc::new(AtomicI64::new(0));
     let on_progress = Arc::new(on_progress);

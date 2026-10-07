@@ -1,3 +1,4 @@
+// File exceeds 150 lines: single-file fetcher with memory fast-path and resumable streaming.
 //! One file: streamed to disk, resumable, SHA1-checked.
 //!
 //! Streaming rather than buffering matters here — a 180 MB JDK held in memory,
@@ -38,7 +39,9 @@ pub async fn fetch_to_file(
     cancelled: CancelFn<'_>,
 ) -> Result<()> {
     if let Some(parent) = dest.parent() {
-        tokio::fs::create_dir_all(parent).await?;
+        if !parent.exists() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
     }
     let part = part_path(dest);
     let mut have = tokio::fs::metadata(&part)
@@ -67,6 +70,26 @@ pub async fn fetch_to_file(
             .with_context(|| format!("bad status from {url}"))?;
         break (resp, partial);
     };
+
+    // Small files (e.g. thousands of quest configs) write directly in one go
+    // without intermediate .part and rename syscalls.
+    let len = resp.content_length().unwrap_or(0);
+    if have == 0 && !resuming && len > 0 && len <= 512 * 1024 {
+        if cancelled() {
+            bail!("cancelled");
+        }
+        let bytes = resp.bytes().await?;
+        if cancelled() {
+            bail!("cancelled");
+        }
+        let actual = hex::encode(Sha1::digest(&bytes));
+        if !expected_sha1.is_empty() && !actual.eq_ignore_ascii_case(expected_sha1) {
+            bail!("SHA1 mismatch for {url}: expected {expected_sha1}, got {actual}");
+        }
+        tokio::fs::write(dest, &bytes).await?;
+        on_bytes(bytes.len() as i64);
+        return Ok(());
+    }
 
     let mut hasher = Sha1::new();
     let file = if resuming {

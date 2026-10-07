@@ -43,6 +43,6 @@ pub(super) const STAGE_GROUPS: &[StageGroup] = &[
     StageGroup {
         stage: SyncStage::DownloadingMods,
         kinds: &[ArtifactKind::Mod, ArtifactKind::Config, ArtifactKind::Other],
-        concurrency: 32,
+        concurrency: 48,
     },
 ];
