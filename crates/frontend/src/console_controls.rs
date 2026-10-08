@@ -141,6 +141,7 @@ pub fn search_field(view: &mut ConsoleWindow, cx: &mut Cx) -> AnyElement {
                 .flex_1()
                 .min_w_0()
                 .truncate()
+                .font_family(FONT_PIXEL_ALT)
                 .text_size(px(12.))
                 .text_color(rgb(if text.is_empty() {
                     TEXT_MUTED

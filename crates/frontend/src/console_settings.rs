@@ -129,6 +129,7 @@ fn switch(
         )
         .child(
             div()
+                .font_family(FONT_PIXEL_ALT)
                 .text_size(px(12.))
                 .text_color(rgb(TEXT_PRIMARY))
                 .child(label.into()),
@@ -153,7 +154,7 @@ fn size_option(size: u8, active: bool, cx: &mut Cx) -> AnyElement {
         .bg(rgb(if active { BG_CARD_HOV } else { BG_INPUT }))
         .border_1()
         .border_color(rgb(if active { CTA } else { BORDER }))
-        .font_family("Courier New")
+        .font_family(FONT_PIXEL_ALT)
         .text_size(px(f32::from(size)))
         .text_color(rgb(if active { CTA } else { TEXT_SECONDARY }))
         .child(size.to_string())
