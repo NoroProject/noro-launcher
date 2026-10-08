@@ -94,6 +94,9 @@ pub struct SyncUiState {
     pub rate: crate::sync_text::Rate,
     /// The stop button was clicked once and waits for the confirming click.
     pub stop_armed: bool,
+    /// The kill went out and the process hasn't exited yet. Without it the
+    /// button went on offering «Stop» and armed itself again on a click.
+    pub stopping: bool,
 }
 
 impl SyncUiState {
@@ -1138,8 +1141,12 @@ impl LauncherUI {
                 total,
                 file,
             } => {
+                // `Done` ends the file sync, not the launch: the check and the
+                // JVM start come after it. Dropping `syncing` here put «Start»
+                // back on the button for those seconds, and a click started a
+                // second game in the same folder.
                 let s = self.sync.entry(server_id).or_default();
-                s.syncing = stage != SyncStage::Done;
+                s.syncing = true;
                 let cancelling = s.heading == Some(SyncHeading::Cancelling);
                 if stage.is_download() {
                     s.stages.insert(stage, (done, total));
@@ -1231,8 +1238,11 @@ impl LauncherUI {
                 let s = self.sync.entry(server_id).or_default();
                 s.running = true;
                 s.syncing = false;
+                s.failed = None;
                 s.launch = None;
                 s.heading = None;
+                s.stages.clear();
+                s.rate.clear();
                 if self
                     .server_client_settings(server_id)
                     .show_console_on_launch
@@ -1243,6 +1253,8 @@ impl LauncherUI {
             MessageToFrontend::GameStopped { server_id, exit_ok } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.running = false;
+                s.stopping = false;
+                s.stop_armed = false;
                 if !exit_ok {
                     if self
                         .server_client_settings(server_id)
@@ -1869,8 +1881,12 @@ impl LauncherUI {
     /// First click arms, second click stops; the arming wears off on its own.
     pub fn stop_clicked(&mut self, id: Uuid, cx: &mut Context<Self>) {
         let s = self.sync.entry(id).or_default();
+        if s.stopping {
+            return;
+        }
         if s.stop_armed {
             s.stop_armed = false;
+            s.stopping = true;
             self.kill(id);
             return;
         }

@@ -115,6 +115,9 @@ fn play_button(
     if sync.syncing {
         return disabled(sync.heading_text());
     }
+    if sync.stopping {
+        return disabled(t("game-stopping"));
+    }
     if sync.running {
         return stop_button(server_id, sync.stop_armed, cx);
     }

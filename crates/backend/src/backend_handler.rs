@@ -107,8 +107,20 @@ impl BackendState {
             }
 
             MessageToBackend::KillGame { server_id } => {
-                if let Some(g) = self.ctx.running.lock().get(&server_id) {
-                    let _ = g.kill.send(());
+                let sent = self
+                    .ctx
+                    .running
+                    .lock()
+                    .get(&server_id)
+                    .is_some_and(|g| g.kill.send(()).is_ok());
+                // The window thought the game was up and is now waiting for it
+                // to exit. Nothing is running to exit, so say so, or the button
+                // sits on «Stopping» for good.
+                if !sent {
+                    self.ctx.send(MessageToFrontend::GameStopped {
+                        server_id,
+                        exit_ok: true,
+                    });
                 }
             }
 
