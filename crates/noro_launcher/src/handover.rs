@@ -68,18 +68,11 @@ pub fn start_core(path: &Path, app_dir: &Path) -> Result<(), Failure> {
         cmd.exec()
     };
     #[cfg(not(unix))]
-    {
-        match cmd.spawn() {
-            Ok(_) => std::process::exit(0),
-            Err(err) => {
-                return Err(Failure::new(
-                    Kind::Start,
-                    anyhow::Error::new(err).context(format!("could not start {}", path.display())),
-                ));
-            }
-        }
-    }
-    #[cfg(unix)]
+    let err = match cmd.spawn() {
+        // Core runs on its own from here; the bootstrapper has nothing left to do.
+        Ok(_) => std::process::exit(0),
+        Err(err) => err,
+    };
     Err(Failure::new(
         Kind::Start,
         anyhow::Error::new(err).context(format!("could not start {}", path.display())),
