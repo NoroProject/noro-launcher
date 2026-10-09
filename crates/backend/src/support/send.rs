@@ -67,33 +67,21 @@ async fn upload(
     }
     let archive = super::pack(&bundle)?;
 
-    let mut url = format!(
-        "{}/api/launcher/support-bundle?note={}",
-        master_url.trim_end_matches('/'),
-        urlencoding::encode(note)
-    );
+    let mut query = format!("note={}", urlencoding::encode(note));
     if let Some(id) = server_id {
-        url.push_str(&format!("&server_id={id}"));
+        query.push_str(&format!("&server_id={id}"));
     }
     if let Some(id) = request_id {
-        url.push_str(&format!("&request_id={id}"));
+        query.push_str(&format!("&request_id={id}"));
     }
 
-    let resp = http
-        .post(&url)
-        .bearer_auth(access_token)
-        .header("content-type", "application/zip")
-        .body(archive)
-        .send()
-        .await?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        bail!("master refused ({status}): {body}");
-    }
-
-    let value: serde_json::Value = resp.json().await?;
+    let api =
+        crate::master_api::MasterApi::new(http.clone(), master_url, Some(access_token.to_string()))
+            .ok_or_else(|| anyhow::anyhow!("not signed in"))?;
+    let value = api
+        .send_support_bundle(&query, archive)
+        .await
+        .map_err(|e| e.context("master refused the bundle"))?;
     let id = value
         .get("id")
         .and_then(|v| v.as_str())

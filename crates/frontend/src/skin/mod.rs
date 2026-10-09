@@ -1,3 +1,4 @@
+// Over 150 lines: the public entry points to the renderer, then tests.
 //! 3D Minecraft skin renderer: software rasterizer with z-buffer, painter sort,
 //! two-light shading, overlay layers, slim/legacy models and capes.
 

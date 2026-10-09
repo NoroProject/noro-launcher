@@ -1,3 +1,4 @@
+// Over 150 lines: the panel and its controls; each control is short.
 //! The global settings panel and its controls.
 
 use super::common::{panel, Cx};

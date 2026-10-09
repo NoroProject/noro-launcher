@@ -1,3 +1,5 @@
+// Over 150 lines: the root view and opening the window: sizes, saved bounds,
+// fonts and the quit hook all have to be in place before the first frame.
 mod assets;
 mod components;
 mod console_chrome;
@@ -18,6 +20,7 @@ mod skin_preview;
 mod state;
 mod sync_text;
 mod theme;
+mod ui_state;
 
 use bridge::{BackendHandle, FrontendReceiver};
 use gpui::{
@@ -33,7 +36,9 @@ use theme::*;
 gpui::actions!(launcher, [CloseOverlay]);
 
 const MAIN_WINDOW_SIZE: (f32, f32) = (1100., 720.);
-const MAIN_WINDOW_MIN_SIZE: (f32, f32) = (1040., 680.);
+/// Fits a 1366×768 screen at 125 % scaling with the taskbar showing; the
+/// old 1040×680 didn't, and the window opened partly off-screen.
+const MAIN_WINDOW_MIN_SIZE: (f32, f32) = (960., 580.);
 /// Updates taken into the window in one go.
 const MAX_UPDATE_BATCH: usize = 256;
 
@@ -43,6 +48,7 @@ impl gpui::Render for LauncherUI {
         // nothing as well.
         let sent = self.backend.sent_count();
         self.perf.frame(sent);
+        self.note_open_server();
 
         let body = match self.page.clone() {
             Page::Login => login::render(self, cx),
@@ -113,14 +119,10 @@ fn open_window(
     backend_handle: BackendHandle,
     frontend_recv: Arc<tokio::sync::Mutex<FrontendReceiver>>,
 ) {
-    let bounds = gpui::Bounds::centered(
-        None,
-        gpui::size(px(MAIN_WINDOW_SIZE.0), px(MAIN_WINDOW_SIZE.1)),
-        cx,
-    );
+    let window_bounds = initial_bounds(cx);
     let _ = cx.open_window(
         WindowOptions {
-            window_bounds: Some(gpui::WindowBounds::Windowed(bounds)),
+            window_bounds: Some(window_bounds),
             window_min_size: Some(gpui::size(
                 px(MAIN_WINDOW_MIN_SIZE.0),
                 px(MAIN_WINDOW_MIN_SIZE.1),
@@ -143,6 +145,32 @@ fn open_window(
             });
             let view_weak: WeakEntity<LauncherUI> = view.downgrade();
             cx.set_global(GlobalLauncherUI(view.clone()));
+
+            // Placement is noted as it changes and written once, on quit:
+            // a drag reports every pixel.
+            view.update(cx, |_, cx| {
+                cx.observe_window_bounds(window, |ui, window, _cx| {
+                    let (bounds, maximized) = match window.window_bounds() {
+                        gpui::WindowBounds::Windowed(b) => (b, false),
+                        gpui::WindowBounds::Maximized(b) | gpui::WindowBounds::Fullscreen(b) => {
+                            (b, true)
+                        }
+                    };
+                    ui.ui_state.window = Some(ui_state::SavedBounds {
+                        x: f32::from(bounds.origin.x),
+                        y: f32::from(bounds.origin.y),
+                        width: f32::from(bounds.size.width),
+                        height: f32::from(bounds.size.height),
+                    });
+                    ui.ui_state.maximized = maximized;
+                })
+                .detach();
+                cx.on_app_quit(|ui, _cx| {
+                    ui_state::save(&ui.ui_state);
+                    async {}
+                })
+                .detach();
+            });
 
             // The skin preview animates only while the window has the focus;
             // coming back to it picks the animation up again.
@@ -223,6 +251,32 @@ fn open_window(
             view
         },
     );
+}
+
+/// Where the window last stood, if that is still on a screen; otherwise
+/// centred, and no bigger than the screen it opens on.
+fn initial_bounds(cx: &App) -> gpui::WindowBounds {
+    let saved = ui_state::load();
+    let min = gpui::size(px(MAIN_WINDOW_MIN_SIZE.0), px(MAIN_WINDOW_MIN_SIZE.1));
+    let restored = saved.window.map(|b| gpui::Bounds {
+        origin: point(px(b.x), px(b.y)),
+        size: gpui::size(px(b.width).max(min.width), px(b.height).max(min.height)),
+    });
+    let on_screen = restored.filter(|b| cx.displays().iter().any(|d| d.bounds().intersects(b)));
+    let bounds = on_screen.unwrap_or_else(|| {
+        let mut size = gpui::size(px(MAIN_WINDOW_SIZE.0), px(MAIN_WINDOW_SIZE.1));
+        if let Some(display) = cx.primary_display() {
+            let screen = display.bounds().size;
+            size.width = size.width.min(screen.width * 0.9).max(min.width);
+            size.height = size.height.min(screen.height * 0.9).max(min.height);
+        }
+        gpui::Bounds::centered(None, size, cx)
+    });
+    if saved.maximized {
+        gpui::WindowBounds::Maximized(bounds)
+    } else {
+        gpui::WindowBounds::Windowed(bounds)
+    }
 }
 
 /// Blocks the calling thread until the app exits.

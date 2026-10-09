@@ -82,7 +82,9 @@ fn header(ui: &LauncherUI, server_id: Uuid, hit: &CatalogHitInfo, cx: &mut Cx) -
                 )
                 .child(facts(hit)),
         )
-        .child(super::content_card::detail_action(ui, server_id, hit, cx))
+        .child(super::mod_detail_action::detail_action(
+            ui, server_id, hit, cx,
+        ))
         .into_any_element()
 }
 

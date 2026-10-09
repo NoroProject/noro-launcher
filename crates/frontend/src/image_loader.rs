@@ -1,8 +1,12 @@
+// Over 150 lines: fetching, decoding and downscaling are one pipeline, and each
+// step hands the next its bytes.
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use gpui::{Image, ImageFormat, RenderImage};
 use image::Frame;
 use std::sync::Arc;
+
+mod disk;
 
 struct LoadedImage {
     format: ImageFormat,
@@ -158,25 +162,61 @@ fn decode_data_url(url: &str) -> Result<Arc<Image>, String> {
     Ok(Arc::new(Image::from_bytes(final_format, final_bytes)))
 }
 
-/// The body as it came, with the declared content type.
+/// The body as it came, with the declared content type: from the disk while
+/// it is fresh, from the network otherwise, and from the disk again, however
+/// old, when the network fails.
 async fn fetch_raw(url: String) -> Result<(Vec<u8>, Option<String>), String> {
+    static PRUNE: std::sync::Once = std::sync::Once::new();
+    PRUNE.call_once(|| {
+        RUNTIME.spawn_blocking(disk::prune);
+    });
     on_runtime(async move {
-        let _slot = SLOTS.acquire().await.map_err(|e| e.to_string())?;
-        let response = CLIENT.get(&url).send().await.map_err(|e| e.to_string())?;
-        if !response.status().is_success() {
-            return Err(format!("HTTP {}", response.status()));
+        let path = disk::path(&url);
+        let cached = match path.clone() {
+            Some(p) => tokio::task::spawn_blocking(move || disk::read(&p))
+                .await
+                .ok()
+                .flatten(),
+            None => None,
+        };
+        if let Some((bytes, content_type, age)) = &cached {
+            if *age < disk::FRESH {
+                return Ok((bytes.clone(), content_type.clone()));
+            }
         }
-        let content_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.split(';').next())
-            .map(str::trim)
-            .map(str::to_string);
-        let bytes = response.bytes().await.map_err(|e| e.to_string())?.to_vec();
-        Ok((bytes, content_type))
+        match fetch_network(&url).await {
+            Ok((bytes, content_type)) => {
+                if let Some(p) = path {
+                    let (b, t) = (bytes.clone(), content_type.clone());
+                    let _ = tokio::task::spawn_blocking(move || disk::write(&p, &b, t.as_deref()))
+                        .await;
+                }
+                Ok((bytes, content_type))
+            }
+            Err(e) => match cached {
+                Some((bytes, content_type, _)) => Ok((bytes, content_type)),
+                None => Err(e),
+            },
+        }
     })
     .await
+}
+
+async fn fetch_network(url: &str) -> Result<(Vec<u8>, Option<String>), String> {
+    let _slot = SLOTS.acquire().await.map_err(|e| e.to_string())?;
+    let response = CLIENT.get(url).send().await.map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .map(str::trim)
+        .map(str::to_string);
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?.to_vec();
+    Ok((bytes, content_type))
 }
 
 async fn fetch_image(url: String) -> Result<LoadedImage, String> {

@@ -1,3 +1,5 @@
+// Over 150 lines: the whole loading window. The bootstrapper never updates, so
+// it stays one file that is easy to audit.
 //! The loading window: logo, mascot and a progress bar while core downloads.
 //!
 //! Drawn with the same GPUI as the launcher, so the first thing a player sees

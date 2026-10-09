@@ -1,3 +1,5 @@
+// Over 150 lines: the tests take up a third; the download and its checks are
+// one function.
 use crate::config::LauncherConfig;
 use crate::directories::LauncherDirectories;
 use anyhow::{bail, Context, Result};

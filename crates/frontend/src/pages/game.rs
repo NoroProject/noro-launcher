@@ -9,14 +9,21 @@ use gpui::{
 use schema::ServerEntry;
 
 pub fn page(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
-    let Some(server) = ui
+    let Some((id, background_url)) = ui
         .selected_server_id()
-        .and_then(|id| ui.server(&id).cloned())
+        .and_then(|id| ui.server(&id))
+        .map(|s| (s.id, s.background_url.clone()))
     else {
         return empty(ui, cx);
     };
+    ui.ensure_background_loaded(id, background_url, cx);
 
-    ui.ensure_background_loaded(server.id, server.background_url.clone(), cx);
+    // Borrowed from here on: the whole server entry, description and node
+    // list included, used to be cloned on every frame.
+    let ui = &*ui;
+    let Some(server) = ui.server(&id) else {
+        return empty(ui, cx);
+    };
     let sync = ui.sync_state(&server.id);
     let locked = server.limited
         && !ui
@@ -30,15 +37,15 @@ pub fn page(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
         .relative()
         .overflow_hidden()
         .bg(rgb(CONTENT_FALLBACK))
-        .child(background(ui, &server))
+        .child(background(ui, server))
         .child(tabs(ui, cx))
-        .child(game_status::info_block(&server))
+        .child(game_status::info_block(server))
         .when(sync.syncing || sync.failed.is_some(), |d| {
-            d.child(game_sync::sync_overlay(server.id, &sync, cx))
+            d.child(game_sync::sync_overlay(server.id, sync, cx))
         })
-        .child(game_bar::bottom_bar(ui, &server, &sync, locked, cx))
+        .child(game_bar::bottom_bar(ui, server, sync, locked, cx))
         // Last, so nothing on the page paints over the open list.
-        .children(super::build_picker::build_menu(ui, &server, cx))
+        .children(super::build_picker::build_menu(ui, server, cx))
         .into_any_element()
 }
 

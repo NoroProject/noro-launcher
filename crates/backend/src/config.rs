@@ -1,3 +1,5 @@
+// Over 150 lines: the config with its defaults, and the per-server settings
+// that are read from it and written to it.
 //! Launcher configuration, persisted to disk.
 
 use schema::RecommendedClientSettings;

@@ -53,25 +53,17 @@ impl Denied {
 
 pub type Answer<T> = std::result::Result<T, Denied>;
 
+/// The case panel's view of the master: the same session as everything else
+/// (`MasterApi`), with answers read as the mod's refusals rather than errors.
 pub struct Api {
-    base: String,
-    token: String,
-    http: reqwest::Client,
+    master: crate::master_api::MasterApi,
 }
 
 impl Api {
     /// `None` when the launcher isn't logged in — nothing to ask the master.
     pub fn new(ctx: &Ctx) -> Option<Self> {
-        let token = ctx.ws.token()?;
         Some(Self {
-            base: ctx
-                .config
-                .get()
-                .master_url
-                .trim_end_matches('/')
-                .to_string(),
-            token,
-            http: ctx.http.clone(),
+            master: crate::master_api::MasterApi::for_session(ctx)?,
         })
     }
 
@@ -151,9 +143,7 @@ impl Api {
     }
 
     pub(super) fn req(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
-        self.http
-            .request(method, format!("{}{path}", self.base))
-            .bearer_auth(&self.token)
+        self.master.request(method, path)
     }
 
     async fn ok(&self, req: reqwest::RequestBuilder) -> Answer<()> {

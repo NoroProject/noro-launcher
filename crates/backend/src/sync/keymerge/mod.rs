@@ -1,3 +1,5 @@
+// Over 150 lines: the merge and fetching the server's side of it, which has to
+// be verified before it is merged.
 //! Merging configs key by key rather than whole-file.
 //!
 //! `merge.rs` answers "who changed this file". The question here is smaller: the

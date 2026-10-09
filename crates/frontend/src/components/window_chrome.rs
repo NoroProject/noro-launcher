@@ -1,3 +1,5 @@
+// Over 150 lines: the bar and the pills in it; each pill is short, and the bar
+// decides which show.
 use crate::icons::ic;
 use crate::state::LauncherUI;
 use crate::theme::*;
@@ -29,6 +31,7 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
             }
         })
         .children(impersonate_pill(ui, cx))
+        .children(update_pill(ui, cx))
         // Windows drags the window itself, from its answer to WM_NCHITTEST;
         // `start_window_move()` does nothing there. Only the empty stretch is
         // marked — cover the whole bar and the system treats the buttons as
@@ -107,6 +110,48 @@ fn impersonate_pill(ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> Option<Any
                         cx.notify();
                     })),
             )
+            .into_any_element(),
+    )
+}
+
+/// A newer launcher is out. Settings had the only word of it, and nobody opens
+/// settings to find out; this sits in the bar on every page but that one.
+fn update_pill(ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> Option<AnyElement> {
+    let version = ui.update_available.as_ref()?;
+    if ui.page == crate::state::Page::Settings || ui.page == crate::state::Page::Login {
+        return None;
+    }
+    let mut args = i18n::FluentArgs::new();
+    args.set(
+        "version",
+        version.version.trim_start_matches("launcher-").to_string(),
+    );
+    Some(
+        div()
+            .id("update-pill")
+            .h(px(24.))
+            .flex()
+            .items_center()
+            .gap(px(6.))
+            .px(px(8.))
+            .rounded(px(R_SM))
+            .cursor_pointer()
+            .bg(rgba((CTA << 8) | 0x22))
+            .border_1()
+            .border_color(rgb(CTA))
+            .hover(|s| s.bg(rgba((CTA << 8) | 0x44)))
+            .child(ic("download", 12., CTA))
+            .child(
+                div()
+                    .text_size(px(11.))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(rgb(CTA))
+                    .child(i18n::t_args("update-pill", &args)),
+            )
+            .on_click(cx.listener(|this, _e, _w, cx| {
+                this.page = crate::state::Page::Settings;
+                cx.notify();
+            }))
             .into_any_element(),
     )
 }

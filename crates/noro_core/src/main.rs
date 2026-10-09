@@ -1,3 +1,5 @@
+// Over 150 lines: the single-instance guard and the start-up around it; the
+// lock decides which path runs.
 //! The launcher itself: single-instance guard, then the frontend/backend pair.
 //! This binary is the one the bootstrapper replaces on update.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]

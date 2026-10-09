@@ -57,7 +57,7 @@ pub fn server_item(
         .when(!collapsed, |d| d.child(info_block(server, &version)))
         .when(!collapsed, |d| d.child(div().flex_1()))
         .when(locked && !collapsed, |d| d.child(ic("lock", 14., WARNING)))
-        .when(!collapsed, |d| d.child(status_dot(&sync)))
+        .when(!collapsed, |d| d.child(status_dot(sync)))
         .into_any_element()
 }
 

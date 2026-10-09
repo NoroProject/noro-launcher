@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 schema = { workspace = true }
+i18n = { workspace = true }
 bridge = { workspace = true }
 mod_link = { workspace = true }
 mc_mod_utils = { workspace = true }

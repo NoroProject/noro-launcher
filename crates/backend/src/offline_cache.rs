@@ -1,3 +1,5 @@
+// Over 150 lines: the tests take up the rest; the cache itself is about a
+// hundred.
 //! What the launcher needs to start an installed build without the master.
 //!
 //! The server list, the player's profile and each installed build's manifest

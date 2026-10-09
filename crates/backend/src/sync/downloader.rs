@@ -1,7 +1,8 @@
-// File exceeds 150 lines: parallel download pool with retries, backoff, and local store linking.
+// Over 150 lines: the pool, its retries and the up-to-date check that decides
+// what the pool gets.
 //! Parallel download pool: retries with backoff, byte-level progress.
 
-use super::fetch::{fetch_small_file, fetch_to_file};
+use super::fetch::fetch_to_file;
 use super::hash_cache::HashCache;
 use anyhow::{bail, Result};
 use futures::stream::{self, StreamExt};
@@ -17,7 +18,6 @@ pub struct DownloadTask {
     pub sha1: String,
     pub size: u64,
     pub executable: bool,
-    pub cacheable: bool,
 }
 
 /// Network hiccups under load are normal; one 502 must not take the whole
@@ -29,26 +29,23 @@ const PROGRESS_STEP: i64 = 512 * 1024;
 
 /// `on_progress` gets the running byte total; `cancelled` aborts the pool.
 pub async fn download_all(
-    pool: &crate::http::HttpClientPool,
+    client: &reqwest::Client,
     tasks: Vec<DownloadTask>,
     concurrency: usize,
     on_progress: impl Fn(u64) + Send + Sync + 'static,
     cancelled: impl Fn() -> bool + Send + Sync + 'static,
 ) -> Result<()> {
-    let tasks = interleave_tasks(tasks);
     let done = Arc::new(AtomicI64::new(0));
     let reported = Arc::new(AtomicI64::new(0));
     let on_progress = Arc::new(on_progress);
     let cancelled = Arc::new(cancelled);
-    let store_root = crate::directories::LauncherDirectories::new().store();
 
-    let results = stream::iter(tasks.into_iter().enumerate().map(|(idx, task)| {
-        let client = pool.get(idx).clone();
+    let results = stream::iter(tasks.into_iter().map(|task| {
+        let client = client.clone();
         let done = done.clone();
         let reported = reported.clone();
         let on_progress = on_progress.clone();
         let cancelled = cancelled.clone();
-        let store_root = store_root.clone();
         async move {
             if cancelled() {
                 bail!("cancelled");
@@ -66,7 +63,10 @@ pub async fn download_all(
                     }
                 }
             };
-            download_with_retry(&client, &task, &store_root, &bytes, cancelled.as_ref()).await?;
+            download_with_retry(&client, &task, &bytes, cancelled.as_ref()).await?;
+            // File finished: report the exact total instead of waiting for
+            // the next progress step.
+            on_progress(done.load(Ordering::Relaxed).max(0) as u64);
             Ok::<_, anyhow::Error>(())
         }
     }))
@@ -79,73 +79,21 @@ pub async fn download_all(
     while let Some(r) = results.next().await {
         r?;
     }
-    on_progress(done.load(Ordering::Relaxed).max(0) as u64);
     Ok(())
-}
-
-fn interleave_tasks(tasks: Vec<DownloadTask>) -> Vec<DownloadTask> {
-    let (mut large, small): (Vec<_>, Vec<_>) = tasks.into_iter().partition(|t| t.size > 512 * 1024);
-    if large.is_empty() || small.is_empty() {
-        large.extend(small);
-        return large;
-    }
-    large.sort_by_key(|t| std::cmp::Reverse(t.size));
-    let step = small.len() / large.len();
-    let mut result = Vec::with_capacity(large.len() + small.len());
-    let mut small_iter = small.into_iter();
-    for l in large {
-        result.push(l);
-        for _ in 0..step {
-            if let Some(s) = small_iter.next() {
-                result.push(s);
-            }
-        }
-    }
-    result.extend(small_iter);
-    result
 }
 
 async fn download_with_retry(
     client: &reqwest::Client,
     task: &DownloadTask,
-    store_root: &Path,
     on_bytes: &(dyn Fn(i64) + Send + Sync),
     cancelled: &(dyn Fn() -> bool + Send + Sync),
 ) -> Result<()> {
-    let store_file = if task.cacheable {
-        super::store::store_path(store_root, &task.sha1)
-    } else {
-        None
-    };
-
-    let _lock = if store_file.is_some() {
-        Some(super::store::acquire_sha1_lock(&task.sha1).await)
-    } else {
-        None
-    };
-
-    if let Some(src) = &store_file {
-        if super::store::has_valid(src, task.size).await {
-            super::store::link_or_copy(src, &task.dest).await?;
-            on_bytes(task.size as i64);
-            apply_exec_bit(&task.dest, task.executable).await?;
-            return Ok(());
-        }
-    }
-
-    let target = store_file.as_deref().unwrap_or(&task.dest);
     let mut attempt = 1;
     loop {
-        if let Some(src) = &store_file {
-            if super::store::has_valid(src, task.size).await {
-                break;
-            }
-        }
-        let result = if task.size <= 512 * 1024 {
-            fetch_small_file(client, &task.url, target, &task.sha1, on_bytes, cancelled).await
-        } else {
-            fetch_to_file(client, &task.url, target, &task.sha1, on_bytes, cancelled).await
-        };
+        let result = fetch_to_file(
+            client, &task.url, &task.dest, &task.sha1, on_bytes, cancelled,
+        )
+        .await;
         match result {
             Ok(()) => break,
             Err(e) if attempt >= MAX_ATTEMPTS || cancelled() => {
@@ -163,23 +111,14 @@ async fn download_with_retry(
         }
     }
 
-    if let Some(src) = &store_file {
-        super::store::link_or_copy(src, &task.dest).await?;
-    }
-
-    apply_exec_bit(&task.dest, task.executable).await?;
-    Ok(())
-}
-
-async fn apply_exec_bit(path: &Path, executable: bool) -> Result<()> {
+    // The java binary and natives need the exec bit on unix.
     #[cfg(unix)]
-    if executable {
+    if task.executable {
         use std::os::unix::fs::PermissionsExt;
-        let mut perms = tokio::fs::metadata(path).await?.permissions();
+        let mut perms = tokio::fs::metadata(&task.dest).await?.permissions();
         perms.set_mode(0o755);
-        tokio::fs::set_permissions(path, perms).await?;
+        tokio::fs::set_permissions(&task.dest, perms).await?;
     }
-    let _ = (path, executable);
     Ok(())
 }
 
@@ -215,3 +154,7 @@ pub async fn needs_download(
         false
     }
 }
+
+#[cfg(test)]
+#[path = "downloader_tests.rs"]
+mod tests;

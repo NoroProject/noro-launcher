@@ -11,7 +11,6 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use crate::message::{MessageToBackend, MessageToFrontend};
-use crate::serial::{AtomicSerialProvider, AtomicSetSerial, Serial};
 
 pub fn create_pair() -> (
     BackendReceiver,
@@ -25,28 +24,19 @@ pub fn create_pair() -> (
     #[cfg(not(debug_assertions))]
     let (backend_send, backend_recv) = tokio::sync::mpsc::unbounded_channel();
 
-    let backend_serial = AtomicSetSerial::default();
-    let frontend_serial = AtomicSetSerial::default();
-
     (
         BackendReceiver {
             receiver: backend_recv,
-            processed_serial: backend_serial.clone(),
         },
         BackendHandle {
             sender: backend_send,
-            processed_serial: backend_serial,
-            next_serial: Default::default(),
             sent: Default::default(),
         },
         FrontendReceiver {
             receiver: frontend_recv,
-            processed_serial: frontend_serial.clone(),
         },
         FrontendHandle {
             sender: frontend_send,
-            processed_serial: frontend_serial,
-            next_serial: Default::default(),
         },
     )
 }
@@ -54,45 +44,31 @@ pub fn create_pair() -> (
 #[derive(Debug)]
 pub struct BackendReceiver {
     #[cfg(debug_assertions)]
-    receiver: Receiver<(MessageToBackend, Option<Serial>)>,
+    receiver: Receiver<MessageToBackend>,
     #[cfg(not(debug_assertions))]
-    receiver: UnboundedReceiver<(MessageToBackend, Option<Serial>)>,
-    processed_serial: AtomicSetSerial,
+    receiver: UnboundedReceiver<MessageToBackend>,
 }
 
 impl BackendReceiver {
     pub async fn recv(&mut self) -> Option<MessageToBackend> {
-        let (message, serial) = self.receiver.recv().await?;
-        if let Some(serial) = serial {
-            self.processed_serial.set(serial);
-        }
-        Some(message)
+        self.receiver.recv().await
     }
 }
 
 #[derive(Debug)]
 pub struct FrontendReceiver {
-    receiver: UnboundedReceiver<(MessageToFrontend, Option<Serial>)>,
-    processed_serial: AtomicSetSerial,
+    receiver: UnboundedReceiver<MessageToFrontend>,
 }
 
 impl FrontendReceiver {
     pub async fn recv(&mut self) -> Option<MessageToFrontend> {
-        let (message, serial) = self.receiver.recv().await?;
-        if let Some(serial) = serial {
-            self.processed_serial.set(serial);
-        }
-        Some(message)
+        self.receiver.recv().await
     }
 
     /// The next update if one is already queued. Lets the window take a burst
     /// in one go instead of waking up once per message.
     pub fn try_recv(&mut self) -> Option<MessageToFrontend> {
-        let (message, serial) = self.receiver.try_recv().ok()?;
-        if let Some(serial) = serial {
-            self.processed_serial.set(serial);
-        }
-        Some(message)
+        self.receiver.try_recv().ok()
     }
 
     /// How many updates are waiting.
@@ -104,13 +80,9 @@ impl FrontendReceiver {
 #[derive(Clone, Debug)]
 pub struct BackendHandle {
     #[cfg(debug_assertions)]
-    sender: Sender<(MessageToBackend, Option<Serial>)>,
+    sender: Sender<MessageToBackend>,
     #[cfg(not(debug_assertions))]
-    sender: UnboundedSender<(MessageToBackend, Option<Serial>)>,
-    #[allow(dead_code)]
-    processed_serial: AtomicSetSerial,
-    #[allow(dead_code)]
-    next_serial: AtomicSerialProvider,
+    sender: UnboundedSender<MessageToBackend>,
     /// How many messages have gone out, ever.
     ///
     /// The overlay reads it once a second and shows the difference. A screen
@@ -126,9 +98,9 @@ impl BackendHandle {
     pub fn send(&self, message: MessageToBackend) {
         self.sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         #[cfg(debug_assertions)]
-        let _ = self.sender.blocking_send((message, None));
+        let _ = self.sender.blocking_send(message);
         #[cfg(not(debug_assertions))]
-        let _ = self.sender.send((message, None));
+        let _ = self.sender.send(message);
     }
 
     /// Total messages sent since start.
@@ -139,11 +111,7 @@ impl BackendHandle {
 
 #[derive(Clone, Debug)]
 pub struct FrontendHandle {
-    sender: UnboundedSender<(MessageToFrontend, Option<Serial>)>,
-    #[allow(dead_code)]
-    processed_serial: AtomicSetSerial,
-    #[allow(dead_code)]
-    next_serial: AtomicSerialProvider,
+    sender: UnboundedSender<MessageToFrontend>,
 }
 
 impl FrontendHandle {
@@ -151,6 +119,6 @@ impl FrontendHandle {
     /// a game can print thousands of lines in a second, and the update that
     /// says it exited comes right after them.
     pub fn send(&self, message: MessageToFrontend) {
-        let _ = self.sender.send((message, None));
+        let _ = self.sender.send(message);
     }
 }

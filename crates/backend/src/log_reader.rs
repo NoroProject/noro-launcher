@@ -1,3 +1,5 @@
+// Over 150 lines: reading the pipes and classifying the lines, then tests for
+// both.
 //! Reading and classifying Minecraft's log output (based on PandoraLauncher).
 //!
 //! Handles the log4j XML format as well as plain lines. Redaction lives in

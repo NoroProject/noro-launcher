@@ -1,3 +1,5 @@
+// Over 150 lines: the install, guarded against a second click, and the restart
+// that follows it.
 //! Launcher self-update: download, check sha256 and the ed25519 signature,
 //! install into the data root.
 //!
@@ -148,3 +150,7 @@ pub fn restart(exe: &std::path::Path) {
         Err(e) => tracing::error!("could not start {}: {e}", exe.display()),
     }
 }
+
+#[cfg(test)]
+#[path = "updater_tests.rs"]
+mod tests;

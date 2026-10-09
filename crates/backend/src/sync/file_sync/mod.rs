@@ -1,4 +1,5 @@
-// File exceeds 150 lines: orchestrates pre-launch manifest sync, stages, and cleanup.
+// Over 150 lines: the sync in order, stage by stage. The steps live in the
+// submodules; this is the sequence that calls them.
 //! The pre-launch sync: verify the manifest signature, download what differs,
 //! remove what doesn't belong, and honour the optional-mod selection.
 
@@ -98,20 +99,6 @@ pub async fn sync_server(
         &cache,
     )
     .await?;
-    // Pre-create destination directories in batch so parallel tasks don't compete on mkdir.
-    let mut parents = std::collections::HashSet::new();
-    for (_, t) in &tasks {
-        if let Some(p) = t.dest.parent() {
-            parents.insert(p.to_path_buf());
-        }
-    }
-    for p in parents {
-        let _ = tokio::fs::create_dir_all(&p).await;
-    }
-
-    // Independent HTTP connections to avoid single-socket HTTP/2 stream bottlenecks.
-    let http_pool = Arc::new(crate::http::HttpClientPool::new(4)?);
-
     // All stages run at once. They touch disjoint files, and a single big JDK
     // download would otherwise hold up a thousand small assets behind it.
     let jobs = STAGE_GROUPS.iter().filter_map(|g| {
@@ -130,10 +117,10 @@ pub async fn sync_server(
 
         let prog = progress.clone();
         let cancelled = cancelled.clone();
-        let pool = http_pool.clone();
+        let client = client.clone();
         Some(async move {
             download_all(
-                &pool,
+                &client,
                 group,
                 g.concurrency,
                 {
@@ -156,13 +143,6 @@ pub async fn sync_server(
     // of them again a second later.
     for (_, task) in &tasks {
         cache.record(&task.dest, &task.sha1).await;
-    }
-    for rel in &fetched {
-        if let Some(dest) = crate::directories::safe_join(instance_dir, rel) {
-            if let Some(entry) = effective.iter().find(|e| &e.path == rel) {
-                cache.record(&dest, &entry.sha1).await;
-            }
-        }
     }
     cache.save(instance_dir).await;
 

@@ -53,50 +53,39 @@ impl MasterApi {
         )
     }
 
-    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let res = self
-            .http
-            .get(format!("{}{path}", self.base))
+    /// A request to `path` on the master with the session token. Every call to
+    /// the master starts here, including the ones that read the answer their
+    /// own way: the in-game case panel turns statuses into its own messages,
+    /// and the startup check tells a refused token from a missing network.
+    pub(crate) fn request(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
+        self.http
+            .request(method, format!("{}{path}", self.base))
             .bearer_auth(&self.token)
-            .send()
-            .await
-            .context("the master is not answering")?;
+    }
+
+    async fn send<T: DeserializeOwned>(&self, req: reqwest::RequestBuilder) -> Result<T> {
+        let res = req.send().await.context("the master is not answering")?;
         parse(res).await
+    }
+
+    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        self.send(self.request(reqwest::Method::GET, path)).await
     }
 
     async fn post<T: DeserializeOwned>(&self, path: &str, body: &Value) -> Result<T> {
-        let res = self
-            .http
-            .post(format!("{}{path}", self.base))
-            .bearer_auth(&self.token)
-            .json(body)
-            .send()
+        self.send(self.request(reqwest::Method::POST, path).json(body))
             .await
-            .context("the master is not answering")?;
-        parse(res).await
     }
 
     async fn put<T: DeserializeOwned>(&self, path: &str, body: &Value) -> Result<T> {
-        let res = self
-            .http
-            .put(format!("{}{path}", self.base))
-            .bearer_auth(&self.token)
-            .json(body)
-            .send()
+        self.send(self.request(reqwest::Method::PUT, path).json(body))
             .await
-            .context("the master is not answering")?;
-        parse(res).await
     }
 
     async fn delete(&self, path: &str) -> Result<()> {
-        let res = self
-            .http
-            .delete(format!("{}{path}", self.base))
-            .bearer_auth(&self.token)
-            .send()
+        self.send::<Value>(self.request(reqwest::Method::DELETE, path))
             .await
-            .context("the master is not answering")?;
-        parse::<Value>(res).await.map(|_| ())
+            .map(|_| ())
     }
 
     // ── Notifications ───────────────────────────────────────────────────────
@@ -197,15 +186,11 @@ impl MasterApi {
         let part = reqwest::multipart::Part::bytes(png)
             .file_name("skin.png")
             .mime_str("image/png")?;
-        let res = self
-            .http
-            .post(format!("{}/api/me/skin", self.base))
-            .bearer_auth(&self.token)
-            .multipart(reqwest::multipart::Form::new().part("skin", part))
-            .send()
-            .await
-            .context("the master is not answering")?;
-        parse(res).await
+        self.send(
+            self.request(reqwest::Method::POST, "/api/me/skin")
+                .multipart(reqwest::multipart::Form::new().part("skin", part)),
+        )
+        .await
     }
 
     pub async fn capes(&self) -> Result<Vec<schema::CapeRow>> {
@@ -228,6 +213,30 @@ impl MasterApi {
         self.post::<Value>("/api/mod-suggestions", body)
             .await
             .map(|_| ())
+    }
+
+    // ── Launcher housekeeping ───────────────────────────────────────────────
+
+    /// Trades a grant the player confirmed for a session in their account.
+    pub async fn claim_impersonation(&self, grant_id: Uuid) -> Result<Value> {
+        self.post(
+            "/api/launcher/impersonate/claim",
+            &json!({ "grant_id": grant_id }),
+        )
+        .await
+    }
+
+    /// `query` is the already-encoded query string.
+    pub async fn send_support_bundle(&self, query: &str, archive: Vec<u8>) -> Result<Value> {
+        self.send(
+            self.request(
+                reqwest::Method::POST,
+                &format!("/api/launcher/support-bundle?{query}"),
+            )
+            .header("content-type", "application/zip")
+            .body(archive),
+        )
+        .await
     }
 
     // ── Java runtimes ───────────────────────────────────────────────────────
@@ -339,3 +348,7 @@ async fn parse<T: DeserializeOwned>(res: reqwest::Response) -> Result<T> {
     };
     serde_json::from_str(body).context("the master answered with something unexpected")
 }
+
+#[cfg(test)]
+#[path = "master_api_tests.rs"]
+mod tests;
