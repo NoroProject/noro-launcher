@@ -106,9 +106,14 @@ impl Api {
         self.json(self.get(&path)).await
     }
 
-    /// A public endpoint; the token isn't needed but doesn't hurt.
-    pub async fn rules(&self) -> Answer<RulesResponse> {
-        self.json(self.get("/api/rules")).await
+    /// A public endpoint; the token isn't needed but doesn't hurt. With a
+    /// server, its own addendum comes along with the shared rules.
+    pub async fn rules(&self, server_id: Option<Uuid>) -> Answer<RulesResponse> {
+        let path = match server_id {
+            Some(id) => format!("/api/rules?server_id={id}"),
+            None => "/api/rules".to_string(),
+        };
+        self.json(self.get(&path)).await
     }
 
     /// Account endpoint: returns the punishments of whoever owns the token, and
@@ -141,11 +146,11 @@ impl Api {
             .await
     }
 
-    fn get(&self, path: &str) -> reqwest::RequestBuilder {
+    pub(super) fn get(&self, path: &str) -> reqwest::RequestBuilder {
         self.req(reqwest::Method::GET, path)
     }
 
-    fn req(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
+    pub(super) fn req(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
         self.http
             .request(method, format!("{}{path}", self.base))
             .bearer_auth(&self.token)
@@ -155,7 +160,7 @@ impl Api {
         check(req).await.map(|_| ())
     }
 
-    async fn json<T: serde::de::DeserializeOwned>(
+    pub(super) async fn json<T: serde::de::DeserializeOwned>(
         &self,
         req: reqwest::RequestBuilder,
     ) -> Answer<T> {

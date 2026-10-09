@@ -11,6 +11,7 @@ mod live_tests;
 mod master;
 mod push;
 mod server;
+mod social;
 mod store;
 
 pub use store::CaseStore;
@@ -34,6 +35,13 @@ struct Inner {
     /// moderator has one panel.
     tx: Option<UnboundedSender<ToMod>>,
     accept: Option<JoinHandle<()>>,
+    /// The last news the master sent. The launcher asks for news on its own at
+    /// login, so the panel is answered from here without a round trip.
+    news: Option<Vec<schema::NewsItem>>,
+    /// The conversation and ticket the panel has open: only these are re-read
+    /// when something arrives.
+    open_chat: Option<Uuid>,
+    open_ticket: Option<Uuid>,
 }
 
 #[derive(Clone, Default)]
@@ -107,6 +115,69 @@ impl ModLink {
         });
     }
 
+    /// News arrived from the master — at login or because it changed. A
+    /// connected panel gets it at once.
+    pub fn news_arrived(&self, ctx: &Ctx, items: Vec<schema::NewsItem>) {
+        let posts = social::news_posts(ctx, &items);
+        self.inner.lock().news = Some(items);
+        self.send(ToMod::News { posts });
+    }
+
+    fn news(&self) -> Option<Vec<schema::NewsItem>> {
+        self.inner.lock().news.clone()
+    }
+
+    /// A direct message arrived. The list changes either way — previews and
+    /// unread counts — and an open conversation is re-read whoever wrote.
+    pub fn message_arrived(&self, ctx: &Ctx) {
+        if !self.connected() {
+            return;
+        }
+        let open = self.inner.lock().open_chat;
+        let (ctx, link) = (ctx.clone(), self.clone());
+        tokio::spawn(async move {
+            if let Some(peer) = open {
+                log_failure(social::refresh_chat(&ctx, &link, peer).await);
+            }
+            log_failure(social::refresh_chats(&ctx, &link).await);
+        });
+    }
+
+    /// Staff answer tickets through the notification feed rather than a frame
+    /// of their own, so any notification refreshes what the panel shows.
+    pub fn notification_arrived(&self, ctx: &Ctx) {
+        if !self.connected() {
+            return;
+        }
+        let open = self.inner.lock().open_ticket;
+        let (ctx, link) = (ctx.clone(), self.clone());
+        tokio::spawn(async move {
+            let result = match open {
+                Some(id) => social::refresh_ticket(&ctx, &link, id).await,
+                None => social::refresh_tickets(&ctx, &link).await,
+            };
+            log_failure(result);
+        });
+    }
+
+    /// The game server being played: the instance directory is named after it.
+    fn server_id(&self) -> Option<Uuid> {
+        let dir = self.inner.lock().instance_dir.clone()?;
+        dir.file_name()?.to_str()?.parse().ok()
+    }
+
+    fn set_open_chat(&self, peer: Option<Uuid>) {
+        self.inner.lock().open_chat = peer;
+    }
+
+    fn set_open_ticket(&self, id: Option<Uuid>) {
+        self.inner.lock().open_ticket = id;
+    }
+
+    fn connected(&self) -> bool {
+        self.inner.lock().tx.is_some()
+    }
+
     pub fn send(&self, frame: ToMod) {
         if let Some(tx) = &self.inner.lock().tx {
             let _ = tx.send(frame);
@@ -122,7 +193,18 @@ impl ModLink {
     }
 
     fn detach(&self) {
-        self.inner.lock().tx = None;
+        let mut inner = self.inner.lock();
+        inner.tx = None;
+        inner.open_chat = None;
+        inner.open_ticket = None;
+        drop(inner);
         self.store.close();
+    }
+}
+
+/// A push nobody asked for has nowhere to report failure; the log is it.
+fn log_failure(result: master::Answer<()>) {
+    if let Err(e) = result {
+        tracing::debug!("mod_link: panel refresh failed: {e:?}");
     }
 }

@@ -840,12 +840,16 @@ impl BackendState {
                 notification,
                 unread,
                 os_toast,
-            } => crate::notifications::arrived(&self.ctx, notification, unread, os_toast),
+            } => {
+                self.ctx.mod_link.notification_arrived(&self.ctx);
+                crate::notifications::arrived(&self.ctx, notification, unread, os_toast)
+            }
             // The set may have changed on another of the player's machines.
             ServerWsMsg::PersonalContentChanged { server_id } => {
                 crate::personal::request(&self.ctx, server_id)
             }
             ServerWsMsg::DirectMessage { message } => {
+                self.ctx.mod_link.message_arrived(&self.ctx);
                 let mine = self.user.as_ref().map(|u| u.id) == Some(message.author_id);
                 self.ctx.send(MessageToFrontend::DmArrived {
                     // The peer is not the author: your own message arriving from another
@@ -875,6 +879,7 @@ impl BackendState {
                 self.ctx.send(MessageToFrontend::ServerList { servers });
             }
             ServerWsMsg::News { items } => {
+                self.ctx.mod_link.news_arrived(&self.ctx, items.clone());
                 self.ctx.send(MessageToFrontend::NewsUpdated { items });
             }
             ServerWsMsg::BuildManifest { manifest } => {

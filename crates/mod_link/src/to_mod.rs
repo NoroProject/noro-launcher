@@ -7,6 +7,8 @@
 use crate::case::{CaseBrief, CaseView, InventorySlot};
 use crate::dossier::Dossier;
 use crate::player::{OwnPunishment, RuleCategory, RuleItem, RuleSanction};
+use crate::social::{ChatMessage, ChatThread, NewsPost, ProfileRole, Ticket, TicketMessage};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
@@ -85,6 +87,59 @@ pub enum ToMod {
     /// The player's whole history, revoked entries included.
     OwnPunishments {
         punishments: Vec<OwnPunishment>,
+    },
+    /// Who is playing. Sent right after `Ready` — the launcher already holds the
+    /// profile, so this costs the master nothing.
+    Profile {
+        username: String,
+        uuid: Uuid,
+        #[serde(default)]
+        roles: Vec<ProfileRole>,
+        #[serde(default)]
+        joined_at: Option<DateTime<Utc>>,
+        /// Joins servers already vanished. Only staff with a vanish permission
+        /// can change it; the mod shows the switch to them alone.
+        #[serde(default)]
+        silent_join: bool,
+    },
+    /// The news channel, newest first. Re-sent whenever the master says the
+    /// news changed.
+    News {
+        posts: Vec<NewsPost>,
+    },
+    /// A picture for a news post, re-encoded as a small PNG — the game reads
+    /// nothing else. `None` means it couldn't be fetched, so the mod stops
+    /// waiting for it.
+    Image {
+        url: String,
+        #[serde(default)]
+        png_base64: Option<String>,
+    },
+    /// The player's conversations, freshest first.
+    Chats {
+        threads: Vec<ChatThread>,
+        total: i64,
+        /// Unread messages across all of them, for the dock badge.
+        #[serde(default)]
+        unread: i64,
+    },
+    /// One conversation, oldest message first. Re-sent while it's open whenever
+    /// a message arrives in it.
+    Chat {
+        peer_id: Uuid,
+        peer_name: String,
+        messages: Vec<ChatMessage>,
+        total: i64,
+    },
+    Tickets {
+        tickets: Vec<Ticket>,
+        total: i64,
+    },
+    /// One ticket's messages, oldest first.
+    TicketMessages {
+        ticket_id: Uuid,
+        messages: Vec<TicketMessage>,
+        total: i64,
     },
     /// Something to say in words, by key, like the master's `Notification`.
     Notice {

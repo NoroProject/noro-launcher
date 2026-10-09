@@ -7,7 +7,7 @@
 use super::master::Api;
 use super::ModLink;
 use crate::backend::Ctx;
-use mod_link::{CaseView, ToMod, PROTOCOL};
+use mod_link::{CaseView, ProfileRole, ToMod, PROTOCOL};
 use uuid::Uuid;
 
 /// First frame after the handshake. The permissions are there so the mod can
@@ -27,6 +27,55 @@ pub fn ready(ctx: &Ctx) -> ToMod {
             .as_ref()
             .map(|u| u.all_permissions().map(str::to_string).collect())
             .unwrap_or_default(),
+    }
+}
+
+/// Who is playing, from the profile the launcher already holds.
+pub fn profile(ctx: &Ctx) -> Option<ToMod> {
+    ctx.profile().map(profile_of)
+}
+
+/// The profile as the master has it now, not as it was at login: the switches
+/// in it (silent join) change from the site and from the panel itself, and the
+/// copy cached at sign-in would put them back on every reconnect.
+pub async fn refresh_profile(ctx: &Ctx, link: &ModLink) {
+    let fresh = match Api::new(ctx) {
+        Some(api) => api
+            .json::<schema::UserProfile>(api.get("/api/me"))
+            .await
+            .ok(),
+        None => None,
+    };
+    match fresh {
+        Some(user) => {
+            ctx.set_profile(Some(user.clone()));
+            link.send(profile_of(user));
+        }
+        None => {
+            if let Some(frame) = profile(ctx) {
+                link.send(frame);
+            }
+        }
+    }
+}
+
+pub fn profile_of(user: schema::UserProfile) -> ToMod {
+    let mut roles = user.roles.clone();
+    // The most senior role first, as everywhere else.
+    roles.sort_by_key(|r| std::cmp::Reverse(r.sort_order));
+    ToMod::Profile {
+        username: user.username,
+        uuid: user.uuid,
+        roles: roles
+            .into_iter()
+            .filter(|r| !r.is_default)
+            .map(|r| ProfileRole {
+                name: r.display_name,
+                color: r.color,
+            })
+            .collect(),
+        joined_at: user.created_at,
+        silent_join: user.silent_join,
     }
 }
 

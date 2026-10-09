@@ -107,4 +107,39 @@ pub enum ToLauncher {
     /// A public document — no permission required.
     RequestRules,
     RequestOwnPunishments,
+    /// The news channel. Answered from the launcher's copy when it has one.
+    RequestNews,
+    /// A picture from a news post. The launcher fetches it, since only it knows
+    /// where relative links point.
+    RequestImage {
+        url: String,
+    },
+    RequestChats,
+    /// The launcher remembers the conversation as open and re-sends it when a
+    /// message arrives. Opening also marks it read, as on the site.
+    OpenChat {
+        peer_id: Uuid,
+    },
+    CloseChat,
+    SendChat {
+        peer_id: Uuid,
+        body: String,
+    },
+    RequestTickets,
+    OpenTicket {
+        ticket_id: Uuid,
+    },
+    CloseTicket,
+    CreateTicket {
+        subject: String,
+        content: String,
+    },
+    ReplyTicket {
+        ticket_id: Uuid,
+        content: String,
+    },
+    /// Join servers vanished. The master checks the vanish permission.
+    SetSilentJoin {
+        silent: bool,
+    },
 }

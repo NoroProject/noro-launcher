@@ -173,3 +173,47 @@ fn extra_master_fields_are_ignored() {
     assert_eq!(sanction.kind, "mute");
     assert_eq!(sanction.min_minutes, Some(15));
 }
+
+/// The panel's requests without fields go out bare, like `CloseCase`.
+#[test]
+fn social_requests_without_fields_parse_bare() {
+    for name in [
+        "RequestNews",
+        "RequestChats",
+        "RequestTickets",
+        "CloseChat",
+        "CloseTicket",
+    ] {
+        let frame: Result<ToLauncher, _> = serde_json::from_value(json!({ "type": name }));
+        assert!(frame.is_ok(), "{name} did not parse without data");
+    }
+}
+
+#[test]
+fn send_chat_carries_peer_and_body() {
+    let peer = uuid::Uuid::nil();
+    let frame: ToLauncher = serde_json::from_value(json!({
+        "type": "SendChat",
+        "data": { "peer_id": peer, "body": "hi" }
+    }))
+    .unwrap();
+    let ToLauncher::SendChat { peer_id, body } = frame else {
+        panic!("not a SendChat");
+    };
+    assert_eq!(peer_id, peer);
+    assert_eq!(body, "hi");
+}
+
+/// A picture that couldn't be fetched still answers, so the mod stops waiting.
+#[test]
+fn failed_image_has_null_png() {
+    let text = serde_json::to_value(ToMod::Image {
+        url: "https://x/a.png".into(),
+        png_base64: None,
+    })
+    .unwrap();
+    assert_eq!(
+        text,
+        json!({ "type": "Image", "data": { "url": "https://x/a.png", "png_base64": null } })
+    );
+}

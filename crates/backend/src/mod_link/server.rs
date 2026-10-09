@@ -57,6 +57,7 @@ async fn session(ctx: Ctx, link: ModLink, stream: TcpStream) -> anyhow::Result<(
     let (tx, mut outgoing) = mpsc::unbounded_channel::<ToMod>();
     link.attach(tx);
     link.send(push::ready(&ctx));
+    push::refresh_profile(&ctx, &link).await;
     // The queue goes out immediately: the panel gets opened to pick up the next
     // case.
     push::refresh_queue(&ctx, &link, None, 0).await;

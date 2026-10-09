@@ -12,6 +12,7 @@
 mod case;
 mod dossier;
 mod player;
+mod social;
 mod to_launcher;
 mod to_mod;
 #[cfg(test)]
@@ -22,6 +23,7 @@ pub use case::{
 };
 pub use dossier::Dossier;
 pub use player::{OwnPunishment, RuleCategory, RuleItem, RuleSanction};
+pub use social::{ChatMessage, ChatThread, NewsPost, ProfileRole, Ticket, TicketMessage};
 pub use to_launcher::ToLauncher;
 pub use to_mod::ToMod;
 
@@ -34,6 +36,13 @@ pub const PROTOCOL: u32 = 1;
 /// The review panel lives in a corner of the screen and fits about ten rows.
 /// Both sides know the number — the mod works out page offsets from it.
 pub const QUEUE_PAGE: i64 = 10;
+
+/// Messages per conversation or ticket the panel loads at once — the latest
+/// ones. Older history stays on the site.
+pub const HISTORY_PAGE: i64 = 50;
+
+/// Conversations or tickets listed in the panel at once.
+pub const LIST_PAGE: i64 = 50;
 
 /// Handshake file, written into the instance directory rather than the
 /// launcher's config: the mod only knows its own `gameDir` and shouldn't have to
