@@ -20,13 +20,24 @@ pub fn info_block(server: &ServerEntry) -> AnyElement {
         })
         .child(tag_row(server))
         // With one node the breakdown just repeats the status line.
-        .when(server.game_servers.len() > 1, |d| d.child(node_row(server)))
+        .when(visible_nodes(server).len() > 1, |d| {
+            d.child(node_row(server))
+        })
         .into_any_element()
+}
+
+fn visible_nodes(server: &ServerEntry) -> Vec<&schema::GameServerEntry> {
+    let has_proxy = server.game_servers.iter().any(|node| node.proxy);
+    server
+        .game_servers
+        .iter()
+        .filter(|node| !has_proxy || node.proxy)
+        .collect()
 }
 
 fn node_row(server: &ServerEntry) -> AnyElement {
     let mut row = div().flex().items_center().flex_wrap().gap(px(8.));
-    for node in &server.game_servers {
+    for node in visible_nodes(server) {
         let color = if node.live { TEXT_MUTED } else { 0x6b7a99 };
         let value = if node.live {
             format!("{}/{}", node.online, node.max_online)
