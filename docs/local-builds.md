@@ -52,6 +52,27 @@ on a Mac, `x86_64-pc-windows-msvc` on Windows, the host target on Linux.
 (`~/.noro-build-agent` by default). The `target/` directory there survives
 between builds, so only the first one is cold.
 
+### Linux targets without a Linux machine
+
+`crates/build_agent/Dockerfile` packages an agent with GPUI's system
+libraries. On an Apple Silicon Mac the arm64 image builds
+`aarch64-unknown-linux-gnu` natively; the same image built with
+`--platform linux/amd64` builds `x86_64-unknown-linux-gnu` under emulation —
+slow the first time, incremental after that, since the volume keeps `target/`:
+
+```sh
+docker build -f crates/build_agent/Dockerfile -t noro-build-agent .
+docker build --platform linux/amd64 -f crates/build_agent/Dockerfile -t noro-build-agent:amd64 .
+docker run -d --restart unless-stopped --name noro-build-agent-arm64 \
+  -e NORO_MASTER_URL -e NORO_ADMIN_TOKEN \
+  -v noro-build-agent-arm64:/root/.noro-build-agent \
+  noro-build-agent run --name mac-linux-arm64
+docker run -d --restart unless-stopped --platform linux/amd64 --name noro-build-agent-amd64 \
+  -e NORO_MASTER_URL -e NORO_ADMIN_TOKEN \
+  -v noro-build-agent-amd64:/root/.noro-build-agent \
+  noro-build-agent:amd64 run --name mac-linux-amd64
+```
+
 Optional, read from the agent's environment:
 
 | Variable | Effect |

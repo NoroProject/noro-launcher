@@ -5,3 +5,5 @@
 **/scratch
 **/data
 **/vendor
+**/.cargo
+.git
