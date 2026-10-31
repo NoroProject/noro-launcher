@@ -702,6 +702,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "build_agent"
+version = "2.0.16"
+dependencies = [
+ "anyhow",
+ "dirs 5.0.1",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "zip",
+]
+
+[[package]]
 name = "built"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

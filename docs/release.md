@@ -10,7 +10,9 @@ independently, and the master is what players actually download from.
 
 The master **does not compile the launcher**. Its `launcher_builder` pulls the
 finished release assets by tag, signs them with ed25519 and puts them in the
-file store. Without Actions there is no other way to ship a launcher version.
+file store. The other way in is a local build: agents on your own machines
+build a source archive and upload the same artifacts, with no Actions minutes
+spent — see [local-builds.md](local-builds.md).
 
 ## Order
 

@@ -7,6 +7,7 @@ members = [
     "crates/frontend",
     "crates/noro_launcher",
     "crates/noro_core",
+    "crates/build_agent",
 ]
 
 [workspace.package]
