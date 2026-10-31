@@ -76,8 +76,15 @@ async fn mac(
     run(make, sink).await?;
 
     let bundle = dist.join(format!("noro-launcher-{target}.app.tar.gz"));
+    // Without these bsdtar stores extended attributes (com.apple.provenance)
+    // as AppleDouble `._*` entries. The master unpacks on Linux, gets them as
+    // real files inside the bundle, seals them into the signature — and
+    // notarisation then rejects the main executable's signature as invalid.
     let mut tar = command("tar", dist);
-    tar.arg("-czf").arg(&bundle).arg("NoroLauncher.app");
+    tar.env("COPYFILE_DISABLE", "1")
+        .args(["--no-xattrs", "--no-mac-metadata", "-czf"])
+        .arg(&bundle)
+        .arg("NoroLauncher.app");
     run(tar, sink).await?;
     Ok(vec![bundle, core.to_path_buf()])
 }
