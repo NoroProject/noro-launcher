@@ -69,7 +69,11 @@ fi
 IDENTITY="${MACOS_SIGN_IDENTITY:--}"
 
 if [ "$IDENTITY" = "-" ]; then
-  codesign --force --deep --sign - --timestamp=none "$APP"
+  # Hardened runtime even ad-hoc: the master re-signs this bundle with the
+  # Developer ID and keeps the flags it finds, and notarisation rejects a
+  # binary without the runtime.
+  codesign --force --deep --sign - --options runtime --timestamp=none \
+    --entitlements .github/scripts/noro-launcher.entitlements "$APP"
 else
   # Notarisation only takes hardened-runtime builds with a secure timestamp;
   # without --options runtime Apple rejects the submission.

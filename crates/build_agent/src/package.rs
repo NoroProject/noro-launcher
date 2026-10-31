@@ -53,10 +53,13 @@ async fn mac(
     for bin in [launcher, core] {
         let mut sign = command("codesign", src);
         sign.args(["--force", "--sign", &identity]);
+        // The runtime either way: the master keeps these flags when it
+        // re-signs, and notarisation refuses a binary without it.
+        sign.args(["--options", "runtime"]);
         if identity == "-" {
             sign.arg("--timestamp=none");
         } else {
-            sign.args(["--options", "runtime", "--timestamp"]);
+            sign.arg("--timestamp");
         }
         sign.arg(bin);
         run(sign, sink).await?;
