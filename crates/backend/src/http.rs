@@ -5,6 +5,8 @@
 //! request forever: no error, so no retry. Every download stage shares one
 //! HTTP/2 connection, so one dead socket stalled the whole sync.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Long enough for a slow TLS handshake on a bad link.
@@ -32,33 +34,58 @@ pub fn client() -> reqwest::Result<reqwest::Client> {
         .build()
 }
 
-/// Pool of independent HTTP clients.
+/// Separate connections for the file sync, each its own TCP and TLS session.
 ///
-/// Multiplexing 12,000 small files over a single HTTP/2 TCP connection hits
-/// Cloudflare's stream creation rate limiter and single-socket packet loss delays.
-/// A pool provides multiple distinct TCP connections with independent HTTP/2 stream spaces.
+/// Measured against production on 31.10.2026: one connection to the origin
+/// carried 1.9 MB/s, four carried 5.1 MB/s, eight 5.6 MB/s — the limit is per
+/// connection, not the link. HTTP/2 multiplexing puts every stream of a
+/// client on one connection, so the sync used to sit at the single-connection
+/// figure no matter how many files were in flight.
 #[derive(Clone)]
 pub struct HttpClientPool {
-    clients: Vec<reqwest::Client>,
+    clients: Arc<Vec<reqwest::Client>>,
+    next: Arc<AtomicUsize>,
+}
+
+/// Default number of connections; `NORO_SYNC_CONNECTIONS` overrides it, which
+/// is how the sync debug report compares settings on a real link.
+pub const SYNC_CONNECTIONS: usize = 4;
+
+pub fn sync_connections() -> usize {
+    std::env::var("NORO_SYNC_CONNECTIONS")
+        .ok()
+        .and_then(|v| v.trim().parse().ok())
+        .unwrap_or(SYNC_CONNECTIONS)
+        .clamp(1, 16)
 }
 
 impl HttpClientPool {
     pub fn new(size: usize) -> reqwest::Result<Self> {
-        let count = size.max(1);
-        let mut clients = Vec::with_capacity(count);
-        for _ in 0..count {
-            clients.push(client()?);
-        }
-        Ok(Self { clients })
+        let clients = (0..size.max(1))
+            .map(|_| client())
+            .collect::<reqwest::Result<Vec<_>>>()?;
+        Ok(Self {
+            clients: Arc::new(clients),
+            next: Arc::new(AtomicUsize::new(0)),
+        })
     }
 
-    pub fn get(&self, index: usize) -> &reqwest::Client {
-        &self.clients[index % self.clients.len()]
+    /// Round robin, with the index so the trace can tell connections apart.
+    pub fn pick(&self) -> (usize, &reqwest::Client) {
+        let i = self.next.fetch_add(1, Ordering::Relaxed) % self.clients.len();
+        (i, &self.clients[i])
+    }
+
+    pub fn size(&self) -> usize {
+        self.clients.len()
     }
 }
 
 impl From<reqwest::Client> for HttpClientPool {
     fn from(c: reqwest::Client) -> Self {
-        Self { clients: vec![c] }
+        Self {
+            clients: Arc::new(vec![c]),
+            next: Arc::new(AtomicUsize::new(0)),
+        }
     }
 }

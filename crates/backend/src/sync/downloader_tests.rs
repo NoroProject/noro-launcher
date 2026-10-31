@@ -25,7 +25,8 @@ async fn downloads_every_file_and_reports_the_exact_total() {
     let last = Arc::new(AtomicU64::new(0));
     let seen = last.clone();
     download_all(
-        &reqwest::Client::new(),
+        &Net::plain(reqwest::Client::new()),
+        "test",
         tasks,
         2,
         move |done| seen.store(done, Ordering::SeqCst),
@@ -43,9 +44,16 @@ async fn a_file_that_never_arrives_fails_the_stage_with_its_address() {
     let server = serve(vec![]).await;
     let tmp = TempDir::new("downloader");
     let tasks = vec![task(&server, "/missing", b"x", tmp.path().join("x"))];
-    let err = download_all(&reqwest::Client::new(), tasks, 1, |_| {}, || false)
-        .await
-        .unwrap_err();
+    let err = download_all(
+        &Net::plain(reqwest::Client::new()),
+        "test",
+        tasks,
+        1,
+        |_| {},
+        || false,
+    )
+    .await
+    .unwrap_err();
     assert!(format!("{err:#}").contains("/missing"), "{err:#}");
     assert_eq!(server.hits() as u32, MAX_ATTEMPTS);
 }
@@ -55,11 +63,16 @@ async fn cancelled_before_starting_fetches_nothing() {
     let server = serve(vec![("/a", 200, b"a".to_vec())]).await;
     let tmp = TempDir::new("downloader");
     let tasks = vec![task(&server, "/a", b"a", tmp.path().join("a"))];
-    assert!(
-        download_all(&reqwest::Client::new(), tasks, 1, |_| {}, || true)
-            .await
-            .is_err()
-    );
+    assert!(download_all(
+        &Net::plain(reqwest::Client::new()),
+        "test",
+        tasks,
+        1,
+        |_| {},
+        || true
+    )
+    .await
+    .is_err());
     assert_eq!(server.hits(), 0);
 }
 

@@ -1,4 +1,5 @@
-// File exceeds 150 lines: single-file fetcher with memory fast-path and resumable streaming.
+// Over 150 lines: one fetch with its resume, small-file fast path and the
+// timings the sync trace reads.
 //! One file: streamed to disk, resumable, SHA1-checked.
 //!
 //! Streaming rather than buffering matters here — a 180 MB JDK held in memory,
@@ -9,7 +10,10 @@ use futures_util::StreamExt;
 use reqwest::StatusCode;
 use sha1::{Digest, Sha1};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+use super::trace::FetchStats;
 
 /// Bytes written. Signed, because discarding a bad partial has to roll the
 /// progress back — otherwise the bar runs past 100%.
@@ -28,50 +32,6 @@ pub fn part_path(dest: &Path) -> PathBuf {
     PathBuf::from(p)
 }
 
-/// Direct in-memory fetch for small files (≤ 512 KB, e.g. configs and tiny assets).
-/// Bypasses .part files, range checks, and rename syscalls completely.
-pub async fn fetch_small_file(
-    client: &reqwest::Client,
-    url: &str,
-    dest: &Path,
-    expected_sha1: &str,
-    on_bytes: BytesFn<'_>,
-    cancelled: CancelFn<'_>,
-) -> Result<()> {
-    if cancelled() {
-        bail!("cancelled");
-    }
-    let resp = client
-        .get(url)
-        .send()
-        .await
-        .with_context(|| format!("GET {url}"))?;
-    let resp = resp
-        .error_for_status()
-        .with_context(|| format!("bad status from {url}"))?;
-    if cancelled() {
-        bail!("cancelled");
-    }
-    let bytes = resp.bytes().await?;
-    if cancelled() {
-        bail!("cancelled");
-    }
-    let actual = hex::encode(Sha1::digest(&bytes));
-    if !expected_sha1.is_empty() && !actual.eq_ignore_ascii_case(expected_sha1) {
-        bail!("SHA1 mismatch for {url}: expected {expected_sha1}, got {actual}");
-    }
-    if let Err(e) = tokio::fs::write(dest, &bytes).await {
-        if let Some(parent) = dest.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-            tokio::fs::write(dest, &bytes).await?;
-        } else {
-            return Err(e.into());
-        }
-    }
-    on_bytes(bytes.len() as i64);
-    Ok(())
-}
-
 /// Download `url` to `dest`. Work in progress lives in a neighbouring `.part`,
 /// so a dropped connection costs the remaining tail, not the whole file.
 pub async fn fetch_to_file(
@@ -81,23 +41,27 @@ pub async fn fetch_to_file(
     expected_sha1: &str,
     on_bytes: BytesFn<'_>,
     cancelled: CancelFn<'_>,
-) -> Result<()> {
+) -> Result<FetchStats> {
+    let mut disk = Duration::ZERO;
+    let t = Instant::now();
     if let Some(parent) = dest.parent() {
         if !parent.exists() {
             tokio::fs::create_dir_all(parent).await?;
         }
     }
+    disk += t.elapsed();
     let part = part_path(dest);
     let mut have = tokio::fs::metadata(&part)
         .await
         .map(|m| m.len())
         .unwrap_or(0);
 
-    let (resp, resuming) = loop {
+    let (resp, resuming, sent) = loop {
         let mut req = client.get(url);
         if have > 0 {
             req = req.header(reqwest::header::RANGE, format!("bytes={have}-"));
         }
+        let sent = Instant::now();
         let resp = req.send().await.with_context(|| format!("GET {url}"))?;
 
         // 416: the partial is longer than the file, so it's left over from
@@ -112,8 +76,9 @@ pub async fn fetch_to_file(
         let resp = resp
             .error_for_status()
             .with_context(|| format!("bad status from {url}"))?;
-        break (resp, partial);
+        break (resp, partial, sent);
     };
+    let mut stats = FetchStats::from_response(&resp, sent.elapsed());
 
     // Small files (e.g. thousands of quest configs) write directly in one go
     // without intermediate .part and rename syscalls.
@@ -122,17 +87,23 @@ pub async fn fetch_to_file(
         if cancelled() {
             bail!("cancelled");
         }
+        let t = Instant::now();
         let bytes = resp.bytes().await?;
+        stats.net = t.elapsed();
         if cancelled() {
             bail!("cancelled");
         }
+        let t = Instant::now();
         let actual = hex::encode(Sha1::digest(&bytes));
+        stats.hash = t.elapsed();
         if !expected_sha1.is_empty() && !actual.eq_ignore_ascii_case(expected_sha1) {
             bail!("SHA1 mismatch for {url}: expected {expected_sha1}, got {actual}");
         }
+        let t = Instant::now();
         tokio::fs::write(dest, &bytes).await?;
+        stats.disk = disk + t.elapsed();
         on_bytes(bytes.len() as i64);
-        return Ok(());
+        return Ok(stats);
     }
 
     let mut hasher = Sha1::new();
@@ -157,18 +128,29 @@ pub async fn fetch_to_file(
 
     let mut writer = tokio::io::BufWriter::with_capacity(128 * 1024, file);
     let mut stream = resp.bytes_stream();
-    while let Some(chunk) = stream.next().await {
+    loop {
+        let t = Instant::now();
+        let Some(chunk) = stream.next().await else {
+            break;
+        };
+        stats.net += t.elapsed();
         if cancelled() {
             writer.flush().await?;
             bail!("cancelled");
         }
         let chunk = chunk.with_context(|| format!("download from {url} interrupted"))?;
+        let t = Instant::now();
         hasher.update(&chunk);
+        stats.hash += t.elapsed();
+        let t = Instant::now();
         writer.write_all(&chunk).await?;
+        disk += t.elapsed();
         on_bytes(chunk.len() as i64);
     }
+    let t = Instant::now();
     writer.flush().await?;
     drop(writer);
+    disk += t.elapsed();
 
     let actual = hex::encode(hasher.finalize());
     if !expected_sha1.is_empty() && !actual.eq_ignore_ascii_case(expected_sha1) {
@@ -183,21 +165,10 @@ pub async fn fetch_to_file(
         bail!("SHA1 mismatch for {url}: expected {expected_sha1}, got {actual}");
     }
 
-    if dest.exists() {
-        let _ = tokio::fs::remove_file(dest).await;
-    }
-    if let Err(e) = tokio::fs::rename(&part, dest).await {
-        if dest.exists() {
-            if let Ok(m) = tokio::fs::metadata(dest).await {
-                if m.len() > 0 {
-                    let _ = tokio::fs::remove_file(&part).await;
-                    return Ok(());
-                }
-            }
-        }
-        return Err(e).with_context(|| format!("renaming to {}", dest.display()));
-    }
-    Ok(())
+    let t = Instant::now();
+    super::segmented::replace(&part, dest).await?;
+    stats.disk = disk + t.elapsed();
+    Ok(stats)
 }
 
 async fn hash_existing(part: &Path, hasher: &mut Sha1) -> Result<()> {

@@ -3,7 +3,8 @@
 //! The pre-launch sync: verify the manifest signature, download what differs,
 //! remove what doesn't belong, and honour the optional-mod selection.
 
-use super::downloader::{download_all, DownloadTask};
+use super::downloader::{download_all, DownloadTask, Net};
+use super::trace::SyncTrace;
 use anyhow::{bail, Result};
 use bridge::SyncStage;
 use schema::{BuildManifest, FileEntry, UserProfile};
@@ -77,7 +78,43 @@ pub async fn sync_server(
 
     tokio::fs::create_dir_all(instance_dir).await?;
 
+    let connections = crate::http::sync_connections();
+    let net = Net {
+        pool: crate::http::HttpClientPool::new(connections)?,
+        trace: SyncTrace::new(connections),
+    };
+    let sampler = net.trace.spawn_sampler();
+    let result = run(
+        client,
+        &net,
+        instance_dir,
+        manifest,
+        enabled_optional,
+        user,
+        progress,
+        cancelled,
+    )
+    .await;
+    sampler.abort();
+    // Failed syncs are reported too: a sync that died at 40% is exactly the
+    // one whose numbers are worth reading.
+    net.trace.finish(instance_dir).await;
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run(
+    client: &reqwest::Client,
+    net: &Net,
+    instance_dir: &Path,
+    manifest: &BuildManifest,
+    enabled_optional: &[String],
+    user: &UserProfile,
+    progress: ProgressFn,
+    cancelled: Arc<dyn Fn() -> bool + Send + Sync>,
+) -> Result<()> {
     let effective = effective_files(manifest, enabled_optional, user);
+    let t = std::time::Instant::now();
 
     let base = super::merge::BaseHashes::load(instance_dir).await;
     let cache = super::hash_cache::HashCache::load(instance_dir).await;
@@ -99,6 +136,8 @@ pub async fn sync_server(
         &cache,
     )
     .await?;
+    net.trace.phase("check", t.elapsed());
+    let t = std::time::Instant::now();
     // All stages run at once. They touch disjoint files, and a single big JDK
     // download would otherwise hold up a thousand small assets behind it.
     let jobs = STAGE_GROUPS.iter().filter_map(|g| {
@@ -117,15 +156,19 @@ pub async fn sync_server(
 
         let prog = progress.clone();
         let cancelled = cancelled.clone();
-        let client = client.clone();
+        let net = net.clone();
         Some(async move {
             download_all(
-                &client,
+                &net,
+                g.name,
                 group,
                 g.concurrency,
                 {
                     let prog = prog.clone();
-                    move |done| prog(g.stage, done, total, String::new())
+                    // Empty unless NORO_SYNC_DEBUG is set; then it is the live
+                    // line shown under the progress bar.
+                    let trace = net.trace.clone();
+                    move |done| prog(g.stage, done, total, trace.ui_line())
                 },
                 move || cancelled(),
             )
@@ -137,6 +180,8 @@ pub async fn sync_server(
         })
     });
     futures::future::try_join_all(jobs).await?;
+    net.trace.phase("download", t.elapsed());
+    let t = std::time::Instant::now();
 
     // Every downloaded file was hashed on the way in and matched the
     // manifest. Recording that saves the pre-launch check from reading each
@@ -154,8 +199,11 @@ pub async fn sync_server(
     }
     base.save(instance_dir).await;
 
+    net.trace.phase("record hashes", t.elapsed());
+    let t = std::time::Instant::now();
     progress(SyncStage::Cleaning, 0, 0, String::new());
     clean_extra(instance_dir, &effective, manifest).await?;
+    net.trace.phase("clean", t.elapsed());
 
     // Which build is installed. The files on disk don't say by themselves, so
     // without this there's no telling "install" and "update" from "launch".

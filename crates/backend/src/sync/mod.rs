@@ -12,7 +12,10 @@ pub mod live;
 mod live_tests;
 pub mod merge;
 pub mod plan;
+pub mod segmented;
 pub mod store;
+pub mod trace;
+mod trace_report;
 pub mod verify;
 
 pub use file_sync::{build_state, find_java, installed_state, sync_server, ProgressFn};
