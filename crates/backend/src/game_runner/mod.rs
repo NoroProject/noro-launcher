@@ -53,7 +53,7 @@ pub async fn launch(
     let java = crate::sync::find_java(&instance_dir, manifest)
         .ok_or_else(|| anyhow!("no java in the manifest"))?;
     #[cfg(unix)]
-    java::ensure_executable(&java).await?;
+    java::ensure_runtime_executable(&java).await?;
 
     let classpath = classpath::build_classpath(&instance_dir, manifest);
     let primary_game_artifact =
