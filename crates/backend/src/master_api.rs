@@ -226,6 +226,18 @@ impl MasterApi {
         .await
     }
 
+    /// A short-lived ticket, signed by the master, saying a signed-in player
+    /// launched this game. Mods that care check it with the master's public key.
+    pub async fn launch_ticket(&self) -> Result<String> {
+        let v: Value = self
+            .post("/api/launcher/ticket", &json!({ "audience": "game" }))
+            .await?;
+        v.get("ticket")
+            .and_then(Value::as_str)
+            .map(String::from)
+            .ok_or_else(|| anyhow!("the master sent no ticket"))
+    }
+
     /// `query` is the already-encoded query string.
     pub async fn send_support_bundle(&self, query: &str, archive: Vec<u8>) -> Result<Value> {
         self.send(

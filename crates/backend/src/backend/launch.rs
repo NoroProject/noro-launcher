@@ -228,6 +228,17 @@ pub fn spawn_sync_and_launch(req: Launch) {
         // means no panel until the next login.
         ctx.mod_link.start(&ctx, instance_dir.clone()).await;
 
+        // Without a ticket the game still starts; only mods that insist on one
+        // refuse, and they say why.
+        let ticket = match crate::master_api::MasterApi::for_session(&ctx) {
+            Some(api) => api
+                .launch_ticket()
+                .await
+                .inspect_err(|e| tracing::warn!("no launch ticket: {e:#}"))
+                .ok(),
+            None => None,
+        };
+
         match game_runner::launch(
             &ctx.http,
             &launch_config,
@@ -236,6 +247,7 @@ pub fn spawn_sync_and_launch(req: Launch) {
             &manifest,
             &login,
             connect,
+            ticket.as_deref(),
         )
         .await
         {

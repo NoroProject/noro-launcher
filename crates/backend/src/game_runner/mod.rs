@@ -45,6 +45,7 @@ pub async fn launch(
     manifest: &BuildManifest,
     login: &LoginInfo,
     connect: Option<ServerConnect>,
+    launch_ticket: Option<&str>,
 ) -> Result<Child> {
     let instance_dir = dirs.instance(server_id);
     let natives_dir = dirs.natives(server_id);
@@ -72,6 +73,9 @@ pub async fn launch(
     cmd.arg(classpath::standard_ignore_list());
 
     add_authlib(client, config, dirs, &mut cmd).await?;
+    if let Some(ticket) = launch_ticket {
+        cmd.arg(format!("-Dnoro.launch_ticket={ticket}"));
+    }
     for flag in args::split_flags(&config.jvm_flags) {
         cmd.arg(flag);
     }
