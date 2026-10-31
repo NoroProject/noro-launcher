@@ -12,6 +12,14 @@ cp "$BIN" "$APP/Contents/MacOS/noro-launcher"
 chmod +x "$APP/Contents/MacOS/noro-launcher"
 cp assets/icon.icns "$APP/Contents/Resources/AppIcon.icns"
 
+# The game runs as this app's child, so macOS asks for the microphone on the
+# app's behalf. With no usage string it refuses without asking, and voice chat
+# mods hear nothing.
+MIC_EN="Minecraft uses the microphone for voice chat in game."
+mkdir -p "$APP/Contents/Resources/en.lproj" "$APP/Contents/Resources/ru.lproj"
+printf '"NSMicrophoneUsageDescription" = "%s";\n' "$MIC_EN" > "$APP/Contents/Resources/en.lproj/InfoPlist.strings"
+printf '"NSMicrophoneUsageDescription" = "%s";\n' "Minecraft использует микрофон для голосового чата в игре." > "$APP/Contents/Resources/ru.lproj/InfoPlist.strings"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -33,6 +41,15 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.13</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>ru</string>
+    </array>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>${MIC_EN}</string>
 </dict>
 </plist>
 PLIST
@@ -56,7 +73,9 @@ if [ "$IDENTITY" = "-" ]; then
 else
   # Notarisation only takes hardened-runtime builds with a secure timestamp;
   # without --options runtime Apple rejects the submission.
-  codesign --force --deep --sign "$IDENTITY" --options runtime --timestamp "$APP"
+  # The hardened runtime also blocks the microphone unless the entitlement asks for it.
+  codesign --force --deep --sign "$IDENTITY" --options runtime --timestamp \
+    --entitlements .github/scripts/noro-launcher.entitlements "$APP"
 fi
 
 codesign --verify --deep --strict "$APP"
