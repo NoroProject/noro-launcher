@@ -19,3 +19,6 @@ secrets/
 *.p12
 *.jks
 *.keystore
+
+# Third-party sources cloned for reference builds; each is its own repository.
+vendor/
