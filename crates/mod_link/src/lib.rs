@@ -25,7 +25,7 @@ pub use dossier::Dossier;
 pub use player::{OwnPunishment, RuleCategory, RuleItem, RuleSanction};
 pub use social::{ChatMessage, ChatThread, NewsPost, ProfileRole, Ticket, TicketMessage};
 pub use to_launcher::ToLauncher;
-pub use to_mod::ToMod;
+pub use to_mod::{RoleBadge, ToMod};
 
 /// Bumped when an old mod can no longer understand a new launcher. A field with
 /// a `default`, or a new frame, is not that.

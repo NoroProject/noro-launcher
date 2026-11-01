@@ -33,7 +33,7 @@ pub fn render_frame(decoded: &Decoded, yaw: f64, sway: f64) -> Arc<RenderImage> 
     };
     let mut canvas = render_decoded(decoded, SUPERSAMPLE_W, SUPERSAMPLE_H, &view);
     // GPUI uploads textures as BGRA.
-    for pixel in canvas.chunks_exact_mut(4) {
+    for pixel in canvas.as_chunks_mut::<4>().0 {
         pixel.swap(0, 2);
     }
     Arc::new(RenderImage::new(vec![Frame::new(canvas)]))

@@ -1,3 +1,4 @@
+// Over 150 lines: one place dispatching all intents received from mod_link.
 //! Turning an intent from the mod into a request to the master.
 //!
 //! The mod knows no URLs; this is the only place an intent becomes an endpoint.
@@ -72,6 +73,10 @@ async fn dispatch(
         }
         ToLauncher::CloseCase => {
             link.store().close();
+            Ok(None)
+        }
+        ToLauncher::RequestBadges => {
+            push::refresh_badges(ctx, link).await;
             Ok(None)
         }
         ToLauncher::Claim { case_id } => {
@@ -283,5 +288,6 @@ fn intent_name(frame: &ToLauncher) -> &'static str {
         ToLauncher::CreateTicket { .. } => "CreateTicket",
         ToLauncher::ReplyTicket { .. } => "ReplyTicket",
         ToLauncher::SetSilentJoin { .. } => "SetSilentJoin",
+        ToLauncher::RequestBadges => "RequestBadges",
     }
 }

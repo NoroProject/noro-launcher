@@ -327,7 +327,7 @@ fn decode_to_frame(bytes: &[u8], max_side: u32) -> Result<Arc<RenderImage>, Stri
         decoded
     };
     let mut rgba = scaled.into_rgba8();
-    for pixel in rgba.chunks_exact_mut(4) {
+    for pixel in rgba.as_chunks_mut::<4>().0 {
         pixel.swap(0, 2);
     }
     Ok(Arc::new(RenderImage::new(vec![Frame::new(rgba)])))

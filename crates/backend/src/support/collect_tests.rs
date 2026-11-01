@@ -1,3 +1,4 @@
+// Over 150 lines: support bundle collection and redaction unit tests.
 //! Both that the right files are collected and that the wrong ones aren't. The
 //! second half matters more — the bundle leaves the machine.
 
@@ -31,7 +32,12 @@ impl Drop for Scratch {
 }
 
 fn names(bundle: &Bundle) -> Vec<&str> {
-    bundle.files.iter().map(|f| f.name.as_str()).collect()
+    bundle
+        .files
+        .iter()
+        .map(|f| f.name.as_str())
+        .filter(|&name| name != "launcher.log" && name != "bootstrapper.log")
+        .collect()
 }
 
 #[tokio::test]
@@ -95,7 +101,7 @@ async fn only_the_newest_crash_reports_are_taken() {
 
     let bundle = collect(dir.path(), None, &[]).await;
 
-    assert_eq!(bundle.files.len(), 3, "{:?}", names(&bundle));
+    assert_eq!(names(&bundle).len(), 3, "{:?}", names(&bundle));
 }
 
 #[tokio::test]

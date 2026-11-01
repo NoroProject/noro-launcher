@@ -174,8 +174,7 @@ pub fn spawn_sync_and_launch(req: Launch) {
             return;
         }
 
-        // Delivered packs are switched on the first time they arrive; the
-        // network's prefix pack every time, chat is unreadable without it.
+        // Delivered packs are switched on the first time they arrive.
         crate::sync::live::enable_delivered_packs(
             &instance_dir,
             &manifest,
@@ -183,11 +182,9 @@ pub fn spawn_sync_and_launch(req: Launch) {
             &user,
         )
         .await;
-        if instance_dir
-            .join("resourcepacks/noro-prefixes.zip")
-            .exists()
-        {
-            let _ = crate::sync::live::enable(&instance_dir, "noro-prefixes.zip").await;
+        let legacy_prefix_pack = instance_dir.join("resourcepacks/noro-prefixes.zip");
+        if legacy_prefix_pack.exists() {
+            let _ = tokio::fs::remove_file(&legacy_prefix_pack).await;
         }
 
         // After the sync but before the launch: the game reads servers.dat at

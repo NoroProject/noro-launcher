@@ -1,3 +1,4 @@
+// Over 150 lines: all outgoing push frames and their API fetches are grouped here for mod_link.
 //! Frames the launcher sends on its own: the queue, a case card, readiness.
 //!
 //! The mod subscribes rather than requesting and waiting. This side decides when
@@ -149,4 +150,20 @@ fn inventory(view: &CaseView) -> Option<ToMod> {
         case_id: view.brief.id,
         items,
     })
+}
+
+/// Fetch role badges from the master and push them to the mod so it can render them in font/chat.
+pub async fn refresh_badges(ctx: &Ctx, link: &ModLink) {
+    let master_url = ctx.config.get().master_url;
+    let url = format!("{}/api/roles/badges", master_url.trim_end_matches('/'));
+    match ctx.http.get(&url).send().await {
+        Ok(res) if res.status().is_success() => {
+            match res.json::<Vec<mod_link::RoleBadge>>().await {
+                Ok(badges) => link.send(ToMod::Badges { badges }),
+                Err(e) => tracing::debug!("mod_link: failed to parse role badges: {e}"),
+            }
+        }
+        Ok(res) => tracing::debug!("mod_link: master returned {} for badges", res.status()),
+        Err(e) => tracing::debug!("mod_link: could not fetch role badges: {e}"),
+    }
 }

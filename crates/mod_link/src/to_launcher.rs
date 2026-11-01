@@ -107,6 +107,8 @@ pub enum ToLauncher {
     /// A public document — no permission required.
     RequestRules,
     RequestOwnPunishments,
+    /// Requests active role badges with symbols and images for dynamic in-memory font rendering.
+    RequestBadges,
     /// The news channel. Answered from the launcher's copy when it has one.
     RequestNews,
     /// A picture from a news post. The launcher fetches it, since only it knows

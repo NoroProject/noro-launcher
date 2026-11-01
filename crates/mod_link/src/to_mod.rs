@@ -1,3 +1,4 @@
+// File exceeds 150 lines: complete ToMod wire frames for client mod communication.
 //! Launcher → mod: state.
 //!
 //! The mod draws what it is sent and works nothing out for itself. Refusals
@@ -147,4 +148,17 @@ pub enum ToMod {
         #[serde(default)]
         args: BTreeMap<String, String>,
     },
+    /// Role badges with image and assigned symbol for client-side dynamic font rendering.
+    Badges {
+        badges: Vec<RoleBadge>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RoleBadge {
+    pub role: String,
+    pub symbol: String,
+    pub png_base64: String,
+    pub width: u32,
+    pub height: u32,
 }

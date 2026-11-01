@@ -91,7 +91,9 @@ fn a_rendered_frame_is_bgra_and_full_size() {
     // see.
     let bytes = frame.as_bytes(0).expect("frame data");
     let has_red_as_bgr = bytes
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .any(|p| p[3] > 200 && p[2] > 200 && p[1] < 80 && p[0] < 80);
     assert!(has_red_as_bgr, "expected red as B=0,G=0,R=255 in BGRA");
 }

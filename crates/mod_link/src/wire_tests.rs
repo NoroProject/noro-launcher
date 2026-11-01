@@ -1,3 +1,4 @@
+// Over 150 lines: pinned wire format test cases for all mod_link frames.
 //! The frame format on the wire. The other end is Java code that ships with a
 //! build and stays on people's machines longer than this launcher version, so
 //! the shape is pinned by tests instead of being whatever serde emits today.
@@ -215,5 +216,43 @@ fn failed_image_has_null_png() {
     assert_eq!(
         text,
         json!({ "type": "Image", "data": { "url": "https://x/a.png", "png_base64": null } })
+    );
+}
+
+#[test]
+fn request_badges_parses_without_data() {
+    let frame: ToLauncher = serde_json::from_value(json!({ "type": "RequestBadges" })).unwrap();
+    assert!(matches!(frame, ToLauncher::RequestBadges));
+}
+
+#[test]
+fn badges_serializes_with_role_badges() {
+    let badge = crate::RoleBadge {
+        role: "admin".into(),
+        symbol: "\u{e000}".into(),
+        png_base64: "iVBORw0KGgo=".into(),
+        width: 16,
+        height: 8,
+    };
+    let value = serde_json::to_value(ToMod::Badges {
+        badges: vec![badge],
+    })
+    .unwrap();
+    assert_eq!(
+        value,
+        json!({
+            "type": "Badges",
+            "data": {
+                "badges": [
+                    {
+                        "role": "admin",
+                        "symbol": "\u{e000}",
+                        "png_base64": "iVBORw0KGgo=",
+                        "width": 16,
+                        "height": 8
+                    }
+                ]
+            }
+        })
     );
 }

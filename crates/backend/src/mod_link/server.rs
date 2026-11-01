@@ -61,6 +61,7 @@ async fn session(ctx: Ctx, link: ModLink, stream: TcpStream) -> anyhow::Result<(
     // The queue goes out immediately: the panel gets opened to pick up the next
     // case.
     push::refresh_queue(&ctx, &link, None, 0).await;
+    push::refresh_badges(&ctx, &link).await;
 
     let result = pump(&ctx, &link, &mut sink, &mut outgoing, &mut incoming).await;
     link.detach();
