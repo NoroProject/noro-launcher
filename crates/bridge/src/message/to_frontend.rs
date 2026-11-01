@@ -44,6 +44,8 @@ pub enum MessageToFrontend {
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,
+        /// Per build; a build without an entry joins its first entry point.
+        auto_join: BTreeMap<Uuid, AutoJoin>,
         console: ConsoleSettings,
         /// Physical memory of this computer, to keep the memory setting
         /// within it. `None` where it can't be read.

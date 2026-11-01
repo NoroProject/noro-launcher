@@ -5,6 +5,7 @@ mod account_punishments;
 mod account_rules;
 mod account_thread;
 mod account_tickets;
+mod auto_join;
 mod build_picker;
 pub mod close_dialog;
 mod common;

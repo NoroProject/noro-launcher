@@ -11,7 +11,7 @@ pub mod quit;
 
 pub use handle::{create_pair, BackendHandle, BackendReceiver, FrontendHandle, FrontendReceiver};
 pub use message::{
-    BuildState, CatalogHitInfo, ClientSettingsState, ConsoleSettings, ContentVersionInfo,
+    AutoJoin, BuildState, CatalogHitInfo, ClientSettingsState, ConsoleSettings, ContentVersionInfo,
     DmMessageView, DmThreadOpen, DmThreadView, GameLogLevel, GameLogLine, LaunchStep,
     LoginErrorKind, MessageToBackend, MessageToFrontend, ModProjectInfo, OptionalModInfo,
     PunishmentView, RuleView, SanctionView, ServerSkinPresetItem, SyncStage, TicketMessageView,

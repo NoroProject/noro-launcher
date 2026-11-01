@@ -224,6 +224,8 @@ pub struct LauncherUI {
     /// A pick is downloading a runtime on the master; it takes a while.
     pub java_busy: bool,
     pub java_picker_open: bool,
+    /// The list of game servers to join on start, for a build with several.
+    pub auto_join_picker_open: bool,
     /// The flags dialog edits a draft: the saved flags change on «Save», not
     /// on every key, and «Cancel» leaves them as they were.
     pub jvm_flags_open: bool,

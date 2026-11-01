@@ -73,6 +73,7 @@ impl BackendState {
             | M::SetServerJvmFlags { .. }
             | M::SetServerShowConsoleOnLaunch { .. }
             | M::SetServerFullscreen { .. }
+            | M::SetServerAutoJoin { .. }
             | M::ResetServerClientSettings { .. }
             | M::OpenServerClientFolder { .. }) => self.on_settings_request(m).await,
             m @ (M::SearchCatalog { .. }

@@ -186,6 +186,8 @@ pub struct UiConfig {
     pub master_url: String,
     pub console: bridge::ConsoleSettings,
     pub system_memory_mb: Option<u32>,
+    /// Per server; none saved means the build's first entry point.
+    pub auto_join: std::collections::BTreeMap<Uuid, bridge::AutoJoin>,
 }
 
 impl Default for UiConfig {
@@ -202,6 +204,7 @@ impl Default for UiConfig {
             master_url: String::new(),
             console: bridge::ConsoleSettings::default(),
             system_memory_mb: None,
+            auto_join: std::collections::BTreeMap::new(),
         }
     }
 }

@@ -76,6 +76,7 @@ impl LauncherUI {
                 master_url,
                 locale,
                 server_settings,
+                auto_join,
                 console,
                 system_memory_mb,
             } => {
@@ -95,6 +96,7 @@ impl LauncherUI {
                     master_url,
                     console,
                     system_memory_mb,
+                    auto_join,
                 };
                 self.server_settings = server_settings.into_iter().collect();
                 self.load_preset_renders(cx);

@@ -96,8 +96,23 @@ impl LauncherUI {
             .send(MessageToBackend::SetServerJvmFlags { server_id, flags });
     }
 
+    /// `None` goes back to joining the build's first entry point.
+    pub fn set_server_auto_join(&mut self, server_id: Uuid, choice: Option<bridge::AutoJoin>) {
+        match choice {
+            Some(choice) => {
+                self.config.auto_join.insert(server_id, choice);
+            }
+            None => {
+                self.config.auto_join.remove(&server_id);
+            }
+        }
+        self.backend
+            .send(MessageToBackend::SetServerAutoJoin { server_id, choice });
+    }
+
     pub fn reset_server_client_settings(&mut self, server_id: Uuid) {
         self.server_settings.remove(&server_id);
+        self.config.auto_join.remove(&server_id);
         self.backend
             .send(MessageToBackend::ResetServerClientSettings { server_id });
     }

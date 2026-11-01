@@ -481,7 +481,7 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "2.0.17"
+version = "2.0.18"
 dependencies = [
  "anyhow",
  "base64",
@@ -682,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "bridge"
-version = "2.0.17"
+version = "2.0.18"
 dependencies = [
  "parking_lot",
  "schema",
@@ -703,7 +703,7 @@ dependencies = [
 
 [[package]]
 name = "build_agent"
-version = "2.0.17"
+version = "2.0.18"
 dependencies = [
  "anyhow",
  "dirs 5.0.1",
@@ -2187,7 +2187,7 @@ dependencies = [
 
 [[package]]
 name = "frontend"
-version = "2.0.17"
+version = "2.0.18"
 dependencies = [
  "base64",
  "bridge",
@@ -3971,7 +3971,7 @@ dependencies = [
 
 [[package]]
 name = "mod_link"
-version = "2.0.17"
+version = "2.0.18"
 dependencies = [
  "chrono",
  "serde",
@@ -4105,7 +4105,7 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
 name = "noro_core"
-version = "2.0.17"
+version = "2.0.18"
 dependencies = [
  "backend",
  "bridge",
@@ -4121,7 +4121,7 @@ dependencies = [
 
 [[package]]
 name = "noro_launcher"
-version = "2.0.17"
+version = "2.0.18"
 dependencies = [
  "anyhow",
  "base64",

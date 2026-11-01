@@ -60,6 +60,11 @@ impl BackendState {
                     .config
                     .update(|c| c.set_server_fullscreen(server_id, enabled));
             }
+            MessageToBackend::SetServerAutoJoin { server_id, choice } => {
+                self.ctx
+                    .config
+                    .update(|c| c.set_server_auto_join(server_id, choice));
+            }
             MessageToBackend::ResetServerClientSettings { server_id } => {
                 self.ctx
                     .config

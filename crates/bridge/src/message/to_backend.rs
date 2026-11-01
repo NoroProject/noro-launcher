@@ -102,6 +102,11 @@ pub enum MessageToBackend {
         server_id: Uuid,
         enabled: bool,
     },
+    /// `None` goes back to the default: the build's first entry point.
+    SetServerAutoJoin {
+        server_id: Uuid,
+        choice: Option<AutoJoin>,
+    },
     ResetServerClientSettings {
         server_id: Uuid,
     },

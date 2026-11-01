@@ -74,13 +74,19 @@ pub fn sync(instance_dir: &Path, server: &ServerEntry) -> Result<bool> {
 /// it are internal, and connecting straight to one skips the proxy's checks.
 /// Without a proxy every game server is an entry point in its own right.
 fn desired_entries(server: &ServerEntry) -> Vec<(String, String)> {
+    entry_points(server)
+        .map(|node| (node.name.clone(), address(&node.mc_host, node.mc_port)))
+        .collect()
+}
+
+/// The game servers a player may join directly: the proxy when there is one,
+/// every game server otherwise.
+pub(crate) fn entry_points(server: &ServerEntry) -> impl Iterator<Item = &schema::GameServerEntry> {
     let has_proxy = server.game_servers.iter().any(|node| node.proxy);
     server
         .game_servers
         .iter()
-        .filter(|node| !has_proxy || node.proxy)
-        .map(|node| (node.name.clone(), address(&node.mc_host, node.mc_port)))
-        .collect()
+        .filter(move |node| !has_proxy || node.proxy)
 }
 
 /// Minecraft shows the address verbatim, so the default port is left off.

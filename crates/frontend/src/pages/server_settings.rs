@@ -53,6 +53,7 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         // lays elements out in tree order, and the "Folder" row landed on top of
         // the open list.
         .children(super::java_picker::dialog(ui, server_id, cx))
+        .children(super::auto_join::dialog(ui, server_id, cx))
         .children(super::jvm_flags::dialog(ui, server_id, cx))
         .into_any_element()
 }
@@ -93,6 +94,13 @@ fn settings_panel(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             t("settings-fullscreen"),
             t("settings-fullscreen-hint"),
             fullscreen(ui, server_id, cx),
+            true,
+        ))
+        .child(setting_row(
+            "server",
+            t("settings-autojoin"),
+            t("settings-autojoin-hint"),
+            super::auto_join::control(ui, server_id, cx),
             true,
         ))
         .child(setting_row(

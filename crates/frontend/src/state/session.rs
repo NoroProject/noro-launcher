@@ -112,6 +112,9 @@ impl LauncherUI {
         if std::mem::take(&mut self.java_picker_open) {
             return true;
         }
+        if std::mem::take(&mut self.auto_join_picker_open) {
+            return true;
+        }
         if self.content_picker.take().is_some() {
             return true;
         }

@@ -15,6 +15,17 @@ pub struct ClientSettingsState {
     pub fullscreen: bool,
 }
 
+/// Where the game goes once it has started, chosen per build. No choice saved
+/// means the build's first entry point, which is what launching always did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoJoin {
+    /// Open on the main menu.
+    Off,
+    /// Join this game server of the build.
+    To(Uuid),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogHitInfo {
     pub provider: String,

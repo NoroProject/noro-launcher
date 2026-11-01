@@ -131,6 +131,7 @@ impl LauncherUI {
             java_default: HashMap::new(),
             java_busy: false,
             java_picker_open: false,
+            auto_join_picker_open: false,
             jvm_flags_open: false,
             jvm_flags_draft: String::new(),
             jvm_flags_focus: None,

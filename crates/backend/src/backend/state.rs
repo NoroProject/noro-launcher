@@ -266,12 +266,28 @@ impl BackendState {
         })
     }
 
-    /// No address means no auto-connect — the game just opens on the main menu.
+    /// Where the game joins on start: the game server the player picked, the
+    /// build's own address by default, or nothing — the main menu — when auto-join
+    /// is off or the build has no address.
     pub fn server_connect(&self, server_id: &Uuid) -> Option<ServerConnect> {
-        self.servers
-            .iter()
-            .find(|s| &s.id == server_id)
-            .and_then(|s| Some((s.mc_host.clone()?, s.mc_port?)))
-            .map(|(host, port)| ServerConnect { host, port })
+        let server = self.servers.iter().find(|s| &s.id == server_id)?;
+        let default = || {
+            Some(ServerConnect {
+                host: server.mc_host.clone()?,
+                port: server.mc_port?,
+            })
+        };
+        match self.ctx.config.get().auto_join.get(server_id).copied() {
+            Some(bridge::AutoJoin::Off) => None,
+            // A game server that has since left the build falls back to the default.
+            Some(bridge::AutoJoin::To(id)) => crate::servers_dat::entry_points(server)
+                .find(|node| node.id == id)
+                .map(|node| ServerConnect {
+                    host: node.mc_host.clone(),
+                    port: node.mc_port,
+                })
+                .or_else(default),
+            None => default(),
+        }
     }
 }

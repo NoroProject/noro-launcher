@@ -35,6 +35,11 @@ pub struct LauncherConfig {
     /// publishes, which is the default.
     #[serde(default)]
     pub selected_build: BTreeMap<Uuid, Uuid>,
+    /// Where the game goes on start, per server. Kept apart from
+    /// [`ServerClientSettings`]: those follow the build's recommendations,
+    /// and which game server to join is the player's call alone.
+    #[serde(default)]
+    pub auto_join: BTreeMap<Uuid, bridge::AutoJoin>,
     #[serde(default)]
     pub console: bridge::ConsoleSettings,
 }
@@ -82,6 +87,7 @@ impl Default for LauncherConfig {
             discord_rpc: true,
             server_settings: BTreeMap::new(),
             selected_build: BTreeMap::new(),
+            auto_join: BTreeMap::new(),
             console: bridge::ConsoleSettings::default(),
         }
     }
@@ -224,8 +230,21 @@ impl LauncherConfig {
             .fullscreen = enabled;
     }
 
+    /// `None` forgets the choice, so the build's first entry point is joined again.
+    pub fn set_server_auto_join(&mut self, server_id: Uuid, choice: Option<bridge::AutoJoin>) {
+        match choice {
+            Some(choice) => {
+                self.auto_join.insert(server_id, choice);
+            }
+            None => {
+                self.auto_join.remove(&server_id);
+            }
+        }
+    }
+
     pub fn reset_server_settings(&mut self, server_id: &Uuid) {
         self.server_settings.remove(server_id);
+        self.auto_join.remove(server_id);
     }
 
     pub fn ws_url(&self) -> String {

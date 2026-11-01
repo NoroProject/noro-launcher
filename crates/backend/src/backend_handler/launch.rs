@@ -122,6 +122,7 @@ impl BackendState {
             discord_rpc: c.discord_rpc,
             master_url: c.master_url,
             server_settings,
+            auto_join: c.auto_join.clone(),
             system_memory_mb: crate::system::total_memory_mb(),
             console: c.console,
         });
