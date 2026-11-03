@@ -84,6 +84,8 @@ The launcher talks to the Noro network to sign you in, list servers and fetch
 game files. It doesn't read your worlds, your screenshots, or anything outside
 its own folder.
 
+Website and documentation: [noro.rest](https://noro.rest).
+
 ## Licence
 
 Free and open source, under the [GNU AGPL-3.0](LICENSE). You can read the code,
