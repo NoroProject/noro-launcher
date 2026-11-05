@@ -275,6 +275,7 @@ impl BackendState {
             Some(ServerConnect {
                 host: server.mc_host.clone()?,
                 port: server.mc_port?,
+                aliased: false,
             })
         };
         match self.ctx.config.get().auto_join.get(server_id).copied() {
@@ -285,6 +286,7 @@ impl BackendState {
                 .map(|node| ServerConnect {
                     host: node.mc_host.clone(),
                     port: node.mc_port,
+                    aliased: false,
                 })
                 .or_else(default),
             None => default(),

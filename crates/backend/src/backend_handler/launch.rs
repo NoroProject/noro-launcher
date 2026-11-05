@@ -88,6 +88,7 @@ impl BackendState {
             connect,
             enabled_optional: enabled,
             server: self.servers.iter().find(|s| s.id == server_id).cloned(),
+            aliases: crate::host_aliases::HostAliases::from_servers(&self.servers),
             modal,
         });
     }

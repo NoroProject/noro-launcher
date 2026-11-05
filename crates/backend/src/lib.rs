@@ -16,6 +16,7 @@ pub mod discord_rpc;
 pub mod failure;
 pub mod fsutil;
 pub mod game_runner;
+pub mod host_aliases;
 pub mod http;
 pub mod impersonation;
 mod log_line;

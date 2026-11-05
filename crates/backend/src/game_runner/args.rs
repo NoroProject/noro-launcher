@@ -87,7 +87,7 @@ pub fn push_game_args(
     if let Some(server) = connect {
         if supports_quick_play(&ctx.manifest.mc_version) {
             cmd.arg("--quickPlayMultiplayer")
-                .arg(format!("{}:{}", server.host, server.port));
+                .arg(quick_play_address(&server));
         } else {
             // Before 1.20 the client ignores quick play and silently opens
             // the main menu instead of joining.
@@ -100,6 +100,18 @@ pub fn push_game_args(
 
     if fullscreen {
         cmd.arg("--fullscreen");
+    }
+}
+
+/// An alias goes without its port: the game looks up the SRV record of an
+/// address given without one, the agent answers it with the real port, and the
+/// port never shows up in the game. `--server`/`--port` before 1.20 connect
+/// directly with no SRV lookup, so there the port stays.
+fn quick_play_address(server: &ServerConnect) -> String {
+    if server.aliased {
+        server.host.clone()
+    } else {
+        format!("{}:{}", server.host, server.port)
     }
 }
 
@@ -277,5 +289,26 @@ mod tests {
         assert!(!supports_quick_play("1.19.4"));
         assert!(!supports_quick_play("1.12.2"));
         assert!(!supports_quick_play("1.7.10"));
+    }
+
+    #[test]
+    fn an_alias_joins_without_a_port() {
+        let aliases = crate::host_aliases::HostAliases::from_servers(&[]);
+        let real = ServerConnect {
+            host: "203.0.113.7".into(),
+            port: 25577,
+            aliased: false,
+        };
+        assert_eq!(quick_play_address(&real), "203.0.113.7:25577");
+        // No alias for it: the address is left as it was.
+        let same = real.via_alias(&aliases);
+        assert!(!same.aliased);
+
+        let aliased = ServerConnect {
+            host: "aoa.example".into(),
+            port: 25577,
+            aliased: true,
+        };
+        assert_eq!(quick_play_address(&aliased), "aoa.example");
     }
 }

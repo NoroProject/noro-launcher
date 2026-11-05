@@ -7,6 +7,7 @@
 //! The player's own entries are carried across whole, fields we don't recognise
 //! included — they are moved, not rebuilt from the keys we know about.
 
+use crate::host_aliases::HostAliases;
 use anyhow::{Context, Result};
 use fastnbt::Value;
 use schema::ServerEntry;
@@ -24,8 +25,11 @@ struct ServersDat {
 
 /// Brings `servers.dat` in line with the build's game servers. Returns whether
 /// the file was rewritten.
-pub fn sync(instance_dir: &Path, server: &ServerEntry) -> Result<bool> {
-    let desired = desired_entries(server);
+///
+/// A server with an alias is written under the alias, without a port: the
+/// agent answers the game's SRV lookup for it with the real one.
+pub fn sync(instance_dir: &Path, server: &ServerEntry, aliases: &HostAliases) -> Result<bool> {
+    let desired = desired_entries(server, aliases);
 
     let stamp_path = instance_dir.join(STAMP);
     let path = instance_dir.join("servers.dat");
@@ -73,9 +77,15 @@ pub fn sync(instance_dir: &Path, server: &ServerEntry) -> Result<bool> {
 /// If the build has a proxy, only the proxy goes in the list. The nodes behind
 /// it are internal, and connecting straight to one skips the proxy's checks.
 /// Without a proxy every game server is an entry point in its own right.
-fn desired_entries(server: &ServerEntry) -> Vec<(String, String)> {
+fn desired_entries(server: &ServerEntry, aliases: &HostAliases) -> Vec<(String, String)> {
     entry_points(server)
-        .map(|node| (node.name.clone(), address(&node.mc_host, node.mc_port)))
+        .map(|node| {
+            let ip = match aliases.alias_of(&node.mc_host, node.mc_port) {
+                Some(alias) => alias.to_string(),
+                None => address(&node.mc_host, node.mc_port),
+            };
+            (node.name.clone(), ip)
+        })
         .collect()
 }
 
