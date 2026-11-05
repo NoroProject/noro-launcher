@@ -37,6 +37,9 @@ impl BackendState {
                 self.ctx.config.update(|c| c.discord_rpc = enabled);
                 self.ctx.rpc.set_enabled(enabled);
             }
+            MessageToBackend::SetHideWhilePlaying { enabled } => {
+                self.ctx.config.update(|c| c.hide_while_playing = enabled);
+            }
             MessageToBackend::SetServerMemory {
                 server_id,
                 min_mb,

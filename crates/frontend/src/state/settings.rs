@@ -58,14 +58,41 @@ impl LauncherUI {
             .send(MessageToBackend::SetFullscreen { enabled });
     }
 
-    /// Takes effect on the next launch: Sentry comes up before GPUI, and its
-    /// panic hook can't be removed while the process runs.
     pub fn set_discord_rpc(&mut self, enabled: bool) {
         self.config.discord_rpc = enabled;
         self.backend
             .send(MessageToBackend::SetDiscordRpc { enabled });
     }
 
+    /// Deferred, like raising the window on a second launch: this runs inside
+    /// an update of the window's own view, and the window can't be updated
+    /// from there.
+    pub(super) fn set_main_window_minimized(&self, minimized: bool, cx: &mut Context<Self>) {
+        let Some(handle) = self.main_window else {
+            return;
+        };
+        cx.defer(move |cx| {
+            let _ = handle.update(cx, |_, window, _| {
+                if minimized {
+                    window.minimize_window();
+                } else {
+                    window.activate_window();
+                }
+            });
+            if !minimized {
+                cx.activate(true);
+            }
+        });
+    }
+
+    pub fn set_hide_while_playing(&mut self, enabled: bool) {
+        self.config.hide_while_playing = enabled;
+        self.backend
+            .send(MessageToBackend::SetHideWhilePlaying { enabled });
+    }
+
+    /// Takes effect on the next launch: Sentry comes up before GPUI, and its
+    /// panic hook can't be removed while the process runs.
     pub fn set_crash_reports(&mut self, enabled: bool) {
         self.config.crash_reports = enabled;
         self.backend

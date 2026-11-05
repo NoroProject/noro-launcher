@@ -182,6 +182,9 @@ impl LauncherUI {
                 {
                     self.open_console(server_id, cx);
                 }
+                if self.config.hide_while_playing {
+                    self.set_main_window_minimized(true, cx);
+                }
             }
             MessageToFrontend::GameStopped {
                 server_id,
@@ -193,6 +196,10 @@ impl LauncherUI {
                 s.stopping = false;
                 s.stop_armed = false;
                 self.refresh_gallery_after_game(server_id);
+                // Back when the last game closes, not the first of two.
+                if self.config.hide_while_playing && !self.sync.values().any(|s| s.running) {
+                    self.set_main_window_minimized(false, cx);
+                }
                 if !exit_ok {
                     if self
                         .server_client_settings(server_id)

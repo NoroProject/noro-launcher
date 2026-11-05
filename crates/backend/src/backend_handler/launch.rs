@@ -120,6 +120,7 @@ impl BackendState {
             crash_reports: c.crash_reports,
             crash_reports_available: crate::telemetry::is_available(),
             discord_rpc: c.discord_rpc,
+            hide_while_playing: c.hide_while_playing,
             master_url: c.master_url,
             server_settings,
             auto_join: c.auto_join.clone(),

@@ -51,6 +51,23 @@ pub fn settings_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             true,
         ))
         .child(row(
+            "eye-off",
+            t("settings-hide-while-playing"),
+            t("settings-hide-while-playing-hint"),
+            checkbox_row(
+                SharedString::new_static("g-hide-while-playing"),
+                ui.config.hide_while_playing,
+                true,
+                cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                    let v = this.config.hide_while_playing;
+                    this.set_hide_while_playing(!v);
+                    cx.notify();
+                }),
+            )
+            .into_any_element(),
+            true,
+        ))
+        .child(row(
             "code",
             t("settings-jvm-flags"),
             t("settings-jvm-hint"),

@@ -28,6 +28,8 @@ pub struct LauncherConfig {
     /// Rich Presence: the server and what the player is doing, shown to their
     /// Discord friends. On by default, as it has always been.
     pub discord_rpc: bool,
+    /// Minimise the window while the game runs and bring it back after.
+    pub hide_while_playing: bool,
     /// Per-server overrides for the fields above.
     #[serde(default)]
     pub server_settings: BTreeMap<Uuid, ServerClientSettings>,
@@ -85,6 +87,7 @@ impl Default for LauncherConfig {
             fullscreen: false,
             crash_reports: default_crash_reports(),
             discord_rpc: true,
+            hide_while_playing: false,
             server_settings: BTreeMap::new(),
             selected_build: BTreeMap::new(),
             auto_join: BTreeMap::new(),

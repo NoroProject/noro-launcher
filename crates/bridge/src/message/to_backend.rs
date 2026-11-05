@@ -85,6 +85,9 @@ pub enum MessageToBackend {
     SetDiscordRpc {
         enabled: bool,
     },
+    SetHideWhilePlaying {
+        enabled: bool,
+    },
     SetServerMemory {
         server_id: Uuid,
         min_mb: u32,

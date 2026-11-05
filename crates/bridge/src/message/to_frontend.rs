@@ -41,6 +41,7 @@ pub enum MessageToFrontend {
         /// nowhere to send and isn't worth showing.
         crash_reports_available: bool,
         discord_rpc: bool,
+        hide_while_playing: bool,
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,

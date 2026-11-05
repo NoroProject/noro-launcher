@@ -69,6 +69,7 @@ impl BackendState {
             | M::SetCrashReports { .. }
             | M::SetConsoleSettings { .. }
             | M::SetDiscordRpc { .. }
+            | M::SetHideWhilePlaying { .. }
             | M::SetServerMemory { .. }
             | M::SetServerJvmFlags { .. }
             | M::SetServerShowConsoleOnLaunch { .. }
