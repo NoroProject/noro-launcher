@@ -129,7 +129,9 @@ impl Render for Splash {
                     .font_family("Monocraft")
                     .text_size(px(26.))
                     .text_color(rgb(CREAM))
-                    .child(SharedString::new_static("NORO")),
+                    .child(SharedString::from(
+                        crate::embedded_config::instance_name().to_uppercase(),
+                    )),
             );
         let root = div()
             .size_full()
@@ -275,7 +277,7 @@ where
                 WindowOptions {
                     window_bounds: Some(gpui::WindowBounds::Windowed(bounds)),
                     titlebar: Some(gpui::TitlebarOptions {
-                        title: Some(SharedString::new_static("noro launcher")),
+                        title: Some(SharedString::from(crate::embedded_config::instance_name())),
                         appears_transparent: true,
                         ..Default::default()
                     }),

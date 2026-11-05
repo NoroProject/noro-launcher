@@ -1,4 +1,4 @@
-//! Minimalistic centered login screen for Noro Launcher.
+//! Minimalistic centered login screen.
 
 use crate::components::{cta_button, mascot, pixel_title, Mood};
 use crate::icons::ic;
@@ -41,7 +41,11 @@ pub fn render(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
                             },
                             130.,
                         ))
-                        .child(pixel_title("NORO NETWORK", 26., CTA))
+                        .child(div().max_w_full().text_center().child(pixel_title(
+                            ui.brand.name.to_uppercase(),
+                            26.,
+                            CTA,
+                        )))
                         .child(
                             div()
                                 .text_center()

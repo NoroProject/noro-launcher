@@ -3,9 +3,9 @@
 use super::common::Cx;
 use crate::components::{mascot, pixel_title, Mood};
 use crate::icons::ic;
-use crate::state::Page;
+use crate::state::{LauncherUI, Page};
 use crate::theme::*;
-use gpui::{div, img, prelude::*, px, rgb, rgba, AnyElement, App, ClickEvent, Window};
+use gpui::{div, img, prelude::*, px, rgb, rgba, AnyElement, App, ClickEvent, ObjectFit, Window};
 use i18n::t;
 
 pub fn nav_icon(
@@ -36,16 +36,34 @@ pub fn nav_icon(
         .into_any_element()
 }
 
-pub fn logo(cx: &mut Cx) -> AnyElement {
+/// The operator's logo once it has loaded, the bundled one until then.
+fn brand_logo(ui: &LauncherUI, size: f32) -> gpui::Img {
+    match &ui.brand.logo {
+        Some(image) => img(image.clone()),
+        None => img("logo.png"),
+    }
+    .size(px(size))
+    .object_fit(ObjectFit::Contain)
+}
+
+pub fn logo(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()
         .id("home-logo")
         .cursor_pointer()
         .flex()
         .items_center()
         .gap(px(10.))
+        .min_w_0()
         .hover(|d| d.opacity(0.8))
-        .child(img("logo.png").size(px(26.)).flex_shrink_0())
-        .child(pixel_title("NORO", 24., CTA))
+        .child(brand_logo(ui, 26.).flex_shrink_0())
+        .child(
+            div()
+                .min_w_0()
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .text_ellipsis()
+                .child(pixel_title(ui.brand.name.to_uppercase(), 24., CTA)),
+        )
         .on_click(cx.listener(|this, _e: &ClickEvent, _w, cx| {
             this.page = this
                 .selected_server_id()
@@ -59,7 +77,7 @@ pub fn logo(cx: &mut Cx) -> AnyElement {
 /// The logo in a collapsed sidebar, doubling as the expand button. On hover the
 /// logo fades out and the icon takes its place at the same size — a corner badge
 /// is unreadable at 40 px.
-pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
+pub fn collapsed_logo_toggle(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
     div()
         .id("collapsed-logo-toggle")
         .tooltip(crate::components::hint(t("hint-expand-sidebar")))
@@ -82,11 +100,7 @@ pub fn collapsed_logo_toggle(cx: &mut Cx) -> AnyElement {
                 .flex()
                 .items_center()
                 .justify_center()
-                .child(
-                    img("logo.png")
-                        .size(px(24.))
-                        .group_hover("collapsed-logo", |s| s.opacity(0.2)),
-                )
+                .child(brand_logo(ui, 24.).group_hover("collapsed-logo", |s| s.opacity(0.2)))
                 .child(
                     div()
                         .absolute()

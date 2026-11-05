@@ -37,7 +37,7 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                 .border_b_1()
                 .border_color(rgb(BORDER))
                 .when(!collapsed, |d| {
-                    d.child(logo(cx)).child(nav_icon(
+                    d.child(logo(ui, cx)).child(nav_icon(
                         "sidebar-toggle-btn",
                         "panel-left-close",
                         t("hint-collapse-sidebar"),
@@ -49,7 +49,7 @@ pub fn sidebar(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                     ))
                 })
                 .when(collapsed, |d| {
-                    d.justify_center().child(collapsed_logo_toggle(cx))
+                    d.justify_center().child(collapsed_logo_toggle(ui, cx))
                 }),
         )
         .child(

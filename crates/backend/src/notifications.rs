@@ -102,7 +102,7 @@ fn toast(notification: &schema::notifications::Notification) {
     let body = notification.body.clone();
     std::thread::spawn(move || {
         let mut builder = notify_rust::Notification::new();
-        builder.summary(&summary).appname("Noro");
+        builder.summary(&summary).appname(&crate::branding::name());
         if !body.is_empty() {
             // Only the first lines fit in a system toast on every platform, and
             // the full text is a click away in the launcher.

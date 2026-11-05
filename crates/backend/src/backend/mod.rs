@@ -276,6 +276,7 @@ async fn run(
     // than after the master answers.
     state.send_config_state();
     crate::translations::refresh(&state.ctx, state.ctx.config.get().locale);
+    crate::branding::refresh(&state.ctx);
     state.load_offline_cache();
 
     // Over REST rather than waiting for the socket: the login screen would

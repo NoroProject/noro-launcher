@@ -129,7 +129,8 @@ fn open_window(
                 px(MAIN_WINDOW_MIN_SIZE.1),
             )),
             titlebar: Some(gpui::TitlebarOptions {
-                title: Some(SharedString::new_static("noro launcher")),
+                // The instance's name; `state::brand` follows the master's.
+                title: Some(SharedString::from(bridge::brand::initial_instance_name())),
                 // Transparent titlebar, traffic lights parked off-screen: the
                 // chrome is drawn by `components::window_chrome`.
                 appears_transparent: true,
