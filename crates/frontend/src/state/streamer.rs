@@ -36,14 +36,15 @@ impl LauncherUI {
     /// This network's server hosts and what may stand in for each on screen.
     pub(super) fn streamer_hosts(&self) -> Vec<(String, String)> {
         let mut hosts = Vec::new();
+        // The alias the game already shows reads better than a mask and gives
+        // nothing away: it resolves only inside the game's own JVM.
+        let stand_in = |alias: &Option<String>| alias.clone().unwrap_or_else(|| MASK.to_string());
         for server in &self.servers {
-            // Where a server alias lands, it goes here as the stand-in; until
-            // then the host is simply masked.
             if let Some(host) = &server.mc_host {
-                hosts.push((host.clone(), MASK.to_string()));
+                hosts.push((host.clone(), stand_in(&server.mc_alias)));
             }
             for node in &server.game_servers {
-                hosts.push((node.mc_host.clone(), MASK.to_string()));
+                hosts.push((node.mc_host.clone(), stand_in(&node.alias)));
             }
         }
         hosts
