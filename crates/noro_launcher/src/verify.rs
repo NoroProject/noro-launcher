@@ -7,7 +7,7 @@ use std::path::Path;
 
 pub const SIG_SUFFIX: &str = ".sig";
 
-use crate::embedded_config;
+use crate::{bootstrap_file, embedded_config};
 
 /// Hex from the stamped config, falling back to env var, bootstrap.json, or build-time.
 ///
@@ -38,15 +38,7 @@ pub fn raw_signing_pubkey() -> String {
 }
 
 fn from_bootstrap(key: &str) -> Option<String> {
-    let path = dirs::data_dir()?
-        .join(schema::launcher_dir_name())
-        .join("bootstrap.json");
-    let content = std::fs::read_to_string(path).ok()?;
-    let val: serde_json::Value = serde_json::from_str(&content).ok()?;
-    val.get(key)?
-        .as_str()
-        .filter(|s| !s.trim().is_empty())
-        .map(|s| s.trim().to_string())
+    bootstrap_file::field(&bootstrap_file::read(&bootstrap_file::path()?)?, key)
 }
 
 fn verifying_key() -> Result<VerifyingKey> {
@@ -80,10 +72,19 @@ fn verifying_key() -> Result<VerifyingKey> {
 }
 
 /// Stamped config first, then env var, then bootstrap.json, then build-time env var.
+///
+/// The stamp gives way to `bootstrap.json` only when core recorded there that
+/// the master moved away from the stamped address. Trusting the file for the
+/// address is no weaker than before: core keeps the address in `config.json`
+/// in the same folder, and whatever this downloads still has to pass the
+/// signature check against the stamped key, which the file can't change.
 pub fn master_url() -> String {
     if let Some(cfg) = embedded_config::get_embedded_config() {
         if !cfg.master_url.is_empty() {
-            return cfg.master_url;
+            let moved = bootstrap_file::path()
+                .and_then(|p| bootstrap_file::read(&p))
+                .and_then(|doc| bootstrap_file::moved_master(&cfg.master_url, &doc));
+            return moved.unwrap_or(cfg.master_url);
         }
     }
     if let Ok(val) = std::env::var("NORO_MASTER_URL") {

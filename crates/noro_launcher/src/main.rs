@@ -8,6 +8,7 @@
 //! `AppData/noro-launcher/`.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bootstrap_file;
 mod download;
 mod embedded_config;
 mod failure;

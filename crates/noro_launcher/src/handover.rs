@@ -1,7 +1,7 @@
 //! Starting core: the arguments it is handed and how the process is replaced.
 
 use crate::failure::{Failure, Kind};
-use crate::{log, verify};
+use crate::{bootstrap_file, log, verify};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -17,14 +17,7 @@ fn prepare_core_cmd(path: &Path, app_dir: &Path) -> std::process::Command {
     let master_url = verify::master_url();
     let pubkey = verify::raw_signing_pubkey();
 
-    let bootstrap_path = app_dir.join("bootstrap.json");
-    let bootstrap_data = serde_json::json!({
-        "master_url": master_url,
-        "signing_pubkey": pubkey,
-    });
-    if let Ok(json_str) = serde_json::to_string_pretty(&bootstrap_data) {
-        let _ = std::fs::write(bootstrap_path, json_str);
-    }
+    bootstrap_file::write(&app_dir.join("bootstrap.json"), &master_url, &pubkey);
 
     let mut cmd = std::process::Command::new(path);
     cmd.args(std::env::args_os().skip(1));
