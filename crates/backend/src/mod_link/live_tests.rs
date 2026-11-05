@@ -143,6 +143,33 @@ async fn wrong_key_is_refused() {
     assert!(refused, "a connection with a bad key stayed open: {next:?}");
 }
 
+/// A web page in the player's browser can reach 127.0.0.1 too. It always sends
+/// `Origin`, and the upgrade is refused before the key is even asked for.
+#[tokio::test]
+async fn a_browser_cannot_open_the_socket() {
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+    let dir = std::env::temp_dir().join(format!("noro-mod-link-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).expect("instance directory");
+
+    let ctx = ctx_for("http://127.0.0.1:1", "no-token");
+    ctx.mod_link.start(&ctx, dir.clone()).await;
+    let raw = std::fs::read(dir.join(HANDSHAKE_FILE)).expect("handshake file");
+    let hs: Handshake = serde_json::from_slice(&raw).expect("parse handshake");
+
+    let mut request = format!("ws://127.0.0.1:{}", hs.port)
+        .into_client_request()
+        .expect("request");
+    request
+        .headers_mut()
+        .insert("origin", "https://example.com".parse().unwrap());
+    let opened = tokio_tungstenite::connect_async(request).await;
+
+    ctx.mod_link.stop().await;
+    let _ = std::fs::remove_dir_all(&dir);
+    assert!(opened.is_err(), "a browser origin got a socket");
+}
+
 type ModSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 

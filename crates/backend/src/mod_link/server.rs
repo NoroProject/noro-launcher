@@ -31,13 +31,47 @@ pub async fn serve(ctx: Ctx, link: ModLink, listener: TcpListener) {
     }
 }
 
+/// How long a connection has to upgrade and say hello. The mod does both at
+/// once; anything slower is not the mod, and without a deadline every such
+/// connection stayed open for good.
+const HELLO_DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// A browser always sends `Origin` on a WebSocket upgrade; the mod's clients
+/// (the JDK one and the hand-written one for Java 8) never do. Refusing it
+/// keeps every web page off the socket before the key is even asked for.
+///
+/// The error type is tungstenite's, fixed by its callback signature.
+#[allow(clippy::result_large_err)]
+fn refuse_browsers(
+    req: &tokio_tungstenite::tungstenite::handshake::server::Request,
+    res: tokio_tungstenite::tungstenite::handshake::server::Response,
+) -> Result<
+    tokio_tungstenite::tungstenite::handshake::server::Response,
+    tokio_tungstenite::tungstenite::handshake::server::ErrorResponse,
+> {
+    if req.headers().contains_key("origin") {
+        let mut refusal = tokio_tungstenite::tungstenite::handshake::server::ErrorResponse::new(
+            Some("browsers are not accepted here".into()),
+        );
+        *refusal.status_mut() = tokio_tungstenite::tungstenite::http::StatusCode::FORBIDDEN;
+        return Err(refusal);
+    }
+    Ok(res)
+}
+
 async fn session(ctx: Ctx, link: ModLink, stream: TcpStream) -> anyhow::Result<()> {
-    let ws = tokio_tungstenite::accept_async(stream).await?;
+    let ws = tokio::time::timeout(
+        HELLO_DEADLINE,
+        tokio_tungstenite::accept_hdr_async(stream, refuse_browsers),
+    )
+    .await??;
     let (mut sink, mut incoming) = ws.split();
 
     // Only something that read the file in the game directory knows the key. A
     // web page can open the socket; it can't read the file.
-    let hello = incoming.next().await.transpose()?;
+    let hello = tokio::time::timeout(HELLO_DEADLINE, incoming.next())
+        .await?
+        .transpose()?;
     let Some(Message::Text(text)) = hello else {
         anyhow::bail!("first frame was not text");
     };
