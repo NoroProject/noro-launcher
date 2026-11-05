@@ -14,6 +14,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 mod console;
+mod gallery;
 mod images;
 mod init;
 mod messages;
@@ -27,6 +28,7 @@ mod settings;
 mod types;
 
 pub use console::ConsoleWindow;
+pub use gallery::{Gallery, GALLERY_PAGE};
 pub use types::*;
 
 pub struct LauncherUI {
@@ -151,6 +153,8 @@ pub struct LauncherUI {
     optional_mod_icons_failed: HashSet<String>,
     /// The same for build backgrounds and icons, by image URL.
     image_failed: HashSet<String>,
+    /// The screenshots tab.
+    pub gallery: Gallery,
 
     pub update_available: Option<LauncherVersion>,
     pub updating: bool,

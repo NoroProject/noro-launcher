@@ -54,6 +54,7 @@ impl LauncherUI {
             | M::SkinUploadFailed
             | M::CapesList { .. }
             | M::SkinPresetsList { .. }) => self.on_content_message(m, cx),
+            M::Screenshots { server_id, items } => self.on_screenshots(server_id, items, cx),
             m @ (M::NotificationFeed { .. }
             | M::NotificationArrived { .. }
             | M::UnreadChanged { .. }

@@ -26,6 +26,7 @@ pub mod offline_cache;
 pub mod persistent;
 pub mod personal;
 pub mod remote_actions;
+pub mod screenshots;
 pub mod servers_dat;
 pub mod signing;
 pub mod support;

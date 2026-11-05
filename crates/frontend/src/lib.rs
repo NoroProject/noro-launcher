@@ -57,6 +57,7 @@ impl gpui::Render for LauncherUI {
             | Page::ServerMods(_)
             | Page::ServerModCatalog(_)
             | Page::ServerSettings(_)
+            | Page::ServerScreenshots(_)
             | Page::News
             | Page::NewsDetail(_)
             | Page::Profile

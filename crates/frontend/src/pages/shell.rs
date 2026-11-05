@@ -1,7 +1,7 @@
 use super::{
     account, game, impersonate_dialog, log_request_dialog, messages, news, news_detail,
-    notifications, profile, remote_action_dialog, server_mod_catalog, server_mods, server_settings,
-    settings, sidebar,
+    notifications, profile, remote_action_dialog, server_mod_catalog, server_mods,
+    server_screenshots, server_settings, settings, sidebar,
 };
 use crate::state::{LauncherUI, Page};
 use crate::theme::*;
@@ -50,6 +50,7 @@ pub fn launcher_shell(ui: &mut LauncherUI, cx: &mut super::common::Cx) -> AnyEle
                             Page::ServerMods(id) => server_mods::page(ui, id, cx),
                             Page::ServerModCatalog(id) => server_mod_catalog::page(ui, id, cx),
                             Page::ServerSettings(id) => server_settings::page(ui, id, cx),
+                            Page::ServerScreenshots(id) => server_screenshots::page(ui, id, cx),
                             Page::Login | Page::Servers | Page::ServerDetail(_) => {
                                 game::page(ui, cx)
                             }

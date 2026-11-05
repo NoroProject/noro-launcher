@@ -1,6 +1,7 @@
 //! Window requests about launcher and per-server settings.
 
 use super::*;
+use crate::screenshots;
 
 impl BackendState {
     /// Only ever gets the variants `handle_to_backend` routes here.
@@ -74,7 +75,47 @@ impl BackendState {
                 let client_path: PathBuf = self.ctx.dirs.instance(&server_id);
                 let _ = open::that(client_path);
             }
+            MessageToBackend::RequestScreenshots { server_id } => {
+                self.send_screenshots(server_id);
+            }
+            MessageToBackend::OpenScreenshot {
+                server_id,
+                file_name,
+            } => {
+                let folder = screenshots::folder(&self.ctx.dirs.instance(&server_id));
+                if let Some(path) = screenshots::resolve(&folder, &file_name) {
+                    let _ = open::that(path);
+                }
+            }
+            MessageToBackend::DeleteScreenshot {
+                server_id,
+                file_name,
+            } => {
+                let folder = screenshots::folder(&self.ctx.dirs.instance(&server_id));
+                if let Some(path) = screenshots::resolve(&folder, &file_name) {
+                    if let Err(e) = std::fs::remove_file(&path) {
+                        tracing::warn!(error = %e, file = %file_name, "screenshot not deleted");
+                    }
+                }
+                self.send_screenshots(server_id);
+            }
+            MessageToBackend::OpenScreenshotsFolder { server_id } => {
+                let folder = screenshots::folder(&self.ctx.dirs.instance(&server_id));
+                let _ = std::fs::create_dir_all(&folder);
+                let _ = open::that(folder);
+            }
             _ => {}
         }
+    }
+
+    /// Reading a folder of a few hundred entries is quick, but it is still disk
+    /// work: off the handler loop, like everything else that touches files.
+    fn send_screenshots(&self, server_id: Uuid) {
+        let folder = screenshots::folder(&self.ctx.dirs.instance(&server_id));
+        let ctx = self.ctx.clone();
+        tokio::task::spawn_blocking(move || {
+            let items = screenshots::list(&folder);
+            ctx.send(MessageToFrontend::Screenshots { server_id, items });
+        });
     }
 }

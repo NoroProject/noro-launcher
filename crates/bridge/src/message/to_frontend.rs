@@ -235,6 +235,12 @@ pub enum MessageToFrontend {
         message: String,
     },
 
+    /// Newest first.
+    Screenshots {
+        server_id: Uuid,
+        items: Vec<ScreenshotInfo>,
+    },
+
     JavaRuntimes {
         server_id: Uuid,
         options: Vec<schema::java::JavaRuntimeOption>,

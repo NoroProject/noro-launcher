@@ -75,7 +75,11 @@ impl BackendState {
             | M::SetServerFullscreen { .. }
             | M::SetServerAutoJoin { .. }
             | M::ResetServerClientSettings { .. }
-            | M::OpenServerClientFolder { .. }) => self.on_settings_request(m).await,
+            | M::OpenServerClientFolder { .. }
+            | M::RequestScreenshots { .. }
+            | M::OpenScreenshot { .. }
+            | M::DeleteScreenshot { .. }
+            | M::OpenScreenshotsFolder { .. }) => self.on_settings_request(m).await,
             m @ (M::SearchCatalog { .. }
             | M::RequestModProject { .. }
             | M::RequestPersonalContent { .. }

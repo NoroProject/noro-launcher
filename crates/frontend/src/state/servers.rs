@@ -22,7 +22,8 @@ impl LauncherUI {
             Page::ServerDetail(id)
             | Page::ServerMods(id)
             | Page::ServerModCatalog(id)
-            | Page::ServerSettings(id) => Some(id),
+            | Page::ServerSettings(id)
+            | Page::ServerScreenshots(id) => Some(id),
             _ => self.servers.first().map(|s| s.id),
         }
     }
@@ -97,7 +98,8 @@ impl LauncherUI {
             Page::ServerDetail(id)
             | Page::ServerMods(id)
             | Page::ServerModCatalog(id)
-            | Page::ServerSettings(id) => Some(id),
+            | Page::ServerSettings(id)
+            | Page::ServerScreenshots(id) => Some(id),
             _ => None,
         };
         if open.is_some() && open != self.ui_state.last_server {

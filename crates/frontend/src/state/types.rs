@@ -27,6 +27,7 @@ pub enum Page {
     ServerMods(Uuid),
     ServerModCatalog(Uuid),
     ServerSettings(Uuid),
+    ServerScreenshots(Uuid),
     News,
     NewsDetail(Uuid),
     Profile,

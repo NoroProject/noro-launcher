@@ -318,6 +318,19 @@ pub async fn load_render_image_capped(
     blocking(move || decode_to_frame(&bytes, max_side)).await
 }
 
+/// A picture from the local disk, shrunk to `max_side`. Read and decoded off the
+/// UI thread, like everything from the network.
+pub async fn load_render_image_file(
+    path: std::path::PathBuf,
+    max_side: u32,
+) -> Result<Arc<RenderImage>, String> {
+    blocking(move || {
+        let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+        decode_to_frame(&bytes, max_side)
+    })
+    .await
+}
+
 /// Decode, shrink and swap to BGRA — the order GPUI uploads textures in.
 fn decode_to_frame(bytes: &[u8], max_side: u32) -> Result<Arc<RenderImage>, String> {
     let decoded = image::load_from_memory(bytes).map_err(|e| e.to_string())?;

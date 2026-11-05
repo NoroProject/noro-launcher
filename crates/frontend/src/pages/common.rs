@@ -108,6 +108,19 @@ pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             },
         )
         .child(tab(
+            "tab-screenshots",
+            t("nav-screenshots"),
+            matches!(page, crate::state::Page::ServerScreenshots(_)),
+            move |this, cx| {
+                if let Some(id) = sid {
+                    this.open_server(id);
+                    this.open_screenshots(id, cx);
+                    cx.notify();
+                }
+            },
+            cx,
+        ))
+        .child(tab(
             "tab-settings",
             t("nav-settings"),
             matches!(page, crate::state::Page::ServerSettings(_)),

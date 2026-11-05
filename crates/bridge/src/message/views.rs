@@ -189,3 +189,14 @@ pub struct DmThreadOpen {
     pub avatar_url: Option<String>,
     pub messages: Vec<DmMessageView>,
 }
+
+/// One picture in a server's `screenshots` folder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScreenshotInfo {
+    pub file_name: String,
+    /// For the thumbnail, which the window reads straight from disk.
+    pub path: std::path::PathBuf,
+    /// Unix seconds; 0 when the file system doesn't say.
+    pub taken_at: i64,
+    pub size_bytes: u64,
+}

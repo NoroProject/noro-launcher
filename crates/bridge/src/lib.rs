@@ -14,8 +14,8 @@ pub use message::{
     AutoJoin, BuildState, CatalogHitInfo, ClientSettingsState, ConsoleSettings, ContentVersionInfo,
     DmMessageView, DmThreadOpen, DmThreadView, GameLogLevel, GameLogLine, LaunchStep,
     LoginErrorKind, MessageToBackend, MessageToFrontend, ModProjectInfo, OptionalModInfo,
-    PunishmentView, RuleView, SanctionView, ServerSkinPresetItem, SyncStage, TicketMessageView,
-    TicketView,
+    PunishmentView, RuleView, SanctionView, ScreenshotInfo, ServerSkinPresetItem, SyncStage,
+    TicketMessageView, TicketView,
 };
 pub use modal_action::{ModalAction, ModalProgress};
 pub use quit::{QuitCoordinator, QuitHandler};

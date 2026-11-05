@@ -88,6 +88,7 @@ impl LauncherUI {
             optional_mod_icons_loading: HashSet::new(),
             optional_mod_icons_failed: HashSet::new(),
             image_failed: HashSet::new(),
+            gallery: Gallery::default(),
             update_available: None,
             impersonate_prompt: None,
             log_request_prompt: None,

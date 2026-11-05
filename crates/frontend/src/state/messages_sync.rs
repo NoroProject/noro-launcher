@@ -188,6 +188,7 @@ impl LauncherUI {
                 s.running = false;
                 s.stopping = false;
                 s.stop_armed = false;
+                self.refresh_gallery_after_game(server_id);
                 if !exit_ok {
                     if self
                         .server_client_settings(server_id)

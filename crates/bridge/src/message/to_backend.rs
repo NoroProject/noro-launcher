@@ -113,6 +113,24 @@ pub enum MessageToBackend {
     OpenServerClientFolder {
         server_id: Uuid,
     },
+    /// List the game's `screenshots` folder; answered with `Screenshots`.
+    RequestScreenshots {
+        server_id: Uuid,
+    },
+    /// Open one screenshot in the system viewer. By file name, not path: the
+    /// backend resolves it inside the server's own folder and nowhere else.
+    OpenScreenshot {
+        server_id: Uuid,
+        file_name: String,
+    },
+    DeleteScreenshot {
+        server_id: Uuid,
+        file_name: String,
+    },
+    /// Open the `screenshots` folder itself, creating it if the game has not.
+    OpenScreenshotsFolder {
+        server_id: Uuid,
+    },
     /// The backend stores the choice and fetches the catalog for it.
     SetLocale {
         code: String,
