@@ -35,7 +35,13 @@ impl BackendState {
             }
             MessageToBackend::SetDiscordRpc { enabled } => {
                 self.ctx.config.update(|c| c.discord_rpc = enabled);
-                self.ctx.rpc.set_enabled(enabled);
+                self.ctx
+                    .rpc
+                    .set_enabled(crate::streamer::rpc_allowed(&self.ctx));
+            }
+            MessageToBackend::SetStreamerMode { on } => crate::streamer::set_manual(&self.ctx, on),
+            MessageToBackend::SetStreamerAuto { enabled } => {
+                crate::streamer::set_auto(&self.ctx, enabled)
             }
             MessageToBackend::SetHideWhilePlaying { enabled } => {
                 self.ctx.config.update(|c| c.hide_while_playing = enabled);

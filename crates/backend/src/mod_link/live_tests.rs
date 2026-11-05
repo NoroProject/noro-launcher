@@ -213,5 +213,6 @@ fn ctx_for(master: &str, token: &str) -> Ctx {
         mod_link: ModLink::default(),
         profile: Default::default(),
         features: Default::default(),
+        streamer: Default::default(),
     }
 }

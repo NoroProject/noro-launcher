@@ -3,6 +3,7 @@
 use super::common::{panel, Cx};
 use super::settings_panel::settings_panel;
 use super::settings_rows::row;
+use super::settings_streamer::streamer_panel;
 use crate::components::{btn, version_badge};
 use crate::icons::ic;
 use crate::state::LauncherUI;
@@ -32,6 +33,7 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                         .flex_col()
                         .gap(px(16.))
                         .child(settings_panel(ui, cx))
+                        .child(streamer_panel(ui, cx))
                         .when_some(ui.update_available.clone(), |d, v| {
                             let progress = ui.update_modal.as_ref().map(|m| m.snapshot());
                             d.child(update_panel(v.version, progress, cx))

@@ -215,6 +215,8 @@ pub struct UiConfig {
     pub crash_reports_available: bool,
     pub discord_rpc: bool,
     pub hide_while_playing: bool,
+    /// A running streaming app switches streamer mode on.
+    pub streamer_auto: bool,
     pub master_url: String,
     pub console: bridge::ConsoleSettings,
     pub system_memory_mb: Option<u32>,
@@ -234,6 +236,7 @@ impl Default for UiConfig {
             crash_reports_available: false,
             discord_rpc: true,
             hide_while_playing: false,
+            streamer_auto: true,
             master_url: String::new(),
             console: bridge::ConsoleSettings::default(),
             system_memory_mb: None,

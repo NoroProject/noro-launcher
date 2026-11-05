@@ -18,6 +18,7 @@ mod skin;
 mod skin_loader;
 mod skin_preview;
 mod state;
+mod streamer_mask;
 mod sync_text;
 mod theme;
 mod ui_state;
@@ -33,7 +34,15 @@ use std::sync::Arc;
 pub use state::{GlobalLauncherUI, LauncherUI, Page};
 use theme::*;
 
-gpui::actions!(launcher, [CloseOverlay]);
+gpui::actions!(launcher, [CloseOverlay, ToggleStreamer]);
+
+/// Streamer mode from any page. The same keys switch it on the site.
+const STREAMER_BINDING: &str = "secondary-shift-s";
+/// How the keys read in the settings hint.
+#[cfg(target_os = "macos")]
+pub const STREAMER_KEYS: &str = "⌘⇧S";
+#[cfg(not(target_os = "macos"))]
+pub const STREAMER_KEYS: &str = "Ctrl+Shift+S";
 
 const MAIN_WINDOW_SIZE: (f32, f32) = (1100., 720.);
 /// Fits a 1366×768 screen at 125 % scaling with the taskbar showing; the
@@ -90,6 +99,11 @@ impl gpui::Render for LauncherUI {
                 if this.close_top_overlay() {
                     cx.notify();
                 }
+            }))
+            .on_action(cx.listener(|this, _: &ToggleStreamer, _w, cx| {
+                let on = !this.streamer;
+                this.set_streamer(on, cx);
+                cx.notify();
             }))
     }
 }
@@ -289,7 +303,10 @@ pub fn start(backend_handle: BackendHandle, frontend_recv: FrontendReceiver) {
         .with_assets(assets::AppAssets)
         .run(move |cx: &mut App| {
             let _ = cx.text_system().add_fonts(assets::fonts());
-            cx.bind_keys([gpui::KeyBinding::new("escape", CloseOverlay, None)]);
+            cx.bind_keys([
+                gpui::KeyBinding::new("escape", CloseOverlay, None),
+                gpui::KeyBinding::new(STREAMER_BINDING, ToggleStreamer, None),
+            ]);
             open_window(cx, backend_handle.clone(), frontend_recv.clone());
             cx.activate(true);
         });

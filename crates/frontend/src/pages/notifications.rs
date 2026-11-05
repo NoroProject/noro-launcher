@@ -105,7 +105,11 @@ pub fn panel(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
         return None;
     }
 
-    let cards: Vec<AnyElement> = ui.notifications.iter().map(|n| card(n, cx)).collect();
+    let cards: Vec<AnyElement> = ui
+        .notifications
+        .iter()
+        .map(|n| card(n, ui.streamer, cx))
+        .collect();
     let more = (ui.notifications.len() as i64) < ui.notifications_total;
 
     Some(

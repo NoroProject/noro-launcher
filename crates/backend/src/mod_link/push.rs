@@ -38,6 +38,13 @@ pub fn features(ctx: &Ctx) -> ToMod {
     }
 }
 
+/// Streamer mode on this computer.
+pub fn streamer(ctx: &Ctx) -> ToMod {
+    ToMod::Streamer {
+        on: ctx.streamer.on(),
+    }
+}
+
 /// Who is playing, from the profile the launcher already holds.
 pub fn profile(ctx: &Ctx) -> Option<ToMod> {
     ctx.profile().map(profile_of)

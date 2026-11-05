@@ -71,6 +71,8 @@ impl BackendState {
             | M::SetConsoleSettings { .. }
             | M::SetDiscordRpc { .. }
             | M::SetHideWhilePlaying { .. }
+            | M::SetStreamerMode { .. }
+            | M::SetStreamerAuto { .. }
             | M::SetServerMemory { .. }
             | M::SetServerJvmFlags { .. }
             | M::SetServerShowConsoleOnLaunch { .. }

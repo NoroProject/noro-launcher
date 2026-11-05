@@ -133,6 +133,16 @@ impl ConsoleWindow {
         self.follow();
     }
 
+    /// Streamer mode went on: every line held here is rewritten in place. The
+    /// search may stop matching what it matched, so the list is recounted.
+    pub fn mask_all(&mut self, mask: impl Fn(&str) -> String) {
+        for line in &mut self.logs {
+            line.text = mask(&line.text);
+            line.body = mask(&line.body);
+        }
+        self.refilter();
+    }
+
     pub fn clear(&mut self) {
         self.logs.clear();
         self.visible.clear();

@@ -186,7 +186,14 @@ fn thread_row(ui: &LauncherUI, row: &DmThreadView, active: bool, cx: &mut Cx) ->
                             TEXT_MUTED
                         }))
                         .truncate()
-                        .child(row.preview.clone()),
+                        // The last line of every conversation at once is the
+                        // one thing a viewer could read without the player
+                        // opening anything.
+                        .child(if ui.streamer {
+                            t("streamer-hidden")
+                        } else {
+                            row.preview.clone()
+                        }),
                 ),
         )
         .when(unread > 0, |d| d.child(badge(unread)))

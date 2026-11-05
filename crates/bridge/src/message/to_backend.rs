@@ -92,6 +92,14 @@ pub enum MessageToBackend {
     SetHideWhilePlaying {
         enabled: bool,
     },
+    /// The player switched streamer mode, from settings or by the shortcut.
+    SetStreamerMode {
+        on: bool,
+    },
+    /// Whether a running streaming app switches streamer mode on.
+    SetStreamerAuto {
+        enabled: bool,
+    },
     SetServerMemory {
         server_id: Uuid,
         min_mb: u32,

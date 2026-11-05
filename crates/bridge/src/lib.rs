@@ -9,6 +9,7 @@ pub mod handle;
 pub mod message;
 pub mod modal_action;
 pub mod quit;
+pub mod streamer;
 
 pub use handle::{create_pair, BackendHandle, BackendReceiver, FrontendHandle, FrontendReceiver};
 pub use message::{

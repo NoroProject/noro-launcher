@@ -92,6 +92,7 @@ async fn session(ctx: Ctx, link: ModLink, stream: TcpStream) -> anyhow::Result<(
     link.attach(tx);
     link.send(push::ready(&ctx));
     link.send(push::features(&ctx));
+    link.send(push::streamer(&ctx));
     push::refresh_profile(&ctx, &link).await;
     // The queue goes out immediately: the panel gets opened to pick up the next
     // case.

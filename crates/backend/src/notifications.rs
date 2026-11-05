@@ -82,7 +82,9 @@ pub fn arrived(
     os_toast: bool,
 ) {
     if os_toast {
-        toast(&notification);
+        let private =
+            ctx.streamer.on() && bridge::streamer::private_category(&notification.category);
+        toast(&notification, private);
     }
     ctx.send(MessageToFrontend::NotificationArrived {
         notification: Box::new(notification),
@@ -97,9 +99,15 @@ pub fn arrived(
 /// switched them off at the OS level and a sandbox with no D-Bus all end up
 /// here, and none of them is a reason to log an error — the card is in the
 /// launcher's own panel either way.
-fn toast(notification: &schema::notifications::Notification) {
-    let summary = notification.title.clone();
-    let body = notification.body.clone();
+///
+/// `private` keeps the words out: a system toast lands on top of whatever the
+/// stream shows, game capture included.
+fn toast(notification: &schema::notifications::Notification, private: bool) {
+    let (summary, body) = if private {
+        (i18n::t("streamer-hidden-notification"), String::new())
+    } else {
+        (notification.title.clone(), notification.body.clone())
+    };
     std::thread::spawn(move || {
         let mut builder = notify_rust::Notification::new();
         builder.summary(&summary).appname(&crate::branding::name());

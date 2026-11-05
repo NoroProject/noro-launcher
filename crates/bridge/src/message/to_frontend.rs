@@ -42,6 +42,9 @@ pub enum MessageToFrontend {
         crash_reports_available: bool,
         discord_rpc: bool,
         hide_while_playing: bool,
+        /// Streamer mode as it stands now, however it got there.
+        streamer_mode: bool,
+        streamer_auto: bool,
         master_url: String,
         locale: String,
         server_settings: BTreeMap<Uuid, ClientSettingsState>,
@@ -162,6 +165,12 @@ pub enum MessageToFrontend {
         level: NotifLevel,
     },
     SkinUploadFailed,
+    /// Streamer mode went on or off. `automatic` says a streaming app turned
+    /// it on, which the player is told about: nobody pressed anything.
+    StreamerMode {
+        on: bool,
+        automatic: bool,
+    },
     /// What the instance has switched on, as the master last said. Sent after
     /// every login and whenever an admin flips a switch, so a section comes and
     /// goes without a restart.
