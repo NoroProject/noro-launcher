@@ -93,6 +93,16 @@ fn unknown_frame_is_an_error_not_a_panic() {
     assert!(serde_json::from_value::<ToLauncher>(text).is_err());
 }
 
+/// The Java side reads `messenger` by name; a rename would leave every panel
+/// with the messenger on, whatever the instance says.
+#[test]
+fn features_frame_names_the_switch() {
+    assert_eq!(
+        serde_json::to_value(ToMod::Features { messenger: false }).unwrap(),
+        json!({ "type": "Features", "data": { "messenger": false } })
+    );
+}
+
 /// The box around the card is a Rust detail; it must not show up on the wire.
 #[test]
 fn boxed_case_is_transparent_on_the_wire() {

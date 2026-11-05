@@ -156,6 +156,12 @@ pub enum MessageToFrontend {
         level: NotifLevel,
     },
     SkinUploadFailed,
+    /// What the instance has switched on, as the master last said. Sent after
+    /// every login and whenever an admin flips a switch, so a section comes and
+    /// goes without a restart.
+    FeaturesChanged {
+        messenger: bool,
+    },
     PermissionsUpdated {
         user: UserProfile,
     },

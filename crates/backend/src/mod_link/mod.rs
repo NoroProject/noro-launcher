@@ -127,10 +127,25 @@ impl ModLink {
         self.inner.lock().news.clone()
     }
 
+    /// The master flipped a switch. The panel hears it at once; a messenger
+    /// that came back needs its list, which nobody asked for while it was off.
+    pub fn features_changed(&self, ctx: &Ctx) {
+        if !self.connected() {
+            return;
+        }
+        self.send(push::features(ctx));
+        if ctx.messenger() {
+            let (ctx, link) = (ctx.clone(), self.clone());
+            tokio::spawn(async move { log_failure(social::refresh_chats(&ctx, &link).await) });
+        } else {
+            self.set_open_chat(None);
+        }
+    }
+
     /// A direct message arrived. The list changes either way — previews and
     /// unread counts — and an open conversation is re-read whoever wrote.
     pub fn message_arrived(&self, ctx: &Ctx) {
-        if !self.connected() {
+        if !self.connected() || !ctx.messenger() {
             return;
         }
         let open = self.inner.lock().open_chat;

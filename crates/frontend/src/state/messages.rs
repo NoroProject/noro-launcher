@@ -65,7 +65,8 @@ impl LauncherUI {
             | M::TicketLoaded { .. }
             | M::DmThreadsLoaded { .. }
             | M::DmThreadLoaded { .. }
-            | M::DmArrived { .. }) => self.on_account_message(m),
+            | M::DmArrived { .. }
+            | M::FeaturesChanged { .. }) => self.on_account_message(m),
         }
         cx.notify();
     }

@@ -254,6 +254,9 @@ pub struct LauncherUI {
     /// second it took the master to reply.
     pub account_loaded: HashSet<&'static str>,
     pub dm_loaded: bool,
+    /// The instance has a messenger. On until the master says otherwise; with
+    /// it off the sidebar loses the button and nothing asks for conversations.
+    pub messenger: bool,
     pub news_loaded: bool,
     /// Window placement and the last open server, written on quit.
     pub ui_state: crate::ui_state::UiState,

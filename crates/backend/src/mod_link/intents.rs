@@ -195,6 +195,11 @@ async fn dispatch(
 
 /// The player's panel. Nothing here touches a case.
 async fn social_intent(ctx: &Ctx, link: &ModLink, api: &Api, frame: ToLauncher) -> Answer<()> {
+    // A panel that hasn't heard the switch yet still asks for conversations
+    // as it connects. The master would refuse; there is no need to ask it.
+    if needs_messenger(&frame) && !ctx.messenger() {
+        return Ok(());
+    }
     match frame {
         ToLauncher::RequestNews => match link.news() {
             Some(items) => link.send(ToMod::News {
@@ -256,6 +261,14 @@ async fn social_intent(ctx: &Ctx, link: &ModLink, api: &Api, frame: ToLauncher) 
     Ok(())
 }
 
+/// Intents that only make sense while the instance has a messenger.
+fn needs_messenger(frame: &ToLauncher) -> bool {
+    matches!(
+        frame,
+        ToLauncher::RequestChats | ToLauncher::OpenChat { .. } | ToLauncher::SendChat { .. }
+    )
+}
+
 /// Frame name for `Rejected` — the mod needs it to know which button to undim.
 fn intent_name(frame: &ToLauncher) -> &'static str {
     match frame {
@@ -289,5 +302,30 @@ fn intent_name(frame: &ToLauncher) -> &'static str {
         ToLauncher::ReplyTicket { .. } => "ReplyTicket",
         ToLauncher::SetSilentJoin { .. } => "SetSilentJoin",
         ToLauncher::RequestBadges => "RequestBadges",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Only the conversation intents wait for the messenger. Tickets and news
+    /// sit in the same panel and must keep working with it off.
+    #[test]
+    fn only_conversations_need_the_messenger() {
+        let peer = Uuid::nil();
+        assert!(needs_messenger(&ToLauncher::RequestChats));
+        assert!(needs_messenger(&ToLauncher::OpenChat { peer_id: peer }));
+        assert!(needs_messenger(&ToLauncher::SendChat {
+            peer_id: peer,
+            body: "hi".into()
+        }));
+        assert!(!needs_messenger(&ToLauncher::CloseChat));
+        assert!(!needs_messenger(&ToLauncher::RequestTickets));
+        assert!(!needs_messenger(&ToLauncher::RequestNews));
+        assert!(!needs_messenger(&ToLauncher::ReplyTicket {
+            ticket_id: peer,
+            content: "hi".into()
+        }));
     }
 }

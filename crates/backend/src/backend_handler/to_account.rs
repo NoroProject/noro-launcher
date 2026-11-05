@@ -105,6 +105,12 @@ impl BackendState {
             MessageToBackend::ReplyTicket { id, content } => {
                 crate::account::reply_ticket(&self.ctx, id, content)
             }
+            // With the messenger off the window has no page to ask from; a
+            // request already queued when the switch flipped goes nowhere.
+            MessageToBackend::RequestDmThreads
+            | MessageToBackend::RequestDmThread { .. }
+            | MessageToBackend::SendDm { .. }
+                if !self.ctx.messenger() => {}
             MessageToBackend::RequestDmThreads => crate::account::dm_threads(&self.ctx),
             MessageToBackend::RequestDmThread { peer } => {
                 crate::account::dm_thread(&self.ctx, peer)

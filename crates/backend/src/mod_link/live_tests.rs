@@ -212,5 +212,6 @@ fn ctx_for(master: &str, token: &str) -> Ctx {
         rpc: crate::discord_rpc::spawn_discord_rpc(false),
         mod_link: ModLink::default(),
         profile: Default::default(),
+        features: Default::default(),
     }
 }

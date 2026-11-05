@@ -31,6 +31,13 @@ pub fn ready(ctx: &Ctx) -> ToMod {
     }
 }
 
+/// What the instance has switched on, as the master last said.
+pub fn features(ctx: &Ctx) -> ToMod {
+    ToMod::Features {
+        messenger: ctx.messenger(),
+    }
+}
+
 /// Who is playing, from the profile the launcher already holds.
 pub fn profile(ctx: &Ctx) -> Option<ToMod> {
     ctx.profile().map(profile_of)
