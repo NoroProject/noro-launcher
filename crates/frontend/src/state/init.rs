@@ -144,6 +144,7 @@ impl LauncherUI {
             account_loaded: HashSet::new(),
             dm_loaded: false,
             messenger: true,
+            streamer: false,
             news_loaded: false,
             ui_state: crate::ui_state::load(),
             last_server_restored: false,

@@ -74,6 +74,8 @@ impl LauncherUI {
                 crash_reports_available,
                 discord_rpc,
                 hide_while_playing,
+                streamer_mode,
+                streamer_auto,
                 master_url,
                 locale,
                 server_settings,
@@ -95,12 +97,14 @@ impl LauncherUI {
                     crash_reports_available,
                     discord_rpc,
                     hide_while_playing,
+                    streamer_auto,
                     master_url,
                     console,
                     system_memory_mb,
                     auto_join,
                 };
                 self.server_settings = server_settings.into_iter().collect();
+                self.on_streamer_mode(streamer_mode, false, cx);
                 self.load_preset_renders(cx);
             }
             MessageToFrontend::LocaleCatalog { code, ftl } => {

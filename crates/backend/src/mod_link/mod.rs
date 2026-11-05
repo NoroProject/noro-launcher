@@ -142,6 +142,14 @@ impl ModLink {
         }
     }
 
+    /// Streamer mode went on or off: the panel stops or starts drawing what
+    /// it hides, without waiting for the next reconnect.
+    pub fn streamer_changed(&self, ctx: &Ctx) {
+        if self.connected() {
+            self.send(push::streamer(ctx));
+        }
+    }
+
     /// A direct message arrived. The list changes either way — previews and
     /// unread counts — and an open conversation is re-read whoever wrote.
     pub fn message_arrived(&self, ctx: &Ctx) {

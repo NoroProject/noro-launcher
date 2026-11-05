@@ -96,6 +96,13 @@ pub enum ToMod {
     Features {
         messenger: bool,
     },
+    /// Streamer mode on this computer. Sent right after `Ready` and again on
+    /// every change. While it is on the mod keeps private messages, report
+    /// details and personal data out of what it draws; a mod that never gets
+    /// the frame shows everything, as before.
+    Streamer {
+        on: bool,
+    },
     /// Who is playing. Sent right after `Ready` — the launcher already holds the
     /// profile, so this costs the master nothing.
     Profile {

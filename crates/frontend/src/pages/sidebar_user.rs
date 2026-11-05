@@ -16,6 +16,8 @@ pub fn user_card(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .user
         .as_ref()
         .map(|u| match u.handle() {
+            // The platform handle finds the player on Discord or Telegram.
+            Some(_) if ui.streamer => t("streamer-hidden"),
             Some(name) => format!("@{name}"),
             None => u.username.clone(),
         })

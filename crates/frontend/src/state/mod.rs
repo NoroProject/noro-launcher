@@ -26,6 +26,7 @@ mod messages_sync;
 mod servers;
 mod session;
 mod settings;
+mod streamer;
 mod types;
 
 pub use brand::Brand;
@@ -261,6 +262,9 @@ pub struct LauncherUI {
     /// The instance has a messenger. On until the master says otherwise; with
     /// it off the sidebar loses the button and nothing asks for conversations.
     pub messenger: bool,
+    /// Streamer mode, as the backend last said. Pages read it to leave out
+    /// what is private; the console masks its lines with it.
+    pub streamer: bool,
     pub news_loaded: bool,
     /// Window placement and the last open server, written on quit.
     pub ui_state: crate::ui_state::UiState,

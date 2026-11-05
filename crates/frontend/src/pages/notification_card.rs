@@ -9,12 +9,20 @@ use gpui::{div, prelude::*, px, rgb, rgba, AnyElement, ClickEvent, FontWeight};
 use i18n::t;
 use schema::notifications::{Level, Notification};
 
-pub(super) fn card(n: &Notification, cx: &mut Cx) -> AnyElement {
+/// `streamer` keeps the words of a private card out of the panel: the panel
+/// may well be open on stream. Opening the card still leads to the full text.
+pub(super) fn card(n: &Notification, streamer: bool, cx: &mut Cx) -> AnyElement {
     let id = n.id;
     let unread = !n.read;
     let (icon, colour) = look(n.level);
-    let title = translated(n.title_key.as_deref(), &n.title, &n.args);
-    let body = translated(n.body_key.as_deref(), &n.body, &n.args);
+    let (title, body) = if streamer && bridge::streamer::private_category(&n.category) {
+        (t("streamer-hidden-notification"), t("streamer-hidden-body"))
+    } else {
+        (
+            translated(n.title_key.as_deref(), &n.title, &n.args),
+            translated(n.body_key.as_deref(), &n.body, &n.args),
+        )
+    };
     let link = n.link.clone();
 
     div()

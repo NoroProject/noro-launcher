@@ -90,6 +90,8 @@ pub struct Ctx {
     /// What the master has switched on for the instance. All on until it says
     /// otherwise: a master from before the switches never sends the frame.
     pub(crate) features: Arc<parking_lot::RwLock<schema::InstanceFeatures>>,
+    /// Streamer mode on this computer; see [`crate::streamer`].
+    pub streamer: Arc<crate::streamer::Streamer>,
 }
 
 impl Ctx {
@@ -230,7 +232,10 @@ async fn run(
 
     tracing::info!("using master server: {}", config.get().master_url);
 
-    let rpc = crate::discord_rpc::spawn_discord_rpc(config.get().discord_rpc);
+    // Streamer mode saved as on keeps Discord quiet from the first second,
+    // not from the moment the window has loaded.
+    let streamer_mode = config.get().streamer_mode;
+    let rpc = crate::discord_rpc::spawn_discord_rpc(config.get().discord_rpc && !streamer_mode);
     rpc.update(crate::discord_rpc::DiscordRpcState::Launcher { server_name: None });
 
     let ctx = Ctx {
@@ -246,7 +251,9 @@ async fn run(
         mod_link: crate::mod_link::ModLink::default(),
         profile: Arc::new(parking_lot::RwLock::new(None)),
         features: Default::default(),
+        streamer: Arc::new(crate::streamer::Streamer::new(streamer_mode)),
     };
+    crate::streamer::spawn_watcher(ctx.clone());
 
     let mut state = BackendState {
         ctx,

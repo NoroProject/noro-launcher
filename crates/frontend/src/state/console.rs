@@ -98,6 +98,15 @@ impl LauncherUI {
         lines: Vec<LogEntry>,
         cx: &mut Context<Self>,
     ) {
+        let lines: Vec<LogEntry> = if self.streamer {
+            let hosts = self.streamer_hosts();
+            lines
+                .into_iter()
+                .map(|line| self.stream_safe(line, &hosts))
+                .collect()
+        } else {
+            lines
+        };
         let logs = self.logs.entry(server_id).or_default();
         logs.extend(lines.iter().cloned());
         while logs.len() > MAX_LOG_LINES {

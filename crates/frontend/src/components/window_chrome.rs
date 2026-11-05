@@ -30,6 +30,7 @@ pub fn window_chrome(compact: bool, ui: &LauncherUI, cx: &mut Context<LauncherUI
                 window.start_window_move();
             }
         })
+        .children(super::streamer_pill(ui, cx))
         .children(impersonate_pill(ui, cx))
         .children(update_pill(ui, cx))
         // Windows drags the window itself, from its answer to WM_NCHITTEST;

@@ -55,6 +55,7 @@ mod server_settings_memory;
 mod settings;
 mod settings_panel;
 mod settings_rows;
+mod settings_streamer;
 mod shell;
 mod sidebar;
 mod sidebar_parts;

@@ -103,6 +103,16 @@ fn features_frame_names_the_switch() {
     );
 }
 
+/// The Java side reads `on` by name; a rename would leave the panel showing
+/// private messages on stream.
+#[test]
+fn streamer_frame_names_the_switch() {
+    assert_eq!(
+        serde_json::to_value(ToMod::Streamer { on: true }).unwrap(),
+        json!({ "type": "Streamer", "data": { "on": true } })
+    );
+}
+
 /// The box around the card is a Rust detail; it must not show up on the wire.
 #[test]
 fn boxed_case_is_transparent_on_the_wire() {

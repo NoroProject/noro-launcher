@@ -2199,6 +2199,7 @@ dependencies = [
  "image",
  "open",
  "pulldown-cmark",
+ "regex",
  "reqwest",
  "rust-embed",
  "schema",

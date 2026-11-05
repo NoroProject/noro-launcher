@@ -34,6 +34,14 @@ pub struct LauncherConfig {
     pub discord_rpc: bool,
     /// Minimise the window while the game runs and bring it back after.
     pub hide_while_playing: bool,
+    /// Streamer mode as the player last switched it. Kept so that restarting
+    /// the launcher in the middle of a stream does not reveal anything; the
+    /// automatic switch-on is not saved, it comes back with the streaming app.
+    pub streamer_mode: bool,
+    /// Turn streamer mode on while a streaming app runs. On by default: the
+    /// player who forgot to switch it on is exactly the one it is for.
+    #[serde(default = "default_streamer_auto")]
+    pub streamer_auto: bool,
     /// Per-server overrides for the fields above.
     #[serde(default)]
     pub server_settings: BTreeMap<Uuid, ServerClientSettings>,
@@ -93,6 +101,8 @@ impl Default for LauncherConfig {
             crash_reports: default_crash_reports(),
             discord_rpc: true,
             hide_while_playing: false,
+            streamer_mode: false,
+            streamer_auto: default_streamer_auto(),
             server_settings: BTreeMap::new(),
             selected_build: BTreeMap::new(),
             auto_join: BTreeMap::new(),
@@ -104,6 +114,10 @@ impl Default for LauncherConfig {
 /// Opt-out rather than opt-in — without it we hear about crashes only when
 /// someone writes in.
 fn default_crash_reports() -> bool {
+    true
+}
+
+fn default_streamer_auto() -> bool {
     true
 }
 
