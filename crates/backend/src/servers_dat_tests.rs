@@ -38,6 +38,7 @@ fn build(nodes: Vec<GameServerEntry>) -> ServerEntry {
         game_servers: nodes,
         online: None,
         max_online: None,
+        my_playtime_minutes: None,
     }
 }
 

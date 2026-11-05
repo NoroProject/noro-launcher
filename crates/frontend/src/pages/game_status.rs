@@ -146,5 +146,22 @@ fn tag_row(server: &ServerEntry) -> AnyElement {
         .when(server.limited, |d| {
             d.child(badge(t("game-vip-only"), WARNING))
         })
+        .when_some(playtime_text(server.my_playtime_minutes), |d, text| {
+            d.child(badge(text, TEXT_SECONDARY))
+        })
         .into_any_element()
+}
+
+/// "PLAYED 34 H" — hidden until there is something to show, and for a master
+/// too old to send it.
+fn playtime_text(minutes: Option<i64>) -> Option<String> {
+    let minutes = minutes.filter(|m| *m > 0)?;
+    let mut args = i18n::FluentArgs::new();
+    Some(if minutes < 60 {
+        args.set("minutes", minutes);
+        i18n::t_args("game-playtime-minutes", &args)
+    } else {
+        args.set("hours", minutes / 60);
+        i18n::t_args("game-playtime-hours", &args)
+    })
 }
