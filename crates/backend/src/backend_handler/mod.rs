@@ -79,7 +79,8 @@ impl BackendState {
             | M::RequestScreenshots { .. }
             | M::OpenScreenshot { .. }
             | M::DeleteScreenshot { .. }
-            | M::OpenScreenshotsFolder { .. }) => self.on_settings_request(m).await,
+            | M::OpenScreenshotsFolder { .. }
+            | M::RepairServerFiles { .. }) => self.on_settings_request(m).await,
             m @ (M::SearchCatalog { .. }
             | M::RequestModProject { .. }
             | M::RequestPersonalContent { .. }

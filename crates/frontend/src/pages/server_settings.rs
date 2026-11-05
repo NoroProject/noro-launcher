@@ -71,8 +71,12 @@ fn settings_source(ui: &LauncherUI, server_id: Uuid) -> &'static str {
 }
 
 fn settings_panel(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    // Scrolls rather than clips: on a short window the last rows used to fall
+    // off the bottom with no way to reach them.
     panel()
-        .overflow_hidden()
+        .id("server-settings-scroll")
+        .min_h_0()
+        .overflow_y_scroll()
         .flex()
         .flex_col()
         .child(setting_row(
@@ -122,6 +126,13 @@ fn settings_panel(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
             t("settings-folder"),
             t("settings-folder-hint"),
             folder(ui, server_id, cx),
+            true,
+        ))
+        .child(setting_row(
+            "life-buoy",
+            t("settings-repair"),
+            t("settings-repair-hint"),
+            repair(ui, server_id, cx),
             false,
         ))
         .into_any_element()
@@ -249,5 +260,47 @@ fn folder(_ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
         .items_center()
         .gap(px(10.))
         .child(open_folder_button(server_id, cx))
+        .into_any_element()
+}
+
+/// Two clicks, like the reset: it deletes the build's mods.
+fn repair(ui: &LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
+    let key = format!("repair-{server_id}");
+    let armed = ui.is_armed(&key);
+    div()
+        .id(SharedString::from(key.clone()))
+        .h(px(36.))
+        .px(px(12.))
+        .rounded(px(R_SM))
+        .border_1()
+        .border_color(rgb(if armed { ERROR } else { BORDER }))
+        .bg(rgb(BG_CARD))
+        .hover(|d| d.bg(rgb(BG_CARD_HOV)))
+        .cursor_pointer()
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .child(ic(
+            "life-buoy",
+            14.,
+            if armed { ERROR } else { TEXT_SECONDARY },
+        ))
+        .child(
+            div()
+                .font_family(FONT_PIXEL_ALT)
+                .text_size(px(12.))
+                .text_color(rgb(if armed { ERROR } else { TEXT_SECONDARY }))
+                .child(if armed {
+                    t("common-click-again")
+                } else {
+                    t("settings-repair-button")
+                }),
+        )
+        .on_click(cx.listener(move |this, _e: &ClickEvent, _w, cx| {
+            if this.confirm_or_arm(key.clone(), cx) {
+                this.repair_server_files(server_id, cx);
+            }
+            cx.notify();
+        }))
         .into_any_element()
 }

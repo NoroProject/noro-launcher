@@ -117,6 +117,21 @@ impl LauncherUI {
             .send(MessageToBackend::ResetServerClientSettings { server_id });
     }
 
+    /// A download in progress is writing the same files; the backend only
+    /// knows about a running game, so the window refuses the sync itself.
+    pub fn repair_server_files(&mut self, server_id: Uuid, cx: &mut Context<Self>) {
+        if self.sync.get(&server_id).is_some_and(|s| s.syncing) {
+            self.notify_toast(
+                i18n::t("notif-repair-busy"),
+                schema::NotifLevel::Warning,
+                cx,
+            );
+            return;
+        }
+        self.backend
+            .send(MessageToBackend::RepairServerFiles { server_id });
+    }
+
     pub fn open_server_client_folder(&mut self, server_id: Uuid) {
         self.backend
             .send(MessageToBackend::OpenServerClientFolder { server_id });

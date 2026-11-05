@@ -99,6 +99,9 @@ impl BackendState {
                 }
                 self.send_screenshots(server_id);
             }
+            MessageToBackend::RepairServerFiles { server_id } => {
+                self.repair_server_files(server_id);
+            }
             MessageToBackend::OpenScreenshotsFolder { server_id } => {
                 let folder = screenshots::folder(&self.ctx.dirs.instance(&server_id));
                 let _ = std::fs::create_dir_all(&folder);
@@ -116,6 +119,33 @@ impl BackendState {
         tokio::task::spawn_blocking(move || {
             let items = screenshots::list(&folder);
             ctx.send(MessageToFrontend::Screenshots { server_id, items });
+        });
+    }
+
+    /// The same reinstall an admin can ask for, started by the player: most
+    /// "the game won't start" cases are a half-written or foreign mod, and
+    /// waiting for staff to press a button for it helped nobody.
+    fn repair_server_files(&self, server_id: Uuid) {
+        // Deleting mods under a running JVM breaks the session and leaves the
+        // files half gone.
+        if self.ctx.running.lock().contains_key(&server_id) {
+            self.notify("notif-repair-busy", schema::NotifLevel::Warning);
+            return;
+        }
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            let action = schema::RemoteAction::ReinstallBuild;
+            match crate::remote_actions::run(&ctx.dirs, action, Some(server_id)).await {
+                Ok(outcome) => {
+                    tracing::info!(%server_id, "player repair: {}", outcome.message);
+                    ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-repair-done".into(),
+                        args: Default::default(),
+                        level: schema::NotifLevel::Info,
+                    });
+                }
+                Err(e) => tracing::warn!(error = %format!("{e:#}"), "player repair failed"),
+            }
         });
     }
 }

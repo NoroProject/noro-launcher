@@ -127,6 +127,11 @@ pub enum MessageToBackend {
         server_id: Uuid,
         file_name: String,
     },
+    /// The player's own "repair": the build's mods and install marker go, and
+    /// the next launch fetches the build again. Refused while the game runs.
+    RepairServerFiles {
+        server_id: Uuid,
+    },
     /// Open the `screenshots` folder itself, creating it if the game has not.
     OpenScreenshotsFolder {
         server_id: Uuid,
