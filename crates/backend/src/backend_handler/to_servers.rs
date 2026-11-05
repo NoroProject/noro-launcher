@@ -62,6 +62,7 @@ impl BackendState {
                     self.ctx.send(MessageToFrontend::GameStopped {
                         server_id,
                         exit_ok: true,
+                        hint: None,
                     });
                 }
             }

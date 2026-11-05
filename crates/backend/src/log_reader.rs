@@ -29,6 +29,7 @@ pub async fn spawn_log_reader<R>(
     frontend: bridge::FrontendHandle,
     is_stderr: bool,
     rpc_info: Option<RpcLogContext>,
+    crash_scan: Option<std::sync::Arc<parking_lot::Mutex<crate::crash_hint::CrashScan>>>,
 ) where
     R: AsyncRead + Unpin + Send + 'static,
 {
@@ -71,6 +72,9 @@ pub async fn spawn_log_reader<R>(
 
                     let redacted = redact(line);
                     let (level, clean_text) = classify_log(&redacted, is_stderr);
+                    if let Some(scan) = &crash_scan {
+                        scan.lock().feed(&clean_text);
+                    }
 
                     if let Some(ref ctx) = rpc_info {
                         let lower = clean_text.to_lowercase();
@@ -219,7 +223,7 @@ mod reader_tests {
             let (_brx, _bh, frx, fh) = bridge::create_pair();
             (fh, frx)
         };
-        spawn_log_reader(input, Uuid::nil(), handle, false, None).await;
+        spawn_log_reader(input, Uuid::nil(), handle, false, None, None).await;
         let mut out = Vec::new();
         while let Some(MessageToFrontend::GameLog { lines, .. }) = recv.try_recv() {
             out.extend(lines.into_iter().map(|l| l.text));

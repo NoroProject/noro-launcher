@@ -8,6 +8,7 @@ pub mod backend;
 pub mod backend_handler;
 pub mod catalog_search;
 pub mod config;
+pub mod crash_hint;
 pub mod diagnostics;
 pub mod directories;
 pub mod discord_rpc;

@@ -300,8 +300,14 @@ async fn run_game_process(
     ctx.send(MessageToFrontend::GameStarted { server_id });
     ctx.ws.send(ClientWsMsg::ReportGameStart { server_id });
 
+    // Both pipes feed one scan: the JVM's own complaints come on stderr, the
+    // game's crash report on stdout.
+    let crash_scan = std::sync::Arc::new(parking_lot::Mutex::new(
+        crate::crash_hint::CrashScan::default(),
+    ));
+    let mut readers = Vec::new();
     if let Some(stdout) = child.stdout.take() {
-        tokio::spawn(crate::log_reader::spawn_log_reader(
+        readers.push(tokio::spawn(crate::log_reader::spawn_log_reader(
             stdout,
             server_id,
             ctx.frontend.clone(),
@@ -313,26 +319,43 @@ async fn run_game_process(
                 online_current: online,
                 online_max: max_online,
             }),
-        ));
+            Some(crash_scan.clone()),
+        )));
     }
     if let Some(stderr) = child.stderr.take() {
-        tokio::spawn(crate::log_reader::spawn_log_reader(
+        readers.push(tokio::spawn(crate::log_reader::spawn_log_reader(
             stderr,
             server_id,
             ctx.frontend.clone(),
             true,
             None,
-        ));
+            Some(crash_scan.clone()),
+        )));
     }
 
+    // A stop the player asked for is not a failure: reporting it as one put an
+    // error toast and the console in front of someone who just pressed Stop.
     let exit_ok = tokio::select! {
         status = child.wait() => status.map(|s| s.success()).unwrap_or(false),
         _ = kill_rx.recv() => {
             let _ = child.start_kill();
             let _ = child.wait().await;
-            false
+            true
         }
     };
+
+    // The last lines — the crash report itself — may still be in the pipes when
+    // the process is gone. The pipes close with it, so the wait is short; the cap
+    // is for a child that left a grandchild holding them open.
+    let _ = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        futures::future::join_all(readers),
+    )
+    .await;
+    let hint = (!exit_ok)
+        .then(|| crash_scan.lock().hint())
+        .flatten()
+        .map(|h| h.key().to_string());
 
     // The game is gone, so the channel comes down with it: a handshake file
     // left on disk promises access that no longer exists.
@@ -344,7 +367,11 @@ async fn run_game_process(
         server_id,
         playtime_secs: playtime,
     });
-    ctx.send(MessageToFrontend::GameStopped { server_id, exit_ok });
+    ctx.send(MessageToFrontend::GameStopped {
+        server_id,
+        exit_ok,
+        hint,
+    });
 
     ctx.rpc
         .update(crate::discord_rpc::DiscordRpcState::Launcher {

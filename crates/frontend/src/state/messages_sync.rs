@@ -183,7 +183,11 @@ impl LauncherUI {
                     self.open_console(server_id, cx);
                 }
             }
-            MessageToFrontend::GameStopped { server_id, exit_ok } => {
+            MessageToFrontend::GameStopped {
+                server_id,
+                exit_ok,
+                hint,
+            } => {
                 let s = self.sync.entry(server_id).or_default();
                 s.running = false;
                 s.stopping = false;
@@ -196,7 +200,11 @@ impl LauncherUI {
                     {
                         self.open_console(server_id, cx);
                     }
-                    self.notify_toast(i18n::t("error-game-exited"), NotifLevel::Warning, cx);
+                    let text = match hint {
+                        Some(key) => i18n::t(&key),
+                        None => i18n::t("error-game-exited"),
+                    };
+                    self.notify_toast(text, NotifLevel::Warning, cx);
                 }
             }
             MessageToFrontend::BuildStateChanged { server_id, state } => {

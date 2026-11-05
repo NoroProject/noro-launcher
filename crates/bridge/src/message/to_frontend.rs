@@ -130,6 +130,9 @@ pub enum MessageToFrontend {
     GameStopped {
         server_id: Uuid,
         exit_ok: bool,
+        /// Translation key of advice on why the game died, when the log named
+        /// a cause the launcher recognises.
+        hint: Option<String>,
     },
     /// What the game printed since the last batch, in order. A batch rather
     /// than a line: a modded client prints thousands of lines a second at
