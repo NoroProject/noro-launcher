@@ -17,6 +17,8 @@ pub struct Launch {
     pub enabled_optional: Vec<String>,
     /// The build's card; its game servers end up in the instance's servers.dat.
     pub server: Option<ServerEntry>,
+    /// Aliases of every server the player can reach, for the agent's table.
+    pub aliases: crate::host_aliases::HostAliases,
     pub modal: bridge::ModalAction,
 }
 
@@ -30,6 +32,7 @@ pub fn spawn_sync_and_launch(req: Launch) {
         connect,
         enabled_optional,
         server,
+        aliases,
         modal,
     } = req;
     tokio::spawn(async move {
@@ -187,21 +190,40 @@ pub fn spawn_sync_and_launch(req: Launch) {
             let _ = tokio::fs::remove_file(&legacy_prefix_pack).await;
         }
 
+        let launch_config = ctx
+            .config
+            .get()
+            .launch_config_for_server(&server_id, &manifest.recommended_client_settings);
+
+        // Before servers.dat and the join address: whether they may carry
+        // aliases depends on the agent this launch gets.
+        let (agent, aliases) = match game_runner::prepare_agent(
+            &ctx.http,
+            &launch_config,
+            &ctx.dirs,
+            &instance_dir,
+            &aliases,
+        )
+        .await
+        {
+            Ok(prepared) => prepared,
+            Err(e) => {
+                report_launch_failure(&ctx, server_id, e);
+                return;
+            }
+        };
+        let connect = connect.map(|c| c.via_alias(&aliases));
+
         // After the sync but before the launch: the game reads servers.dat at
         // start and rewrites it on exit. A broken server list is no reason to
         // keep the player out, so failures are only logged.
         if let Some(server) = &server {
-            match crate::servers_dat::sync(&instance_dir, server) {
+            match crate::servers_dat::sync(&instance_dir, server, &aliases) {
                 Ok(true) => tracing::info!("servers.dat updated from the build's game servers"),
                 Ok(false) => {}
                 Err(e) => tracing::warn!("servers.dat not updated: {e}"),
             }
         }
-
-        let launch_config = ctx
-            .config
-            .get()
-            .launch_config_for_server(&server_id, &manifest.recommended_client_settings);
         let server_name = server
             .as_ref()
             .map(|s| s.name.clone())
@@ -237,7 +259,6 @@ pub fn spawn_sync_and_launch(req: Launch) {
         };
 
         match game_runner::launch(
-            &ctx.http,
             &launch_config,
             &ctx.dirs,
             &server_id,
@@ -245,6 +266,7 @@ pub fn spawn_sync_and_launch(req: Launch) {
             &login,
             connect,
             ticket.as_deref(),
+            &agent,
         )
         .await
         {
@@ -253,18 +275,22 @@ pub fn spawn_sync_and_launch(req: Launch) {
             }
             Err(e) => {
                 ctx.mod_link.stop().await;
-                tracing::error!(%server_id, error = %format!("{e:#}"), "launch failed");
-                let key = match crate::failure::sync_failure_key(&e) {
-                    "sync-error-unknown" => crate::failure::LAUNCH_FAILED,
-                    key => key,
-                };
-                ctx.send(MessageToFrontend::SyncFailed {
-                    server_id,
-                    reason: key.into(),
-                    detail: format!("{e:#}"),
-                });
+                report_launch_failure(&ctx, server_id, e);
             }
         }
+    });
+}
+
+fn report_launch_failure(ctx: &Ctx, server_id: Uuid, e: anyhow::Error) {
+    tracing::error!(%server_id, error = %format!("{e:#}"), "launch failed");
+    let key = match crate::failure::sync_failure_key(&e) {
+        "sync-error-unknown" => crate::failure::LAUNCH_FAILED,
+        key => key,
+    };
+    ctx.send(MessageToFrontend::SyncFailed {
+        server_id,
+        reason: key.into(),
+        detail: format!("{e:#}"),
     });
 }
 

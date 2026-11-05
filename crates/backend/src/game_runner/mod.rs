@@ -33,12 +33,35 @@ pub struct LoginInfo {
 pub struct ServerConnect {
     pub host: String,
     pub port: u16,
+    /// `host` is an alias the agent resolves: quick play then leaves the port
+    /// out, and the agent's SRV answer supplies it.
+    pub aliased: bool,
+}
+
+impl ServerConnect {
+    /// The same server under its alias, when it has one in `aliases`.
+    pub fn via_alias(self, aliases: &crate::host_aliases::HostAliases) -> Self {
+        match aliases.alias_of(&self.host, self.port) {
+            Some(alias) => Self {
+                host: alias.to_string(),
+                port: self.port,
+                aliased: true,
+            },
+            None => self,
+        }
+    }
+}
+
+/// authlib-injector as this launch runs it.
+pub struct Agent {
+    pub jar: PathBuf,
+    /// The alias table, when the jar resolves aliases and there are any.
+    pub aliases_file: Option<PathBuf>,
 }
 
 /// Returns the child process with stdout and stderr piped.
 #[allow(clippy::too_many_arguments)]
 pub async fn launch(
-    client: &reqwest::Client,
     config: &LauncherConfig,
     dirs: &LauncherDirectories,
     server_id: &uuid::Uuid,
@@ -46,6 +69,7 @@ pub async fn launch(
     login: &LoginInfo,
     connect: Option<ServerConnect>,
     launch_ticket: Option<&str>,
+    agent: &Agent,
 ) -> Result<Child> {
     let instance_dir = dirs.instance(server_id);
     let natives_dir = dirs.natives(server_id);
@@ -72,7 +96,7 @@ pub async fn launch(
     ));
     cmd.arg(classpath::standard_ignore_list());
 
-    add_authlib(client, config, dirs, &mut cmd).await?;
+    add_authlib(config, agent, &mut cmd);
     if let Some(ticket) = launch_ticket {
         cmd.arg(format!("-Dnoro.launch_ticket={ticket}"));
     }
@@ -163,26 +187,73 @@ async fn write_legacy_classpath(
     Ok(legacy_cp_path)
 }
 
-/// Without the agent the game starts, then fails to join any server with a
-/// session error that points nowhere near the launcher — so a missing agent
-/// stops the launch here, with the reason.
-async fn add_authlib(
-    client: &reqwest::Client,
-    config: &LauncherConfig,
-    dirs: &LauncherDirectories,
-    cmd: &mut Command,
-) -> Result<()> {
-    let authlib = ensure_authlib_injector(client, config, dirs)
-        .await
-        .context("authlib-injector is not available")?;
+fn add_authlib(config: &LauncherConfig, agent: &Agent, cmd: &mut Command) {
+    if let Some(table) = &agent.aliases_file {
+        cmd.arg(format!(
+            "-D{}={}",
+            crate::host_aliases::PROPERTY,
+            table.to_string_lossy()
+        ));
+    }
     // authlib-injector wants the Yggdrasil API root, not the master's root:
     // it fetches the ALI metadata from there and derives the authserver and
     // sessionserver paths from it.
     let master_url = config.master_url.replace("localhost", "127.0.0.1");
     cmd.arg(format!(
         "-javaagent:{}={}/api/yggdrasil",
-        authlib.to_string_lossy(),
+        agent.jar.to_string_lossy(),
         master_url.trim_end_matches('/')
     ));
-    Ok(())
+}
+
+/// Fetches the agent and writes the alias table it will read.
+///
+/// Without the agent the game starts, then fails to join any server with a
+/// session error that points nowhere near the launcher — so a missing agent
+/// stops the launch here, with the reason. A jar that cannot resolve aliases
+/// gets none, and the caller falls back to real addresses.
+pub async fn prepare_agent(
+    client: &reqwest::Client,
+    config: &LauncherConfig,
+    dirs: &LauncherDirectories,
+    instance_dir: &std::path::Path,
+    aliases: &crate::host_aliases::HostAliases,
+) -> Result<(Agent, crate::host_aliases::HostAliases)> {
+    let jar = ensure_authlib_injector(client, config, dirs)
+        .await
+        .context("authlib-injector is not available")?;
+    if aliases.is_empty() {
+        return Ok((
+            Agent {
+                jar,
+                aliases_file: None,
+            },
+            aliases.clone(),
+        ));
+    }
+    let probe = jar.clone();
+    let supported =
+        tokio::task::spawn_blocking(move || crate::host_aliases::agent_resolves_aliases(&probe))
+            .await
+            .unwrap_or(false);
+    if !supported {
+        tracing::warn!(
+            "authlib-injector cannot resolve server aliases; the game gets real addresses"
+        );
+        return Ok((
+            Agent {
+                jar,
+                aliases_file: None,
+            },
+            Default::default(),
+        ));
+    }
+    let table = aliases.write(instance_dir).await?;
+    Ok((
+        Agent {
+            jar,
+            aliases_file: Some(table),
+        },
+        aliases.clone(),
+    ))
 }

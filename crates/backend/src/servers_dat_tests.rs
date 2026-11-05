@@ -15,6 +15,7 @@ fn node(name: &str, host: &str, port: u16, proxy: bool) -> GameServerEntry {
         proxy_id: None,
         proxy_role: None,
         is_default: false,
+        alias: None,
     }
 }
 
@@ -29,6 +30,7 @@ fn build(nodes: Vec<GameServerEntry>) -> ServerEntry {
         // Matches the master: no address at all when there are no game servers.
         mc_host: nodes.first().map(|n| n.mc_host.clone()),
         mc_port: nodes.first().map(|n| n.mc_port),
+        mc_alias: None,
         modloader: Modloader::NeoForge,
         mc_version: "1.21.1".into(),
         current_build_id: None,
@@ -67,13 +69,13 @@ fn writes_game_servers_and_skips_unchanged() {
     let dir = tempdir();
     let server = build(vec![node("Main", "play.example.com", 25565, false)]);
 
-    assert!(sync(&dir, &server).unwrap());
+    assert!(sync(&dir, &server, &HostAliases::default()).unwrap());
     assert_eq!(
         names(&dir),
         vec![("Main".into(), "play.example.com".into())]
     );
     // Nothing changed on the master, so the second pass leaves the file alone.
-    assert!(!sync(&dir, &server).unwrap());
+    assert!(!sync(&dir, &server, &HostAliases::default()).unwrap());
 }
 
 #[test]
@@ -85,7 +87,7 @@ fn proxy_hides_backends_behind_it() {
         node("Creative", "10.0.0.3", 25567, false),
     ]);
 
-    sync(&dir, &server).unwrap();
+    sync(&dir, &server, &HostAliases::default()).unwrap();
 
     assert_eq!(
         names(&dir),
@@ -101,7 +103,7 @@ fn without_proxy_every_node_is_listed() {
         node("Creative", "s2.example.com", 25566, false),
     ]);
 
-    sync(&dir, &server).unwrap();
+    sync(&dir, &server, &HostAliases::default()).unwrap();
 
     let got = names(&dir);
     assert!(got.contains(&("Survival".into(), "s1.example.com".into())));
@@ -117,6 +119,7 @@ fn keeps_player_entries_and_drops_removed_ones() {
     sync(
         &dir,
         &build(vec![node("Old", "old.example.com", 25565, false)]),
+        &HostAliases::default(),
     )
     .unwrap();
 
@@ -129,6 +132,7 @@ fn keeps_player_entries_and_drops_removed_ones() {
     sync(
         &dir,
         &build(vec![node("New", "new.example.com", 25566, false)]),
+        &HostAliases::default(),
     )
     .unwrap();
 
@@ -150,18 +154,21 @@ fn a_missing_file_is_rebuilt_even_when_the_stamp_matches() {
     let dir = tempdir();
     let server = build(vec![node("Main", "create.example.dev", 25565, false)]);
 
-    assert!(sync(&dir, &server).unwrap(), "first run writes the file");
+    assert!(
+        sync(&dir, &server, &HostAliases::default()).unwrap(),
+        "first run writes the file"
+    );
     assert!(dir.join("servers.dat").exists());
 
     assert!(
-        !sync(&dir, &server).unwrap(),
+        !sync(&dir, &server, &HostAliases::default()).unwrap(),
         "same list, nothing to rewrite"
     );
 
     std::fs::remove_file(dir.join("servers.dat")).unwrap();
 
     assert!(
-        sync(&dir, &server).unwrap(),
+        sync(&dir, &server, &HostAliases::default()).unwrap(),
         "missing file has to come back"
     );
     assert!(
@@ -187,11 +194,11 @@ fn the_server_entry_is_identical_across_restarts() {
     let dir = tempdir();
     let server = build(vec![node("Main", "play.example.com", 25565, false)]);
 
-    sync(&dir, &server).unwrap();
+    sync(&dir, &server, &HostAliases::default()).unwrap();
     let first = identity(&dir);
 
     for _ in 0..5 {
-        assert!(!sync(&dir, &server).unwrap());
+        assert!(!sync(&dir, &server, &HostAliases::default()).unwrap());
     }
     assert_eq!(identity(&dir), first);
 }
@@ -204,8 +211,13 @@ fn reordered_nodes_from_the_database_do_not_rewrite_the_file() {
     let a = node("A", "a.example.com", 25565, false);
     let b = node("B", "b.example.com", 25565, false);
 
-    sync(&dir, &build(vec![a.clone(), b.clone()])).unwrap();
-    assert!(!sync(&dir, &build(vec![b, a])).unwrap());
+    sync(
+        &dir,
+        &build(vec![a.clone(), b.clone()]),
+        &HostAliases::default(),
+    )
+    .unwrap();
+    assert!(!sync(&dir, &build(vec![b, a]), &HostAliases::default()).unwrap());
 }
 
 #[test]
@@ -217,12 +229,14 @@ fn renaming_the_server_does_change_the_entry() {
     sync(
         &dir,
         &build(vec![node("Main", "play.example.com", 25565, false)]),
+        &HostAliases::default(),
     )
     .unwrap();
 
     assert!(sync(
         &dir,
-        &build(vec![node("Main Server", "play.example.com", 25565, false)])
+        &build(vec![node("Main Server", "play.example.com", 25565, false)]),
+        &HostAliases::default()
     )
     .unwrap());
     assert_eq!(
@@ -252,4 +266,34 @@ fn xaero_directories_are_protected_from_the_sync() {
             "{path} should be protected from deletion"
         );
     }
+}
+
+#[test]
+fn an_aliased_server_is_listed_under_its_alias_without_a_port() {
+    let dir = tempdir();
+    let mut proxy = node("Proxy", "203.0.113.7", 25577, true);
+    proxy.alias = Some("aoa.example".into());
+    let server = build(vec![proxy, node("Lobby", "lobby.example.com", 25565, true)]);
+    let aliases = HostAliases::from_servers(std::slice::from_ref(&server));
+
+    sync(&dir, &server, &aliases).unwrap();
+    let got = names(&dir);
+    assert!(
+        got.contains(&("Proxy".into(), "aoa.example".into())),
+        "{got:?}"
+    );
+    assert!(
+        got.contains(&("Lobby".into(), "lobby.example.com".into())),
+        "{got:?}"
+    );
+
+    // The alias switched off on the master: the real address replaces the
+    // alias instead of joining it as a second entry.
+    sync(&dir, &server, &HostAliases::default()).unwrap();
+    let got = names(&dir);
+    assert!(
+        got.contains(&("Proxy".into(), "203.0.113.7:25577".into())),
+        "{got:?}"
+    );
+    assert!(!got.iter().any(|(_, ip)| ip == "aoa.example"), "{got:?}");
 }
