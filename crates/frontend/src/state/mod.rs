@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use uuid::Uuid;
 
+mod brand;
 mod console;
 mod gallery;
 mod images;
@@ -27,6 +28,7 @@ mod session;
 mod settings;
 mod types;
 
+pub use brand::Brand;
 pub use console::ConsoleWindow;
 pub use gallery::{Gallery, GALLERY_PAGE};
 pub use types::*;
@@ -174,6 +176,8 @@ pub struct LauncherUI {
     pub console_window: Option<gpui::WindowHandle<ConsoleWindow>>,
     /// The main window, to raise it when the launcher is started again.
     pub main_window: Option<gpui::AnyWindowHandle>,
+    /// The instance's name and logo, as the master gives them.
+    pub brand: Brand,
     /// Closing would stop a running game or download; the window is asking.
     pub close_prompt: bool,
     /// A destructive button clicked once, waiting for the confirming click.

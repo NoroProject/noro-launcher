@@ -4,6 +4,7 @@
 //! disk-shaped runs on the tokio side and the two talk over a pair of mpsc
 //! channels.
 
+pub mod brand;
 pub mod handle;
 pub mod message;
 pub mod modal_action;

@@ -6,6 +6,7 @@ pub mod account;
 pub mod auth;
 pub mod backend;
 pub mod backend_handler;
+pub mod branding;
 pub mod catalog_search;
 pub mod config;
 pub mod crash_hint;

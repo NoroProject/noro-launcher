@@ -57,6 +57,12 @@ pub enum MessageToFrontend {
         code: String,
         ftl: String,
     },
+    /// The instance's name and logo, from the master or from the local cache.
+    Branding {
+        name: String,
+        /// `None` keeps the logo the launcher ships with.
+        logo_url: Option<String>,
+    },
     OptionalMods {
         server_id: Uuid,
         mods: Vec<OptionalModInfo>,

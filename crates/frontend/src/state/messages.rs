@@ -56,6 +56,7 @@ impl LauncherUI {
             | M::CapesList { .. }
             | M::SkinPresetsList { .. }) => self.on_content_message(m, cx),
             M::Screenshots { server_id, items } => self.on_screenshots(server_id, items, cx),
+            M::Branding { name, logo_url } => self.on_branding(name, logo_url, cx),
             m @ (M::NotificationFeed { .. }
             | M::NotificationArrived { .. }
             | M::UnreadChanged { .. }

@@ -151,9 +151,11 @@ fn update_activity(
     launcher_start_time: i64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut act = activity::Activity::new();
+    // The network's name, not the product's: friends see where the player is.
+    let brand = crate::branding::name();
     let assets = activity::Assets::new()
         .large_image("logo")
-        .large_text("NORO Launcher");
+        .large_text(&brand);
 
     // In the player's language: friends reading the status mostly share it.
     // The catalog is the process-wide one the window switches.
@@ -164,7 +166,9 @@ fn update_activity(
     };
     let (details, state_str, start_ts) = match state {
         DiscordRpcState::Launcher { server_name } => {
-            let details = i18n::t("rpc-in-launcher");
+            let mut args = i18n::FluentArgs::new();
+            args.set("instance", brand.clone());
+            let details = i18n::t_args("rpc-in-launcher", &args);
             let state_str = match server_name {
                 Some(name) => named("rpc-server", name),
                 None => i18n::t("rpc-picking-server"),
