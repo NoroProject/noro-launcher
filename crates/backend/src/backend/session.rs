@@ -143,6 +143,9 @@ pub(super) async fn check_launcher_update(ctx: Ctx) {
     else {
         return;
     };
+    // Every start makes this request, signed in or not, which makes it the
+    // one place that is sure to hear about a move of the master.
+    crate::master_move::follow(&ctx, &r);
     let Ok(v) = r.json::<serde_json::Value>().await else {
         return;
     };

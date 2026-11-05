@@ -20,6 +20,7 @@ pub mod impersonation;
 mod log_line;
 pub mod log_reader;
 pub mod master_api;
+pub mod master_move;
 pub mod mod_icon;
 pub mod mod_link;
 pub mod notifications;

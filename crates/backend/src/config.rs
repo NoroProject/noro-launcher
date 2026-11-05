@@ -14,6 +14,10 @@ use uuid::Uuid;
 #[serde(default)]
 pub struct LauncherConfig {
     pub master_url: String,
+    /// Origins the master announced it has left (see [`crate::master_move`]).
+    /// An installed bootstrapper keeps handing one of these over on every
+    /// start, and taking it would undo the move.
+    pub master_moved_from: Vec<String>,
     #[serde(default = "default_locale")]
     pub locale: String,
     pub memory_min_mb: u32,
@@ -79,6 +83,7 @@ impl Default for LauncherConfig {
     fn default() -> Self {
         Self {
             master_url: default_master_url(),
+            master_moved_from: Vec::new(),
             locale: default_locale(),
             memory_min_mb: DEFAULT_MEMORY_MIN_MB,
             memory_max_mb: DEFAULT_MEMORY_MAX_MB,
@@ -270,6 +275,9 @@ impl LauncherConfig {
     /// address has to go to that address — before this, it kept knocking on the
     /// one written down the first time it ever started, and the only cure was
     /// deleting the config by hand.
+    ///
+    /// The one exception is an address the master has announced it left: a
+    /// bootstrapper installed before the move hands that one over forever.
     pub fn adopt_stamped_master(&mut self) -> Option<String> {
         if cfg!(debug_assertions) && std::env::var_os("NORO_MASTER_URL").is_none() {
             let dev_url = "http://127.0.0.1:8080";
@@ -278,8 +286,12 @@ impl LauncherConfig {
             }
             return None;
         }
-        let stamped = stamped_master_url()?;
-        if stamped == self.master_url {
+        self.adopt_master(stamped_master_url()?)
+    }
+
+    /// [`Self::adopt_stamped_master`] once the address is known.
+    pub fn adopt_master(&mut self, stamped: String) -> Option<String> {
+        if stamped == self.master_url || self.moved_away_from(&stamped) {
             return None;
         }
         Some(std::mem::replace(&mut self.master_url, stamped))

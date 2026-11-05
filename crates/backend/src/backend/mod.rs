@@ -186,6 +186,14 @@ async fn run(
             tracing::info!("migrated config: localhost -> 127.0.0.1");
         }
     });
+    {
+        let c = config.get();
+        crate::master_move::sync_bootstrap(
+            &dirs.bootstrap_file(),
+            &c.master_url,
+            &c.master_moved_from,
+        );
+    }
     let optional = Persistent::<OptionalModsSelection>::load(dirs.optional_mods_file());
     let http = crate::http::client()?;
 
