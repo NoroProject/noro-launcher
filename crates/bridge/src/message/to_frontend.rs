@@ -227,6 +227,11 @@ pub enum MessageToFrontend {
         server_id: Uuid,
         items: Vec<schema::personal::PersonalItem>,
     },
+    /// The player's own mod suggestions for a server, newest first.
+    MySuggestions {
+        server_id: Uuid,
+        items: Vec<schema::MyModSuggestion>,
+    },
     ContentVersions {
         provider: String,
         project_id: String,

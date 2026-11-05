@@ -60,6 +60,7 @@ impl BackendState {
             | M::SetOptionalMods { .. }
             | M::SelectBuild { .. }
             | M::SuggestOptionalMod { .. }
+            | M::RequestMySuggestions { .. }
             | M::RequestJavaRuntimes { .. }
             | M::SetJavaRuntime { .. }) => self.on_server_request(m).await,
             m @ (M::SetMemory { .. }

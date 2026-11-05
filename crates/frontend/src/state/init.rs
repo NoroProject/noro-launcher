@@ -75,6 +75,7 @@ impl LauncherUI {
             allow_mod_suggestions: HashMap::new(),
             allow_personal_content: HashMap::new(),
             suggested_mods: HashSet::new(),
+            my_suggestions: HashMap::new(),
             background_images: HashMap::new(),
             news_images: HashMap::new(),
             news_excerpts: HashMap::new(),

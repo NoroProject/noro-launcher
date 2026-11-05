@@ -45,6 +45,9 @@ impl LauncherUI {
                     self.mod_project = Some(project);
                 }
             }
+            MessageToFrontend::MySuggestions { server_id, items } => {
+                self.my_suggestions.insert(server_id, items);
+            }
             MessageToFrontend::PersonalContent { server_id, items } => {
                 self.personal_content.insert(server_id, items);
                 self.content_busy = false;

@@ -47,6 +47,7 @@ mod profile_user;
 mod remote_action_dialog;
 mod server_mod_catalog;
 mod server_mods;
+mod server_mods_suggestions;
 mod server_screenshots;
 mod server_settings;
 mod server_settings_header;

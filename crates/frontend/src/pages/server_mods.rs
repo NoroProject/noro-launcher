@@ -19,6 +19,13 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
     for icon_url in icons {
         ui.ensure_optional_mod_icon_loaded(Some(icon_url), cx);
     }
+    // Once per visit, not "while the list is empty": the empty entry is the
+    // flag, so an empty answer does not turn into a request per frame.
+    if let std::collections::hash_map::Entry::Vacant(slot) = ui.my_suggestions.entry(server_id) {
+        slot.insert(Vec::new());
+        ui.backend
+            .send(bridge::MessageToBackend::RequestMySuggestions { server_id });
+    }
     // Borrowed for the rest of the frame: the list used to be cloned whole,
     // descriptions and all, on every redraw.
     let ui = &*ui;
@@ -44,7 +51,17 @@ pub fn page(ui: &mut LauncherUI, server_id: Uuid, cx: &mut Cx) -> AnyElement {
                 .flex_col()
                 .gap(px(16.))
                 .child(page_header(ui, server_id, mods, cx))
-                .child(mod_list(ui, server_id, mods, cx)),
+                .child(
+                    div()
+                        .id("mods-scroll")
+                        .flex_1()
+                        .overflow_y_scroll()
+                        .flex()
+                        .flex_col()
+                        .gap(px(24.))
+                        .child(mod_list(ui, server_id, mods, cx))
+                        .children(super::server_mods_suggestions::section(ui, server_id)),
+                ),
         )
         .into_any_element()
 }

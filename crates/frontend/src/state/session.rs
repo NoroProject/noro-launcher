@@ -99,6 +99,7 @@ impl LauncherUI {
         self.custom_presets.clear();
         self.personal_content.clear();
         self.suggested_mods.clear();
+        self.my_suggestions.clear();
     }
 
     /// Closes whatever sits on top; false when nothing was open.

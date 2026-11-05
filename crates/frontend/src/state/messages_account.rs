@@ -32,6 +32,11 @@ impl LauncherUI {
                 // replaces it: the master collapses repeats into one row with a
                 // counter, and keeping the old copy would show both.
                 self.notifications.retain(|n| n.id != notification.id);
+                // A decision on a suggestion: the mods page asks again on its
+                // next visit instead of showing the stale status.
+                if notification.category == schema::notifications::categories::SUGGESTIONS {
+                    self.my_suggestions.clear();
+                }
                 self.notifications.insert(0, *notification);
                 self.unread = unread;
             }

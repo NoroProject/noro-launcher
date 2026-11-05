@@ -128,6 +128,10 @@ pub struct LauncherUI {
     /// "Mods" tab at all: a button that leads to a refusal is worse than none.
     pub allow_personal_content: HashMap<Uuid, bool>,
     pub suggested_mods: HashSet<String>,
+    /// The player's own suggestions per server. An entry — even an empty one —
+    /// means "asked already": the mods page requests it once per visit, and an
+    /// empty answer must not look like "not asked yet".
+    pub my_suggestions: HashMap<Uuid, Vec<schema::MyModSuggestion>>,
     pub background_images: HashMap<Uuid, Arc<RenderImage>>,
     pub news_images: HashMap<Uuid, Arc<Image>>,
     /// Card text per post, made when the news arrive: parsing every post's

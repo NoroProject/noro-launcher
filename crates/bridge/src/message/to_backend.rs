@@ -36,6 +36,10 @@ pub enum MessageToBackend {
         server_id: uuid::Uuid,
         build_id: Option<uuid::Uuid>,
     },
+    /// The player's own suggestions for this server, with what became of them.
+    RequestMySuggestions {
+        server_id: Uuid,
+    },
     SuggestOptionalMod {
         server_id: Uuid,
         build_id: Option<Uuid>,

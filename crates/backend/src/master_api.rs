@@ -215,6 +215,17 @@ impl MasterApi {
             .map(|_| ())
     }
 
+    /// The last suggestions of this player for one server. One page is
+    /// enough: the screen shows what is recent, the full list is in the cabinet.
+    pub async fn my_suggestions(&self, server_id: Uuid) -> Result<Vec<schema::MyModSuggestion>> {
+        let page: Page<schema::MyModSuggestion> = self
+            .get(&format!(
+                "/api/mod-suggestions/mine?server_id={server_id}&limit=20"
+            ))
+            .await?;
+        Ok(page.items)
+    }
+
     // ── Launcher housekeeping ───────────────────────────────────────────────
 
     /// Trades a grant the player confirmed for a session in their account.

@@ -118,11 +118,15 @@ impl BackendState {
                         "description": description,
                     });
                     match api.suggest_mod(&body).await {
-                        Ok(()) => ctx.send(MessageToFrontend::AddNotification {
-                            key: "notif-mod-suggestion-sent".into(),
-                            args: std::collections::BTreeMap::new(),
-                            level: schema::NotifLevel::Info,
-                        }),
+                        Ok(()) => {
+                            ctx.send(MessageToFrontend::AddNotification {
+                                key: "notif-mod-suggestion-sent".into(),
+                                args: std::collections::BTreeMap::new(),
+                                level: schema::NotifLevel::Info,
+                            });
+                            // The new one belongs in "my suggestions" right away.
+                            send_my_suggestions(&ctx, &api, server_id).await;
+                        }
                         Err(e) => ctx.send(MessageToFrontend::AddNotification {
                             key: "notif-mod-suggestion-failed".into(),
                             args: [("reason".to_string(), format!("{e:#}"))].into(),
@@ -130,6 +134,13 @@ impl BackendState {
                         }),
                     }
                 });
+            }
+            MessageToBackend::RequestMySuggestions { server_id } => {
+                let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
+                    return;
+                };
+                let ctx = self.ctx.clone();
+                tokio::spawn(async move { send_my_suggestions(&ctx, &api, server_id).await });
             }
             MessageToBackend::RequestJavaRuntimes { server_id } => {
                 crate::personal::request_java(&self.ctx, server_id)
@@ -140,5 +151,20 @@ impl BackendState {
             } => crate::personal::set_java(&self.ctx, server_id, component),
             _ => {}
         }
+    }
+}
+
+/// Fetch the player's suggestions for a server and hand them to the window.
+///
+/// A failure is logged and nothing is sent: the section simply stays as it
+/// was, which is better than a toast about a list nobody asked to see.
+async fn send_my_suggestions(
+    ctx: &crate::backend::Ctx,
+    api: &crate::master_api::MasterApi,
+    server_id: Uuid,
+) {
+    match api.my_suggestions(server_id).await {
+        Ok(items) => ctx.send(MessageToFrontend::MySuggestions { server_id, items }),
+        Err(e) => tracing::warn!(error = %format!("{e:#}"), "could not load my mod suggestions"),
     }
 }

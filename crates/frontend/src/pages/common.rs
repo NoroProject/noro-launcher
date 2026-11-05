@@ -78,6 +78,9 @@ pub fn tabs(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             move |this, cx| {
                 if let Some(id) = sid {
                     this.open_server(id);
+                    // A fresh look at "my suggestions" on every visit: a decision
+                    // may have landed while the player was elsewhere.
+                    this.my_suggestions.remove(&id);
                     this.page = crate::state::Page::ServerMods(id);
                     cx.notify();
                 }

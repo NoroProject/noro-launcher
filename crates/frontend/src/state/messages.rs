@@ -49,6 +49,7 @@ impl LauncherUI {
             | M::CatalogFailed { .. }
             | M::ModProjectLoaded { .. }
             | M::PersonalContent { .. }
+            | M::MySuggestions { .. }
             | M::ContentVersions { .. }
             | M::ContentActionFailed { .. }
             | M::SkinUploadFailed
