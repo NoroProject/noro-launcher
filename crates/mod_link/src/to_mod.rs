@@ -89,6 +89,13 @@ pub enum ToMod {
     OwnPunishments {
         punishments: Vec<OwnPunishment>,
     },
+    /// What the instance has switched on. Sent right after `Ready` and again
+    /// whenever an admin flips a switch. A mod that never gets it keeps every
+    /// section; one that gets `messenger: false` hides the conversations and
+    /// stops asking for them.
+    Features {
+        messenger: bool,
+    },
     /// Who is playing. Sent right after `Ready` — the launcher already holds the
     /// profile, so this costs the master nothing.
     Profile {

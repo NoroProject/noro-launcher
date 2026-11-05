@@ -39,6 +39,36 @@ pub enum Page {
     Messages,
 }
 
+impl Page {
+    /// Where the window stands once the instance has (or hasn't) a messenger.
+    /// The conversations page has nothing to show without one, so the player
+    /// is taken to the server list rather than left on an empty screen.
+    pub fn with_messenger(self, messenger: bool) -> Page {
+        match self {
+            Page::Messages if !messenger => Page::Servers,
+            page => page,
+        }
+    }
+}
+
+#[cfg(test)]
+mod page_tests {
+    use super::Page;
+
+    #[test]
+    fn turning_the_messenger_off_leaves_the_conversations_page() {
+        assert!(Page::Messages.with_messenger(false) == Page::Servers);
+        assert!(Page::Messages.with_messenger(true) == Page::Messages);
+    }
+
+    #[test]
+    fn other_pages_stay_where_they_are() {
+        for page in [Page::Servers, Page::News, Page::Account, Page::Settings] {
+            assert!(page.clone().with_messenger(false) == page);
+        }
+    }
+}
+
 /// Which of the account page's three lists is showing.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum AccountTab {

@@ -79,6 +79,17 @@ impl LauncherUI {
                 self.dm_scroll.scroll_to_bottom();
                 self.compose.clear();
             }
+            MessageToFrontend::FeaturesChanged { messenger } => {
+                self.messenger = messenger;
+                if !messenger {
+                    self.dm_threads.clear();
+                    self.dm_open = None;
+                    self.dm_loaded = false;
+                }
+                // Turned back on, the page asks for the list again when opened.
+                self.dm_requested = false;
+                self.page = self.page.clone().with_messenger(messenger);
+            }
             MessageToFrontend::DmArrived { peer, message } => {
                 // Only into the conversation that is open. The list of threads
                 // is refetched instead: its previews and unread counts are the

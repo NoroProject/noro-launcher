@@ -19,6 +19,11 @@ use gpui::{
 use i18n::t;
 
 pub fn page(ui: &mut LauncherUI, cx: &mut Cx) -> AnyElement {
+    // The switch moves the window off this page; this guards the frame between
+    // the two, so nothing asks a master that would only refuse.
+    if !ui.messenger {
+        return div().into_any_element();
+    }
     // Once on entry, not "while the list is empty": this runs every frame, and
     // an account with no conversations would ask for them sixty times a second.
     if !ui.dm_requested {
@@ -367,5 +372,8 @@ fn bubble(ui: &LauncherUI, open: &DmThreadOpen, m: &DmMessageView) -> AnyElement
 
 /// Unread across every conversation — the dot on the sidebar button.
 pub fn unread_total(ui: &LauncherUI) -> i64 {
+    if !ui.messenger {
+        return 0;
+    }
     ui.dm_threads.iter().map(|t| t.unread).sum()
 }

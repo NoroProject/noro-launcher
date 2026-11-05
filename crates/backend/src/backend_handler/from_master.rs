@@ -27,7 +27,19 @@ impl BackendState {
             ServerWsMsg::PersonalContentChanged { server_id } => {
                 crate::personal::request(&self.ctx, server_id)
             }
+            ServerWsMsg::InstanceFeatures { features } => {
+                self.ctx.set_features(features);
+                self.ctx.send(MessageToFrontend::FeaturesChanged {
+                    messenger: features.messenger,
+                });
+                self.ctx.mod_link.features_changed(&self.ctx);
+            }
             ServerWsMsg::DirectMessage { message } => {
+                // The master stops sending these once the messenger is off; one
+                // already in flight when the switch flipped is dropped here.
+                if !self.ctx.messenger() {
+                    return;
+                }
                 self.ctx.mod_link.message_arrived(&self.ctx);
                 let mine = self.user.as_ref().map(|u| u.id) == Some(message.author_id);
                 self.ctx.send(MessageToFrontend::DmArrived {

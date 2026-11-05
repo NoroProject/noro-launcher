@@ -100,17 +100,21 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
         .when(!collapsed, |d| d.justify_between())
         .gap(px(2.))
         .child(super::notifications::bell(ui, cx))
-        .child(dot_icon(
-            "messages-bottom",
-            "mail",
-            t("hint-messages"),
-            ui.page == Page::Messages,
-            super::messages::unread_total(ui) > 0,
-            cx.listener(|this, _e: &ClickEvent, _w, cx| {
-                this.page = Page::Messages;
-                cx.notify();
-            }),
-        ))
+        // No messenger on the instance, no button: one that opens an empty page
+        // reads as a broken launcher.
+        .when(ui.messenger, |d| {
+            d.child(dot_icon(
+                "messages-bottom",
+                "mail",
+                t("hint-messages"),
+                ui.page == Page::Messages,
+                super::messages::unread_total(ui) > 0,
+                cx.listener(|this, _e: &ClickEvent, _w, cx| {
+                    this.page = Page::Messages;
+                    cx.notify();
+                }),
+            ))
+        })
         .child(nav_icon(
             "account-bottom",
             "shield",

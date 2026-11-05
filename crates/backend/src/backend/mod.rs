@@ -87,6 +87,9 @@ pub struct Ctx {
     /// from a background task, and dragging all of `BackendState` there isn't
     /// worth it.
     pub(crate) profile: Arc<parking_lot::RwLock<Option<UserProfile>>>,
+    /// What the master has switched on for the instance. All on until it says
+    /// otherwise: a master from before the switches never sends the frame.
+    pub(crate) features: Arc<parking_lot::RwLock<schema::InstanceFeatures>>,
 }
 
 impl Ctx {
@@ -100,6 +103,16 @@ impl Ctx {
 
     pub fn set_profile(&self, user: Option<UserProfile>) {
         *self.profile.write() = user;
+    }
+
+    /// Whether direct messages exist on this instance. Read from memory only:
+    /// the master pushes the switch, nobody polls for it.
+    pub fn messenger(&self) -> bool {
+        self.features.read().messenger
+    }
+
+    pub fn set_features(&self, features: schema::InstanceFeatures) {
+        *self.features.write() = features;
     }
 }
 
@@ -232,6 +245,7 @@ async fn run(
         rpc,
         mod_link: crate::mod_link::ModLink::default(),
         profile: Arc::new(parking_lot::RwLock::new(None)),
+        features: Default::default(),
     };
 
     let mut state = BackendState {
