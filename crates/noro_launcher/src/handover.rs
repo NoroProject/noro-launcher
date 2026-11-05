@@ -1,7 +1,7 @@
 //! Starting core: the arguments it is handed and how the process is replaced.
 
 use crate::failure::{Failure, Kind};
-use crate::{bootstrap_file, log, verify};
+use crate::{bootstrap_file, embedded_config, log, verify};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -22,6 +22,8 @@ fn prepare_core_cmd(path: &Path, app_dir: &Path) -> std::process::Command {
     let mut cmd = std::process::Command::new(path);
     cmd.args(std::env::args_os().skip(1));
     cmd.env("NORO_MASTER_URL", &master_url);
+    // Core shows it until the master answers with the current one.
+    cmd.env("NORO_INSTANCE_NAME", embedded_config::instance_name());
     if !pubkey.is_empty() {
         cmd.env("NORO_SIGNING_PUBKEY", &pubkey);
     }
