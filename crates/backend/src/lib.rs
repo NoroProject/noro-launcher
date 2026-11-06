@@ -10,6 +10,7 @@ pub mod branding;
 pub mod catalog_search;
 pub mod config;
 pub mod crash_hint;
+pub mod data_location;
 pub mod diagnostics;
 pub mod directories;
 pub mod discord_rpc;
