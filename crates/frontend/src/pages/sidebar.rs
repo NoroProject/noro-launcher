@@ -141,7 +141,7 @@ fn nav_row(ui: &LauncherUI, collapsed: bool, cx: &mut Cx) -> AnyElement {
             t("hint-settings"),
             ui.page == Page::Settings,
             cx.listener(|this, _e: &ClickEvent, _w, cx| {
-                this.page = Page::Settings;
+                this.open_settings();
                 cx.notify();
             }),
         ))

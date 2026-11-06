@@ -17,6 +17,8 @@ pub fn dialog(ui: &LauncherUI, cx: &mut Cx) -> Option<AnyElement> {
     let game_running = ui.sync.values().any(|s| s.running);
     let body = if game_running {
         t("close-prompt-game")
+    } else if ui.data.moving() {
+        t("close-prompt-data-move")
     } else {
         t("close-prompt-download")
     };

@@ -32,7 +32,7 @@ mod types;
 
 pub use brand::Brand;
 pub use console::ConsoleWindow;
-pub use data_location::DataUi;
+pub use data_location::{data_text, size_text, DataUi};
 pub use gallery::{Gallery, GALLERY_PAGE};
 pub use types::*;
 

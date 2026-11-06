@@ -150,7 +150,7 @@ fn update_pill(ui: &LauncherUI, cx: &mut Context<LauncherUI>) -> Option<AnyEleme
                     .child(i18n::t_args("update-pill", &args)),
             )
             .on_click(cx.listener(|this, _e, _w, cx| {
-                this.page = crate::state::Page::Settings;
+                this.open_settings();
                 cx.notify();
             }))
             .into_any_element(),

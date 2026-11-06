@@ -1,6 +1,7 @@
 //! Global launcher settings, as opposed to the per-server tabs.
 
 use super::common::{panel, Cx};
+use super::settings_data::data_panel;
 use super::settings_panel::settings_panel;
 use super::settings_rows::row;
 use super::settings_streamer::streamer_panel;
@@ -20,6 +21,10 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .child(header())
         .child(
             div()
+                // The folder section can grow by a confirmation and a progress
+                // block; on a short window the page has to scroll to them.
+                .id("settings-scroll")
+                .overflow_y_scroll()
                 .flex_1()
                 .min_h_0()
                 .px(px(32.))
@@ -33,6 +38,7 @@ pub fn page(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
                         .flex_col()
                         .gap(px(16.))
                         .child(settings_panel(ui, cx))
+                        .child(data_panel(ui, cx))
                         .child(streamer_panel(ui, cx))
                         .when_some(ui.update_available.clone(), |d, v| {
                             let progress = ui.update_modal.as_ref().map(|m| m.snapshot());
