@@ -17,6 +17,10 @@ impl BackendState {
             });
             return;
         }
+        if let Some(reason) = self.data_blocker() {
+            refuse_launch(&self.ctx, server_id, &modal, reason);
+            return;
+        }
         if self.ctx.running.lock().contains_key(&server_id) {
             self.ctx.send(MessageToFrontend::AddNotification {
                 key: "notif-already-running".into(),
@@ -74,12 +78,24 @@ impl BackendState {
             });
             return;
         };
+        // Checked again: a move may have started while the manifest was on
+        // its way. Held until the game exits.
+        let data_use = match self.data_blocker() {
+            None => self.ctx.data_use.enter(),
+            Some(_) => None,
+        };
+        let Some(data_use) = data_use else {
+            let reason = self.data_blocker().unwrap_or("data-move-launch-blocked");
+            refuse_launch(&self.ctx, server_id, &modal, reason);
+            return;
+        };
         let enabled = crate::sync::file_sync::resolve_enabled(
             &manifest,
             self.ctx.optional.get().for_server(&server_id),
         );
         let connect = self.server_connect(&server_id);
         spawn_sync_and_launch(crate::backend::Launch {
+            data_use,
             ctx: self.ctx.clone(),
             server_id,
             manifest,
@@ -282,4 +298,20 @@ impl BackendState {
                 },
             });
     }
+}
+
+/// The game files folder is away or being moved: the launch stops before it
+/// writes anything there.
+fn refuse_launch(
+    ctx: &crate::backend::Ctx,
+    server_id: Uuid,
+    modal: &bridge::ModalAction,
+    reason: &str,
+) {
+    modal.fail(reason);
+    ctx.send(MessageToFrontend::SyncFailed {
+        server_id,
+        reason: reason.into(),
+        detail: String::new(),
+    });
 }

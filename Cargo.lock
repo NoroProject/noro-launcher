@@ -4110,10 +4110,8 @@ version = "2.0.21"
 dependencies = [
  "backend",
  "bridge",
- "dirs 5.0.1",
  "frontend",
  "fs2",
- "schema",
  "tokio",
  "tokio-util",
  "tracing",

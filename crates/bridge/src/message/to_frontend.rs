@@ -307,6 +307,27 @@ pub enum MessageToFrontend {
         message: DmMessageView,
     },
 
+    /// Where the game files are and in what state; at start, after every
+    /// change, and with the size when the settings page asks.
+    DataLocation {
+        view: DataLocationView,
+    },
+    DataMovePlanned {
+        plan: DataMovePlan,
+    },
+    /// A translation key with its arguments. Byte counts go as plain numbers
+    /// under `need`, `free` and `size`, for the window to format.
+    DataMoveRefused {
+        key: String,
+        args: BTreeMap<String, String>,
+    },
+    DataMoveProgress {
+        progress: DataMoveProgress,
+    },
+    DataMoveFinished {
+        outcome: DataMoveOutcome,
+    },
+
     OpenOrFocusMainWindow,
     CloseModal,
     Quit,

@@ -138,7 +138,7 @@ impl LauncherUI {
     /// Whether the window may close now. With a game running or a download in
     /// flight it may not: closing would stop them, so the window asks first.
     pub fn request_close(&mut self) -> bool {
-        let busy = self.sync.values().any(|s| s.running || s.syncing);
+        let busy = self.data.moving() || self.sync.values().any(|s| s.running || s.syncing);
         if busy {
             self.close_prompt = true;
         }

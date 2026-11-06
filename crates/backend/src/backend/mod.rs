@@ -92,6 +92,8 @@ pub struct Ctx {
     pub(crate) features: Arc<parking_lot::RwLock<schema::InstanceFeatures>>,
     /// Streamer mode on this computer; see [`crate::streamer`].
     pub streamer: Arc<crate::streamer::Streamer>,
+    /// Syncs, games and repairs in the data root, and a move of it.
+    pub data_use: Arc<crate::data_location::DataUse>,
 }
 
 impl Ctx {
@@ -209,6 +211,9 @@ async fn run(
             &c.master_moved_from,
         );
     }
+    // Before anything asks for an instance path; whether it is there is
+    // checked once the window can be told (`data_startup`).
+    dirs.set_data_root(config.get().data_dir.as_deref());
     let optional = Persistent::<OptionalModsSelection>::load(dirs.optional_mods_file());
     let http = crate::http::client()?;
 
@@ -252,6 +257,7 @@ async fn run(
         profile: Arc::new(parking_lot::RwLock::new(None)),
         features: Default::default(),
         streamer: Arc::new(crate::streamer::Streamer::new(streamer_mode)),
+        data_use: Default::default(),
     };
     crate::streamer::spawn_watcher(ctx.clone());
 
@@ -282,6 +288,7 @@ async fn run(
     // window should be in the player's language from the first frame rather
     // than after the master answers.
     state.send_config_state();
+    crate::backend_handler::data_startup(&state.ctx);
     crate::translations::refresh(&state.ctx, state.ctx.config.get().locale);
     crate::branding::refresh(&state.ctx);
     state.load_offline_cache();

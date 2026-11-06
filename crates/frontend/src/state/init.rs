@@ -107,6 +107,7 @@ impl LauncherUI {
             console_window: None,
             main_window: None,
             close_prompt: false,
+            data: DataUi::default(),
             armed_action: None,
 
             notifications: Vec::new(),

@@ -14,6 +14,7 @@ pub mod streamer;
 pub use handle::{create_pair, BackendHandle, BackendReceiver, FrontendHandle, FrontendReceiver};
 pub use message::{
     AutoJoin, BuildState, CatalogHitInfo, ClientSettingsState, ConsoleSettings, ContentVersionInfo,
+    DataLocationView, DataMoveOutcome, DataMovePhase, DataMovePlan, DataMoveProgress, DataStatus,
     DmMessageView, DmThreadOpen, DmThreadView, GameLogLevel, GameLogLine, LaunchStep,
     LoginErrorKind, MessageToBackend, MessageToFrontend, ModProjectInfo, OptionalModInfo,
     PunishmentView, RuleView, SanctionView, ScreenshotInfo, ServerSkinPresetItem, SyncStage,

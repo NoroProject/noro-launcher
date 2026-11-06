@@ -50,6 +50,13 @@ impl BackendState {
             return;
         }
 
+        // A restart in the middle of a move would leave it for the next start
+        // to sort out; the admin can ask again once it is done.
+        if self.ctx.data_use.is_moving() && action != schema::RemoteAction::VerifyIntegrity {
+            self.notify("data-move-launch-blocked", schema::NotifLevel::Warning);
+            return;
+        }
+
         if action == schema::RemoteAction::RestartLauncher {
             let ctx = self.ctx.clone();
             tokio::spawn(async move {
@@ -84,8 +91,13 @@ impl BackendState {
             return;
         }
 
+        let Some(data_use) = self.ctx.data_use.enter() else {
+            self.notify("data-move-launch-blocked", schema::NotifLevel::Warning);
+            return;
+        };
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
+            let _data_use = data_use;
             match crate::remote_actions::run(&ctx.dirs, action, server_id).await {
                 Ok(outcome) => {
                     tracing::info!(action = action.as_str(), "{}", outcome.message);
@@ -115,7 +127,7 @@ impl BackendState {
         let server_id = target_server_id.or_else(|| self.fallback_log_server());
         let instance_dir = match server_id {
             Some(ref id) => self.ctx.dirs.instance(id),
-            None => self.ctx.dirs.root.clone(),
+            None => self.ctx.dirs.root().clone(),
         };
         let ctx = self.ctx.clone();
         let token = self.access_token.clone();
@@ -170,7 +182,7 @@ impl BackendState {
         let server_id = self.fallback_log_server();
         let instance_dir = match server_id {
             Some(ref id) => self.ctx.dirs.instance(id),
-            None => self.ctx.dirs.root.clone(),
+            None => self.ctx.dirs.root().clone(),
         };
         let ctx = self.ctx.clone();
         let master = self.ctx.config.get().master_url;

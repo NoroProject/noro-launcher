@@ -141,8 +141,13 @@ impl BackendState {
             self.notify("notif-repair-busy", schema::NotifLevel::Warning);
             return;
         }
+        let Some(data_use) = self.ctx.data_use.enter() else {
+            self.notify("data-move-launch-blocked", schema::NotifLevel::Warning);
+            return;
+        };
         let ctx = self.ctx.clone();
         tokio::spawn(async move {
+            let _data_use = data_use;
             let action = schema::RemoteAction::ReinstallBuild;
             match crate::remote_actions::run(&ctx.dirs, action, Some(server_id)).await {
                 Ok(outcome) => {

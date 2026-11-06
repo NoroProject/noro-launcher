@@ -9,7 +9,6 @@ name = "noro-launcher-core"
 path = "src/main.rs"
 
 [dependencies]
-schema = { workspace = true }
 bridge = { workspace = true }
 backend = { workspace = true }
 frontend = { path = "../frontend" }
@@ -17,7 +16,6 @@ frontend = { path = "../frontend" }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
-dirs = { workspace = true }
 fs2 = "0.4"
 
 [build-dependencies]

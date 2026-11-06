@@ -28,9 +28,7 @@ async fn installs_only_what_verifies_and_leaves_the_bootstrapper_a_matching_sign
     let body = b"new launcher binary".to_vec();
     let server = serve(vec![("/core", 200, body.clone())]).await;
     let tmp = TempDir::new("updater");
-    let dirs = LauncherDirectories {
-        root: tmp.path().to_path_buf(),
-    };
+    let dirs = LauncherDirectories::at(tmp.path().to_path_buf());
     let client = reqwest::Client::new();
     let core = core_binary_path(&dirs);
 
