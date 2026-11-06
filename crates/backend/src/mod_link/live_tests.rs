@@ -214,5 +214,6 @@ fn ctx_for(master: &str, token: &str) -> Ctx {
         profile: Default::default(),
         features: Default::default(),
         streamer: Default::default(),
+        data_use: Default::default(),
     }
 }

@@ -16,9 +16,12 @@ mod launch;
 mod staff;
 mod to_account;
 mod to_content;
+mod to_data;
 mod to_servers;
 mod to_session;
 mod to_settings;
+
+pub(crate) use to_data::data_startup;
 
 impl BackendState {
     /// `build_id` stays `None` while the player has not pinned a version, and
@@ -85,6 +88,13 @@ impl BackendState {
             | M::DeleteScreenshot { .. }
             | M::OpenScreenshotsFolder { .. }
             | M::RepairServerFiles { .. }) => self.on_settings_request(m).await,
+            m @ (M::RequestDataLocation
+            | M::PlanDataMove { .. }
+            | M::StartDataMove { .. }
+            | M::CancelDataMove
+            | M::ResolveDataMove { .. }
+            | M::ResetDataLocation
+            | M::OpenDataFolder) => self.on_data_request(m).await,
             m @ (M::SearchCatalog { .. }
             | M::RequestModProject { .. }
             | M::RequestPersonalContent { .. }

@@ -20,6 +20,8 @@ pub struct Launch {
     /// Aliases of every server the player can reach, for the agent's table.
     pub aliases: crate::host_aliases::HostAliases,
     pub modal: bridge::ModalAction,
+    /// Keeps a move of the data root out until the game has exited.
+    pub data_use: crate::data_location::UseGuard,
 }
 
 pub fn spawn_sync_and_launch(req: Launch) {
@@ -34,8 +36,10 @@ pub fn spawn_sync_and_launch(req: Launch) {
         server,
         aliases,
         modal,
+        data_use,
     } = req;
     tokio::spawn(async move {
+        let _data_use = data_use;
         let instance_dir = ctx.dirs.instance(&server_id);
 
         let to_fe = ctx.frontend.clone();

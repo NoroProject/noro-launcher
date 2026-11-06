@@ -15,6 +15,7 @@ use uuid::Uuid;
 
 mod brand;
 mod console;
+mod data_location;
 mod gallery;
 mod images;
 mod init;
@@ -31,6 +32,7 @@ mod types;
 
 pub use brand::Brand;
 pub use console::ConsoleWindow;
+pub use data_location::DataUi;
 pub use gallery::{Gallery, GALLERY_PAGE};
 pub use types::*;
 
@@ -181,6 +183,8 @@ pub struct LauncherUI {
     pub brand: Brand,
     /// Closing would stop a running game or download; the window is asking.
     pub close_prompt: bool,
+    /// The game files folder and a move of it.
+    pub data: DataUi,
     /// A destructive button clicked once, waiting for the confirming click.
     pub armed_action: Option<String>,
     pub impersonate_prompt: Option<ImpersonatePrompt>,

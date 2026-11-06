@@ -151,6 +151,28 @@ pub enum MessageToBackend {
     OpenScreenshotsFolder {
         server_id: Uuid,
     },
+    // --- Game files folder ---
+    /// Counts the folder's size and free space; answered with `DataLocation`.
+    RequestDataLocation,
+    /// Checks a folder the player picked; answered with `DataMovePlanned` or
+    /// `DataMoveRefused`. Nothing is written yet.
+    PlanDataMove {
+        target: std::path::PathBuf,
+    },
+    /// The player confirmed the plan for `target`; the checks run again.
+    StartDataMove {
+        target: std::path::PathBuf,
+    },
+    CancelDataMove,
+    /// An interrupted move: finish it, or remove the partial copy.
+    ResolveDataMove {
+        resume: bool,
+    },
+    /// The folder is unavailable and the player gives up on it for now: back
+    /// to the standard folder, deleting nothing.
+    ResetDataLocation,
+    OpenDataFolder,
+
     /// The backend stores the choice and fetches the catalog for it.
     SetLocale {
         code: String,

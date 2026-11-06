@@ -58,6 +58,11 @@ impl LauncherUI {
             M::Screenshots { server_id, items } => self.on_screenshots(server_id, items, cx),
             M::Branding { name, logo_url } => self.on_branding(name, logo_url, cx),
             M::StreamerMode { on, automatic } => self.on_streamer_mode(on, automatic, cx),
+            m @ (M::DataLocation { .. }
+            | M::DataMovePlanned { .. }
+            | M::DataMoveRefused { .. }
+            | M::DataMoveProgress { .. }
+            | M::DataMoveFinished { .. }) => self.on_data_message(m, cx),
             m @ (M::NotificationFeed { .. }
             | M::NotificationArrived { .. }
             | M::UnreadChanged { .. }

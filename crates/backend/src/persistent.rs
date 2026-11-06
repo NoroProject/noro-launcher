@@ -53,6 +53,21 @@ impl<T: Serialize + DeserializeOwned + Default + Clone> Persistent<T> {
         self.save();
     }
 
+    /// [`Self::update`] for a change that must not exist only in memory: when
+    /// the file can't be written the change is undone and the error returned.
+    pub fn try_update(&self, f: impl FnOnce(&mut T)) -> std::io::Result<()> {
+        let mut guard = self.value.write();
+        let before = guard.clone();
+        f(&mut guard);
+        let written = serde_json::to_string_pretty(&*guard)
+            .map_err(std::io::Error::other)
+            .and_then(|json| crate::fsutil::write_atomic_sync(&self.path, json.as_bytes()));
+        if written.is_err() {
+            *guard = before;
+        }
+        written
+    }
+
     /// Atomic: an interrupted save leaves the previous file, not an empty one.
     pub fn save(&self) {
         let json = match serde_json::to_string_pretty(&*self.value.read()) {
@@ -94,5 +109,17 @@ mod tests {
         );
         let reread = Persistent::<Sample>::load(path);
         assert_eq!(reread.get().value, 1);
+    }
+
+    #[test]
+    fn a_change_that_could_not_be_written_is_undone() {
+        let dir = TempDir::new("persistent-try");
+        // A directory where the file should be: the rename over it fails.
+        let path = dir.path().join("config.json");
+        std::fs::create_dir_all(path.join("blocker")).unwrap();
+        let loaded = Persistent::<Sample>::load(path);
+
+        assert!(loaded.try_update(|s| s.value = 9).is_err());
+        assert_eq!(loaded.get().value, 0);
     }
 }
