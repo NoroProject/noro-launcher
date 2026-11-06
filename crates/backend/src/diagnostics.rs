@@ -19,8 +19,8 @@ pub async fn collect(
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
         java_path: find_java(dirs),
-        disk_free_mb: free_space_mb(dirs.root()),
-        data_size_mb: dir_size_mb(dirs.root()).await,
+        disk_free_mb: free_space_mb(&dirs.data_root()),
+        data_size_mb: dir_size_mb(dirs.root()).await + moved_data_size_mb(dirs).await,
         master_ping_ms: ping(http, master_url).await,
         last_sync_error,
         instances: instances(dirs).await,
@@ -46,31 +46,7 @@ fn find_java(dirs: &LauncherDirectories) -> Option<String> {
 /// Free space on the volume holding the instances. A download that stopped
 /// because the disk filled up leaves no trace in any game log.
 fn free_space_mb(path: &Path) -> u64 {
-    #[cfg(unix)]
-    {
-        use std::os::unix::ffi::OsStrExt;
-        let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
-            return 0;
-        };
-        // SAFETY: valid C string in, statvfs fills the struct completely.
-        unsafe {
-            let mut stat: libc::statvfs = std::mem::zeroed();
-            if libc::statvfs(c_path.as_ptr(), &mut stat) != 0 {
-                return 0;
-            }
-            // `f_bavail` is 32-bit on macOS and 64-bit on Linux, so the cast is
-            // required on one and redundant on the other. Silencing the lint is
-            // the only way to keep both platforms compiling.
-            #[allow(clippy::unnecessary_cast)]
-            let free = (stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64);
-            free / 1_048_576
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
-        0
-    }
+    crate::disk_space::available(path).unwrap_or(0) / 1_048_576
 }
 
 async fn dir_size_mb(root: &Path) -> u64 {
@@ -87,6 +63,16 @@ async fn dir_size_mb(root: &Path) -> u64 {
     })
     .await
     .unwrap_or(0)
+}
+
+/// The data root counts on top of the service root only when it lives
+/// elsewhere; otherwise the walk above has already been through it.
+async fn moved_data_size_mb(dirs: &LauncherDirectories) -> u64 {
+    if dirs.data_root_is_default() {
+        0
+    } else {
+        dir_size_mb(&dirs.data_root()).await
+    }
 }
 
 async fn ping(http: &reqwest::Client, master_url: &str) -> Option<u64> {

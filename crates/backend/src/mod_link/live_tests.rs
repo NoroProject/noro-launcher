@@ -193,10 +193,10 @@ fn ctx_for(master: &str, token: &str) -> Ctx {
         conn,
     );
     // A throwaway directory: the test must not touch the real launcher config.
-    let dirs = crate::directories::LauncherDirectories {
-        root: std::env::temp_dir().join(format!("noro-mod-link-home-{}", uuid::Uuid::new_v4())),
-    };
-    std::fs::create_dir_all(&dirs.root).ok();
+    let dirs = crate::directories::LauncherDirectories::at(
+        std::env::temp_dir().join(format!("noro-mod-link-home-{}", uuid::Uuid::new_v4())),
+    );
+    std::fs::create_dir_all(dirs.root()).ok();
     let config = crate::persistent::Persistent::load(dirs.config_file());
     config.update(|c: &mut crate::config::LauncherConfig| c.master_url = master.to_string());
     let (internal, _internal_rx) = tokio::sync::mpsc::unbounded_channel();

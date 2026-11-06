@@ -113,9 +113,7 @@ mod tests {
             master_url: master.to_string(),
             ..LauncherConfig::default()
         };
-        let dirs = LauncherDirectories {
-            root: root.to_path_buf(),
-        };
+        let dirs = LauncherDirectories::at(root.to_path_buf());
         (config, dirs)
     }
 

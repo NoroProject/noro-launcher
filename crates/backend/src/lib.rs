@@ -13,6 +13,7 @@ pub mod crash_hint;
 pub mod diagnostics;
 pub mod directories;
 pub mod discord_rpc;
+pub mod disk_space;
 pub mod failure;
 pub mod fsutil;
 pub mod game_runner;

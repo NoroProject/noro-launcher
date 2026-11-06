@@ -115,7 +115,7 @@ impl BackendState {
         let server_id = target_server_id.or_else(|| self.fallback_log_server());
         let instance_dir = match server_id {
             Some(ref id) => self.ctx.dirs.instance(id),
-            None => self.ctx.dirs.root.clone(),
+            None => self.ctx.dirs.root().clone(),
         };
         let ctx = self.ctx.clone();
         let token = self.access_token.clone();
@@ -170,7 +170,7 @@ impl BackendState {
         let server_id = self.fallback_log_server();
         let instance_dir = match server_id {
             Some(ref id) => self.ctx.dirs.instance(id),
-            None => self.ctx.dirs.root.clone(),
+            None => self.ctx.dirs.root().clone(),
         };
         let ctx = self.ctx.clone();
         let master = self.ctx.config.get().master_url;

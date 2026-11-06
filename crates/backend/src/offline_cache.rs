@@ -105,9 +105,7 @@ mod tests {
     use crate::test_http::TempDir;
 
     fn dirs(root: &Path) -> LauncherDirectories {
-        LauncherDirectories {
-            root: root.to_path_buf(),
-        }
+        LauncherDirectories::at(root.to_path_buf())
     }
 
     fn build(server_id: Uuid) -> BuildManifest {

@@ -10,9 +10,7 @@ use std::fs::OpenOptions;
 use std::path::PathBuf;
 
 fn main() {
-    let app_dir = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(schema::launcher_dir_name());
+    let app_dir = backend::directories::service_root();
     let _ = std::fs::create_dir_all(&app_dir);
 
     // The config path comes from backend rather than being rebuilt here, or the

@@ -56,6 +56,11 @@ pub struct LauncherConfig {
     pub auto_join: BTreeMap<Uuid, bridge::AutoJoin>,
     #[serde(default)]
     pub console: bridge::ConsoleSettings,
+    /// Where the instances and the store live, when the player moved them off
+    /// the service root (see [`crate::directories`]). Left out of the file
+    /// until then, so an untouched install keeps the config it always had.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_dir: Option<std::path::PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,6 +112,7 @@ impl Default for LauncherConfig {
             selected_build: BTreeMap::new(),
             auto_join: BTreeMap::new(),
             console: bridge::ConsoleSettings::default(),
+            data_dir: None,
         }
     }
 }

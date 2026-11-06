@@ -209,6 +209,12 @@ async fn run(
             &c.master_moved_from,
         );
     }
+    // Before anything asks for an instance path. A moved data root on a disk
+    // that is not connected is left alone rather than recreated empty.
+    dirs.set_data_root(config.get().data_dir.as_deref());
+    if dirs.data_available() {
+        dirs.ensure_data().ok();
+    }
     let optional = Persistent::<OptionalModsSelection>::load(dirs.optional_mods_file());
     let http = crate::http::client()?;
 
