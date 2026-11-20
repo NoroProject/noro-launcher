@@ -157,15 +157,34 @@ impl LauncherUI {
         self.backend.send(MessageToBackend::Logout);
     }
 
-    pub fn upload_skin(&mut self, bytes: Vec<u8>) {
+    /// `slim` is the model saved with a preset; `None` for a fresh file.
+    pub fn upload_skin(&mut self, bytes: Vec<u8>, slim: Option<bool>) {
         if self.skin_uploading {
             return;
         }
         // Shown right away; put back if the master turns it down, or the
         // preview went on showing a skin that was never accepted.
         self.skin_before_upload = self.skin_bytes.replace(bytes.clone());
+        self.skin_upload_slim = slim;
         self.skin_uploading = true;
-        self.backend.send(MessageToBackend::UploadSkin { bytes });
+        self.backend
+            .send(MessageToBackend::UploadSkin { bytes, slim });
+    }
+
+    /// Copy the skin of the player typed into the nickname field.
+    pub fn import_skin_by_name(&mut self) {
+        let name = self.skin_import_query.trim().to_string();
+        if name.is_empty() || self.skin_uploading {
+            return;
+        }
+        // Nothing to show until the master answers: the preview keeps the
+        // current skin, and a refusal has to leave it exactly as it was.
+        self.skin_before_upload = self.skin_bytes.clone();
+        self.skin_upload_slim = self.user.as_ref().map(|u| u.skin_slim);
+        self.skin_uploading = true;
+        self.skin_import_query.clear();
+        self.backend
+            .send(MessageToBackend::ImportSkinByName { username: name });
     }
 
     /// Switch the skin model. The image stays as it is and only the arm width

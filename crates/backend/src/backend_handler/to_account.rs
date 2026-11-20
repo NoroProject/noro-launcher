@@ -1,3 +1,5 @@
+// Over 150 lines: one router for every account request; the skin import is the
+// only branch long enough to have a function of its own.
 //! Window requests about skins, capes, notifications, punishments, rules, tickets and messages.
 
 use super::*;
@@ -26,7 +28,7 @@ impl BackendState {
                     }
                 });
             }
-            MessageToBackend::UploadSkin { bytes } => {
+            MessageToBackend::UploadSkin { bytes, slim } => {
                 let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
                     self.notify("notif-sign-in-to-upload", schema::NotifLevel::Error);
                     self.ctx.send(MessageToFrontend::SkinUploadFailed);
@@ -34,7 +36,7 @@ impl BackendState {
                 };
                 let ctx = self.ctx.clone();
                 tokio::spawn(async move {
-                    match api.upload_skin(bytes).await {
+                    match api.upload_skin(bytes, slim).await {
                         Ok(profile) => {
                             let _ = ctx
                                 .internal
@@ -51,6 +53,7 @@ impl BackendState {
                     }
                 });
             }
+            MessageToBackend::ImportSkinByName { username } => self.import_skin(username),
             MessageToBackend::RequestCapesList => {
                 let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
                     return;
@@ -120,5 +123,43 @@ impl BackendState {
             }
             _ => {}
         }
+    }
+
+    fn import_skin(&self, username: String) {
+        let Some(api) = crate::master_api::MasterApi::for_session(&self.ctx) else {
+            self.notify("notif-sign-in-to-upload", schema::NotifLevel::Error);
+            self.ctx.send(MessageToFrontend::SkinUploadFailed);
+            return;
+        };
+        let ctx = self.ctx.clone();
+        tokio::spawn(async move {
+            match api.import_skin(&username).await {
+                Ok(profile) => {
+                    let _ = ctx
+                        .internal
+                        .send(InternalEvent::ProfileUpdated { user: profile });
+                    // The master saved it as a preset too; without a fresh list
+                    // the grid would not show it until the tab is reopened.
+                    match api.skin_presets().await {
+                        Ok(presets) => ctx.send(MessageToFrontend::SkinPresetsList { presets }),
+                        Err(e) => {
+                            tracing::warn!(error = %format!("{e:#}"), "skin presets did not load")
+                        }
+                    }
+                }
+                Err(e) => {
+                    ctx.send(MessageToFrontend::AddNotification {
+                        key: "notif-skin-import-failed".into(),
+                        args: [
+                            ("name".to_string(), username),
+                            ("reason".to_string(), format!("{e:#}")),
+                        ]
+                        .into(),
+                        level: schema::NotifLevel::Error,
+                    });
+                    ctx.send(MessageToFrontend::SkinUploadFailed);
+                }
+            }
+        });
     }
 }

@@ -114,12 +114,14 @@ impl LauncherUI {
                     let id = p.id;
                     let name = p.name;
                     let url = p.skin_url;
+                    let slim = p.skin_slim;
                     let known = previous.remove(&id).filter(|bytes| !bytes.is_empty());
                     let had_render = self.preset_images.contains_key(&id);
                     self.custom_presets.push(SavedSkinPreset {
                         id: id.clone(),
                         name: name.clone(),
                         bytes: known.clone().unwrap_or_default(),
+                        slim: Some(slim),
                     });
                     if known.is_some() && had_render {
                         continue;
@@ -143,8 +145,10 @@ impl LauncherUI {
                     })
                     .detach();
 
+                    // A bare url carries no model, and the master would guess
+                    // it from the picture; the preset knows it.
                     let render_url = format!(
-                        "{}/api/textures/renders/bust?url={}&scale=8&yaw=-25&pitch=12",
+                        "{}/api/textures/renders/bust?url={}&slim={slim}&scale=8&yaw=-25&pitch=12",
                         master_url.trim_end_matches('/'),
                         urlencoding::encode(&url)
                     );

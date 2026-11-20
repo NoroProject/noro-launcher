@@ -48,11 +48,12 @@ pub fn on_upload_click(
         match loaded {
             Ok(skin) => {
                 let _ = this.update(cx, |this, cx| {
-                    this.upload_skin(skin.bytes.clone());
+                    this.upload_skin(skin.bytes.clone(), None);
                     this.custom_presets.push(SavedSkinPreset {
                         id: uuid::Uuid::new_v4().to_string(),
                         name: skin.name,
                         bytes: std::sync::Arc::new(skin.bytes),
+                        slim: None,
                     });
                     cx.notify();
                 });

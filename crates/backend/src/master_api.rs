@@ -182,13 +182,33 @@ impl MasterApi {
         .await
     }
 
-    pub async fn upload_skin(&self, png: Vec<u8>) -> Result<schema::UserProfile> {
+    /// `slim = None` leaves the model to the master, which guesses it from the
+    /// picture.
+    pub async fn upload_skin(
+        &self,
+        png: Vec<u8>,
+        slim: Option<bool>,
+    ) -> Result<schema::UserProfile> {
         let part = reqwest::multipart::Part::bytes(png)
             .file_name("skin.png")
             .mime_str("image/png")?;
+        let mut form = reqwest::multipart::Form::new().part("skin", part);
+        if let Some(slim) = slim {
+            form = form.text("model", if slim { "slim" } else { "classic" });
+        }
         self.send(
             self.request(reqwest::Method::POST, "/api/me/skin")
-                .multipart(reqwest::multipart::Form::new().part("skin", part)),
+                .multipart(form),
+        )
+        .await
+    }
+
+    /// Another player's skin, with its model; the master also saves it as a
+    /// preset under that name.
+    pub async fn import_skin(&self, username: &str) -> Result<schema::UserProfile> {
+        self.post(
+            "/api/me/skin/from-username",
+            &json!({ "username": username }),
         )
         .await
     }

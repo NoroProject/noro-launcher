@@ -15,6 +15,9 @@ pub(super) fn custom_preset_card(
     cx: &mut Cx,
 ) -> AnyElement {
     let bytes = preset.bytes.clone();
+    // Worn again with the model it was saved with, not the master's guess
+    // from the picture: the player may have picked it by hand.
+    let slim = preset.slim;
     let id = preset.id.clone();
     let name = preset.name.clone();
     let is_active = ui.skin_bytes.as_deref() == Some(bytes.as_slice());
@@ -67,7 +70,7 @@ pub(super) fn custom_preset_card(
         .gap(px(4.))
         .on_click(cx.listener(move |this, _, _, cx| {
             if !card_apply_bytes.is_empty() {
-                this.upload_skin(card_apply_bytes.to_vec());
+                this.upload_skin(card_apply_bytes.to_vec(), slim);
                 cx.notify();
             }
         }))
@@ -166,7 +169,7 @@ pub(super) fn custom_preset_card(
                 .text_color(rgb(TEXT_PRIMARY))
                 .child(t("profile-preset-wear"))
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.upload_skin(apply_bytes.to_vec());
+                    this.upload_skin(apply_bytes.to_vec(), slim);
                     cx.notify();
                 }))
                 .into_any_element()

@@ -146,4 +146,7 @@ pub struct ServerSkinPresetItem {
     pub id: String,
     pub name: String,
     pub skin_url: String,
+    /// Absent from masters that predate skin models; those are classic.
+    #[serde(default)]
+    pub skin_slim: bool,
 }

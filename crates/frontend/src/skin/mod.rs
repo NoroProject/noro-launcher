@@ -70,7 +70,8 @@ fn load_skin(bytes: &[u8]) -> Option<Skin> {
     })
 }
 
-/// Slim skins leave the extra arm column of the texture transparent.
+/// Slim skins leave the extra arm column of the texture transparent. Only a
+/// guess: the model is the player's choice and lives on the profile.
 fn is_slim(skin: &Skin) -> bool {
     if skin.legacy {
         return false;
@@ -88,10 +89,15 @@ pub struct Decoded {
 }
 
 /// `None` if the skin is not a valid 64×64 / 64×32 layout.
-pub fn decode(skin_png: &[u8], cape_png: Option<&[u8]>) -> Option<Decoded> {
+///
+/// `slim` is the model from the profile. The picture is only read when it is
+/// unknown: a slim skin often has that arm column painted over, and guessing
+/// from it drew the player with arms the game doesn't give them.
+pub fn decode(skin_png: &[u8], cape_png: Option<&[u8]>, slim: Option<bool>) -> Option<Decoded> {
     let skin = load_skin(skin_png)?;
     let cape = cape_png.and_then(|b| image::load_from_memory(b).ok());
-    let slim = is_slim(&skin);
+    // A 64×32 skin has no slim variant at all, whatever the profile says.
+    let slim = !skin.legacy && slim.unwrap_or_else(|| is_slim(&skin));
     Some(Decoded { skin, cape, slim })
 }
 
@@ -107,7 +113,7 @@ pub fn render_rgba(
     view: &View,
 ) -> Option<RgbaImage> {
     Some(render_decoded(
-        &decode(skin_png, cape_png)?,
+        &decode(skin_png, cape_png, None)?,
         width,
         height,
         view,

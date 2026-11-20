@@ -79,7 +79,7 @@ fn sway_moves_limbs_without_touching_the_facing() {
 #[test]
 fn a_rendered_frame_is_bgra_and_full_size() {
     let skin = test_skin();
-    let decoded = crate::skin::decode(&skin, None).expect("skin decodes");
+    let decoded = crate::skin::decode(&skin, None, None).expect("skin decodes");
     let frame = render_frame(&decoded, 0.0, 0.0);
     let size = frame.size(0);
     // The frame comes out at the supersample size, not the logical PREVIEW_*.
@@ -96,4 +96,23 @@ fn a_rendered_frame_is_bgra_and_full_size() {
         .iter()
         .any(|p| p[3] > 200 && p[2] > 200 && p[1] < 80 && p[0] < 80);
     assert!(has_red_as_bgr, "expected red as B=0,G=0,R=255 in BGRA");
+}
+
+/// The model is the player's choice and lives on the profile. The picture is
+/// only a guess, and a wrong one for slim skins with the arm column painted.
+#[test]
+fn the_profile_model_wins_over_the_picture() {
+    let skin = test_skin(); // opaque arm column: the picture reads as classic
+    assert!(!crate::skin::decode(&skin, None, None).unwrap().slim);
+    assert!(crate::skin::decode(&skin, None, Some(true)).unwrap().slim);
+}
+
+#[test]
+fn a_legacy_skin_is_never_slim() {
+    let img = RgbaImage::from_pixel(64, 32, image::Rgba([10, 10, 10, 255]));
+    let mut png = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut png)
+        .write_image(img.as_raw(), 64, 32, image::ExtendedColorType::Rgba8)
+        .expect("encode legacy skin");
+    assert!(!crate::skin::decode(&png, None, Some(true)).unwrap().slim);
 }

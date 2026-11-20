@@ -41,6 +41,7 @@ mod profile;
 mod profile_cape;
 mod profile_skin;
 mod profile_skin_custom;
+mod profile_skin_import;
 mod profile_skin_model;
 mod profile_skin_pick;
 mod profile_skin_presets;

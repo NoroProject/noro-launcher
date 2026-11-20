@@ -266,6 +266,9 @@ pub struct SavedSkinPreset {
     /// Shared: the preset cards are drawn every frame the skin turns, and
     /// copying each preset's PNG for every one of them added up.
     pub bytes: Arc<Vec<u8>>,
+    /// The model saved with it on the master. `None` for a file picked from
+    /// disk this session: the master guesses that one from the picture.
+    pub slim: Option<bool>,
 }
 
 /// An action an admin is asking the player to take.

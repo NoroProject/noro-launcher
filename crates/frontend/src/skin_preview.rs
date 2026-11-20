@@ -21,12 +21,15 @@ pub(crate) struct FrameJob {
     sway: f64,
 }
 
-/// Identifies a skin + cape pair without keeping a copy of either.
-fn skin_key(skin: &[u8], cape: Option<&[u8]>) -> u64 {
+/// Identifies a skin + cape + model without keeping a copy of either picture.
+/// The model is part of it: switching it changes no bytes, and the old
+/// decode would go on drawing the old arms.
+fn skin_key(skin: &[u8], cape: Option<&[u8]>, slim: Option<bool>) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     skin.hash(&mut h);
     cape.hash(&mut h);
+    slim.hash(&mut h);
     h.finish()
 }
 
@@ -40,11 +43,12 @@ impl LauncherUI {
             return None;
         }
         let skin = self.skin_bytes.as_deref()?;
-        let key = skin_key(skin, self.cape_bytes.as_deref());
+        let slim = self.preview_slim();
+        let key = skin_key(skin, self.cape_bytes.as_deref(), slim);
         let decoded = match &self.skin_decoded {
             Some((k, d)) if *k == key => d.clone(),
             _ => {
-                let d = Arc::new(skin::decode(skin, self.cape_bytes.as_deref())?);
+                let d = Arc::new(skin::decode(skin, self.cape_bytes.as_deref(), slim)?);
                 self.skin_decoded = Some((key, d.clone()));
                 d
             }
@@ -59,6 +63,15 @@ impl LauncherUI {
             yaw: self.skin_yaw as f64,
             sway: self.skin_sway as f64,
         })
+    }
+
+    /// The model to draw: the one the upload in flight carries, otherwise the
+    /// profile's — the same one the game gets from the master.
+    fn preview_slim(&self) -> Option<bool> {
+        if self.skin_uploading {
+            return self.skin_upload_slim;
+        }
+        self.user.as_ref().map(|u| u.skin_slim)
     }
 
     /// The loop picks the new angle up on its next frame; nothing to redraw

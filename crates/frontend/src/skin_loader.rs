@@ -17,6 +17,13 @@ impl LauncherUI {
             self.skin_url = user.skin_url.clone();
             self.skin_uploading = false;
             self.reset_skin_preview(cx);
+        } else if self.skin_uploading {
+            // The master answered with the file the player already wore —
+            // wearing the current preset again, or copying a skin that is the
+            // same picture. The url doesn't change, and waiting for it to left
+            // every later upload and model switch silently dropped.
+            self.skin_uploading = false;
+            self.skin_before_upload = None;
         }
         if self.cape_url != user.cape_url {
             self.cape_url = user.cape_url.clone();

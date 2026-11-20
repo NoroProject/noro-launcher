@@ -209,6 +209,17 @@ pub enum MessageToBackend {
 
     UploadSkin {
         bytes: Vec<u8>,
+        /// The arms the skin was saved with. `None` lets the master guess from
+        /// the picture — fine for a fresh file, wrong for a saved preset whose
+        /// model the player picked by hand.
+        slim: Option<bool>,
+    },
+
+    /// Copy another player's skin by nickname. The master looks the name up
+    /// among its own players first and at Mojang second, and brings the model
+    /// along with the picture.
+    ImportSkinByName {
+        username: String,
     },
 
     /// Slim (Alex) or classic (Steve) arms for the skin already uploaded.

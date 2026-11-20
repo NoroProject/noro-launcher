@@ -60,6 +60,12 @@ pub struct LauncherUI {
     pub skin_uploading: bool,
     /// The skin before an upload, to go back to if the upload is refused.
     pub skin_before_upload: Option<Vec<u8>>,
+    /// The model the preview shows while an upload is in flight. `None` reads
+    /// it from the picture, the same guess the master makes.
+    pub skin_upload_slim: Option<bool>,
+    /// Nickname typed into the copy-a-skin field on the presets tab.
+    pub skin_import_query: String,
+    pub skin_import_focus: Option<gpui::FocusHandle>,
     pub skin_dragging: bool,
     /// Cursor x at the last drag sample, in window px.
     pub skin_drag_x: f32,

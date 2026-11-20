@@ -104,6 +104,7 @@ impl BackendState {
             | M::SetPersonalContentEnabled { .. }) => self.on_content_request(m).await,
             m @ (M::SetSkinModel { .. }
             | M::UploadSkin { .. }
+            | M::ImportSkinByName { .. }
             | M::RequestCapesList
             | M::RequestSkinPresetsList
             | M::SelectCape { .. }

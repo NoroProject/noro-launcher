@@ -5,6 +5,7 @@
 
 use super::common::{panel, Cx};
 use super::profile_skin_custom::custom_preset_card;
+use super::profile_skin_import::import_row;
 use super::profile_skin_pick::on_upload_click;
 use crate::icons::ic;
 use crate::state::LauncherUI;
@@ -35,6 +36,7 @@ pub fn skin_presets_panel(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
         .flex_col()
         .gap(px(12.))
         .child(header_row())
+        .child(import_row(ui, cx))
         .child(
             div()
                 .id("skin-presets-scroll")
@@ -242,8 +244,10 @@ fn apply_preset(this: &mut LauncherUI, name: &'static str, cx: &mut Cx) {
     cx.spawn(async move |this, cx| {
         let loaded = crate::image_loader::load_image_and_bytes(url).await;
         let _ = this.update(cx, |this, cx| {
+            // Built-in skins are drawn for their model, so the master's guess
+            // from the picture is right for them.
             if let Ok((_, bytes)) = loaded {
-                this.upload_skin(bytes);
+                this.upload_skin(bytes, None);
             }
             cx.notify();
         });
