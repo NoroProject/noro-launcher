@@ -143,13 +143,29 @@ fn tag_row(server: &ServerEntry) -> AnyElement {
         .gap(px(8.))
         .child(badge(loader_label, loader_color))
         .child(badge(server.mc_version.clone(), BLUE))
-        .when(server.limited, |d| {
-            d.child(badge(t("game-vip-only"), WARNING))
-        })
+        .when_some(access_text(server), |d, text| d.child(badge(text, WARNING)))
         .when_some(playtime_text(server.my_playtime_minutes), |d, text| {
             d.child(badge(text, TEXT_SECONDARY))
         })
         .into_any_element()
+}
+
+/// Who a limited build is open to: the roles that grant joining it, or admins
+/// alone. A master too old to send the roles only says "limited", and the
+/// neutral key covers that.
+fn access_text(server: &ServerEntry) -> Option<String> {
+    if !server.limited {
+        return None;
+    }
+    Some(match server.access_roles.as_deref() {
+        None => t("game-vip-only"),
+        Some([]) => t("game-access-admins"),
+        Some(roles) => {
+            let mut args = i18n::FluentArgs::new();
+            args.set("roles", roles.join(", ").to_uppercase());
+            i18n::t_args("game-access-roles", &args)
+        }
+    })
 }
 
 /// "PLAYED 34 H" — hidden until there is something to show, and for a master
