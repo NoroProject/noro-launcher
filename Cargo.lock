@@ -481,7 +481,7 @@ dependencies = [
 
 [[package]]
 name = "backend"
-version = "2.0.22"
+version = "2.0.23"
 dependencies = [
  "anyhow",
  "base64",
@@ -682,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "bridge"
-version = "2.0.22"
+version = "2.0.23"
 dependencies = [
  "parking_lot",
  "schema",
@@ -703,7 +703,7 @@ dependencies = [
 
 [[package]]
 name = "build_agent"
-version = "2.0.22"
+version = "2.0.23"
 dependencies = [
  "anyhow",
  "dirs 5.0.1",
@@ -2187,7 +2187,7 @@ dependencies = [
 
 [[package]]
 name = "frontend"
-version = "2.0.22"
+version = "2.0.23"
 dependencies = [
  "base64",
  "bridge",
@@ -3148,7 +3148,7 @@ dependencies = [
 [[package]]
 name = "i18n"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#93919a8e51e1e345f876780ee2b4cd121fb46abe"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#88314a1446928e86524b70671077d8231b61fd0d"
 dependencies = [
  "fluent-bundle",
  "parking_lot",
@@ -3168,7 +3168,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.57.0",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -3855,7 +3855,7 @@ dependencies = [
 [[package]]
 name = "mc_mod_utils"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#93919a8e51e1e345f876780ee2b4cd121fb46abe"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#88314a1446928e86524b70671077d8231b61fd0d"
 dependencies = [
  "base64",
  "serde",
@@ -3972,7 +3972,7 @@ dependencies = [
 
 [[package]]
 name = "mod_link"
-version = "2.0.22"
+version = "2.0.23"
 dependencies = [
  "chrono",
  "serde",
@@ -4106,7 +4106,7 @@ checksum = "0676bb32a98c1a483ce53e500a81ad9c3d5b3f7c920c28c24e9cb0980d0b5bc8"
 
 [[package]]
 name = "noro_core"
-version = "2.0.22"
+version = "2.0.23"
 dependencies = [
  "backend",
  "bridge",
@@ -4120,7 +4120,7 @@ dependencies = [
 
 [[package]]
 name = "noro_launcher"
-version = "2.0.22"
+version = "2.0.23"
 dependencies = [
  "anyhow",
  "base64",
@@ -5766,7 +5766,7 @@ dependencies = [
 [[package]]
 name = "schema"
 version = "3.0.0"
-source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#93919a8e51e1e345f876780ee2b4cd121fb46abe"
+source = "git+https://github.com/NoroProject/noro-shared.git?branch=master#88314a1446928e86524b70671077d8231b61fd0d"
 dependencies = [
  "chrono",
  "once_cell",

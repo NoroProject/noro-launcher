@@ -59,12 +59,13 @@ pub fn row(
         .into_any_element()
 }
 
-/// A number with arrows on either side: `[−] 2048 MB [+]`.
+/// Memory with arrows on either side: `[−] 2 GB [+]`. The callback gets
+/// `true` for a step up.
 pub fn stepper(
     id: &'static str,
     label: impl Into<SharedString>,
     value: u32,
-    on_step: impl Fn(&mut LauncherUI, i32) + Clone + 'static,
+    on_step: impl Fn(&mut LauncherUI, bool) + Clone + 'static,
     cx: &mut Cx,
 ) -> AnyElement {
     let dec = on_step.clone();
@@ -83,7 +84,7 @@ pub fn stepper(
             SharedString::from(format!("{id}-dec")),
             "minus",
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                dec(this, -512);
+                dec(this, false);
                 cx.notify();
             }),
         ))
@@ -95,13 +96,13 @@ pub fn stepper(
                 .text_size(px(13.))
                 .font_weight(FontWeight::BOLD)
                 .text_color(rgb(TEXT_PRIMARY))
-                .child(format!("{value} MB")),
+                .child(super::memory_step::label(value)),
         )
         .child(stepper_btn(
             SharedString::from(format!("{id}-inc")),
             "plus",
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                on_step(this, 512);
+                on_step(this, true);
                 cx.notify();
             }),
         ))

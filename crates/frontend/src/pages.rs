@@ -27,6 +27,7 @@ mod java_picker;
 mod jvm_flags;
 mod log_request_dialog;
 mod markdown;
+mod memory_step;
 mod messages;
 mod mod_detail;
 mod mod_detail_action;

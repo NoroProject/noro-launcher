@@ -67,7 +67,7 @@ fn mem_group(
             SharedString::from(format!("cs-mem-dec-{id}")),
             "minus",
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                adjust(this, server_id, is_min, -512);
+                adjust(this, server_id, is_min, false);
                 cx.notify();
             }),
         ))
@@ -86,13 +86,13 @@ fn mem_group(
                 .font_family(FONT_PIXEL_ALT)
                 .text_size(px(12.))
                 .font_weight(FontWeight::BOLD)
-                .child(format!("{value} MB")),
+                .child(super::memory_step::label(value)),
         )
         .child(mini_icon_btn(
             SharedString::from(format!("cs-mem-inc-{id}")),
             "plus",
             cx.listener(move |this, _e: &ClickEvent, _w, cx| {
-                adjust(this, server_id, is_min, 512);
+                adjust(this, server_id, is_min, true);
                 cx.notify();
             }),
         ))
@@ -121,18 +121,14 @@ fn mini_icon_btn(
         .into_any_element()
 }
 
-fn adjust(ui: &mut LauncherUI, server_id: Uuid, is_min: bool, delta: i32) {
-    let ceiling = ui.memory_ceiling_mb() as i32;
+fn adjust(ui: &mut LauncherUI, server_id: Uuid, is_min: bool, up: bool) {
     let settings = ui.server_client_settings(server_id);
-    let mut min = settings.memory_min_mb as i32;
-    let mut max = settings.memory_max_mb as i32;
-    if is_min {
-        min = (min + delta).clamp(512, ceiling);
-    } else {
-        max = (max + delta).clamp(512, ceiling);
-    }
-    if max < min {
-        max = min;
-    }
-    ui.set_server_memory(server_id, min as u32, max as u32);
+    let (min, max) = super::memory_step::step(
+        settings.memory_min_mb,
+        settings.memory_max_mb,
+        is_min,
+        up,
+        ui.memory_ceiling_mb(),
+    );
+    ui.set_server_memory(server_id, min, max);
 }

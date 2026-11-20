@@ -133,14 +133,14 @@ fn memory_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
             "g-mem-min",
             t("settings-memory-min"),
             ui.config.memory_min_mb,
-            |ui, d| adjust(ui, true, d),
+            |ui, up| adjust(ui, true, up),
             cx,
         ))
         .child(stepper(
             "g-mem-max",
             t("settings-memory-max"),
             ui.config.memory_max_mb,
-            |ui, d| adjust(ui, false, d),
+            |ui, up| adjust(ui, false, up),
             cx,
         ));
     div()
@@ -183,17 +183,13 @@ fn fullscreen_control(ui: &LauncherUI, cx: &mut Cx) -> AnyElement {
 
 /// Keeps the max at or above the min by raising the max, never by lowering the
 /// min the player just set.
-fn adjust(ui: &mut LauncherUI, is_min: bool, delta: i32) {
-    let ceiling = ui.memory_ceiling_mb() as i32;
-    let mut min = ui.config.memory_min_mb as i32;
-    let mut max = ui.config.memory_max_mb as i32;
-    if is_min {
-        min = (min + delta).clamp(512, ceiling);
-    } else {
-        max = (max + delta).clamp(512, ceiling);
-    }
-    if max < min {
-        max = min;
-    }
-    ui.set_memory(min as u32, max as u32);
+fn adjust(ui: &mut LauncherUI, is_min: bool, up: bool) {
+    let (min, max) = super::memory_step::step(
+        ui.config.memory_min_mb,
+        ui.config.memory_max_mb,
+        is_min,
+        up,
+        ui.memory_ceiling_mb(),
+    );
+    ui.set_memory(min, max);
 }
